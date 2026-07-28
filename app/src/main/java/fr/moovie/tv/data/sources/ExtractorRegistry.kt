@@ -18,9 +18,11 @@ object ExtractorRegistry {
 
     private val extractors: List<SourceExtractor> = listOf(
         FsvidExtractor(http),
+        VidzyExtractor(http),
+        UqloadExtractor(http),
         VoeExtractor(http),
-        // À compléter : UqloadExtractor, DoodStreamExtractor, VidzyExtractor,
-        // SibnetExtractor, SeekStreamingExtractor… (portage des handlers proxiesembed).
+        // À compléter : DoodStreamExtractor, SibnetExtractor, SeekStreamingExtractor…
+        // (portage des handlers de API/proxiesembed).
     )
 
     fun extractorFor(url: String): SourceExtractor? =
