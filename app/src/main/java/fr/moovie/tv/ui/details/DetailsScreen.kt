@@ -6,6 +6,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -25,6 +26,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -43,6 +45,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.tv.material3.Border
+import androidx.tv.material3.Card
+import androidx.tv.material3.CardDefaults
+import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import coil.compose.AsyncImage
@@ -235,19 +241,42 @@ private fun SourcesSlideOver(
     }
 }
 
+@OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 private fun EpisodeRow(ep: Episode, onSources: () -> Unit) {
-    Row(
+    // Toute la carte épisode est cliquable → charge les sources de l'épisode.
+    Card(
+        onClick = onSources,
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        scale = CardDefaults.scale(focusedScale = 1.02f),
+        border = CardDefaults.border(
+            focusedBorder = Border(BorderStroke(2.dp, ACCENT), shape = RoundedCornerShape(8.dp)),
+        ),
     ) {
-        Column(modifier = Modifier.width(520.dp)) {
-            Text("${ep.episodeNumber}. ${ep.name}", style = MaterialTheme.typography.titleSmall)
-            if (ep.overview.isNotBlank()) {
-                Text(ep.overview, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(160.dp, 90.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(Color(0xFF222222)),
+            ) {
+                AsyncImage(
+                    model = ep.stillUrl(),
+                    contentDescription = ep.name,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text("${ep.episodeNumber}. ${ep.name}", style = MaterialTheme.typography.titleSmall)
+                if (ep.overview.isNotBlank()) {
+                    Text(ep.overview, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                }
             }
         }
-        MoovieButton(onClick = onSources) { Text("Sources") }
     }
 }
 

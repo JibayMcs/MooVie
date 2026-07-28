@@ -20,9 +20,9 @@ object ExtractorRegistry {
         FsvidExtractor(http),
         VidzyExtractor(http),
         UqloadExtractor(http),
+        DoodStreamExtractor(http),
         VoeExtractor(http),
-        // À compléter : DoodStreamExtractor, SibnetExtractor, SeekStreamingExtractor…
-        // (portage des handlers de API/proxiesembed).
+        // À compléter : SibnetExtractor, SeekStreamingExtractor (AES)…
     )
 
     fun extractorFor(url: String): SourceExtractor? =
