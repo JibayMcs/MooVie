@@ -24,9 +24,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
@@ -69,12 +71,32 @@ fun DetailsScreen(
         }
     }
 
-    Column(
-        modifier = Modifier.fillMaxSize().padding(48.dp).verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        when (val s = state) {
-            DetailsState.Loading -> Text("Chargement…")
+    // Fond : backdrop de l'élément, flouté et bien assombri, pour une fiche
+    // immersive tout en gardant le texte lisible.
+    val backdrop = (state as? DetailsState.Movie)?.details?.backdropUrl()
+        ?: (state as? DetailsState.Tv)?.details?.backdropUrl()
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        backdrop?.let { url ->
+            AsyncImage(
+                model = url,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize().blur(40.dp),
+            )
+        }
+        // Voile assombri mais laissant transparaître l'affiche floutée.
+        Box(
+            modifier = Modifier.fillMaxSize().background(
+                Brush.verticalGradient(listOf(Color(0xAA0A0A0A), Color(0xE00A0A0A))),
+            ),
+        )
+        Column(
+            modifier = Modifier.fillMaxSize().padding(48.dp).verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            when (val s = state) {
+                DetailsState.Loading -> Text("Chargement…")
             is DetailsState.Error -> {
                 Text(s.message)
                 Button(onClick = onBack) { Text("Retour") }
@@ -110,6 +132,7 @@ fun DetailsScreen(
                     EpisodeRow(ep, onSources = { viewModel.loadEpisodeSources(ep.episodeNumber) })
                 }
                 SourcesPanel(sources, onPick = viewModel::play)
+                }
             }
         }
     }
