@@ -1,6 +1,7 @@
 package fr.moovie.tv.ui.home
 
-import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.Crossfade
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -25,7 +27,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -34,7 +35,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.tv.material3.Border
 import androidx.tv.material3.Card
+import androidx.tv.material3.CardDefaults
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -56,13 +59,20 @@ fun HomeScreen(
     val featured = focused ?: rows?.firstOrNull()?.items?.firstOrNull()
 
     Box(modifier = Modifier.fillMaxSize().background(Color(0xFF0A0A0A))) {
-        featured?.backdropUrl()?.let { url ->
-            AsyncImage(
-                model = url,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize().blur(28.dp),
-            )
+        // Backdrop dynamique avec fondu enchaîné quand l'élément focalisé change.
+        Crossfade(
+            targetState = featured?.backdropUrl(),
+            label = "homeBackdrop",
+            modifier = Modifier.fillMaxSize(),
+        ) { url ->
+            if (url != null) {
+                AsyncImage(
+                    model = url,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize().blur(28.dp),
+                )
+            }
         }
         Box(
             modifier = Modifier.fillMaxSize().background(
@@ -154,18 +164,18 @@ private fun CatalogRow(
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 private fun PosterCard(item: TmdbItem, onClick: () -> Unit, onFocusItem: (TmdbItem) -> Unit) {
-    var isFocused by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(if (isFocused) 1.08f else 1f, label = "posterScale")
-
     Card(
         onClick = onClick,
         modifier = Modifier
             .width(150.dp)
-            .scale(scale)
-            .onFocusChanged {
-                isFocused = it.isFocused
-                if (it.isFocused) onFocusItem(item)
-            },
+            .onFocusChanged { if (it.isFocused) onFocusItem(item) },
+        scale = CardDefaults.scale(focusedScale = 1.1f),
+        border = CardDefaults.border(
+            focusedBorder = Border(
+                border = BorderStroke(3.dp, Color(0xFFB5302C)),
+                shape = RoundedCornerShape(10.dp),
+            ),
+        ),
     ) {
         Column {
             AsyncImage(

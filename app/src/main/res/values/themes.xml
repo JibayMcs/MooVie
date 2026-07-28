@@ -2,6 +2,13 @@
 <resources>
     <!-- Thème hôte pour l'Activity : le rendu réel est en Compose (MooVieTheme). -->
     <style name="Theme.MooVie" parent="@android:style/Theme.Material.NoActionBar">
-        <item name="android:windowBackground">@android:color/black</item>
+        <item name="android:windowBackground">@color/movix_dark</item>
+    </style>
+
+    <!-- Splash au lancement : fond rouge Movix + logo, puis bascule sur Theme.MooVie. -->
+    <style name="Theme.MooVie.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/movix_red</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/movix_logo</item>
+        <item name="postSplashScreenTheme">@style/Theme.MooVie</item>
     </style>
 </resources>
