@@ -6,5 +6,10 @@ sealed interface Screen {
     data object Settings : Screen
     data object Search : Screen
     data class Details(val tmdbId: Int, val isTv: Boolean) : Screen
-    data class Player(val streamUrl: String, val headers: Map<String, String> = emptyMap()) : Screen
+    data class Player(
+        val streamUrl: String,
+        val headers: Map<String, String> = emptyMap(),
+        val mediaKey: String = "",
+        val subtitles: Map<String, String> = emptyMap(),
+    ) : Screen
 }

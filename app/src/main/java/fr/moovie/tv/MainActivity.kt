@@ -67,12 +67,14 @@ class MainActivity : ComponentActivity() {
                             is Screen.Details -> DetailsScreen(
                                 tmdbId = s.tmdbId,
                                 isTv = s.isTv,
-                                onPlay = { url, headers -> screen = Screen.Player(url, headers) },
+                                onPlay = { url, headers, key, subs -> screen = Screen.Player(url, headers, key, subs) },
                                 onBack = { screen = Screen.Home },
                             )
                             is Screen.Player -> PlayerScreen(
                                 streamUrl = s.streamUrl,
                                 headers = s.headers,
+                                mediaKey = s.mediaKey,
+                                subtitles = s.subtitles,
                                 onBack = { screen = Screen.Home },
                             )
                         }

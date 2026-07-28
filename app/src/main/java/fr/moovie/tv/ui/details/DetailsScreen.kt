@@ -72,7 +72,7 @@ private val ACCENT = Color(0xFFB5302C)
 fun DetailsScreen(
     tmdbId: Int,
     isTv: Boolean,
-    onPlay: (streamUrl: String, headers: Map<String, String>) -> Unit,
+    onPlay: (streamUrl: String, headers: Map<String, String>, mediaKey: String, subtitles: Map<String, String>) -> Unit,
     onBack: () -> Unit,
     viewModel: DetailsViewModel = viewModel(),
 ) {
@@ -91,7 +91,7 @@ fun DetailsScreen(
     }
     LaunchedEffect(resolved) {
         resolved?.let { s ->
-            if (s.url.isNotBlank()) onPlay(s.url, s.headers)
+            if (s.url.isNotBlank()) onPlay(s.url, s.headers, viewModel.playbackKey, s.subtitleUrls)
             viewModel.consumeResolved()
         }
     }

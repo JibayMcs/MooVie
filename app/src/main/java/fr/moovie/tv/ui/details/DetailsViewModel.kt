@@ -112,15 +112,21 @@ class DetailsViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Clé de reprise du contenu dont on charge les sources (film ou épisode). */
+    var playbackKey: String = ""
+        private set
+
     /** Charge les sources du film courant, en streaming par provider. */
     fun loadMovieSources() {
         val movie = _state.value as? DetailsState.Movie ?: return
+        playbackKey = "movie:$tmdbId"
         startSourceLoad { it.movieSources(movie.details.title, movie.details.year) }
     }
 
     /** Charge les sources d'un épisode, en streaming par provider. */
     fun loadEpisodeSources(episode: Int) {
         val tv = _state.value as? DetailsState.Tv ?: return
+        playbackKey = "tv:$tmdbId:s${tv.season}e$episode"
         startSourceLoad { it.tvSources(tv.details.name, tv.details.year, tv.season, episode) }
     }
 
