@@ -1,6 +1,7 @@
 package fr.moovie.tv.ui.details
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -9,7 +10,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -19,9 +22,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -29,7 +36,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.tv.material3.Button
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import coil.compose.AsyncImage
 import fr.moovie.tv.data.sources.EmbedLink
+import fr.moovie.tv.data.tmdb.CastMember
 import fr.moovie.tv.data.tmdb.Episode
 
 @Composable
@@ -74,15 +83,11 @@ fun DetailsScreen(
                 Text(s.details.title, style = MaterialTheme.typography.headlineMedium)
                 s.details.year?.let { Text("$it • ${s.details.runtime ?: "?"} min") }
                 Text(s.details.overview, style = MaterialTheme.typography.bodyMedium)
-                CastRow(s.details.credits?.cast.orEmpty().take(10).map { it.name })
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Button(
-                        onClick = { viewModel.loadMovieSources() },
-                        modifier = Modifier.focusRequester(primaryFocus),
-                    ) { Text("Sources") }
-                    Button(onClick = { onPlay(DEMO_HLS, emptyMap()) }) { Text("Lecture démo") }
-                    Button(onClick = onBack) { Text("Retour") }
-                }
+                CastRow(s.details.credits?.cast.orEmpty())
+                Button(
+                    onClick = { viewModel.loadMovieSources() },
+                    modifier = Modifier.focusRequester(primaryFocus),
+                ) { Text("Sources") }
                 SourcesPanel(sources, onPick = viewModel::play)
             }
             is DetailsState.Tv -> {
@@ -104,7 +109,6 @@ fun DetailsScreen(
                 s.episodes.forEach { ep ->
                     EpisodeRow(ep, onSources = { viewModel.loadEpisodeSources(ep.episodeNumber) })
                 }
-                Button(onClick = onBack) { Text("Retour") }
                 SourcesPanel(sources, onPick = viewModel::play)
             }
         }
@@ -128,9 +132,51 @@ private fun EpisodeRow(ep: Episode, onSources: () -> Unit) {
 }
 
 @Composable
-private fun CastRow(names: List<String>) {
-    if (names.isEmpty()) return
-    Text("Casting : " + names.joinToString(", "), style = MaterialTheme.typography.bodySmall)
+private fun CastRow(cast: List<CastMember>) {
+    val members = cast.take(15)
+    if (members.isEmpty()) return
+    Column {
+        Text("Casting", style = MaterialTheme.typography.titleMedium)
+        Spacer(Modifier.height(8.dp))
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            items(members) { member ->
+                Column(
+                    modifier = Modifier.width(96.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(80.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF222222)),
+                    ) {
+                        AsyncImage(
+                            model = member.profileUrl(),
+                            contentDescription = member.name,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        member.name,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    if (member.character.isNotBlank()) {
+                        Text(
+                            member.character,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            color = Color(0xFF9A9A9A),
+                            style = MaterialTheme.typography.labelSmall,
+                        )
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable
@@ -150,4 +196,3 @@ private fun SourcesPanel(state: SourcesState, onPick: (EmbedLink) -> Unit) {
     }
 }
 
-private const val DEMO_HLS = "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8"

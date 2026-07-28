@@ -3,6 +3,7 @@ package fr.moovie.tv
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -42,6 +43,10 @@ class MainActivity : ComponentActivity() {
                 CompositionLocalProvider(LocalContentColor provides Color.White) {
                     Box(modifier = Modifier.fillMaxSize().background(Color(0xFF0A0A0A))) {
                         var screen: Screen by remember { mutableStateOf(Screen.Home) }
+
+                        // Bouton Retour de la télécommande : revient à l'accueil
+                        // depuis n'importe quel écran (pas de bouton Retour à l'écran).
+                        BackHandler(enabled = screen != Screen.Home) { screen = Screen.Home }
 
                         when (val s = screen) {
                             Screen.Home -> HomeScreen(
