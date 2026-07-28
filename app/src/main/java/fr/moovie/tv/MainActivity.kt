@@ -8,7 +8,9 @@ import androidx.activity.compose.setContent
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -17,6 +19,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.tv.material3.LocalContentColor
 import fr.moovie.tv.data.settings.SettingsRepository
 import fr.moovie.tv.ui.navigation.Screen
@@ -26,6 +30,8 @@ import fr.moovie.tv.ui.player.PlayerScreen
 import fr.moovie.tv.ui.search.SearchScreen
 import fr.moovie.tv.ui.settings.SettingsScreen
 import fr.moovie.tv.ui.theme.MooVieTheme
+import fr.moovie.tv.ui.update.UpdateBanner
+import fr.moovie.tv.ui.update.UpdateViewModel
 import kotlinx.coroutines.launch
 
 /**
@@ -44,7 +50,17 @@ class MainActivity : ComponentActivity() {
                 // Fixe la couleur de contenu par défaut (sinon les Text libres
                 // héritent d'une couleur sombre sans Surface parent → invisibles).
                 CompositionLocalProvider(LocalContentColor provides Color.White) {
-                    Box(modifier = Modifier.fillMaxSize().background(Color(0xFF0A0A0A))) {
+                    Column(modifier = Modifier.fillMaxSize().background(Color(0xFF0A0A0A))) {
+                        // Bannière de mise à jour : tout en haut, sur toutes les pages.
+                        val updateViewModel: UpdateViewModel = viewModel()
+                        val updateState by updateViewModel.state.collectAsStateWithLifecycle()
+                        UpdateBanner(
+                            state = updateState,
+                            onInstall = updateViewModel::install,
+                            onDismiss = updateViewModel::dismiss,
+                        )
+
+                        Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
                         var screen: Screen by remember { mutableStateOf(Screen.Home) }
 
                         // Bouton Retour de la télécommande : revient à l'accueil
@@ -89,6 +105,7 @@ class MainActivity : ComponentActivity() {
                                 subtitles = s.subtitles,
                                 onBack = { screen = Screen.Home },
                             )
+                        }
                         }
                     }
                 }

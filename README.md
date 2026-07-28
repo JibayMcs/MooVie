@@ -1,11 +1,8 @@
 # Moo-vie — application Android TV native
 
 Application de streaming pour Android TV, **native Kotlin** (Jetpack Compose for TV
-+ Media3/ExoPlayer). Réécriture propre de l'expérience Movix, façon SmartTube :
-front TV, lecture native, extraction des sources **on-device** (pas de backend).
-
-> Repart d'un dépôt clean. La codebase Movix (React + backends Node/Python) sert
-> de **spécification de référence** pour porter chaque extracteur de source.
++ Media3/ExoPlayer), façon SmartTube : front TV, lecture native, extraction des
+sources **on-device** (pas de backend).
 
 ## Pourquoi natif (et pas une WebView)
 

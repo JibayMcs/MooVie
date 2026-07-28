@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="movix_red">#B5302C</color>
-    <color name="movix_dark">#0A0A0A</color>
+    <color name="app_background">#0A0A0A</color>
+    <!-- Violet profond du branding Moo-vie (fond de la bannière). -->
+    <color name="splash_background">#080345</color>
 </resources>

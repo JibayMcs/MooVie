@@ -21,7 +21,7 @@ val SELECTED_GREEN = Color(0xFF4CAF50)
 private val BUTTON_SHAPE = RoundedCornerShape(10.dp)
 
 /**
- * Bouton stylé de l'app : sombre au repos, accent rouge Movix au focus.
+ * Bouton stylé de l'app : sombre au repos, accent rouge au focus.
  * [selected] ajoute une outline verte (état actif/choisi) — remplace les
  * anciens marqueurs « ● » dans les libellés.
  */
