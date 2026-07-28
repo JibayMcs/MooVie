@@ -28,7 +28,7 @@ nohup "$EMULATOR" -avd "$AVD_NAME" \
   -gpu auto \
   -accel on \
   -no-boot-anim \
-  -no-snapshot-save \
+  -no-snapshot \
   "${MODE_ARGS[@]}" >"$LOG" 2>&1 &
 EMU_PID=$!
 disown "$EMU_PID" 2>/dev/null || true

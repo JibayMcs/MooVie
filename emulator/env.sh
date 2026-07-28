@@ -28,3 +28,14 @@ export SYSTEM_IMAGE="system-images;android-36;android-tv;x86_64"
 export APK_PATH="$PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk"
 export APK_PACKAGE="fr.moovie.tv"
 export APK_ACTIVITY="fr.moovie.tv/.MainActivity"
+
+# Ciblage device : si plusieurs émulateurs tournent, adb refuse sans -s. On fixe
+# ANDROID_SERIAL sur l'émulateur dont l'AVD == $AVD_NAME (adb respecte cette var
+# nativement, donc tous les appels $ADB ciblent le bon device).
+if [ -z "${ANDROID_SERIAL:-}" ]; then
+  for _s in $("$ADB" devices 2>/dev/null | awk '/emulator-/{print $1}'); do
+    _name="$("$ADB" -s "$_s" emu avd name 2>/dev/null | head -1 | tr -d '\r')"
+    if [ "$_name" = "$AVD_NAME" ]; then export ANDROID_SERIAL="$_s"; break; fi
+  done
+  unset _s _name
+fi

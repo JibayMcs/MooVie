@@ -23,4 +23,16 @@ else
     --device "tv_1080p" --force \
     || echo "no" | "$AVDMANAGER" create avd -n "$AVD_NAME" -k "$SYSTEM_IMAGE" --force
 fi
+
+# Clavier hôte transmis directement à l'émulateur (flèches = D-pad, Entrée =
+# sélection, saisie de texte possible). Sans ça, le clavier physique peut ne pas
+# piloter la navigation TV selon l'environnement.
+CFG="$ANDROID_AVD_HOME/$AVD_NAME.avd/config.ini"
+if [ -f "$CFG" ]; then
+  if grep -q "^hw.keyboard=" "$CFG"; then
+    sed -i 's/^hw\.keyboard=.*/hw.keyboard=yes/' "$CFG"
+  else
+    echo "hw.keyboard=yes" >> "$CFG"
+  fi
+fi
 echo ">> Prêt. Lance ./start.sh puis ./build-install.sh"
