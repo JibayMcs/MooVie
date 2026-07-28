@@ -23,6 +23,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
+import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
@@ -63,6 +64,9 @@ fun PlayerScreen(
             .setMediaSourceFactory(DefaultMediaSourceFactory(httpFactory))
             .setSeekBackIncrementMs(5_000)
             .setSeekForwardIncrementMs(15_000)
+            // Garde CPU + Wi-Fi éveillés pendant la lecture (évite les coupures
+            // de flux quand le réseau se met en veille).
+            .setWakeMode(C.WAKE_MODE_NETWORK)
             .build()
     }
 
@@ -128,6 +132,22 @@ fun PlayerScreen(
                     }
                 },
             )
+        }
+    }
+
+    // Garde l'écran allumé tant que ça joue (sinon l'Android TV se met en veille
+    // sur inactivité, la lecture n'étant pas vue comme une « activité »).
+    DisposableEffect(player, playerView) {
+        val listener = object : Player.Listener {
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                playerView.keepScreenOn = isPlaying
+            }
+        }
+        playerView.keepScreenOn = player.isPlaying
+        player.addListener(listener)
+        onDispose {
+            player.removeListener(listener)
+            playerView.keepScreenOn = false
         }
     }
 
