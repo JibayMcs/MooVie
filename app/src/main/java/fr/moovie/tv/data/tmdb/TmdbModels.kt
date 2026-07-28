@@ -33,6 +33,9 @@ data class TmdbItem(
     /** true si c'est une série (heuristique : présence de `name`/`first_air_date`). */
     val isTv: Boolean get() = mediaType == "tv" || (title == null && name != null)
 
+    /** Année de sortie (film ou série), ou null. */
+    val year: String? get() = (releaseDate ?: firstAirDate)?.take(4)?.ifBlank { null }
+
     fun posterUrl(size: String = "w342"): String? =
         posterPath?.let { "https://image.tmdb.org/t/p/$size$it" }
 

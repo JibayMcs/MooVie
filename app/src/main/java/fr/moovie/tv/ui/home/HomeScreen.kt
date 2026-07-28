@@ -26,21 +26,21 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.tv.material3.Button
 import androidx.tv.material3.Card
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import coil.compose.AsyncImage
 import fr.moovie.tv.data.tmdb.TmdbItem
+import fr.moovie.tv.ui.components.MoovieButton
 
 @Composable
 fun HomeScreen(
@@ -49,12 +49,14 @@ fun HomeScreen(
     viewModel: HomeViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    // Élément survolé (focus D-pad) → alimente le fond dynamique.
+    // Élément survolé (focus D-pad) → alimente le hero et le fond dynamique.
     var focused by remember { mutableStateOf<TmdbItem?>(null) }
 
+    val rows = (state as? HomeState.Ready)?.rows
+    val featured = focused ?: rows?.firstOrNull()?.items?.firstOrNull()
+
     Box(modifier = Modifier.fillMaxSize().background(Color(0xFF0A0A0A))) {
-        // Fond : backdrop flouté de l'élément focalisé (blur no-op < API 31).
-        focused?.backdropUrl()?.let { url ->
+        featured?.backdropUrl()?.let { url ->
             AsyncImage(
                 model = url,
                 contentDescription = null,
@@ -62,12 +64,9 @@ fun HomeScreen(
                 modifier = Modifier.fillMaxSize().blur(28.dp),
             )
         }
-        // Voile dégradé pour la lisibilité.
         Box(
             modifier = Modifier.fillMaxSize().background(
-                Brush.verticalGradient(
-                    listOf(Color(0xCC0A0A0A), Color(0xF20A0A0A)),
-                ),
+                Brush.verticalGradient(listOf(Color(0x990A0A0A), Color(0xF20A0A0A))),
             ),
         )
 
@@ -78,26 +77,52 @@ fun HomeScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text("Moo-vie", style = MaterialTheme.typography.headlineMedium)
-                Button(onClick = onOpenSettings) { Text("Réglages") }
+                MoovieButton(onClick = onOpenSettings) { Text("Réglages") }
             }
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(16.dp))
 
             when (val s = state) {
                 HomeState.Loading -> Text("Chargement…")
                 is HomeState.NeedsApiKey -> Column {
                     Text(s.reason)
                     Spacer(Modifier.height(16.dp))
-                    Button(onClick = onOpenSettings) { Text("Ouvrir les réglages") }
+                    MoovieButton(onClick = onOpenSettings) { Text("Ouvrir les réglages") }
                 }
                 is HomeState.Ready -> LazyColumn(
                     verticalArrangement = Arrangement.spacedBy(24.dp),
                     contentPadding = PaddingValues(bottom = 48.dp),
                 ) {
+                    item { Hero(featured) }
                     items(s.rows) { row ->
                         CatalogRow(row = row, onOpenTitle = onOpenTitle, onFocusItem = { focused = it })
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun Hero(item: TmdbItem?) {
+    if (item == null) return
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+        Text(item.displayTitle, style = MaterialTheme.typography.displaySmall)
+        Spacer(Modifier.height(6.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            item.year?.let { Text(it, style = MaterialTheme.typography.titleMedium, color = Color(0xFFCCCCCC)) }
+            if (item.voteAverage > 0) {
+                Text("★ %.1f".format(item.voteAverage), style = MaterialTheme.typography.titleMedium, color = Color(0xFFE6B800))
+            }
+        }
+        Spacer(Modifier.height(10.dp))
+        Box(modifier = Modifier.fillMaxWidth(0.6f)) {
+            Text(
+                item.overview.orEmpty(),
+                style = MaterialTheme.typography.bodyLarge,
+                color = Color(0xFFDDDDDD),
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }

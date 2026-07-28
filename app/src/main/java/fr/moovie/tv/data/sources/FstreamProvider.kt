@@ -156,9 +156,10 @@ class FstreamProvider(private val http: OkHttpClient) : SourceProvider {
         if (hoster.equals("netu", true) && !raw.startsWith("http")) "https://www.fembed.com/v/$raw" else raw
 
     private fun mapLanguage(version: String): String = when (version.lowercase()) {
-        "vf", "vff", "vfq", "premium" -> "VF"
+        // "default" sur French-Stream = version française du site.
+        "vf", "vff", "vfq", "premium", "default" -> "VF"
         "vostfr" -> "VOSTFR"
-        "vo", "voeng" -> "VO"
+        "vo", "voeng", "vostfr_hd" -> "VO"
         else -> version.uppercase()
     }
 

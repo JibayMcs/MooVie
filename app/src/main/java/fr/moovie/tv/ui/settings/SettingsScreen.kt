@@ -23,7 +23,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.tv.material3.Button
+import fr.moovie.tv.ui.components.MoovieButton
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import fr.moovie.tv.data.settings.StreamLanguage
@@ -61,7 +61,7 @@ fun SettingsScreen(
             Text("Langue du stream par défaut", style = MaterialTheme.typography.titleMedium)
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 StreamLanguage.entries.forEach { lang ->
-                    Button(onClick = { viewModel.setStreamLanguage(lang) }) {
+                    MoovieButton(onClick = { viewModel.setStreamLanguage(lang) }) {
                         Text(if (lang == streamLang) "● ${lang.name}" else lang.name)
                     }
                 }
@@ -70,14 +70,14 @@ fun SettingsScreen(
             Text("Langue de l'interface (TMDB)", style = MaterialTheme.typography.titleMedium)
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 listOf("fr-FR" to "Français", "en-US" to "English").forEach { (code, label) ->
-                    Button(onClick = { viewModel.setUiLanguage(code) }) {
+                    MoovieButton(onClick = { viewModel.setUiLanguage(code) }) {
                         Text(if (code == uiLang) "● $label" else label)
                     }
                 }
             }
         }
 
-        Button(onClick = onBack) { Text("Retour") }
+        MoovieButton(onClick = onBack) { Text("Retour") }
     }
 }
 

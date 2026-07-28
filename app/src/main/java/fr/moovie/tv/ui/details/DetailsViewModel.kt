@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import fr.moovie.tv.data.settings.SettingsRepository
+import fr.moovie.tv.data.settings.StreamLanguage
 import fr.moovie.tv.data.sources.EmbedLink
 import fr.moovie.tv.data.sources.ExtractorRegistry
 import fr.moovie.tv.data.sources.PlayableStream
@@ -13,8 +14,10 @@ import fr.moovie.tv.data.tmdb.MovieDetails
 import fr.moovie.tv.data.tmdb.TmdbRepository
 import fr.moovie.tv.data.tmdb.TvDetails
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 sealed interface DetailsState {
@@ -29,6 +32,8 @@ sealed interface SourcesState {
     data object Idle : SourcesState
     data object Loading : SourcesState
     data class Loaded(val links: List<EmbedLink>) : SourcesState
+    /** Aucune source trouvée (site ok mais pas de lecteur). */
+    data object Empty : SourcesState
     data class Error(val message: String) : SourcesState
 }
 
@@ -45,6 +50,10 @@ class DetailsViewModel(app: Application) : AndroidViewModel(app) {
     /** Flux prêt à jouer (émis une fois qu'un extracteur a résolu un lien). */
     private val _resolved = MutableStateFlow<PlayableStream?>(null)
     val resolved: StateFlow<PlayableStream?> = _resolved
+
+    /** Langue de stream préférée de l'utilisateur (pour trier/prioriser les sources). */
+    val streamLanguage: StateFlow<StreamLanguage> = settings.streamLanguage
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), StreamLanguage.VF)
 
     private var tmdbId = 0
     private var isTv = false
@@ -108,9 +117,12 @@ class DetailsViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun emitSources(links: List<EmbedLink>) {
-        _sources.value =
-            if (links.isEmpty()) SourcesState.Error("Aucune source (Cloudflare/site indisponible ?).")
-            else SourcesState.Loaded(links)
+        _sources.value = if (links.isEmpty()) SourcesState.Empty else SourcesState.Loaded(links)
+    }
+
+    /** Ferme le panneau des sources (retour à l'état inactif). */
+    fun clearSources() {
+        _sources.value = SourcesState.Idle
     }
 
     /** Résout un lien d'embed en flux jouable via les extracteurs. */
