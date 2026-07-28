@@ -3,9 +3,11 @@ package fr.moovie.tv.data.settings
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import fr.moovie.tv.data.net.DohProvider
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -48,6 +50,23 @@ class SettingsRepository(private val context: Context) {
             prefs[PROVIDER_ORDER]?.split(',')?.filter { it.isNotBlank() } ?: emptyList()
         }
 
+    /** DoH activé (par défaut oui : nécessaire au contournement du blocage FAI). */
+    val dohEnabled: Flow<Boolean> =
+        context.dataStore.data.map { it[DOH_ENABLED] ?: true }
+
+    /** Résolveur DoH choisi (par défaut Cloudflare). */
+    val dohProvider: Flow<DohProvider> =
+        context.dataStore.data.map {
+            runCatching { DohProvider.valueOf(it[DOH_PROVIDER] ?: "CLOUDFLARE") }
+                .getOrDefault(DohProvider.CLOUDFLARE)
+        }
+
+    suspend fun setDohEnabled(value: Boolean) =
+        context.dataStore.edit { it[DOH_ENABLED] = value }
+
+    suspend fun setDohProvider(value: DohProvider) =
+        context.dataStore.edit { it[DOH_PROVIDER] = value.name }
+
     suspend fun setTmdbApiKey(value: String) =
         context.dataStore.edit { it[TMDB_API_KEY] = value.trim() }
 
@@ -74,5 +93,7 @@ class SettingsRepository(private val context: Context) {
         val STREAM_LANGUAGE = stringPreferencesKey("stream_language")
         val DISABLED_PROVIDERS = stringPreferencesKey("disabled_providers")
         val PROVIDER_ORDER = stringPreferencesKey("provider_order")
+        val DOH_ENABLED = booleanPreferencesKey("doh_enabled")
+        val DOH_PROVIDER = stringPreferencesKey("doh_provider")
     }
 }

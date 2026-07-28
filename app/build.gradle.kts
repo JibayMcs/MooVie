@@ -25,8 +25,8 @@ android {
         applicationId = "fr.moovie.tv"
         minSdk = 23
         targetSdk = 34
-        versionCode = 2
-        versionName = "1.0.0"
+        versionCode = 3
+        versionName = "1.0.1"
     }
 
     signingConfigs {
@@ -95,6 +95,8 @@ dependencies {
     implementation("com.squareup.retrofit2:converter-kotlinx-serialization:2.11.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+    // DNS-over-HTTPS : contourne le blocage DNS des FAI sur les domaines sources
+    implementation("com.squareup.okhttp3:okhttp-dnsoverhttps:4.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     implementation("org.jsoup:jsoup:1.18.1")
 

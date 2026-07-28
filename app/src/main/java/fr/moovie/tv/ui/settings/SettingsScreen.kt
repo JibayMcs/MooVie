@@ -42,6 +42,7 @@ import fr.moovie.tv.ui.components.MoovieButton
 import fr.moovie.tv.ui.components.MoovieIconButton
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import fr.moovie.tv.data.net.DohProvider
 import fr.moovie.tv.data.settings.StreamLanguage
 
 /**
@@ -58,6 +59,8 @@ fun SettingsScreen(
     val streamLang by viewModel.streamLanguage.collectAsStateWithLifecycle()
     val uiLang by viewModel.uiLanguage.collectAsStateWithLifecycle()
     val providers by viewModel.providers.collectAsStateWithLifecycle()
+    val dohEnabled by viewModel.dohEnabled.collectAsStateWithLifecycle()
+    val dohProvider by viewModel.dohProvider.collectAsStateWithLifecycle()
 
     Column(
         // Scroll pleine page puis marges : les boutons agrandis au focus débordent
@@ -141,6 +144,36 @@ fun SettingsScreen(
                             contentDescription = if (p.enabled) "Désactiver ${p.name}" else "Activer ${p.name}",
                             selected = p.enabled,
                         )
+                    }
+                }
+            }
+        }
+
+        SettingsCategory("Réseau (DNS)") {
+            Text(
+                "Les domaines des sources sont souvent bloqués par DNS chez les FAI. " +
+                    "Le DNS-over-HTTPS (DoH) contourne ce blocage. Laisse activé si les sources restent introuvables.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                MoovieButton(
+                    onClick = { viewModel.setDohEnabled(true) },
+                    selected = dohEnabled,
+                ) { Text("DoH activé") }
+                MoovieButton(
+                    onClick = { viewModel.setDohEnabled(false) },
+                    selected = !dohEnabled,
+                ) { Text("DNS système") }
+            }
+            if (dohEnabled) {
+                Spacer(Modifier.height(8.dp))
+                Text("Résolveur", style = MaterialTheme.typography.titleMedium)
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    DohProvider.entries.forEach { provider ->
+                        MoovieButton(
+                            onClick = { viewModel.setDohProvider(provider) },
+                            selected = provider == dohProvider,
+                        ) { Text(provider.label) }
                     }
                 }
             }

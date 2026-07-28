@@ -1,5 +1,6 @@
 package fr.moovie.tv.data.sources
 
+import fr.moovie.tv.data.net.AppDns
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
 
@@ -11,6 +12,8 @@ import java.util.concurrent.TimeUnit
 object ExtractorRegistry {
 
     val http: OkHttpClient = OkHttpClient.Builder()
+        // DoH : les domaines sources sont bloqués par DNS chez les FAI.
+        .dns(AppDns)
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
         .followRedirects(true)

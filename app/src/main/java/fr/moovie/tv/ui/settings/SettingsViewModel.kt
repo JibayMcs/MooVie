@@ -3,6 +3,7 @@ package fr.moovie.tv.ui.settings
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import fr.moovie.tv.data.net.DohProvider
 import fr.moovie.tv.data.settings.SettingsRepository
 import fr.moovie.tv.data.settings.StreamLanguage
 import fr.moovie.tv.data.sources.ProviderRegistry
@@ -28,6 +29,15 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
 
     val uiLanguage: StateFlow<String> =
         repo.uiLanguage.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "fr-FR")
+
+    val dohEnabled: StateFlow<Boolean> =
+        repo.dohEnabled.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+
+    val dohProvider: StateFlow<DohProvider> =
+        repo.dohProvider.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DohProvider.CLOUDFLARE)
+
+    fun setDohEnabled(value: Boolean) = viewModelScope.launch { repo.setDohEnabled(value) }
+    fun setDohProvider(value: DohProvider) = viewModelScope.launch { repo.setDohProvider(value) }
 
     /** Providers dans l'ordre de priorité effectif, avec leur état on/off. */
     val providers: StateFlow<List<ProviderSetting>> =
