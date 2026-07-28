@@ -74,4 +74,8 @@ class SearchViewModel(app: Application) : AndroidViewModel(app) {
     fun removeHistory(q: String) {
         viewModelScope.launch { historyRepo.remove(q) }
     }
+
+    fun clearHistory() {
+        viewModelScope.launch { historyRepo.clear() }
+    }
 }

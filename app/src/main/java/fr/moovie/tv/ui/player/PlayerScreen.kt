@@ -17,6 +17,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.session.MediaSession
 import androidx.media3.ui.PlayerView
 import fr.moovie.tv.data.watch.WatchProgressRepository
 import kotlinx.coroutines.delay
@@ -45,8 +46,16 @@ fun PlayerScreen(
         }
         ExoPlayer.Builder(context)
             .setMediaSourceFactory(DefaultMediaSourceFactory(httpFactory))
+            // Incréments alignés sur les boutons -5s/+15s des contrôles ; utilisés
+            // aussi par les touches média REWIND/FAST_FORWARD de la télécommande.
+            .setSeekBackIncrementMs(5_000)
+            .setSeekForwardIncrementMs(15_000)
             .build()
     }
+
+    // Sans MediaSession, Android route les touches média (play/pause/seek de la
+    // télécommande) vers la dernière session système au lieu de l'app.
+    val mediaSession = remember { MediaSession.Builder(context, player).build() }
 
     // Prépare le média (avec sous-titres externes) et reprend à la position sauvée.
     LaunchedEffect(streamUrl) {
@@ -100,6 +109,7 @@ fun PlayerScreen(
     DisposableEffect(Unit) {
         onDispose {
             playerView.player = null
+            mediaSession.release()
             player.release()
         }
     }

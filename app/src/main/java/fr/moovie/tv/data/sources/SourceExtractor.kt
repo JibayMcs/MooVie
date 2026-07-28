@@ -25,6 +25,8 @@ data class EmbedLink(
     val url: String,
     val hoster: String,
     val language: String? = null,
+    /** Nom du provider d'origine (renseigné à l'agrégation, pour la priorité). */
+    val provider: String? = null,
 )
 
 /**

@@ -16,6 +16,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -60,11 +61,15 @@ import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import coil.compose.AsyncImage
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import fr.moovie.tv.data.settings.StreamLanguage
 import fr.moovie.tv.data.sources.EmbedLink
 import fr.moovie.tv.data.tmdb.CastMember
 import fr.moovie.tv.data.tmdb.Episode
 import fr.moovie.tv.ui.components.MoovieButton
+import fr.moovie.tv.ui.components.MoovieIconButton
 
 private val ACCENT = Color(0xFFB5302C)
 
@@ -74,6 +79,9 @@ fun DetailsScreen(
     isTv: Boolean,
     onPlay: (streamUrl: String, headers: Map<String, String>, mediaKey: String, subtitles: Map<String, String>) -> Unit,
     onBack: () -> Unit,
+    autoSources: Boolean = false,
+    resumeSeason: Int = 0,
+    resumeEpisode: Int = 0,
     viewModel: DetailsViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -81,27 +89,52 @@ fun DetailsScreen(
     val resolved by viewModel.resolved.collectAsStateWithLifecycle()
     val resolveError by viewModel.resolveError.collectAsStateWithLifecycle()
     val streamLang by viewModel.streamLanguage.collectAsStateWithLifecycle()
+    val watched by viewModel.watched.collectAsStateWithLifecycle()
+    val resume by viewModel.resume.collectAsStateWithLifecycle()
+    val quickPlay by viewModel.quickPlay.collectAsStateWithLifecycle()
+    val panelVisible by viewModel.panelVisible.collectAsStateWithLifecycle()
     val primaryFocus = remember { FocusRequester() }
+    // Reprise depuis l'accueil : lance la lecture directe une seule fois, dès que la fiche est chargée.
+    val autoConsumed = remember { mutableStateOf(false) }
 
     LaunchedEffect(tmdbId, isTv) { viewModel.start(tmdbId, isTv) }
     LaunchedEffect(state) {
         if (state is DetailsState.Movie || state is DetailsState.Tv) {
             runCatching { primaryFocus.requestFocus() }
         }
+        if (autoSources && !autoConsumed.value) {
+            when (state) {
+                is DetailsState.Movie -> {
+                    autoConsumed.value = true
+                    viewModel.quickPlayMovie()
+                }
+                is DetailsState.Tv -> {
+                    autoConsumed.value = true
+                    viewModel.selectSeason(resumeSeason)
+                    viewModel.quickPlayEpisode(resumeSeason, resumeEpisode)
+                }
+                else -> Unit
+            }
+        }
     }
     LaunchedEffect(resolved) {
         resolved?.let { s ->
-            if (s.url.isNotBlank()) onPlay(s.url, s.headers, viewModel.playbackKey, s.subtitleUrls)
+            if (s.url.isNotBlank()) {
+                // Ferme le panneau avant de partir : au retour (ou sur une autre
+                // fiche, le ViewModel étant partagé), il ne doit pas rester ouvert.
+                viewModel.closePanel()
+                onPlay(s.url, s.headers, viewModel.playbackKey, s.subtitleUrls)
+            }
             viewModel.consumeResolved()
         }
     }
 
     val backdrop = (state as? DetailsState.Movie)?.details?.backdropUrl()
         ?: (state as? DetailsState.Tv)?.details?.backdropUrl()
-    val panelOpen = sources is SourcesState.Active
+    val panelOpen = panelVisible
 
     // Retour ferme d'abord le panneau des sources (sinon retour à l'accueil).
-    BackHandler(enabled = panelOpen) { viewModel.clearSources() }
+    BackHandler(enabled = panelOpen) { viewModel.closePanel() }
 
     Box(modifier = Modifier.fillMaxSize()) {
         backdrop?.let { url ->
@@ -118,32 +151,99 @@ fun DetailsScreen(
             ),
         )
 
+        // Scroll pleine largeur + marges portées par les enfants : les éléments
+        // agrandis au focus débordent dans la marge au lieu d'être rognés.
+        val hPad = Modifier.padding(horizontal = 48.dp)
         Column(
-            modifier = Modifier.fillMaxSize().padding(48.dp).verticalScroll(rememberScrollState()),
+            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(vertical = 48.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             when (val s = state) {
-                DetailsState.Loading -> Text("Chargement…")
+                DetailsState.Loading -> Text("Chargement…", modifier = hPad)
                 is DetailsState.Error -> {
-                    Text(s.message)
-                    MoovieButton(onClick = onBack) { Text("Retour") }
+                    Text(s.message, modifier = hPad)
+                    MoovieButton(onClick = onBack, modifier = hPad) { Text("Retour") }
                 }
                 is DetailsState.Movie -> {
-                    Text(s.details.title, style = MaterialTheme.typography.headlineMedium)
-                    s.details.year?.let { Text("$it • ${s.details.runtime ?: "?"} min") }
-                    Text(s.details.overview, style = MaterialTheme.typography.bodyMedium)
+                    val movieWatched = viewModel.movieKey() in watched
+                    Row(
+                        modifier = hPad,
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Text(s.details.title, style = MaterialTheme.typography.headlineMedium)
+                        if (movieWatched) WatchedBadge()
+                    }
+                    s.details.year?.let { Text("$it • ${s.details.runtime ?: "?"} min", modifier = hPad) }
+                    Text(s.details.overview, style = MaterialTheme.typography.bodyMedium, modifier = hPad)
                     CastRow(s.details.credits?.cast.orEmpty())
-                    MoovieButton(
-                        onClick = { viewModel.loadMovieSources() },
-                        modifier = Modifier.focusRequester(primaryFocus),
-                    ) { Text("Sources") }
+
+                    // Bouton Lire direct : loader pendant le chargement des sources,
+                    // cliquable dès qu'un lien dans la langue préférée existe,
+                    // « VF indisponible » sinon. Le panneau reste en choix manuel.
+                    val active = sources as? SourcesState.Active
+                    val prefReady = active?.links?.any { it.language == streamLang.name } == true
+                    val loadingSources = active == null || active.anyLoading
+                    val searching = quickPlay is QuickPlayState.Searching
+                    Row(
+                        modifier = hPad,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        MoovieButton(
+                            onClick = {
+                                // Cliquable aussi pendant le chargement : la lecture
+                                // démarrera dès qu'une source arrive.
+                                if (prefReady || loadingSources) viewModel.quickPlayMovie()
+                            },
+                            modifier = Modifier.focusRequester(primaryFocus),
+                        ) {
+                            when {
+                                searching -> {
+                                    CircularProgressIndicator(
+                                        color = Color.White,
+                                        strokeWidth = 2.dp,
+                                        modifier = Modifier.size(14.dp),
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Lecture…")
+                                }
+                                prefReady -> Text(
+                                    if (resume.containsKey(viewModel.movieKey())) "▶  Reprendre" else "▶  Lire",
+                                )
+                                loadingSources -> {
+                                    CircularProgressIndicator(
+                                        color = ACCENT,
+                                        strokeWidth = 2.dp,
+                                        modifier = Modifier.size(14.dp),
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Recherche ${streamLang.name}…")
+                                }
+                                else -> Text("${streamLang.name} indisponible", color = Color(0xFF8A8A8A))
+                            }
+                        }
+                        MoovieButton(onClick = { viewModel.openPanel() }) { Text("Sources") }
+                        // Œil = marquer vu / non vu (outline verte quand vu).
+                        MoovieIconButton(
+                            onClick = { viewModel.toggleWatched(viewModel.movieKey()) },
+                            icon = if (movieWatched) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                            contentDescription = if (movieWatched) "Marquer non vu" else "Marquer comme vu",
+                            selected = movieWatched,
+                        )
+                    }
                 }
                 is DetailsState.Tv -> {
-                    Text(s.details.name, style = MaterialTheme.typography.headlineMedium)
-                    s.details.year?.let { Text(it) }
-                    Text(s.details.overview, style = MaterialTheme.typography.bodyMedium, maxLines = 4, overflow = TextOverflow.Ellipsis)
-                    Text("Saisons", style = MaterialTheme.typography.titleMedium)
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(s.details.name, style = MaterialTheme.typography.headlineMedium, modifier = hPad)
+                    s.details.year?.let { Text(it, modifier = hPad) }
+                    Text(s.details.overview, style = MaterialTheme.typography.bodyMedium, maxLines = 4, overflow = TextOverflow.Ellipsis, modifier = hPad)
+                    val seasonAllWatched = s.episodes.isNotEmpty() &&
+                        s.episodes.all { viewModel.episodeKey(s.season, it.episodeNumber) in watched }
+                    Text("Saisons", style = MaterialTheme.typography.titleMedium, modifier = hPad)
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        contentPadding = PaddingValues(horizontal = 48.dp),
+                    ) {
                         itemsIndexed(s.details.seasons.filter { it.seasonNumber > 0 }) { index, season ->
                             MoovieButton(
                                 onClick = { viewModel.selectSeason(season.seasonNumber) },
@@ -152,10 +252,31 @@ fun DetailsScreen(
                                 Text(if (season.seasonNumber == s.season) "● S${season.seasonNumber}" else "S${season.seasonNumber}")
                             }
                         }
+                        // En fin de rangée (atteignable au D-pad) : œil = marquer la
+                        // saison vue / non vue (outline verte quand tout est vu).
+                        item {
+                            MoovieIconButton(
+                                onClick = { viewModel.toggleSeasonWatched() },
+                                icon = if (seasonAllWatched) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                contentDescription = if (seasonAllWatched) "Marquer la saison non vue" else "Marquer la saison vue",
+                                selected = seasonAllWatched,
+                            )
+                        }
                     }
-                    Text("Épisodes (saison ${s.season})", style = MaterialTheme.typography.titleMedium)
+                    Text("Épisodes (saison ${s.season})", style = MaterialTheme.typography.titleMedium, modifier = hPad)
                     s.episodes.forEach { ep ->
-                        EpisodeRow(ep, onSources = { viewModel.loadEpisodeSources(ep.episodeNumber) })
+                        val key = viewModel.episodeKey(s.season, ep.episodeNumber)
+                        Box(modifier = hPad) {
+                            EpisodeRow(
+                                ep = ep,
+                                isWatched = key in watched,
+                                progress = resume[key]?.progress,
+                                // Clic = lecture directe (meilleure source dans la langue
+                                // préférée) ; le panneau ne s'ouvre qu'en secours.
+                                onSources = { viewModel.quickPlayEpisode(s.season, ep.episodeNumber) },
+                                onToggleWatched = { viewModel.toggleWatched(key) },
+                            )
+                        }
                     }
                 }
             }
@@ -174,6 +295,48 @@ fun DetailsScreen(
         ) {
             lastActive.value?.let { active ->
                 SourcesSlideOver(state = active, preferred = streamLang, resolveError = resolveError, onPick = viewModel::play)
+            }
+        }
+
+        // Bannière de lecture rapide (recherche en cours / indisponible),
+        // surtout utile pour les épisodes qui n'ont pas de bouton dédié.
+        val q = quickPlay
+        if (q is QuickPlayState.Unavailable) {
+            LaunchedEffect(q) {
+                kotlinx.coroutines.delay(4000)
+                viewModel.dismissQuickPlay()
+            }
+        }
+        AnimatedVisibility(
+            visible = q !is QuickPlayState.Idle,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 40.dp),
+        ) {
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(Color(0xF21E1E1E))
+                    .padding(horizontal = 20.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                when (q) {
+                    is QuickPlayState.Searching -> {
+                        CircularProgressIndicator(
+                            color = ACCENT,
+                            strokeWidth = 2.dp,
+                            modifier = Modifier.size(16.dp),
+                        )
+                        Text("Recherche d'une source… ${q.label}", style = MaterialTheme.typography.bodyMedium)
+                    }
+                    is QuickPlayState.Unavailable -> Text(
+                        q.label,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color(0xFFE0A0A0),
+                    )
+                    else -> Unit
+                }
             }
         }
     }
@@ -198,46 +361,53 @@ private fun SourcesSlideOver(
         if (links.isNotEmpty()) runCatching { firstFocus.requestFocus() }
     }
 
+    // Marges horizontales portées par les enfants : la liste défilante va jusqu'aux
+    // bords du panneau, les boutons agrandis au focus ne sont plus rognés.
+    val pPad = Modifier.padding(horizontal = 24.dp)
     Column(
         modifier = Modifier
             .fillMaxHeight()
             .width(380.dp)
             .background(Color(0xF2121212))
-            .padding(horizontal = 24.dp, vertical = 28.dp),
+            .padding(vertical = 28.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("Sources", style = MaterialTheme.typography.titleLarge)
-        Text("Retour pour fermer", style = MaterialTheme.typography.labelSmall, color = Color(0xFF8A8A8A))
+        Text("Sources", style = MaterialTheme.typography.titleLarge, modifier = pPad)
 
         // Barre de progression tant qu'au moins un provider charge.
         if (state.anyLoading) {
             LinearProgressIndicator(
                 color = ACCENT,
                 trackColor = Color(0xFF2A2A2A),
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().then(pPad),
             )
         }
-        ProviderChips(state.providers)
+        ProviderChips(state.providers, modifier = pPad)
 
         resolveError?.let {
-            Text(it, style = MaterialTheme.typography.labelMedium, color = Color(0xFFE06A6A))
+            Text(it, style = MaterialTheme.typography.labelMedium, color = Color(0xFFE06A6A), modifier = pPad)
         }
         if (prefMissing) {
             Text(
                 "Aucune source en ${preferred.name} — autres langues disponibles.",
                 style = MaterialTheme.typography.labelMedium,
                 color = Color(0xFFE0A0A0),
+                modifier = pPad,
             )
         }
         Spacer(Modifier.height(4.dp))
 
         when {
-            links.isEmpty() && state.anyLoading -> SkeletonRows()
+            links.isEmpty() && state.anyLoading -> SkeletonRows(modifier = pPad)
             links.isEmpty() -> Text(
                 "Aucune source disponible pour ce titre.",
                 color = Color(0xFFE0A0A0),
+                modifier = pPad,
             )
-            else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            else -> LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(horizontal = 24.dp),
+            ) {
                 sections.forEachIndexed { sectionIndex, (lang, sourcesInLang) ->
                     item(key = "h_$lang") {
                         Text(
@@ -266,8 +436,8 @@ private fun SourcesSlideOver(
 
 /** Pastilles de progression par provider (chargement / trouvé / vide / échec). */
 @Composable
-private fun ProviderChips(providers: List<ProviderProgress>) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+private fun ProviderChips(providers: List<ProviderProgress>, modifier: Modifier = Modifier) {
+    Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         providers.forEach { p ->
             Row(
                 modifier = Modifier
@@ -295,7 +465,7 @@ private fun ProviderChips(providers: List<ProviderProgress>) {
 
 /** Lignes fantômes (skeleton) animées tant qu'aucune source n'est encore arrivée. */
 @Composable
-private fun SkeletonRows() {
+private fun SkeletonRows(modifier: Modifier = Modifier) {
     val transition = rememberInfiniteTransition(label = "skeleton")
     val alpha by transition.animateFloat(
         initialValue = 0.25f,
@@ -303,7 +473,7 @@ private fun SkeletonRows() {
         animationSpec = infiniteRepeatable(tween(700), RepeatMode.Reverse),
         label = "skeletonAlpha",
     )
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
         repeat(5) {
             Box(
                 modifier = Modifier
@@ -316,12 +486,33 @@ private fun SkeletonRows() {
     }
 }
 
+/** Pastille ✓ (contenu déjà vu). */
+@Composable
+private fun WatchedBadge(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .size(24.dp)
+            .clip(CircleShape)
+            .background(Color(0xCC0A0A0A)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text("✓", color = Color(0xFF5FD98A), style = MaterialTheme.typography.labelMedium)
+    }
+}
+
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
-private fun EpisodeRow(ep: Episode, onSources: () -> Unit) {
-    // Toute la carte épisode est cliquable → charge les sources de l'épisode.
+private fun EpisodeRow(
+    ep: Episode,
+    isWatched: Boolean,
+    progress: Float?,
+    onSources: () -> Unit,
+    onToggleWatched: () -> Unit,
+) {
+    // Clic → sources de l'épisode ; OK long → bascule vu/non vu.
     Card(
         onClick = onSources,
+        onLongClick = onToggleWatched,
         modifier = Modifier.fillMaxWidth(),
         scale = CardDefaults.scale(focusedScale = 1.02f),
         border = CardDefaults.border(
@@ -344,9 +535,25 @@ private fun EpisodeRow(ep: Episode, onSources: () -> Unit) {
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),
                 )
+                if (isWatched) {
+                    WatchedBadge(modifier = Modifier.align(Alignment.TopEnd).padding(4.dp))
+                }
+                // Épisode commencé : mini-barre de progression sur la vignette.
+                if (!isWatched && progress != null && progress > 0f) {
+                    LinearProgressIndicator(
+                        progress = progress,
+                        color = ACCENT,
+                        trackColor = Color(0x66000000),
+                        modifier = Modifier.fillMaxWidth().height(4.dp).align(Alignment.BottomCenter),
+                    )
+                }
             }
             Column(modifier = Modifier.weight(1f)) {
-                Text("${ep.episodeNumber}. ${ep.name}", style = MaterialTheme.typography.titleSmall)
+                Text(
+                    "${ep.episodeNumber}. ${ep.name}",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = if (isWatched) Color(0xFF9A9A9A) else Color.White,
+                )
                 if (ep.overview.isNotBlank()) {
                     Text(ep.overview, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
@@ -360,9 +567,12 @@ private fun CastRow(cast: List<CastMember>) {
     val members = cast.take(15)
     if (members.isEmpty()) return
     Column {
-        Text("Casting", style = MaterialTheme.typography.titleMedium)
+        Text("Casting", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 48.dp))
         Spacer(Modifier.height(8.dp))
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            contentPadding = PaddingValues(horizontal = 48.dp),
+        ) {
             items(members) { member ->
                 Column(
                     modifier = Modifier.width(96.dp),

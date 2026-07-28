@@ -33,6 +33,21 @@ class SettingsRepository(private val context: Context) {
                 .getOrDefault(StreamLanguage.VF)
         }
 
+    /** Providers désactivés par l'utilisateur (par défaut : aucun). */
+    val disabledProviders: Flow<Set<String>> =
+        context.dataStore.data.map { prefs ->
+            prefs[DISABLED_PROVIDERS]?.split(',')?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
+        }
+
+    /**
+     * Ordre de priorité des providers (les premiers sont joués en premier).
+     * Les providers absents de la liste passent en fin, dans l'ordre du registre.
+     */
+    val providerOrder: Flow<List<String>> =
+        context.dataStore.data.map { prefs ->
+            prefs[PROVIDER_ORDER]?.split(',')?.filter { it.isNotBlank() } ?: emptyList()
+        }
+
     suspend fun setTmdbApiKey(value: String) =
         context.dataStore.edit { it[TMDB_API_KEY] = value.trim() }
 
@@ -42,9 +57,22 @@ class SettingsRepository(private val context: Context) {
     suspend fun setStreamLanguage(value: StreamLanguage) =
         context.dataStore.edit { it[STREAM_LANGUAGE] = value.name }
 
+    suspend fun setProviderEnabled(name: String, enabled: Boolean) =
+        context.dataStore.edit { prefs ->
+            val current = prefs[DISABLED_PROVIDERS]?.split(',')?.filter { it.isNotBlank() }?.toMutableSet()
+                ?: mutableSetOf()
+            if (enabled) current.remove(name) else current.add(name)
+            prefs[DISABLED_PROVIDERS] = current.joinToString(",")
+        }
+
+    suspend fun setProviderOrder(order: List<String>) =
+        context.dataStore.edit { it[PROVIDER_ORDER] = order.joinToString(",") }
+
     private companion object {
         val TMDB_API_KEY = stringPreferencesKey("tmdb_api_key")
         val UI_LANGUAGE = stringPreferencesKey("ui_language")
         val STREAM_LANGUAGE = stringPreferencesKey("stream_language")
+        val DISABLED_PROVIDERS = stringPreferencesKey("disabled_providers")
+        val PROVIDER_ORDER = stringPreferencesKey("provider_order")
     }
 }

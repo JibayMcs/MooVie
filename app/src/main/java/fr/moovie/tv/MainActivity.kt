@@ -54,6 +54,15 @@ class MainActivity : ComponentActivity() {
                         when (val s = screen) {
                             Screen.Home -> HomeScreen(
                                 onOpenTitle = { id, isTv -> screen = Screen.Details(id, isTv) },
+                                onResume = { e ->
+                                    screen = Screen.Details(
+                                        tmdbId = e.tmdbId,
+                                        isTv = e.isTv,
+                                        autoSources = true,
+                                        resumeSeason = e.season,
+                                        resumeEpisode = e.episode,
+                                    )
+                                },
                                 onOpenSettings = { screen = Screen.Settings },
                                 onOpenSearch = { screen = Screen.Search },
                             )
@@ -69,6 +78,9 @@ class MainActivity : ComponentActivity() {
                                 isTv = s.isTv,
                                 onPlay = { url, headers, key, subs -> screen = Screen.Player(url, headers, key, subs) },
                                 onBack = { screen = Screen.Home },
+                                autoSources = s.autoSources,
+                                resumeSeason = s.resumeSeason,
+                                resumeEpisode = s.resumeEpisode,
                             )
                             is Screen.Player -> PlayerScreen(
                                 streamUrl = s.streamUrl,
