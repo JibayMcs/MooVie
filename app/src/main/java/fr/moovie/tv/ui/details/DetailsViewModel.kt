@@ -113,6 +113,14 @@ class DetailsViewModel(app: Application) : AndroidViewModel(app) {
     /** Métadonnées du contenu en cours de résolution, persistées quand la lecture démarre. */
     private var pendingMeta: ResumeEntry? = null
 
+    /**
+     * Génération de résolution : incrémentée à chaque changement de titre ou
+     * nouvelle demande de lecture. Une résolution en vol (panneau/lecture rapide)
+     * n'émet son flux que si sa génération est toujours courante — sinon un
+     * « Film B » résolu tardivement écraserait la lecture de « Série A ».
+     */
+    private var resolveGen = 0
+
     private var tmdbId = 0
     private var isTv = false
 
@@ -124,10 +132,12 @@ class DetailsViewModel(app: Application) : AndroidViewModel(app) {
         // Le ViewModel est partagé entre fiches (scope Activity) : purge l'état
         // de la fiche précédente (panneau sources, erreurs) avant de charger.
         quickPlayJob?.cancel()
+        resolveGen++ // invalide toute résolution en vol de la fiche précédente
         _quickPlay.value = QuickPlayState.Idle
         _panelVisible.value = false
         _sources.value = SourcesState.Idle
         _resolveError.value = null
+        _resolved.value = null
         pendingMeta = null
         this.tmdbId = tmdbId
         this.isTv = isTv
@@ -323,6 +333,7 @@ class DetailsViewModel(app: Application) : AndroidViewModel(app) {
      */
     private fun startQuickPlay(label: String) {
         if (quickPlayJob?.isActive == true) return
+        val gen = ++resolveGen
         quickPlayJob = viewModelScope.launch {
             val lang = settings.streamLanguage.first().name
             _quickPlay.value = QuickPlayState.Searching("$label · $lang")
@@ -338,6 +349,7 @@ class DetailsViewModel(app: Application) : AndroidViewModel(app) {
                 if (next != null) {
                     tried += next.url
                     val stream = runCatching { ExtractorRegistry.resolve(next) }.getOrNull()
+                    if (gen != resolveGen) return@launch // titre changé entre-temps
                     if (stream != null && stream.url.isNotBlank()) {
                         pendingMeta?.let { watchRepo.register(it) }
                         _quickPlay.value = QuickPlayState.Idle
@@ -369,8 +381,11 @@ class DetailsViewModel(app: Application) : AndroidViewModel(app) {
     /** Résout un lien d'embed en flux jouable via les extracteurs. */
     fun play(link: EmbedLink) {
         _resolveError.value = null
+        val gen = ++resolveGen
         viewModelScope.launch {
             val stream = runCatching { ExtractorRegistry.resolve(link) }.getOrNull()
+            // Titre changé pendant la résolution : ne pas écraser la lecture courante.
+            if (gen != resolveGen) return@launch
             if (stream != null) {
                 // La lecture va démarrer : persiste les métadonnées pour le
                 // rail « Reprendre » (la position suivra depuis le lecteur).
