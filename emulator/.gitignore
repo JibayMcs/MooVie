@@ -1,0 +1,5 @@
+# Données de la VM (lourdes) et sorties locales — jamais versionnées.
+avd/
+*.log
+*.pid
+*.png
