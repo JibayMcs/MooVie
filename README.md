@@ -23,6 +23,9 @@ native, extraction des sources **on-device** — pas de backend, pas de compte,
 - **Lecteur** : Media3/ExoPlayer (HLS, DASH, MP4), reprise de lecture,
   sous-titres externes, sélection de pistes, touches média de la télécommande
   (MediaSession), seek 5 s / 15 s.
+- **Passer intro & générique** (TheIntroDB) : boutons « Passer l'intro / le
+  générique » pendant la lecture — passer le générique enchaîne l'épisode
+  suivant (série) ou revient à l'accueil (film). Activable dans les réglages.
 - **Réglages** : clé TMDB, langue de stream par défaut, langue d'interface,
   sources activables/désactivables et ordonnables par priorité.
 - **Mises à jour intégrées** : l'app vérifie les releases GitHub au démarrage et

@@ -61,6 +61,7 @@ fun SettingsScreen(
     val providers by viewModel.providers.collectAsStateWithLifecycle()
     val dohEnabled by viewModel.dohEnabled.collectAsStateWithLifecycle()
     val dohProvider by viewModel.dohProvider.collectAsStateWithLifecycle()
+    val skipIntroOutro by viewModel.skipIntroOutro.collectAsStateWithLifecycle()
 
     Column(
         // Scroll pleine page puis marges : les boutons agrandis au focus débordent
@@ -146,6 +147,25 @@ fun SettingsScreen(
                         )
                     }
                 }
+            }
+        }
+
+        SettingsCategory("Intro & générique") {
+            Text(
+                "Affiche des boutons « Passer l'intro / le générique » pendant la lecture " +
+                    "(données TheIntroDB). Passer le générique enchaîne l'épisode suivant (série) " +
+                    "ou revient à l'accueil (film).",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                MoovieButton(
+                    onClick = { viewModel.setSkipIntroOutro(true) },
+                    selected = skipIntroOutro,
+                ) { Text("Activé") }
+                MoovieButton(
+                    onClick = { viewModel.setSkipIntroOutro(false) },
+                    selected = !skipIntroOutro,
+                ) { Text("Désactivé") }
             }
         }
 

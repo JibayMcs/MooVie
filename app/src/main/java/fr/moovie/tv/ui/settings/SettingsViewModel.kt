@@ -39,6 +39,11 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     fun setDohEnabled(value: Boolean) = viewModelScope.launch { repo.setDohEnabled(value) }
     fun setDohProvider(value: DohProvider) = viewModelScope.launch { repo.setDohProvider(value) }
 
+    val skipIntroOutro: StateFlow<Boolean> =
+        repo.skipIntroOutro.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+
+    fun setSkipIntroOutro(value: Boolean) = viewModelScope.launch { repo.setSkipIntroOutro(value) }
+
     /** Providers dans l'ordre de priorité effectif, avec leur état on/off. */
     val providers: StateFlow<List<ProviderSetting>> =
         combine(repo.providerOrder, repo.disabledProviders) { order, disabled ->

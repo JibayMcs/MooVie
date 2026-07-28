@@ -5,11 +5,21 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -19,7 +29,9 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
@@ -30,19 +42,39 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.MediaSession
 import androidx.media3.ui.PlayerView
+import androidx.tv.material3.Icon
+import androidx.tv.material3.Text
+import fr.moovie.tv.data.intro.IntroDbRepository
+import fr.moovie.tv.data.intro.IntroMedia
+import fr.moovie.tv.data.settings.SettingsRepository
 import fr.moovie.tv.data.watch.WatchProgressRepository
+import fr.moovie.tv.ui.components.MoovieButton
 import kotlinx.coroutines.delay
 
+/** Contenu déduit de la mediaKey ("movie:<id>" ou "tv:<id>:s<S>e<E>"). */
+private data class PlaybackId(val tmdbId: Int, val isTv: Boolean, val season: Int, val episode: Int)
+
+private fun parseMediaKey(key: String): PlaybackId? {
+    val parts = key.split(":")
+    return when {
+        parts.size >= 2 && parts[0] == "movie" ->
+            parts[1].toIntOrNull()?.let { PlaybackId(it, false, 0, 0) }
+        parts.size >= 3 && parts[0] == "tv" -> {
+            val tmdb = parts[1].toIntOrNull() ?: return null
+            val m = Regex("s(\\d+)e(\\d+)").find(parts[2]) ?: return null
+            PlaybackId(tmdb, true, m.groupValues[1].toInt(), m.groupValues[2].toInt())
+        }
+        else -> null
+    }
+}
+
+private enum class SkipKind { INTRO, CREDITS }
+
 /**
- * Lecteur natif Media3/ExoPlayer avec :
- * - reprise de lecture (position sauvegardée par contenu via [mediaKey]),
- * - sous-titres externes fournis par le provider ([subtitles] : langue → URL),
- * - contrôles Media3 pilotables à la télécommande (D-pad).
- *
- * Pilotage D-pad : une couche Compose focusable capte la 1re touche pour réveiller
- * les contrôles puis passe le focus à la PlayerView, dont la navigation native
- * (seek, pause, sélection de pistes, CC) prend alors le relais. Quand les contrôles
- * se masquent, le focus revient à la couche Compose pour la prochaine touche.
+ * Lecteur natif Media3/ExoPlayer : reprise, sous-titres externes, contrôles
+ * pilotables au D-pad, anti-veille, et boutons « Passer l'intro / le générique »
+ * (TheIntroDB) — passer le générique enchaîne l'épisode suivant ou revient à
+ * l'accueil pour un film.
  */
 @OptIn(UnstableApi::class)
 @Composable
@@ -52,9 +84,13 @@ fun PlayerScreen(
     mediaKey: String = "",
     subtitles: Map<String, String> = emptyMap(),
     onBack: () -> Unit,
+    onNextEpisode: (tmdbId: Int, season: Int, episode: Int) -> Unit = { _, _, _ -> },
 ) {
     val context = LocalContext.current
     val progress = remember { WatchProgressRepository(context) }
+    val introRepo = remember { IntroDbRepository() }
+    val settings = remember { SettingsRepository(context) }
+    val skipEnabled by settings.skipIntroOutro.collectAsStateWithLifecycle(initialValue = true)
 
     val player = remember {
         val httpFactory = DefaultHttpDataSource.Factory().apply {
@@ -76,7 +112,6 @@ fun PlayerScreen(
 
     // Prépare le média (avec sous-titres externes) et reprend à la position sauvée.
     LaunchedEffect(streamUrl) {
-        // Filet anti-flux fantôme : repart d'un lecteur vide même s'il était réutilisé.
         player.stop()
         player.clearMediaItems()
 
@@ -110,7 +145,44 @@ fun PlayerScreen(
         }
     }
 
+    // ── Intro / générique (TheIntroDB) ───────────────────────────────────────
+    val pid = remember(mediaKey) { parseMediaKey(mediaKey) }
+    var media by remember(streamUrl) { mutableStateOf<IntroMedia?>(null) }
+    var activeSkip by remember { mutableStateOf<SkipKind?>(null) }
+
+    // Récupère les segments une fois la durée connue (meilleur choix de version).
+    LaunchedEffect(streamUrl, skipEnabled, pid) {
+        if (!skipEnabled || pid == null) return@LaunchedEffect
+        var dur = 0L
+        repeat(20) {
+            val d = player.duration
+            if (d != C.TIME_UNSET && d > 0) return@repeat
+            delay(500)
+        }
+        player.duration.let { if (it != C.TIME_UNSET && it > 0) dur = it }
+        media = introRepo.fetch(pid.tmdbId, pid.isTv, pid.season, pid.episode, dur)
+    }
+
+    // Détermine le segment actif selon la position courante.
+    LaunchedEffect(media) {
+        val m = media
+        if (m == null) { activeSkip = null; return@LaunchedEffect }
+        val intro = m.intro.firstOrNull()
+        val credits = m.credits.firstOrNull()
+        while (true) {
+            val pos = player.currentPosition
+            activeSkip = when {
+                intro?.endMs != null && pos >= (intro.startMs ?: 0L) && pos <= intro.endMs -> SkipKind.INTRO
+                credits?.startMs != null && pos >= credits.startMs &&
+                    (credits.endMs == null || pos <= credits.endMs) -> SkipKind.CREDITS
+                else -> null
+            }
+            delay(500)
+        }
+    }
+
     val dpadFocus = remember { FocusRequester() }
+    val skipFocus = remember { FocusRequester() }
 
     val playerView = remember {
         PlayerView(context).apply {
@@ -123,8 +195,6 @@ fun PlayerScreen(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT,
             )
-            // Quand les contrôles se masquent, on rend le focus à la couche
-            // Compose : la prochaine touche les réveillera à nouveau.
             setControllerVisibilityListener(
                 PlayerView.ControllerVisibilityListener { visibility ->
                     if (visibility != View.VISIBLE) {
@@ -135,8 +205,7 @@ fun PlayerScreen(
         }
     }
 
-    // Garde l'écran allumé tant que ça joue (sinon l'Android TV se met en veille
-    // sur inactivité, la lecture n'étant pas vue comme une « activité »).
+    // Garde l'écran allumé tant que ça joue (anti-veille de l'Android TV).
     DisposableEffect(player, playerView) {
         val listener = object : Player.Listener {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -159,37 +228,88 @@ fun PlayerScreen(
         }
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .focusRequester(dpadFocus)
-            .focusable()
-            .onKeyEvent { event ->
-                if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
-                // La couche Compose n'a le focus que contrôles masqués : on les
-                // réveille et on passe la main à la PlayerView (navigation native).
-                when (event.key) {
-                    Key.DirectionCenter, Key.Enter, Key.NumPadEnter,
-                    Key.MediaPlayPause, Key.Spacebar,
-                    Key.DirectionUp, Key.DirectionDown,
-                    Key.DirectionLeft, Key.DirectionRight -> {
-                        // OK/Play-Pause : bascule immédiate en plus de réveiller.
-                        if (event.key == Key.DirectionCenter || event.key == Key.Enter ||
-                            event.key == Key.NumPadEnter || event.key == Key.MediaPlayPause ||
-                            event.key == Key.Spacebar
-                        ) {
-                            player.playWhenReady = !player.playWhenReady
+    fun doSkip() {
+        val m = media ?: return
+        when (activeSkip) {
+            SkipKind.INTRO -> m.intro.firstOrNull()?.endMs?.let { player.seekTo(it) }
+            SkipKind.CREDITS -> {
+                if (pid != null && pid.isTv) onNextEpisode(pid.tmdbId, pid.season, pid.episode + 1)
+                else onBack()
+            }
+            null -> Unit
+        }
+    }
+
+    // Auto-focus du bouton de skip dès qu'un segment devient actif ; le focus
+    // revient au lecteur quand le bouton disparaît.
+    LaunchedEffect(activeSkip) {
+        if (activeSkip != null) {
+            delay(50)
+            runCatching { skipFocus.requestFocus() }
+        } else {
+            runCatching { dpadFocus.requestFocus() }
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .focusRequester(dpadFocus)
+                .focusable()
+                .onKeyEvent { event ->
+                    if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
+                    when (event.key) {
+                        Key.DirectionCenter, Key.Enter, Key.NumPadEnter,
+                        Key.MediaPlayPause, Key.Spacebar,
+                        Key.DirectionUp, Key.DirectionDown,
+                        Key.DirectionLeft, Key.DirectionRight -> {
+                            if (event.key == Key.DirectionCenter || event.key == Key.Enter ||
+                                event.key == Key.NumPadEnter || event.key == Key.MediaPlayPause ||
+                                event.key == Key.Spacebar
+                            ) {
+                                player.playWhenReady = !player.playWhenReady
+                            }
+                            playerView.showController()
+                            playerView.requestFocus()
+                            true
                         }
-                        playerView.showController()
-                        playerView.requestFocus()
-                        true
+                        else -> false
                     }
-                    else -> false
-                }
-            },
-    ) {
-        AndroidView(modifier = Modifier.fillMaxSize(), factory = { playerView })
+                },
+        ) {
+            AndroidView(modifier = Modifier.fillMaxSize(), factory = { playerView })
+        }
+
+        // Bouton « Passer » en overlay, visible que les contrôles soient affichés
+        // ou non. Auto-focalisé ; une flèche rend la main au lecteur.
+        val skip = activeSkip
+        if (skip != null) {
+            MoovieButton(
+                onClick = { doSkip() },
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(48.dp)
+                    .focusRequester(skipFocus)
+                    .onKeyEvent { event ->
+                        if (event.type == KeyEventType.KeyDown && event.key in DPAD_DIRECTIONS) {
+                            runCatching { dpadFocus.requestFocus() }
+                            true
+                        } else {
+                            false
+                        }
+                    },
+            ) {
+                Icon(Icons.Default.SkipNext, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(10.dp))
+                Text(if (skip == SkipKind.INTRO) "Passer l'intro" else "Passer le générique")
+            }
+        }
     }
 
     LaunchedEffect(Unit) { runCatching { dpadFocus.requestFocus() } }
 }
+
+private val DPAD_DIRECTIONS = setOf(
+    Key.DirectionUp, Key.DirectionDown, Key.DirectionLeft, Key.DirectionRight,
+)

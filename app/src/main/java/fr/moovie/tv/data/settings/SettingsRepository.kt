@@ -61,6 +61,13 @@ class SettingsRepository(private val context: Context) {
                 .getOrDefault(DohProvider.CLOUDFLARE)
         }
 
+    /** Boutons « Passer l'intro / le générique » (TheIntroDB) — activés par défaut. */
+    val skipIntroOutro: Flow<Boolean> =
+        context.dataStore.data.map { it[SKIP_INTRO_OUTRO] ?: true }
+
+    suspend fun setSkipIntroOutro(value: Boolean) =
+        context.dataStore.edit { it[SKIP_INTRO_OUTRO] = value }
+
     suspend fun setDohEnabled(value: Boolean) =
         context.dataStore.edit { it[DOH_ENABLED] = value }
 
@@ -95,5 +102,6 @@ class SettingsRepository(private val context: Context) {
         val PROVIDER_ORDER = stringPreferencesKey("provider_order")
         val DOH_ENABLED = booleanPreferencesKey("doh_enabled")
         val DOH_PROVIDER = stringPreferencesKey("doh_provider")
+        val SKIP_INTRO_OUTRO = booleanPreferencesKey("skip_intro_outro")
     }
 }
