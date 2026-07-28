@@ -49,6 +49,7 @@ import fr.moovie.tv.ui.components.MoovieButton
 fun HomeScreen(
     onOpenTitle: (tmdbId: Int, isTv: Boolean) -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenSearch: () -> Unit,
     viewModel: HomeViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -87,7 +88,10 @@ fun HomeScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text("Moo-vie", style = MaterialTheme.typography.headlineMedium)
-                MoovieButton(onClick = onOpenSettings) { Text("Réglages") }
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    MoovieButton(onClick = onOpenSearch) { Text("Rechercher") }
+                    MoovieButton(onClick = onOpenSettings) { Text("Réglages") }
+                }
             }
             Spacer(Modifier.height(16.dp))
 

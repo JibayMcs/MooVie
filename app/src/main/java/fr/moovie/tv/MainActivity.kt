@@ -23,6 +23,7 @@ import fr.moovie.tv.ui.navigation.Screen
 import fr.moovie.tv.ui.details.DetailsScreen
 import fr.moovie.tv.ui.home.HomeScreen
 import fr.moovie.tv.ui.player.PlayerScreen
+import fr.moovie.tv.ui.search.SearchScreen
 import fr.moovie.tv.ui.settings.SettingsScreen
 import fr.moovie.tv.ui.theme.MooVieTheme
 import kotlinx.coroutines.launch
@@ -54,8 +55,13 @@ class MainActivity : ComponentActivity() {
                             Screen.Home -> HomeScreen(
                                 onOpenTitle = { id, isTv -> screen = Screen.Details(id, isTv) },
                                 onOpenSettings = { screen = Screen.Settings },
+                                onOpenSearch = { screen = Screen.Search },
                             )
                             Screen.Settings -> SettingsScreen(
+                                onBack = { screen = Screen.Home },
+                            )
+                            Screen.Search -> SearchScreen(
+                                onOpenTitle = { id, isTv -> screen = Screen.Details(id, isTv) },
                                 onBack = { screen = Screen.Home },
                             )
                             is Screen.Details -> DetailsScreen(
