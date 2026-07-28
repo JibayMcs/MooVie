@@ -54,6 +54,7 @@ dependencies {
     // Compose + Compose for TV
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.material:material-icons-extended")
+    implementation("androidx.compose.material3:material3") // uniquement pour les indicateurs de progression
     implementation("androidx.tv:tv-material:1.0.0")
 
     // Lecture vidéo native

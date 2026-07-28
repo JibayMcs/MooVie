@@ -21,8 +21,10 @@ object ExtractorRegistry {
         VidzyExtractor(http),
         UqloadExtractor(http),
         DoodStreamExtractor(http),
+        SibnetExtractor(http),
+        SeekStreamingExtractor(http),
+        AnsembedExtractor(http),
         VoeExtractor(http),
-        // À compléter : SibnetExtractor, SeekStreamingExtractor (AES)…
     )
 
     fun extractorFor(url: String): SourceExtractor? =
@@ -34,7 +36,14 @@ object ExtractorRegistry {
         extractorFor(link.url)?.extract(link)
 }
 
-/** Providers de sources disponibles (portage des routes backend). */
+/**
+ * Liste des providers de sources. L'orchestration (chargement progressif, timeout,
+ * fusion) est faite par l'appelant (DetailsViewModel) pour un affichage en streaming.
+ */
 object ProviderRegistry {
-    val fstream: SourceProvider = FstreamProvider(ExtractorRegistry.http)
+    val all: List<SourceProvider> = listOf(
+        FstreamProvider(ExtractorRegistry.http),
+        AnimeSamaProvider(ExtractorRegistry.http),
+        CoflixProvider(ExtractorRegistry.http),
+    )
 }

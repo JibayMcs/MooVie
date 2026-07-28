@@ -2,6 +2,11 @@ package fr.moovie.tv.ui.details
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
@@ -28,9 +33,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -71,6 +79,7 @@ fun DetailsScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val sources by viewModel.sources.collectAsStateWithLifecycle()
     val resolved by viewModel.resolved.collectAsStateWithLifecycle()
+    val resolveError by viewModel.resolveError.collectAsStateWithLifecycle()
     val streamLang by viewModel.streamLanguage.collectAsStateWithLifecycle()
     val primaryFocus = remember { FocusRequester() }
 
@@ -89,7 +98,7 @@ fun DetailsScreen(
 
     val backdrop = (state as? DetailsState.Movie)?.details?.backdropUrl()
         ?: (state as? DetailsState.Tv)?.details?.backdropUrl()
-    val panelOpen = sources is SourcesState.Loaded
+    val panelOpen = sources is SourcesState.Active
 
     // Retour ferme d'abord le panneau des sources (sinon retour à l'accueil).
     BackHandler(enabled = panelOpen) { viewModel.clearSources() }
@@ -128,7 +137,6 @@ fun DetailsScreen(
                         onClick = { viewModel.loadMovieSources() },
                         modifier = Modifier.focusRequester(primaryFocus),
                     ) { Text("Sources") }
-                    SourcesStatus(sources, streamLang)
                 }
                 is DetailsState.Tv -> {
                     Text(s.details.name, style = MaterialTheme.typography.headlineMedium)
@@ -149,63 +157,71 @@ fun DetailsScreen(
                     s.episodes.forEach { ep ->
                         EpisodeRow(ep, onSources = { viewModel.loadEpisodeSources(ep.episodeNumber) })
                     }
-                    SourcesStatus(sources, streamLang)
                 }
             }
         }
 
-        // Panneau des sources en slide-over depuis la droite (seulement si chargé).
+        // Panneau des sources : s'ouvre dès le clic, se remplit en streaming.
+        // On mémorise le dernier état actif pour garder le contenu pendant la
+        // sortie animée (où `sources` repasse à Idle).
+        val lastActive = remember { mutableStateOf<SourcesState.Active?>(null) }
+        (sources as? SourcesState.Active)?.let { lastActive.value = it }
         AnimatedVisibility(
             visible = panelOpen,
             enter = slideInHorizontally(initialOffsetX = { it }) + fadeIn(),
             exit = slideOutHorizontally(targetOffsetX = { it }) + fadeOut(),
             modifier = Modifier.align(Alignment.CenterEnd),
         ) {
-            val links = (sources as? SourcesState.Loaded)?.links.orEmpty()
-            SourcesSlideOver(links = links, preferred = streamLang, onPick = viewModel::play)
+            lastActive.value?.let { active ->
+                SourcesSlideOver(state = active, preferred = streamLang, resolveError = resolveError, onPick = viewModel::play)
+            }
         }
-    }
-}
-
-/** Message inline sur la fiche pour les états non-chargés (recherche / vide / erreur). */
-@Composable
-private fun SourcesStatus(state: SourcesState, preferred: StreamLanguage) {
-    when (state) {
-        SourcesState.Loading -> Text("Recherche des sources…", color = Color(0xFFBBBBBB))
-        SourcesState.Empty -> Text(
-            "Aucune source disponible pour ce titre (recherché en ${preferred.name}).",
-            color = Color(0xFFE0A0A0),
-        )
-        is SourcesState.Error -> Text(state.message, color = Color(0xFFE0A0A0))
-        else -> Unit
     }
 }
 
 @Composable
 private fun SourcesSlideOver(
-    links: List<EmbedLink>,
+    state: SourcesState.Active,
     preferred: StreamLanguage,
+    resolveError: String?,
     onPick: (EmbedLink) -> Unit,
 ) {
-    // Groupement par langue, langue préférée de l'utilisateur en premier.
+    val links = state.links
     val grouped = links.groupBy { it.language ?: "?" }
     val order = (listOf(preferred.name, "VF", "VOSTFR", "VO") + grouped.keys).distinct()
     val sections = order.filter { grouped.containsKey(it) }.map { it to grouped.getValue(it) }
-    val prefMissing = !grouped.containsKey(preferred.name)
+    val prefMissing = links.isNotEmpty() && !grouped.containsKey(preferred.name)
     val firstFocus = remember { FocusRequester() }
 
-    LaunchedEffect(links) { runCatching { firstFocus.requestFocus() } }
+    // Focalise le 1er lecteur dès qu'une source arrive (le panneau s'ouvre vide).
+    LaunchedEffect(links.isNotEmpty()) {
+        if (links.isNotEmpty()) runCatching { firstFocus.requestFocus() }
+    }
 
     Column(
         modifier = Modifier
             .fillMaxHeight()
-            .width(560.dp)
+            .width(380.dp)
             .background(Color(0xF2121212))
-            .padding(32.dp),
+            .padding(horizontal = 24.dp, vertical = 28.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text("Sources", style = MaterialTheme.typography.titleLarge)
         Text("Retour pour fermer", style = MaterialTheme.typography.labelSmall, color = Color(0xFF8A8A8A))
+
+        // Barre de progression tant qu'au moins un provider charge.
+        if (state.anyLoading) {
+            LinearProgressIndicator(
+                color = ACCENT,
+                trackColor = Color(0xFF2A2A2A),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        ProviderChips(state.providers)
+
+        resolveError?.let {
+            Text(it, style = MaterialTheme.typography.labelMedium, color = Color(0xFFE06A6A))
+        }
         if (prefMissing) {
             Text(
                 "Aucune source en ${preferred.name} — autres langues disponibles.",
@@ -215,28 +231,87 @@ private fun SourcesSlideOver(
         }
         Spacer(Modifier.height(4.dp))
 
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            sections.forEachIndexed { sectionIndex, (lang, sourcesInLang) ->
-                item(key = "h_$lang") {
-                    Text(
-                        lang,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = ACCENT,
-                        modifier = Modifier.padding(top = if (sectionIndex == 0) 0.dp else 8.dp),
-                    )
-                }
-                itemsIndexed(sourcesInLang, key = { _, l -> l.url }) { linkIndex, link ->
-                    val isFirst = sectionIndex == 0 && linkIndex == 0
-                    MoovieButton(
-                        onClick = { onPick(link) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .then(if (isFirst) Modifier.focusRequester(firstFocus) else Modifier),
-                    ) {
-                        Text(link.hoster.replaceFirstChar { it.uppercase() })
+        when {
+            links.isEmpty() && state.anyLoading -> SkeletonRows()
+            links.isEmpty() -> Text(
+                "Aucune source disponible pour ce titre.",
+                color = Color(0xFFE0A0A0),
+            )
+            else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                sections.forEachIndexed { sectionIndex, (lang, sourcesInLang) ->
+                    item(key = "h_$lang") {
+                        Text(
+                            lang,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = ACCENT,
+                            modifier = Modifier.padding(top = if (sectionIndex == 0) 0.dp else 8.dp),
+                        )
+                    }
+                    itemsIndexed(sourcesInLang, key = { _, l -> l.url }) { linkIndex, link ->
+                        val isFirst = sectionIndex == 0 && linkIndex == 0
+                        MoovieButton(
+                            onClick = { onPick(link) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .then(if (isFirst) Modifier.focusRequester(firstFocus) else Modifier),
+                        ) {
+                            Text(link.hoster.replaceFirstChar { it.uppercase() })
+                        }
                     }
                 }
             }
+        }
+    }
+}
+
+/** Pastilles de progression par provider (chargement / trouvé / vide / échec). */
+@Composable
+private fun ProviderChips(providers: List<ProviderProgress>) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        providers.forEach { p ->
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color(0xFF1E1E1E))
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                when (p.status) {
+                    ProviderStatus.LOADING -> CircularProgressIndicator(
+                        color = ACCENT,
+                        strokeWidth = 2.dp,
+                        modifier = Modifier.size(12.dp),
+                    )
+                    ProviderStatus.DONE -> Text("✓", color = Color(0xFF5FD98A), style = MaterialTheme.typography.labelMedium)
+                    ProviderStatus.EMPTY -> Text("—", color = Color(0xFF8A8A8A), style = MaterialTheme.typography.labelMedium)
+                    ProviderStatus.FAILED -> Text("✕", color = Color(0xFFE06A6A), style = MaterialTheme.typography.labelMedium)
+                }
+                Text(p.name, style = MaterialTheme.typography.labelMedium, color = Color(0xFFCCCCCC))
+            }
+        }
+    }
+}
+
+/** Lignes fantômes (skeleton) animées tant qu'aucune source n'est encore arrivée. */
+@Composable
+private fun SkeletonRows() {
+    val transition = rememberInfiniteTransition(label = "skeleton")
+    val alpha by transition.animateFloat(
+        initialValue = 0.25f,
+        targetValue = 0.6f,
+        animationSpec = infiniteRepeatable(tween(700), RepeatMode.Reverse),
+        label = "skeletonAlpha",
+    )
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        repeat(5) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(46.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color.White.copy(alpha = alpha * 0.15f)),
+            )
         }
     }
 }

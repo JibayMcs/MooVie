@@ -13,12 +13,15 @@ import fr.moovie.tv.data.tmdb.Episode
 import fr.moovie.tv.data.tmdb.MovieDetails
 import fr.moovie.tv.data.tmdb.TmdbRepository
 import fr.moovie.tv.data.tmdb.TvDetails
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 sealed interface DetailsState {
     data object Loading : DetailsState
@@ -27,15 +30,27 @@ sealed interface DetailsState {
     data class Error(val message: String) : DetailsState
 }
 
-/** Liens d'embed résolus par le provider, ou état de résolution/erreur. */
+/** Statut de chargement d'un provider donné. */
+enum class ProviderStatus { LOADING, DONE, EMPTY, FAILED }
+
+data class ProviderProgress(val name: String, val status: ProviderStatus)
+
+/**
+ * État du panneau de sources. Idle = fermé. Active = panneau ouvert (dès le clic),
+ * avec les liens accumulés et la progression par provider, mis à jour en streaming.
+ */
 sealed interface SourcesState {
     data object Idle : SourcesState
-    data object Loading : SourcesState
-    data class Loaded(val links: List<EmbedLink>) : SourcesState
-    /** Aucune source trouvée (site ok mais pas de lecteur). */
-    data object Empty : SourcesState
-    data class Error(val message: String) : SourcesState
+    data class Active(
+        val links: List<EmbedLink>,
+        val providers: List<ProviderProgress>,
+    ) : SourcesState {
+        val anyLoading: Boolean get() = providers.any { it.status == ProviderStatus.LOADING }
+    }
 }
+
+/** Délai max par provider avant de le marquer en échec (n'affecte que ce provider). */
+private const val PROVIDER_TIMEOUT_MS = 12000L
 
 class DetailsViewModel(app: Application) : AndroidViewModel(app) {
 
@@ -50,6 +65,10 @@ class DetailsViewModel(app: Application) : AndroidViewModel(app) {
     /** Flux prêt à jouer (émis une fois qu'un extracteur a résolu un lien). */
     private val _resolved = MutableStateFlow<PlayableStream?>(null)
     val resolved: StateFlow<PlayableStream?> = _resolved
+
+    /** Message transitoire si un lecteur choisi n'a pas pu être résolu. */
+    private val _resolveError = MutableStateFlow<String?>(null)
+    val resolveError: StateFlow<String?> = _resolveError
 
     /** Langue de stream préférée de l'utilisateur (pour trier/prioriser les sources). */
     val streamLanguage: StateFlow<StreamLanguage> = settings.streamLanguage
@@ -93,31 +112,52 @@ class DetailsViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Charge les liens d'embed pour le film courant. */
+    /** Charge les sources du film courant, en streaming par provider. */
     fun loadMovieSources() {
         val movie = _state.value as? DetailsState.Movie ?: return
-        _sources.value = SourcesState.Loading
-        viewModelScope.launch {
-            runCatching { ProviderRegistry.fstream.movieSources(movie.details.title, movie.details.year) }
-                .onSuccess { emitSources(it) }
-                .onFailure { _sources.value = SourcesState.Error(it.message ?: "erreur") }
-        }
+        startSourceLoad { it.movieSources(movie.details.title, movie.details.year) }
     }
 
-    /** Charge les liens d'embed pour un épisode. */
+    /** Charge les sources d'un épisode, en streaming par provider. */
     fun loadEpisodeSources(episode: Int) {
         val tv = _state.value as? DetailsState.Tv ?: return
-        _sources.value = SourcesState.Loading
-        viewModelScope.launch {
-            runCatching {
-                ProviderRegistry.fstream.tvSources(tv.details.name, tv.details.year, tv.season, episode)
-            }.onSuccess { emitSources(it) }
-                .onFailure { _sources.value = SourcesState.Error(it.message ?: "erreur") }
-        }
+        startSourceLoad { it.tvSources(tv.details.name, tv.details.year, tv.season, episode) }
     }
 
-    private fun emitSources(links: List<EmbedLink>) {
-        _sources.value = if (links.isEmpty()) SourcesState.Empty else SourcesState.Loaded(links)
+    /**
+     * Ouvre le panneau immédiatement (tous providers en LOADING) puis interroge
+     * chaque provider en parallèle ; chaque résultat met à jour l'état de façon
+     * atomique → les sources apparaissent au fil de l'eau. Un provider lent/mort
+     * passe en FAILED après [PROVIDER_TIMEOUT_MS] sans bloquer les autres.
+     */
+    private fun startSourceLoad(query: suspend (fr.moovie.tv.data.sources.SourceProvider) -> List<EmbedLink>) {
+        val providers = ProviderRegistry.all
+        _sources.value = SourcesState.Active(
+            links = emptyList(),
+            providers = providers.map { ProviderProgress(it.name, ProviderStatus.LOADING) },
+        )
+        providers.forEach { provider ->
+            viewModelScope.launch(Dispatchers.IO) {
+                val result = runCatching {
+                    withTimeoutOrNull(PROVIDER_TIMEOUT_MS) { query(provider) }
+                }
+                _sources.update { st ->
+                    val active = st as? SourcesState.Active ?: return@update st
+                    val links = result.getOrNull().orEmpty()
+                    val status = when {
+                        result.isFailure || result.getOrNull() == null -> ProviderStatus.FAILED
+                        links.isEmpty() -> ProviderStatus.EMPTY
+                        else -> ProviderStatus.DONE
+                    }
+                    active.copy(
+                        links = (active.links + links).distinctBy { it.url },
+                        providers = active.providers.map {
+                            if (it.name == provider.name) it.copy(status = status) else it
+                        },
+                    )
+                }
+            }
+        }
     }
 
     /** Ferme le panneau des sources (retour à l'état inactif). */
@@ -127,11 +167,11 @@ class DetailsViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Résout un lien d'embed en flux jouable via les extracteurs. */
     fun play(link: EmbedLink) {
+        _resolveError.value = null
         viewModelScope.launch {
             val stream = runCatching { ExtractorRegistry.resolve(link) }.getOrNull()
             if (stream != null) _resolved.value = stream
-            else _sources.value =
-                SourcesState.Error("Impossible de résoudre « ${link.hoster} » (extracteur manquant ?).")
+            else _resolveError.value = "Impossible de lire « ${link.hoster} ». Essaie un autre lecteur."
         }
     }
 
