@@ -17,14 +17,22 @@ object ExtractorRegistry {
         .build()
 
     private val extractors: List<SourceExtractor> = listOf(
+        FsvidExtractor(http),
         VoeExtractor(http),
-        // À compléter : UqloadExtractor, DoodStreamExtractor, SibnetExtractor,
-        // SeekStreamingExtractor… (portage 1:1 des handlers de API/proxiesembed).
+        // À compléter : UqloadExtractor, DoodStreamExtractor, VidzyExtractor,
+        // SibnetExtractor, SeekStreamingExtractor… (portage des handlers proxiesembed).
     )
 
     fun extractorFor(url: String): SourceExtractor? =
         extractors.firstOrNull { it.canHandle(url) }
 
+    fun canResolve(url: String): Boolean = extractorFor(url) != null
+
     suspend fun resolve(link: EmbedLink): PlayableStream? =
         extractorFor(link.url)?.extract(link)
+}
+
+/** Providers de sources disponibles (portage des routes backend). */
+object ProviderRegistry {
+    val fstream: SourceProvider = FstreamProvider(ExtractorRegistry.http)
 }

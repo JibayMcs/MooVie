@@ -30,35 +30,34 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     val state: StateFlow<HomeState> = _state
 
     init {
-        load()
+        // Réactif : recharge automatiquement dès que la clé TMDB change
+        // (saisie dans les réglages ou injectée par adb).
+        viewModelScope.launch {
+            settings.tmdbApiKey.collect { apiKey ->
+                if (apiKey.isBlank()) {
+                    _state.value = HomeState.NeedsApiKey("Renseigne ta clé API TMDB dans les réglages.")
+                } else {
+                    loadRows(apiKey)
+                }
+            }
+        }
     }
 
-    fun load() {
-        viewModelScope.launch {
-            val apiKey = settings.tmdbApiKey.first()
-            if (apiKey.isBlank()) {
-                _state.value = HomeState.NeedsApiKey("Renseigne ta clé API TMDB dans les réglages.")
-                return@launch
-            }
-            _state.value = HomeState.Loading
-            val language = settings.uiLanguage.first()
-            val repo = TmdbRepository(language)
-            runCatching {
-                val trendingMovies = repo.trendingMovies(apiKey)
-                val trendingTv = repo.trendingTv(apiKey)
-                val topRated = repo.topRatedMovies(apiKey)
-                listOf(
-                    HomeRow("Films tendances", trendingMovies),
-                    HomeRow("Séries tendances", trendingTv),
-                    HomeRow("Films les mieux notés", topRated),
-                ).filter { it.items.isNotEmpty() }
-            }.onSuccess { rows ->
-                _state.value =
-                    if (rows.isEmpty()) HomeState.NeedsApiKey("Aucun résultat — vérifie ta clé TMDB.")
-                    else HomeState.Ready(rows)
-            }.onFailure {
-                _state.value = HomeState.NeedsApiKey("Échec du chargement TMDB : ${it.message}")
-            }
+    private suspend fun loadRows(apiKey: String) {
+        _state.value = HomeState.Loading
+        val repo = TmdbRepository(settings.uiLanguage.first())
+        runCatching {
+            listOf(
+                HomeRow("Films tendances", repo.trendingMovies(apiKey)),
+                HomeRow("Séries tendances", repo.trendingTv(apiKey)),
+                HomeRow("Films les mieux notés", repo.topRatedMovies(apiKey)),
+            ).filter { it.items.isNotEmpty() }
+        }.onSuccess { rows ->
+            _state.value =
+                if (rows.isEmpty()) HomeState.NeedsApiKey("Aucun résultat — vérifie ta clé TMDB.")
+                else HomeState.Ready(rows)
+        }.onFailure {
+            _state.value = HomeState.NeedsApiKey("Échec du chargement TMDB : ${it.message}")
         }
     }
 }

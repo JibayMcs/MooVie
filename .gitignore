@@ -11,3 +11,4 @@
 *.keystore
 !debug.keystore
 keystore.properties
+/.env

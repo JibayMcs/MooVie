@@ -1,60 +1,88 @@
 package fr.moovie.tv
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.lifecycle.lifecycleScope
+import androidx.tv.material3.LocalContentColor
+import fr.moovie.tv.data.settings.SettingsRepository
 import fr.moovie.tv.ui.navigation.Screen
 import fr.moovie.tv.ui.details.DetailsScreen
 import fr.moovie.tv.ui.home.HomeScreen
 import fr.moovie.tv.ui.player.PlayerScreen
 import fr.moovie.tv.ui.settings.SettingsScreen
 import fr.moovie.tv.ui.theme.MooVieTheme
+import kotlinx.coroutines.launch
 
 /**
- * Activity unique. La navigation est gérée par un simple état `Screen` plutôt
- * que navigation-compose : sur TV, le contrôle explicite du focus/back est plus
- * simple à maîtriser qu'un NavHost. À remplacer si le graphe grossit.
+ * Activity unique. Navigation par état `Screen` (contrôle explicite du focus/back,
+ * plus simple à maîtriser sur TV qu'un NavHost).
  */
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        handleTmdbKey(intent)
+
         setContent {
             MooVieTheme {
-                Box(
-                    modifier = Modifier.fillMaxSize().background(Color.Black),
-                ) {
-                    var screen: Screen by remember { mutableStateOf(Screen.Home) }
+                // Fixe la couleur de contenu par défaut (sinon les Text libres
+                // héritent d'une couleur sombre sans Surface parent → invisibles).
+                CompositionLocalProvider(LocalContentColor provides Color.White) {
+                    Box(modifier = Modifier.fillMaxSize().background(Color(0xFF0A0A0A))) {
+                        var screen: Screen by remember { mutableStateOf(Screen.Home) }
 
-                    when (val s = screen) {
-                        Screen.Home -> HomeScreen(
-                            onOpenTitle = { id, isTv -> screen = Screen.Details(id, isTv) },
-                            onOpenSettings = { screen = Screen.Settings },
-                        )
-                        Screen.Settings -> SettingsScreen(
-                            onBack = { screen = Screen.Home },
-                        )
-                        is Screen.Details -> DetailsScreen(
-                            tmdbId = s.tmdbId,
-                            isTv = s.isTv,
-                            onPlay = { streamUrl -> screen = Screen.Player(streamUrl) },
-                            onBack = { screen = Screen.Home },
-                        )
-                        is Screen.Player -> PlayerScreen(
-                            streamUrl = s.streamUrl,
-                            onBack = { screen = Screen.Home },
-                        )
+                        when (val s = screen) {
+                            Screen.Home -> HomeScreen(
+                                onOpenTitle = { id, isTv -> screen = Screen.Details(id, isTv) },
+                                onOpenSettings = { screen = Screen.Settings },
+                            )
+                            Screen.Settings -> SettingsScreen(
+                                onBack = { screen = Screen.Home },
+                            )
+                            is Screen.Details -> DetailsScreen(
+                                tmdbId = s.tmdbId,
+                                isTv = s.isTv,
+                                onPlay = { url, headers -> screen = Screen.Player(url, headers) },
+                                onBack = { screen = Screen.Home },
+                            )
+                            is Screen.Player -> PlayerScreen(
+                                streamUrl = s.streamUrl,
+                                headers = s.headers,
+                                onBack = { screen = Screen.Home },
+                            )
+                        }
                     }
                 }
             }
+        }
+    }
+
+    // L'app pouvant déjà tourner, l'intent d'injection arrive ici (pas onCreate).
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleTmdbKey(intent)
+    }
+
+    /**
+     * Enregistre une clé TMDB passée en extra (test sans clavier TV) :
+     * adb shell am start -n fr.moovie.tv/.MainActivity --es tmdb_key <clé>
+     */
+    private fun handleTmdbKey(intent: Intent?) {
+        intent?.getStringExtra("tmdb_key")?.takeIf { it.isNotBlank() }?.let { key ->
+            lifecycleScope.launch { SettingsRepository(applicationContext).setTmdbApiKey(key) }
         }
     }
 }

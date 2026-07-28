@@ -1,6 +1,8 @@
 package fr.moovie.tv.ui.settings
 
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -9,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
@@ -88,14 +91,23 @@ private fun SettingsCategory(title: String, content: @Composable () -> Unit) {
 
 @Composable
 private fun ApiKeyField(value: String, onValueChange: (String) -> Unit) {
-    BasicTextField(
-        value = value,
-        onValueChange = onValueChange,
-        singleLine = true,
-        textStyle = TextStyle(color = Color.White),
-        cursorBrush = SolidColor(Color.White),
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp),
-    )
+            .padding(vertical = 8.dp)
+            .border(1.dp, Color(0xFF555555), RoundedCornerShape(6.dp))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+    ) {
+        if (value.isEmpty()) {
+            Text("Colle ta clé TMDB ici…", color = Color(0xFF888888))
+        }
+        BasicTextField(
+            value = value,
+            onValueChange = onValueChange,
+            singleLine = true,
+            textStyle = TextStyle(color = Color.White),
+            cursorBrush = SolidColor(Color.White),
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
 }

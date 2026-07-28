@@ -33,4 +33,13 @@ class TmdbRepository(
         api.searchMulti(query, apiKey, language)
             .results
             .filter { it.mediaType == "movie" || it.mediaType == "tv" }
+
+    suspend fun movieDetails(apiKey: String, id: Int): MovieDetails =
+        api.movieDetails(id, apiKey, language)
+
+    suspend fun tvDetails(apiKey: String, id: Int): TvDetails =
+        api.tvDetails(id, apiKey, language)
+
+    suspend fun season(apiKey: String, id: Int, season: Int): SeasonDetails =
+        api.season(id, season, apiKey, language)
 }

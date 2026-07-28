@@ -32,6 +32,30 @@ interface TmdbApi {
         @Query("page") page: Int = 1,
     ): TmdbPageResult
 
+    @GET("movie/{id}")
+    suspend fun movieDetails(
+        @Path("id") id: Int,
+        @Query("api_key") apiKey: String,
+        @Query("language") language: String,
+        @Query("append_to_response") append: String = "credits",
+    ): MovieDetails
+
+    @GET("tv/{id}")
+    suspend fun tvDetails(
+        @Path("id") id: Int,
+        @Query("api_key") apiKey: String,
+        @Query("language") language: String,
+        @Query("append_to_response") append: String = "credits",
+    ): TvDetails
+
+    @GET("tv/{id}/season/{season}")
+    suspend fun season(
+        @Path("id") id: Int,
+        @Path("season") season: Int,
+        @Query("api_key") apiKey: String,
+        @Query("language") language: String,
+    ): SeasonDetails
+
     companion object {
         const val BASE_URL = "https://api.themoviedb.org/3/"
     }
