@@ -115,7 +115,7 @@ internal fun DesktopSettingsScreen(onBack: () -> Unit) {
 @Composable
 internal fun DesktopDetailsScreen(
     params: Screen.Details,
-    onPlay: (streamUrl: String, headers: Map<String, String>, mediaKey: String, subtitles: Map<String, String>) -> Unit,
+    onPlay: (Screen.Player) -> Unit,
     onBack: () -> Unit,
     onRegisterBack: ((() -> Unit)?) -> Unit,
 ) {
@@ -129,6 +129,7 @@ internal fun DesktopDetailsScreen(
     val resume by vm.resume.collectAsState()
     val quickPlay by vm.quickPlay.collectAsState()
     val panelVisible by vm.panelVisible.collectAsState()
+    val selectedEpisode by vm.selectedEpisode.collectAsState()
     // Reprise depuis l'accueil : lance la lecture directe une seule fois.
     val autoConsumed = remember { mutableStateOf(false) }
 
@@ -153,14 +154,30 @@ internal fun DesktopDetailsScreen(
         resolved?.let { s ->
             if (s.url.isNotBlank()) {
                 vm.closePanel()
-                onPlay(s.url, s.headers, vm.playbackKey, s.subtitleUrls)
+                onPlay(
+                    Screen.Player(
+                        streamUrl = s.url,
+                        headers = s.headers,
+                        mediaKey = vm.playbackKey,
+                        subtitles = s.subtitleUrls,
+                        title = vm.playbackTitle,
+                        subtitle = vm.playbackSubtitle,
+                    ),
+                )
             }
             vm.consumeResolved()
         }
     }
-    // Échap ferme d'abord le panneau des sources, sinon retour à l'accueil.
-    LaunchedEffect(panelVisible) {
-        onRegisterBack(if (panelVisible) vm::closePanel else onBack)
+    // Échap ferme d'abord le panneau des sources, puis la fiche d'épisode,
+    // et seulement ensuite revient à l'accueil.
+    LaunchedEffect(panelVisible, selectedEpisode) {
+        onRegisterBack(
+            when {
+                panelVisible -> vm::closePanel
+                selectedEpisode != null -> vm::closeEpisode
+                else -> onBack
+            },
+        )
     }
 
     DetailsScreenContent(
@@ -172,11 +189,14 @@ internal fun DesktopDetailsScreen(
         resume = resume,
         quickPlay = quickPlay,
         panelVisible = panelVisible,
+        selectedEpisode = selectedEpisode,
         movieKey = vm.movieKey(),
         episodeKey = vm::episodeKey,
         onQuickPlayMovie = vm::quickPlayMovie,
         onQuickPlayEpisode = vm::quickPlayEpisode,
         onSelectSeason = vm::selectSeason,
+        onOpenEpisode = vm::openEpisode,
+        onOpenEpisodePanel = vm::openEpisodePanel,
         onToggleWatched = vm::toggleWatched,
         onToggleSeasonWatched = vm::toggleSeasonWatched,
         onOpenPanel = vm::openPanel,

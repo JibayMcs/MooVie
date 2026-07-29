@@ -61,8 +61,14 @@ data class Episode(
     val name: String = "",
     val overview: String = "",
     @SerialName("still_path") val stillPath: String? = null,
+    @SerialName("air_date") val airDate: String? = null,
+    @SerialName("vote_average") val voteAverage: Double = 0.0,
+    val runtime: Int? = null,
 ) {
     fun stillUrl() = stillPath?.let { "https://image.tmdb.org/t/p/w300$it" }
+
+    /** Visuel large pour la fiche d'épisode (la vignette w300 y est floue). */
+    fun stillUrlLarge() = stillPath?.let { "https://image.tmdb.org/t/p/w780$it" }
 }
 
 @Serializable

@@ -26,8 +26,11 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
+import org.jetbrains.compose.resources.painterResource
 import fr.moovie.tv.data.net.AppDns
 import fr.moovie.tv.data.settings.SettingsRepository
+import fr.moovie.tv.resources.Res
+import fr.moovie.tv.resources.moovie_icon
 import fr.moovie.tv.ui.components.MoovieButton
 import fr.moovie.tv.ui.navigation.Screen
 import fr.moovie.tv.ui.theme.MooVieTheme
@@ -71,6 +74,9 @@ fun main() {
         Window(
             onCloseRequest = ::exitApplication,
             title = "Moo-vie",
+            // Sans icône explicite, Compose Desktop affiche celle de Kotlin
+            // dans la barre des tâches et le gestionnaire de fenêtres.
+            icon = painterResource(Res.drawable.moovie_icon),
             state = windowState,
             onPreviewKeyEvent = { event ->
                 if (event.type != KeyEventType.KeyDown || event.key != Key.Escape) return@Window false
@@ -149,9 +155,9 @@ private fun DesktopApp(
             )
             is Screen.Details -> DesktopDetailsScreen(
                 params = s,
-                onPlay = { url, headers, key, subs ->
+                onPlay = { player ->
                     lastDetails = s.copy(autoSources = false)
-                    onNavigate(Screen.Player(url, headers, key, subs))
+                    onNavigate(player)
                 },
                 onBack = { onNavigate(Screen.Home) },
                 onRegisterBack = onRegisterBack,
@@ -164,6 +170,8 @@ private fun DesktopApp(
                     headers = s.headers,
                     mediaKey = s.mediaKey,
                     subtitles = s.subtitles,
+                    title = s.title,
+                    subtitle = s.subtitle,
                     isFullscreen = isFullscreen,
                     onToggleFullscreen = onToggleFullscreen,
                     onBack = backFromPlayer,

@@ -27,9 +27,19 @@ sealed interface SourcesState {
         val links: List<EmbedLink>,
         val providers: List<ProviderProgress>,
     ) : SourcesState {
-        val anyLoading: Boolean get() = providers.any { it.status == ProviderStatus.LOADING }
+        /**
+         * Liste de providers vide = chargement tout juste démarré (elle n'arrive
+         * qu'après lecture des réglages). On la compte comme « en cours » sinon
+         * la lecture rapide conclurait « aucune source » avant même d'avoir
+         * cherché — c'est ce qui obligeait à appuyer deux fois sur OK.
+         */
+        val anyLoading: Boolean
+            get() = providers.isEmpty() || providers.any { it.status == ProviderStatus.LOADING }
     }
 }
+
+/** Épisode ouvert en fiche détaillée (saison + épisode affichés). */
+data class EpisodeSelection(val season: Int, val episode: Episode)
 
 /**
  * État de la « lecture rapide » : résolution automatique de la meilleure source

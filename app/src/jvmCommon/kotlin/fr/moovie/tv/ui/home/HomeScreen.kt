@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -70,6 +71,8 @@ import fr.moovie.tv.ui.components.MOOVIE_ACCENT
 import fr.moovie.tv.ui.components.MoovieButton
 import fr.moovie.tv.ui.components.MoovieCard
 import fr.moovie.tv.ui.components.MoovieIconButton
+import fr.moovie.tv.ui.components.MoovieMarqueeText
+import fr.moovie.tv.ui.components.MoovieRail
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -88,8 +91,8 @@ fun HomeScreenContent(
     onRemoveResume: (String) -> Unit,
     onMarkResumeWatched: (String) -> Unit,
 ) {
-    // Élément survolé (focus D-pad) → alimente le hero et le fond dynamique.
-    var focused by remember { mutableStateOf<TmdbItem?>(null) }
+    // Élément focalisé (D-pad) ou survolé → alimente le hero et le fond.
+    var focused by remember { mutableStateOf<HeroTarget?>(null) }
     // Cible de descente depuis l'en-tête : sans ça, le focus reste bloqué sur
     // les boutons (les cartes sont hors du faisceau vertical du D-pad).
     val firstContentFocus = remember { FocusRequester() }
@@ -97,7 +100,14 @@ fun HomeScreenContent(
     var resumeMenuFor by remember { mutableStateOf<ResumeEntry?>(null) }
 
     val rows = (state as? HomeState.Ready)?.rows
-    val featured = focused ?: rows?.firstOrNull()?.items?.firstOrNull()
+    // Valeur par défaut = ce qui prendra le focus en premier. Sans ça le hero
+    // décrivait un film en tendance alors que le focus arrive sur « Reprendre
+    // la lecture » : titre et synopsis ne correspondaient pas à la carte visée.
+    val fallback = remember(resume, rows) {
+        resume.firstOrNull()?.let { HeroTarget.Resume(it) }
+            ?: rows?.firstOrNull()?.items?.firstOrNull()?.let { HeroTarget.Catalog(it) }
+    }
+    val featured = focused ?: fallback
 
     Box(modifier = Modifier.fillMaxSize().background(Color(0xFF0A0A0A))) {
         // Backdrop dynamique avec fondu enchaîné quand l'élément focalisé change.
@@ -175,6 +185,7 @@ fun HomeScreenContent(
                                 entries = resume,
                                 onResume = onResume,
                                 onMenu = { resumeMenuFor = it },
+                                onFocusEntry = { focused = HeroTarget.Resume(it) },
                                 firstFocus = firstContentFocus,
                             )
                         }
@@ -184,7 +195,7 @@ fun HomeScreenContent(
                             row = row,
                             watched = watched,
                             onOpenTitle = onOpenTitle,
-                            onFocusItem = { focused = it },
+                            onFocusItem = { focused = HeroTarget.Catalog(it) },
                             // Sans rail Reprendre, la 1re rangée devient la cible
                             // de descente depuis l'en-tête.
                             firstFocus = if (resume.isEmpty() && rowIndex == 0) firstContentFocus else null,
@@ -205,11 +216,52 @@ fun HomeScreenContent(
     }
 }
 
+/**
+ * Média décrit par le hero. Il suit l'élément réellement focalisé — y compris
+ * une carte du rail « Reprendre la lecture », qui n'a rien à voir avec les
+ * rangées de tendances.
+ */
+private sealed interface HeroTarget {
+    data class Catalog(val item: TmdbItem) : HeroTarget
+    data class Resume(val entry: ResumeEntry) : HeroTarget
+
+    fun backdropUrl(): String? = when (this) {
+        is Catalog -> item.backdropUrl()
+        is Resume -> entry.imageUrl
+    }
+}
+
+/**
+ * Hauteur fixe : le hero est le 1er élément d'une LazyColumn, une hauteur
+ * variable ferait sauter toutes les rangées au changement de focus.
+ */
+private val HERO_HEIGHT = 176.dp
+
 @Composable
-private fun Hero(item: TmdbItem?) {
-    if (item == null) return
-    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 8.dp)) {
-        Text(item.displayTitle, style = MaterialTheme.typography.displaySmall)
+private fun Hero(target: HeroTarget?) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(HERO_HEIGHT)
+            .padding(horizontal = 32.dp, vertical = 8.dp),
+    ) {
+        when (target) {
+            is HeroTarget.Catalog -> CatalogHero(target.item)
+            is HeroTarget.Resume -> ResumeHero(target.entry)
+            null -> Unit
+        }
+    }
+}
+
+@Composable
+private fun CatalogHero(item: TmdbItem) {
+    Column {
+        Text(
+            item.displayTitle,
+            style = MaterialTheme.typography.displaySmall,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
         Spacer(Modifier.height(6.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             item.year?.let { Text(it, style = MaterialTheme.typography.titleMedium, color = Color(0xFFCCCCCC)) }
@@ -230,12 +282,55 @@ private fun Hero(item: TmdbItem?) {
     }
 }
 
+/** Hero d'une entrée « Reprendre » : progression plutôt que synopsis. */
+@Composable
+private fun ResumeHero(entry: ResumeEntry) {
+    val remainMin = ((entry.durationMs - entry.positionMs) / 60_000).coerceAtLeast(0)
+    Column {
+        Text(
+            stringResource(Res.string.home_continue_watching),
+            style = MaterialTheme.typography.titleMedium,
+            color = MOOVIE_ACCENT,
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            entry.title,
+            style = MaterialTheme.typography.displaySmall,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(Modifier.height(6.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            entry.episodeLabel?.let {
+                Text(it, style = MaterialTheme.typography.titleMedium, color = Color(0xFFCCCCCC))
+            }
+            Text(
+                if (entry.durationMs > 0) {
+                    stringResource(Res.string.home_minutes_left, remainMin)
+                } else {
+                    stringResource(Res.string.home_in_progress)
+                },
+                style = MaterialTheme.typography.titleMedium,
+                color = Color(0xFFCCCCCC),
+            )
+        }
+        Spacer(Modifier.height(12.dp))
+        LinearProgressIndicator(
+            progress = { entry.progress },
+            color = MOOVIE_ACCENT,
+            trackColor = Color(0x66FFFFFF),
+            modifier = Modifier.fillMaxWidth(0.3f).height(4.dp),
+        )
+    }
+}
+
 /** Rail « Reprendre la lecture » : cartes paysage avec barre de progression. */
 @Composable
 private fun ResumeRow(
     entries: List<ResumeEntry>,
     onResume: (ResumeEntry) -> Unit,
     onMenu: (ResumeEntry) -> Unit,
+    onFocusEntry: (ResumeEntry) -> Unit,
     firstFocus: FocusRequester? = null,
 ) {
     Column {
@@ -245,7 +340,10 @@ private fun ResumeRow(
             modifier = Modifier.padding(horizontal = 32.dp),
         )
         Spacer(Modifier.height(8.dp))
+        val listState = rememberLazyListState()
+        MoovieRail(listState) {
         LazyRow(
+            state = listState,
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             contentPadding = PaddingValues(horizontal = 32.dp, vertical = 12.dp),
         ) {
@@ -254,9 +352,11 @@ private fun ResumeRow(
                     entry = entry,
                     onClick = { onResume(entry) },
                     onLongClick = { onMenu(entry) },
+                    onFocusEntry = onFocusEntry,
                     modifier = if (index == 0 && firstFocus != null) Modifier.focusRequester(firstFocus) else Modifier,
                 )
             }
+        }
         }
     }
 }
@@ -308,6 +408,7 @@ private fun ResumeCard(
     entry: ResumeEntry,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
+    onFocusEntry: (ResumeEntry) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val remainMin = ((entry.durationMs - entry.positionMs) / 60_000).coerceAtLeast(0)
@@ -315,7 +416,9 @@ private fun ResumeCard(
         onClick = onClick,
         onLongClick = onLongClick,
         focusedScale = 1.08f,
-        modifier = modifier.width(260.dp),
+        modifier = modifier
+            .width(260.dp)
+            .onFocusChanged { if (it.isFocused) onFocusEntry(entry) },
     ) {
         Column {
             Box(
@@ -338,10 +441,8 @@ private fun ResumeCard(
                 )
             }
             Column(modifier = Modifier.padding(8.dp)) {
-                Text(
+                MoovieMarqueeText(
                     text = entry.title,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
                     style = MaterialTheme.typography.bodySmall,
                 )
                 Text(
@@ -372,19 +473,23 @@ private fun CatalogRow(
             modifier = Modifier.padding(horizontal = 32.dp),
         )
         Spacer(Modifier.height(8.dp))
-        LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            contentPadding = PaddingValues(horizontal = 32.dp, vertical = 12.dp),
-        ) {
-            itemsIndexed(row.items) { index, item ->
-                PosterCard(
-                    item = item,
-                    // Badge ✓ seulement pour les films (une série n'a pas de clé unique).
-                    isWatched = !item.isTv && "movie:${item.id}" in watched,
-                    onClick = { onOpenTitle(item.id, item.isTv) },
-                    onFocusItem = onFocusItem,
-                    modifier = if (index == 0 && firstFocus != null) Modifier.focusRequester(firstFocus) else Modifier,
-                )
+        val listState = rememberLazyListState()
+        MoovieRail(listState) {
+            LazyRow(
+                state = listState,
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                contentPadding = PaddingValues(horizontal = 32.dp, vertical = 12.dp),
+            ) {
+                itemsIndexed(row.items) { index, item ->
+                    PosterCard(
+                        item = item,
+                        // Badge ✓ seulement pour les films (une série n'a pas de clé unique).
+                        isWatched = !item.isTv && "movie:${item.id}" in watched,
+                        onClick = { onOpenTitle(item.id, item.isTv) },
+                        onFocusItem = onFocusItem,
+                        modifier = if (index == 0 && firstFocus != null) Modifier.focusRequester(firstFocus) else Modifier,
+                    )
+                }
             }
         }
     }
@@ -428,10 +533,8 @@ private fun PosterCard(
                     }
                 }
             }
-            Text(
+            MoovieMarqueeText(
                 text = item.displayTitle,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(8.dp),
                 style = MaterialTheme.typography.bodySmall,
             )

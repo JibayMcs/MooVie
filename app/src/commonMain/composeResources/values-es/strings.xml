@@ -47,6 +47,8 @@
     <string name="mark_season_watched">Marcar temporada vista</string>
     <string name="mark_season_unwatched">Marcar temporada no vista</string>
     <string name="details_episodes_season">Episodios (temporada %1$d)</string>
+    <string name="details_episode_header">%1$s · Temporada %2$d</string>
+    <string name="details_episode_runtime">%1$d min</string>
     <string name="details_no_player">Ningún reproductor %1$s funcionó.</string>
     <string name="details_lang_missing">Sin fuente en %1$s — otros idiomas disponibles.</string>
     <string name="details_no_sources">No hay fuente disponible para este título.</string>
@@ -58,6 +60,26 @@
     <!-- Reproductor -->
     <string name="player_skip_intro">Saltar intro</string>
     <string name="player_skip_outro">Saltar créditos</string>
+    <string name="player_play">Reproducir</string>
+    <string name="player_pause">Pausa</string>
+    <string name="player_seek_back">Retroceder 15 segundos</string>
+    <string name="player_seek_forward">Avanzar 15 segundos</string>
+    <string name="player_next_episode">Episodio siguiente</string>
+    <string name="player_prev_episode">Episodio anterior</string>
+    <string name="player_progress">Barra de progreso</string>
+    <string name="player_scrub_hint">OK para confirmar</string>
+    <string name="player_subtitles">Subtítulos</string>
+    <string name="player_subtitles_off">Desactivados</string>
+    <string name="player_audio">Pista de audio</string>
+    <string name="player_settings">Ajustes</string>
+    <string name="player_speed">Velocidad de reproducción</string>
+    <string name="player_mute">Silenciar</string>
+    <string name="player_unmute">Activar sonido</string>
+    <string name="player_fullscreen">Pantalla completa</string>
+    <string name="player_fullscreen_exit">Salir de pantalla completa</string>
+    <string name="player_error">No se pudo reproducir — prueba otro reproductor desde el panel Fuentes.</string>
+    <string name="player_vlc_missing">VLC no encontrado</string>
+    <string name="player_vlc_help">El reproductor de escritorio usa libVLC. Instala VLC y reinicia:\nLinux: sudo apt install vlc — Windows/macOS: videolan.org</string>
 
     <!-- Actualización -->
     <string name="update_available">Actualización v%1$s disponible</string>

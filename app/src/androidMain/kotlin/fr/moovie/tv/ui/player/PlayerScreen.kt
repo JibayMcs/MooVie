@@ -1,57 +1,111 @@
 package fr.moovie.tv.ui.player
 
-import androidx.compose.ui.res.stringResource
 import android.net.Uri
-import android.view.View
 import android.view.ViewGroup
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ClosedCaption
+import androidx.compose.material.icons.filled.FastForward
+import androidx.compose.material.icons.filled.FastRewind
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.Player
+import androidx.media3.common.TrackSelectionOverride
+import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.MediaSession
 import androidx.media3.ui.PlayerView
-import androidx.tv.material3.Icon
-import androidx.tv.material3.Text
-import fr.moovie.tv.R
 import fr.moovie.tv.data.intro.IntroDbRepository
 import fr.moovie.tv.data.intro.IntroMedia
 import fr.moovie.tv.data.settings.SettingsRepository
 import fr.moovie.tv.data.watch.WatchProgressRepository
+import fr.moovie.tv.resources.Res
+import fr.moovie.tv.resources.common_back
+import fr.moovie.tv.resources.player_audio
+import fr.moovie.tv.resources.player_next_episode
+import fr.moovie.tv.resources.player_pause
+import fr.moovie.tv.resources.player_play
+import fr.moovie.tv.resources.player_prev_episode
+import fr.moovie.tv.resources.player_progress
+import fr.moovie.tv.resources.player_scrub_hint
+import fr.moovie.tv.resources.player_seek_back
+import fr.moovie.tv.resources.player_seek_forward
+import fr.moovie.tv.resources.player_settings
+import fr.moovie.tv.resources.player_skip_intro
+import fr.moovie.tv.resources.player_skip_outro
+import fr.moovie.tv.resources.player_speed
+import fr.moovie.tv.resources.player_subtitles
+import fr.moovie.tv.resources.player_subtitles_off
+import fr.moovie.tv.ui.components.MOOVIE_ACCENT
 import fr.moovie.tv.ui.components.MoovieButton
+import fr.moovie.tv.ui.components.MoovieIconButton
 import kotlinx.coroutines.delay
+import org.jetbrains.compose.resources.stringResource
 
 /** Contenu déduit de la mediaKey ("movie:<id>" ou "tv:<id>:s<S>e<E>"). */
 private data class PlaybackId(val tmdbId: Int, val isTv: Boolean, val season: Int, val episode: Int)
@@ -72,11 +126,24 @@ private fun parseMediaKey(key: String): PlaybackId? {
 
 private enum class SkipKind { INTRO, CREDITS }
 
+/** Pas de saut des boutons ±, et du mode réglage de la barre de progression. */
+private const val SEEK_STEP_MS = 15_000L
+private const val SCRUB_STEP_MS = 10_000L
+
+/** Vitesses proposées dans le menu Paramètres. */
+private val SPEEDS = listOf(0.75f, 1f, 1.25f, 1.5f, 2f)
+
+private enum class PlayerDialog { SUBTITLES, SETTINGS }
+
 /**
- * Lecteur natif Media3/ExoPlayer : reprise, sous-titres externes, contrôles
- * pilotables au D-pad, anti-veille, et boutons « Passer l'intro / le générique »
- * (TheIntroDB) — passer le générique enchaîne l'épisode suivant ou revient à
- * l'accueil pour un film.
+ * Lecteur natif Media3/ExoPlayer.
+ *
+ * Les contrôles sont un **overlay Compose** et non le contrôleur intégré de
+ * [PlayerView] : sur Android TV, ce dernier vit dans la hiérarchie de vues
+ * Android et le D-pad n'arrivait à focaliser qu'un seul de ses boutons. Ici
+ * chaque commande est un focusable Compose ordinaire, donc la navigation à la
+ * télécommande fonctionne nativement — y compris le bouton « Passer l'intro /
+ * le générique », qui appartient au même arbre de focus.
  */
 @OptIn(UnstableApi::class)
 @Composable
@@ -85,6 +152,8 @@ fun PlayerScreen(
     headers: Map<String, String> = emptyMap(),
     mediaKey: String = "",
     subtitles: Map<String, String> = emptyMap(),
+    title: String = "",
+    subtitle: String = "",
     onBack: () -> Unit,
     onNextEpisode: (tmdbId: Int, season: Int, episode: Int) -> Unit = { _, _, _ -> },
 ) {
@@ -100,8 +169,8 @@ fun PlayerScreen(
         }
         ExoPlayer.Builder(context)
             .setMediaSourceFactory(DefaultMediaSourceFactory(httpFactory))
-            .setSeekBackIncrementMs(5_000)
-            .setSeekForwardIncrementMs(15_000)
+            .setSeekBackIncrementMs(SEEK_STEP_MS)
+            .setSeekForwardIncrementMs(SEEK_STEP_MS)
             // Garde CPU + Wi-Fi éveillés pendant la lecture (évite les coupures
             // de flux quand le réseau se met en veille).
             .setWakeMode(C.WAKE_MODE_NETWORK)
@@ -111,6 +180,38 @@ fun PlayerScreen(
     // Sans MediaSession, Android route les touches média (play/pause/seek de la
     // télécommande) vers la dernière session système au lieu de l'app.
     val mediaSession = remember { MediaSession.Builder(context, player).build() }
+
+    // Surface vidéo seule : le contrôleur intégré est remplacé par l'overlay
+    // Compose, et la vue ne doit pas capter le focus du D-pad.
+    val playerView = remember {
+        PlayerView(context).apply {
+            this.player = player
+            useController = false
+            isFocusable = false
+            isFocusableInTouchMode = false
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT,
+            )
+        }
+    }
+
+    // ── État observé par l'UI ────────────────────────────────────────────────
+    var isPlaying by remember { mutableStateOf(false) }
+    var positionMs by remember { mutableLongStateOf(0L) }
+    var durationMs by remember { mutableLongStateOf(0L) }
+    var tracks by remember { mutableStateOf(Tracks.EMPTY) }
+    var speed by remember { mutableStateOf(1f) }
+    var controlsVisible by remember { mutableStateOf(true) }
+    var activityTick by remember { mutableIntStateOf(0) }
+    var dialog by remember { mutableStateOf<PlayerDialog?>(null) }
+    // Position en cours de réglage à la télécommande (null = pas en mode réglage).
+    var scrubTarget by remember { mutableStateOf<Long?>(null) }
+
+    fun wake() {
+        controlsVisible = true
+        activityTick++
+    }
 
     // Prépare le média (avec sous-titres externes) et reprend à la position sauvée.
     LaunchedEffect(streamUrl) {
@@ -134,6 +235,15 @@ fun PlayerScreen(
         if (resumeAt > 0) player.seekTo(resumeAt)
         player.prepare()
         player.playWhenReady = true
+    }
+
+    // Suivi de la position pour la barre de progression (~2 rafraîchissements/s).
+    LaunchedEffect(Unit) {
+        while (true) {
+            positionMs = player.currentPosition.coerceAtLeast(0)
+            durationMs = player.duration.let { if (it == C.TIME_UNSET) 0L else it }
+            delay(500)
+        }
     }
 
     // Sauvegarde périodique de la position (résolution ~5 s pour la reprise).
@@ -183,37 +293,20 @@ fun PlayerScreen(
         }
     }
 
-    val dpadFocus = remember { FocusRequester() }
-    val skipFocus = remember { FocusRequester() }
-
-    val playerView = remember {
-        PlayerView(context).apply {
-            this.player = player
-            useController = true
-            setShowSubtitleButton(true)
-            controllerShowTimeoutMs = 3500
-            isFocusable = true
-            layoutParams = ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT,
-            )
-            setControllerVisibilityListener(
-                PlayerView.ControllerVisibilityListener { visibility ->
-                    if (visibility != View.VISIBLE) {
-                        runCatching { dpadFocus.requestFocus() }
-                    }
-                },
-            )
-        }
-    }
-
-    // Garde l'écran allumé tant que ça joue (anti-veille de l'Android TV).
+    // Garde l'écran allumé tant que ça joue (anti-veille de l'Android TV) et
+    // tient l'UI au courant de l'état de lecture / des pistes disponibles.
     DisposableEffect(player, playerView) {
         val listener = object : Player.Listener {
-            override fun onIsPlayingChanged(isPlaying: Boolean) {
-                playerView.keepScreenOn = isPlaying
+            override fun onIsPlayingChanged(playing: Boolean) {
+                isPlaying = playing
+                playerView.keepScreenOn = playing
+            }
+
+            override fun onTracksChanged(newTracks: Tracks) {
+                tracks = newTracks
             }
         }
+        isPlaying = player.isPlaying
         playerView.keepScreenOn = player.isPlaying
         player.addListener(listener)
         onDispose {
@@ -230,6 +323,38 @@ fun PlayerScreen(
         }
     }
 
+    // Auto-masquage : la barre reste affichée en pause et tant qu'un menu est
+    // ouvert, sinon elle se replie après 4 s sans appui.
+    LaunchedEffect(activityTick, isPlaying, dialog) {
+        if (!isPlaying || dialog != null) {
+            controlsVisible = true
+            return@LaunchedEffect
+        }
+        delay(4000)
+        controlsVisible = false
+    }
+
+    val wakeFocus = remember { FocusRequester() }
+    val playFocus = remember { FocusRequester() }
+    val skipFocus = remember { FocusRequester() }
+
+    // Le focus suit l'état : barre visible → bouton Lecture ; barre masquée avec
+    // un bouton « Passer » → ce bouton ; sinon la couche de réveil plein écran.
+    LaunchedEffect(controlsVisible, activeSkip != null) {
+        delay(60)
+        runCatching {
+            when {
+                controlsVisible -> playFocus.requestFocus()
+                activeSkip != null -> skipFocus.requestFocus()
+                else -> wakeFocus.requestFocus()
+            }
+        }
+    }
+
+    fun togglePause() {
+        player.playWhenReady = !player.playWhenReady
+    }
+
     fun doSkip() {
         val m = media ?: return
         when (activeSkip) {
@@ -242,76 +367,489 @@ fun PlayerScreen(
         }
     }
 
-    // Auto-focus du bouton de skip dès qu'un segment devient actif ; le focus
-    // revient au lecteur quand le bouton disparaît.
-    LaunchedEffect(activeSkip) {
-        if (activeSkip != null) {
-            delay(50)
-            runCatching { skipFocus.requestFocus() }
-        } else {
-            runCatching { dpadFocus.requestFocus() }
-        }
-    }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+            .onPreviewKeyEvent { event ->
+                if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                if (!controlsVisible) {
+                    // Barre masquée : la 1re touche ne fait que réveiller les
+                    // contrôles (play/pause agit quand même), elle n'est pas
+                    // transmise aux boutons — sinon on déclencherait une action
+                    // invisible pour l'utilisateur.
+                    if (event.key == Key.MediaPlayPause || event.key == Key.MediaPlay ||
+                        event.key == Key.MediaPause || event.key == Key.Spacebar
+                    ) {
+                        togglePause()
+                    }
+                    wake()
+                    return@onPreviewKeyEvent true
+                }
+                // Barre visible : toute touche relance le minuteur, la navigation
+                // reste gérée par les boutons focalisés.
+                activityTick++
+                false
+            },
+    ) {
+        AndroidView(modifier = Modifier.fillMaxSize(), factory = { playerView })
 
-    Box(modifier = Modifier.fillMaxSize()) {
+        // Couche de réveil : cible de focus quand la barre est masquée. Elle
+        // cesse d'être focalisable dès que la barre s'affiche, sinon la
+        // recherche de focus du D-pad retomberait dessus au lieu des boutons.
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .focusRequester(dpadFocus)
-                .focusable()
-                .onKeyEvent { event ->
-                    if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
-                    when (event.key) {
-                        Key.DirectionCenter, Key.Enter, Key.NumPadEnter,
-                        Key.MediaPlayPause, Key.Spacebar,
-                        Key.DirectionUp, Key.DirectionDown,
-                        Key.DirectionLeft, Key.DirectionRight -> {
-                            if (event.key == Key.DirectionCenter || event.key == Key.Enter ||
-                                event.key == Key.NumPadEnter || event.key == Key.MediaPlayPause ||
-                                event.key == Key.Spacebar
-                            ) {
-                                player.playWhenReady = !player.playWhenReady
-                            }
-                            playerView.showController()
-                            playerView.requestFocus()
-                            true
-                        }
-                        else -> false
-                    }
-                },
+                .focusRequester(wakeFocus)
+                .focusable(enabled = !controlsVisible),
+        )
+
+        // Titre du média, visible avec les contrôles (souris ou télécommande).
+        AnimatedVisibility(
+            visible = controlsVisible,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.align(Alignment.TopCenter),
         ) {
-            AndroidView(modifier = Modifier.fillMaxSize(), factory = { playerView })
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Brush.verticalGradient(listOf(Color(0xCC000000), Color.Transparent)))
+                    .padding(horizontal = 48.dp, vertical = 32.dp),
+            ) {
+                if (title.isNotBlank()) {
+                    Text(
+                        title,
+                        style = MaterialTheme.typography.headlineMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                if (subtitle.isNotBlank()) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        subtitle,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = Color(0xFFBBBBBB),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
         }
 
-        // Bouton « Passer » en overlay, visible que les contrôles soient affichés
-        // ou non. Auto-focalisé ; une flèche rend la main au lecteur.
+        // Bouton « Passer l'intro / le générique », au-dessus de la barre pour
+        // rester atteignable au D-pad quand les contrôles sont affichés.
         val skip = activeSkip
         if (skip != null) {
             MoovieButton(
                 onClick = { doSkip() },
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(48.dp)
-                    .focusRequester(skipFocus)
-                    .onKeyEvent { event ->
-                        if (event.type == KeyEventType.KeyDown && event.key in DPAD_DIRECTIONS) {
-                            runCatching { dpadFocus.requestFocus() }
-                            true
-                        } else {
-                            false
-                        }
-                    },
+                    .padding(end = 48.dp, bottom = if (controlsVisible) 128.dp else 48.dp)
+                    .focusRequester(skipFocus),
             ) {
-                Icon(Icons.Default.SkipNext, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(10.dp))
-                Text(if (skip == SkipKind.INTRO) stringResource(R.string.player_skip_intro) else stringResource(R.string.player_skip_outro))
+                Text(
+                    if (skip == SkipKind.INTRO) {
+                        stringResource(Res.string.player_skip_intro)
+                    } else {
+                        stringResource(Res.string.player_skip_outro)
+                    },
+                )
+            }
+        }
+
+        AnimatedVisibility(
+            visible = controlsVisible,
+            enter = fadeIn() + slideInVertically(initialOffsetY = { it }),
+            exit = fadeOut() + slideOutVertically(targetOffsetY = { it }),
+            modifier = Modifier.align(Alignment.BottomCenter),
+        ) {
+            ControlBar(
+                isPlaying = isPlaying,
+                positionMs = scrubTarget ?: positionMs,
+                durationMs = durationMs,
+                scrubbing = scrubTarget != null,
+                isTv = pid?.isTv == true,
+                canGoPrevious = pid != null && pid.isTv && pid.episode > 1,
+                playFocus = playFocus,
+                onBack = onBack,
+                onTogglePause = { togglePause() },
+                onSeekBack = { player.seekBack() },
+                onSeekForward = { player.seekForward() },
+                onToggleScrub = {
+                    val target = scrubTarget
+                    if (target != null) {
+                        player.seekTo(target)
+                        scrubTarget = null
+                    } else {
+                        scrubTarget = positionMs
+                    }
+                },
+                onNudgeScrub = { delta ->
+                    val max = if (durationMs > 0) durationMs else Long.MAX_VALUE
+                    scrubTarget = ((scrubTarget ?: positionMs) + delta).coerceIn(0L, max)
+                },
+                onCancelScrub = { scrubTarget = null },
+                onPreviousEpisode = { pid?.let { onNextEpisode(it.tmdbId, it.season, it.episode - 1) } },
+                onNextEpisode = { pid?.let { onNextEpisode(it.tmdbId, it.season, it.episode + 1) } },
+                onOpenSubtitles = { dialog = PlayerDialog.SUBTITLES },
+                onOpenSettings = { dialog = PlayerDialog.SETTINGS },
+                onActivity = { activityTick++ },
+            )
+        }
+
+        when (dialog) {
+            PlayerDialog.SUBTITLES -> OptionsDialog(
+                sections = listOf(subtitleSection(tracks) { group, index ->
+                    player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+                        .clearOverridesOfType(C.TRACK_TYPE_TEXT)
+                        .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, group == null)
+                        .apply {
+                            if (group != null) {
+                                setOverrideForType(TrackSelectionOverride(group.mediaTrackGroup, index))
+                            }
+                        }
+                        .build()
+                    dialog = null
+                }),
+                onDismiss = { dialog = null },
+            )
+            PlayerDialog.SETTINGS -> OptionsDialog(
+                sections = listOf(
+                    speedSection(speed) {
+                        speed = it
+                        player.setPlaybackSpeed(it)
+                        dialog = null
+                    },
+                    audioSection(tracks) { group, index ->
+                        player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+                            .clearOverridesOfType(C.TRACK_TYPE_AUDIO)
+                            .setOverrideForType(TrackSelectionOverride(group.mediaTrackGroup, index))
+                            .build()
+                        dialog = null
+                    },
+                ).filter { it.options.isNotEmpty() },
+                onDismiss = { dialog = null },
+            )
+            null -> Unit
+        }
+    }
+}
+
+@Composable
+private fun ControlBar(
+    isPlaying: Boolean,
+    positionMs: Long,
+    durationMs: Long,
+    scrubbing: Boolean,
+    isTv: Boolean,
+    canGoPrevious: Boolean,
+    playFocus: FocusRequester,
+    onBack: () -> Unit,
+    onTogglePause: () -> Unit,
+    onSeekBack: () -> Unit,
+    onSeekForward: () -> Unit,
+    onToggleScrub: () -> Unit,
+    onNudgeScrub: (Long) -> Unit,
+    onCancelScrub: () -> Unit,
+    onPreviousEpisode: () -> Unit,
+    onNextEpisode: () -> Unit,
+    onOpenSubtitles: () -> Unit,
+    onOpenSettings: () -> Unit,
+    onActivity: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xE6000000))))
+            .padding(horizontal = 32.dp, vertical = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            MoovieIconButton(
+                onClick = onBack,
+                icon = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = stringResource(Res.string.common_back),
+            )
+            MoovieIconButton(
+                onClick = onTogglePause,
+                icon = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                contentDescription = if (isPlaying) {
+                    stringResource(Res.string.player_pause)
+                } else {
+                    stringResource(Res.string.player_play)
+                },
+                modifier = Modifier.focusRequester(playFocus),
+            )
+            MoovieIconButton(
+                onClick = onSeekBack,
+                icon = Icons.Default.FastRewind,
+                contentDescription = stringResource(Res.string.player_seek_back),
+            )
+            MoovieIconButton(
+                onClick = onSeekForward,
+                icon = Icons.Default.FastForward,
+                contentDescription = stringResource(Res.string.player_seek_forward),
+            )
+            if (isTv) {
+                MoovieIconButton(
+                    onClick = onPreviousEpisode,
+                    icon = Icons.Default.SkipPrevious,
+                    contentDescription = stringResource(Res.string.player_prev_episode),
+                    enabled = canGoPrevious,
+                )
+                MoovieIconButton(
+                    onClick = onNextEpisode,
+                    icon = Icons.Default.SkipNext,
+                    contentDescription = stringResource(Res.string.player_next_episode),
+                )
+            }
+            MoovieIconButton(
+                onClick = onOpenSubtitles,
+                icon = Icons.Default.ClosedCaption,
+                contentDescription = stringResource(Res.string.player_subtitles),
+            )
+            MoovieIconButton(
+                onClick = onOpenSettings,
+                icon = Icons.Default.Settings,
+                contentDescription = stringResource(Res.string.player_settings),
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Text(
+                formatTime(positionMs),
+                style = MaterialTheme.typography.labelLarge,
+                color = if (scrubbing) MOOVIE_ACCENT else Color(0xFFCCCCCC),
+            )
+            SeekBar(
+                fraction = if (durationMs > 0) (positionMs.toFloat() / durationMs).coerceIn(0f, 1f) else 0f,
+                scrubbing = scrubbing,
+                onToggleScrub = onToggleScrub,
+                onNudgeScrub = onNudgeScrub,
+                onCancelScrub = onCancelScrub,
+                onActivity = onActivity,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                formatTime(durationMs),
+                style = MaterialTheme.typography.labelLarge,
+                color = Color(0xFFCCCCCC),
+            )
+        }
+    }
+}
+
+/**
+ * Barre de progression pilotable au D-pad. OK entre/sort du « mode réglage » :
+ * hors de ce mode, ←/→ ne sont pas consommées et servent à passer d'un bouton à
+ * l'autre — sinon le focus resterait piégé sur la barre, sans issue possible à
+ * la télécommande.
+ */
+@Composable
+private fun SeekBar(
+    fraction: Float,
+    scrubbing: Boolean,
+    onToggleScrub: () -> Unit,
+    onNudgeScrub: (Long) -> Unit,
+    onCancelScrub: () -> Unit,
+    onActivity: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val focused by interaction.collectIsFocusedAsState()
+
+    // Quitter la barre annule un réglage non validé.
+    LaunchedEffect(focused) { if (!focused) onCancelScrub() }
+
+    val barHeight = if (focused || scrubbing) 10.dp else 6.dp
+    Box(
+        modifier = modifier
+            .height(32.dp)
+            .onKeyEvent { event ->
+                if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
+                onActivity()
+                when (event.key) {
+                    Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
+                        onToggleScrub()
+                        true
+                    }
+                    Key.DirectionLeft -> if (scrubbing) {
+                        onNudgeScrub(-SCRUB_STEP_MS)
+                        true
+                    } else {
+                        false
+                    }
+                    Key.DirectionRight -> if (scrubbing) {
+                        onNudgeScrub(SCRUB_STEP_MS)
+                        true
+                    } else {
+                        false
+                    }
+                    else -> false
+                }
+            }
+            .focusable(interactionSource = interaction),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(barHeight)
+                .clip(CircleShape)
+                .background(if (focused) Color(0x66FFFFFF) else Color(0x40FFFFFF)),
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(fraction)
+                .height(barHeight)
+                .clip(CircleShape)
+                .background(if (scrubbing) Color.White else MOOVIE_ACCENT),
+        )
+        if (scrubbing) {
+            Text(
+                stringResource(Res.string.player_scrub_hint),
+                style = MaterialTheme.typography.labelSmall,
+                color = Color(0xFFBBBBBB),
+                modifier = Modifier.align(Alignment.BottomCenter),
+            )
+        } else if (focused) {
+            Text(
+                stringResource(Res.string.player_progress),
+                style = MaterialTheme.typography.labelSmall,
+                color = Color(0x00000000),
+                modifier = Modifier.align(Alignment.BottomCenter),
+            )
+        }
+    }
+}
+
+private data class PlayerOption(val label: String, val selected: Boolean, val onSelect: () -> Unit)
+
+private data class OptionSection(val title: String, val options: List<PlayerOption>)
+
+@Composable
+private fun subtitleSection(tracks: Tracks, onSelect: (Tracks.Group?, Int) -> Unit): OptionSection {
+    val groups = tracks.groups.filter { it.type == C.TRACK_TYPE_TEXT }
+    val anySelected = groups.any { g -> (0 until g.length).any { g.isTrackSelected(it) } }
+    val options = buildList {
+        add(PlayerOption(stringResource(Res.string.player_subtitles_off), !anySelected) { onSelect(null, 0) })
+        groups.forEach { group ->
+            for (i in 0 until group.length) {
+                if (!group.isTrackSupported(i)) continue
+                add(
+                    PlayerOption(trackLabel(group, i), group.isTrackSelected(i)) { onSelect(group, i) },
+                )
             }
         }
     }
-
-    LaunchedEffect(Unit) { runCatching { dpadFocus.requestFocus() } }
+    return OptionSection(stringResource(Res.string.player_subtitles), options)
 }
 
-private val DPAD_DIRECTIONS = setOf(
-    Key.DirectionUp, Key.DirectionDown, Key.DirectionLeft, Key.DirectionRight,
-)
+@Composable
+private fun audioSection(tracks: Tracks, onSelect: (Tracks.Group, Int) -> Unit): OptionSection {
+    val groups = tracks.groups.filter { it.type == C.TRACK_TYPE_AUDIO }
+    val options = buildList {
+        groups.forEach { group ->
+            for (i in 0 until group.length) {
+                if (!group.isTrackSupported(i)) continue
+                add(PlayerOption(trackLabel(group, i), group.isTrackSelected(i)) { onSelect(group, i) })
+            }
+        }
+    }
+    // Une seule piste = rien à choisir, la section est masquée par l'appelant.
+    return OptionSection(stringResource(Res.string.player_audio), if (options.size > 1) options else emptyList())
+}
+
+@Composable
+private fun speedSection(current: Float, onSelect: (Float) -> Unit): OptionSection =
+    OptionSection(
+        stringResource(Res.string.player_speed),
+        SPEEDS.map { value ->
+            PlayerOption("×%.2f".format(value).trimEnd('0').trimEnd('.', ','), value == current) { onSelect(value) }
+        },
+    )
+
+private fun trackLabel(group: Tracks.Group, index: Int): String {
+    val format = group.getTrackFormat(index)
+    return format.label
+        ?: format.language?.takeIf { it.isNotBlank() && it != "und" }
+        ?: "#${index + 1}"
+}
+
+/** Une ligne du menu : intitulé de section ou choix sélectionnable. */
+private sealed interface DialogRow {
+    data class Header(val title: String) : DialogRow
+    data class Item(val option: PlayerOption) : DialogRow
+}
+
+/** Menu du lecteur (sous-titres, vitesse, piste audio) pilotable au D-pad. */
+@Composable
+private fun OptionsDialog(sections: List<OptionSection>, onDismiss: () -> Unit) {
+    val firstOption = remember { FocusRequester() }
+    val rows = buildList {
+        sections.forEach { section ->
+            add(DialogRow.Header(section.title))
+            section.options.forEach { add(DialogRow.Item(it)) }
+        }
+    }
+    val firstItemIndex = rows.indexOfFirst { it is DialogRow.Item }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .width(380.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .background(Color(0xF5161616))
+                .padding(24.dp),
+        ) {
+            LazyColumn(
+                modifier = Modifier.heightIn(max = 420.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                contentPadding = PaddingValues(vertical = 4.dp),
+            ) {
+                itemsIndexed(rows) { index, row ->
+                    when (row) {
+                        is DialogRow.Header -> Text(
+                            row.title,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MOOVIE_ACCENT,
+                        )
+                        is DialogRow.Item -> MoovieButton(
+                            onClick = row.option.onSelect,
+                            selected = row.option.selected,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .then(
+                                    if (index == firstItemIndex) {
+                                        Modifier.focusRequester(firstOption)
+                                    } else {
+                                        Modifier
+                                    },
+                                ),
+                        ) {
+                            Text(row.option.label)
+                        }
+                    }
+                }
+            }
+        }
+    }
+    LaunchedEffect(Unit) { runCatching { firstOption.requestFocus() } }
+}
+
+private fun formatTime(ms: Long): String {
+    val totalSec = (ms / 1000).coerceAtLeast(0)
+    val h = totalSec / 3600
+    val m = (totalSec % 3600) / 60
+    val s = totalSec % 60
+    return if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%d:%02d".format(m, s)
+}

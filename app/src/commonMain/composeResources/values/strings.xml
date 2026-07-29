@@ -49,6 +49,8 @@
     <string name="mark_season_watched">Marquer la saison vue</string>
     <string name="mark_season_unwatched">Marquer la saison non vue</string>
     <string name="details_episodes_season">Épisodes (saison %1$d)</string>
+    <string name="details_episode_header">%1$s · Saison %2$d</string>
+    <string name="details_episode_runtime">%1$d min</string>
     <string name="details_no_player">Aucun lecteur %1$s n'a fonctionné.</string>
     <string name="details_lang_missing">Aucune source en %1$s — autres langues disponibles.</string>
     <string name="details_no_sources">Aucune source disponible pour ce titre.</string>
@@ -60,6 +62,26 @@
     <!-- Lecteur -->
     <string name="player_skip_intro">Passer l'intro</string>
     <string name="player_skip_outro">Passer le générique</string>
+    <string name="player_play">Lecture</string>
+    <string name="player_pause">Pause</string>
+    <string name="player_seek_back">Reculer de 15 secondes</string>
+    <string name="player_seek_forward">Avancer de 15 secondes</string>
+    <string name="player_next_episode">Épisode suivant</string>
+    <string name="player_prev_episode">Épisode précédent</string>
+    <string name="player_progress">Barre de progression</string>
+    <string name="player_scrub_hint">OK pour valider</string>
+    <string name="player_subtitles">Sous-titres</string>
+    <string name="player_subtitles_off">Désactivés</string>
+    <string name="player_audio">Piste audio</string>
+    <string name="player_settings">Paramètres</string>
+    <string name="player_speed">Vitesse de lecture</string>
+    <string name="player_mute">Couper le son</string>
+    <string name="player_unmute">Rétablir le son</string>
+    <string name="player_fullscreen">Plein écran</string>
+    <string name="player_fullscreen_exit">Quitter le plein écran</string>
+    <string name="player_error">Lecture impossible — essaie un autre lecteur depuis le panneau Sources.</string>
+    <string name="player_vlc_missing">VLC introuvable</string>
+    <string name="player_vlc_help">Le lecteur desktop s\'appuie sur libVLC. Installe VLC puis relance :\nLinux : sudo apt install vlc — Windows/macOS : videolan.org</string>
 
     <!-- Mise à jour -->
     <string name="update_available">Mise à jour v%1$s disponible</string>

@@ -19,10 +19,16 @@ sealed interface Screen {
         val resumeEpisode: Int = 0,
     ) : Screen
 
+    /**
+     * Lecture d'un flux. [title]/[subtitle] ne servent qu'à l'affichage dans le
+     * lecteur (« Film », « Série » + « S1 · E3 — Nom de l'épisode »).
+     */
     data class Player(
         val streamUrl: String,
         val headers: Map<String, String> = emptyMap(),
         val mediaKey: String = "",
         val subtitles: Map<String, String> = emptyMap(),
+        val title: String = "",
+        val subtitle: String = "",
     ) : Screen
 }

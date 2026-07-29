@@ -12,7 +12,7 @@ plugins {
 
 // Version unique Android + desktop (l'updater compare les tags GitHub à cette
 // valeur ; côté desktop elle est injectée en propriété système moovie.version).
-val appVersion = "1.0.7"
+val appVersion = "1.1.0"
 
 // Signature release : keystore.properties en local (gitignoré), variables
 // d'environnement en CI (KEYSTORE_FILE / KEYSTORE_PASSWORD / KEY_ALIAS).
@@ -120,7 +120,7 @@ android {
         applicationId = "fr.moovie.tv"
         minSdk = 23
         targetSdk = 34
-        versionCode = 9
+        versionCode = 10
         versionName = appVersion
     }
 
@@ -175,6 +175,14 @@ compose.desktop {
             description = "Moo-vie — streaming, extraction de sources on-device"
             // JNA (vlcj) a besoin de sun.misc.Unsafe dans l'image jpackage.
             modules("jdk.unsupported")
+
+            // Icônes des paquets natifs. Sans elles, jpackage retombe sur
+            // l'icône Kotlin/Java par défaut. Les fichiers sont versionnés
+            // (générés depuis docs/assets/sources/moo_vie_launcher_icon_master_1024x1024.png)
+            // car la CI n'a pas d'outil de conversion ico/icns.
+            linux { iconFile.set(project.file("icons/moovie.png")) }
+            windows { iconFile.set(project.file("icons/moovie.ico")) }
+            macOS { iconFile.set(project.file("icons/moovie.icns")) }
         }
     }
 }

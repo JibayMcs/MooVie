@@ -1,6 +1,7 @@
 package fr.moovie.tv.ui.details
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -18,6 +19,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -29,6 +31,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -56,8 +59,10 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import fr.moovie.tv.data.settings.StreamLanguage
 import fr.moovie.tv.data.sources.EmbedLink
@@ -68,6 +73,8 @@ import fr.moovie.tv.resources.Res
 import fr.moovie.tv.resources.common_back
 import fr.moovie.tv.resources.common_loading
 import fr.moovie.tv.resources.details_cast
+import fr.moovie.tv.resources.details_episode_header
+import fr.moovie.tv.resources.details_episode_runtime
 import fr.moovie.tv.resources.details_episodes_season
 import fr.moovie.tv.resources.details_lang_missing
 import fr.moovie.tv.resources.details_lang_unavailable
@@ -84,10 +91,13 @@ import fr.moovie.tv.resources.mark_season_unwatched
 import fr.moovie.tv.resources.mark_season_watched
 import fr.moovie.tv.resources.mark_unwatched
 import fr.moovie.tv.resources.mark_watched
+import fr.moovie.tv.ui.components.LocalMoovieCardActive
 import fr.moovie.tv.ui.components.MOOVIE_ACCENT
 import fr.moovie.tv.ui.components.MoovieButton
 import fr.moovie.tv.ui.components.MoovieCard
 import fr.moovie.tv.ui.components.MoovieIconButton
+import fr.moovie.tv.ui.components.MoovieMarqueeText
+import fr.moovie.tv.ui.components.MoovieRail
 import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.stringResource
 
@@ -105,11 +115,14 @@ fun DetailsScreenContent(
     resume: Map<String, ResumeEntry>,
     quickPlay: QuickPlayState,
     panelVisible: Boolean,
+    selectedEpisode: EpisodeSelection?,
     movieKey: String,
     episodeKey: (season: Int, episode: Int) -> String,
     onQuickPlayMovie: () -> Unit,
     onQuickPlayEpisode: (season: Int, episode: Int) -> Unit,
     onSelectSeason: (Int) -> Unit,
+    onOpenEpisode: (season: Int, episode: Episode) -> Unit,
+    onOpenEpisodePanel: (season: Int, episode: Int) -> Unit,
     onToggleWatched: (String) -> Unit,
     onToggleSeasonWatched: () -> Unit,
     onOpenPanel: () -> Unit,
@@ -122,7 +135,9 @@ fun DetailsScreenContent(
     showBackButton: Boolean = false,
 ) {
     val primaryFocus = remember { FocusRequester() }
-    LaunchedEffect(state) {
+    // Le focus est aussi replacé quand on entre/sort d'une fiche d'épisode :
+    // le bouton porteur de `primaryFocus` change de nœud à ce moment-là.
+    LaunchedEffect(state, selectedEpisode) {
         if (state is DetailsState.Movie || state is DetailsState.Tv) {
             runCatching { primaryFocus.requestFocus() }
         }
@@ -233,48 +248,73 @@ fun DetailsScreenContent(
                     }
                 }
                 is DetailsState.Tv -> {
-                    Text(s.details.name, style = MaterialTheme.typography.headlineMedium, modifier = hPad)
-                    s.details.year?.let { Text(it, modifier = hPad) }
-                    Text(s.details.overview, style = MaterialTheme.typography.bodyMedium, maxLines = 4, overflow = TextOverflow.Ellipsis, modifier = hPad)
-                    val seasonAllWatched = s.episodes.isNotEmpty() &&
-                        s.episodes.all { episodeKey(s.season, it.episodeNumber) in watched }
-                    Text(stringResource(Res.string.details_seasons), style = MaterialTheme.typography.titleMedium, modifier = hPad)
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        contentPadding = PaddingValues(horizontal = 48.dp),
-                    ) {
-                        itemsIndexed(s.details.seasons.filter { it.seasonNumber > 0 }) { index, season ->
-                            MoovieButton(
-                                onClick = { onSelectSeason(season.seasonNumber) },
-                                modifier = if (index == 0) Modifier.focusRequester(primaryFocus) else Modifier,
+                    val selected = selectedEpisode
+                    if (selected != null) {
+                        // Fiche d'un épisode : même logique qu'un film (visuel,
+                        // synopsis complet, Lire / Sources / Marquer vu).
+                        // Retour / Échap revient à la liste des épisodes.
+                        val ep = selected.episode
+                        val key = episodeKey(selected.season, ep.episodeNumber)
+                        EpisodeDetail(
+                            showName = s.details.name,
+                            season = selected.season,
+                            ep = ep,
+                            isWatched = key in watched,
+                            hasResume = resume.containsKey(key),
+                            searching = quickPlay is QuickPlayState.Searching,
+                            primaryFocus = primaryFocus,
+                            onPlay = { onQuickPlayEpisode(selected.season, ep.episodeNumber) },
+                            onOpenSources = { onOpenEpisodePanel(selected.season, ep.episodeNumber) },
+                            onToggleWatched = { onToggleWatched(key) },
+                        )
+                    } else {
+                        Text(s.details.name, style = MaterialTheme.typography.headlineMedium, modifier = hPad)
+                        s.details.year?.let { Text(it, modifier = hPad) }
+                        Text(s.details.overview, style = MaterialTheme.typography.bodyMedium, maxLines = 4, overflow = TextOverflow.Ellipsis, modifier = hPad)
+                        val seasonAllWatched = s.episodes.isNotEmpty() &&
+                            s.episodes.all { episodeKey(s.season, it.episodeNumber) in watched }
+                        Text(stringResource(Res.string.details_seasons), style = MaterialTheme.typography.titleMedium, modifier = hPad)
+                        val seasonsState = rememberLazyListState()
+                        MoovieRail(seasonsState) {
+                            LazyRow(
+                                state = seasonsState,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                contentPadding = PaddingValues(horizontal = 48.dp),
                             ) {
-                                Text(if (season.seasonNumber == s.season) "● S${season.seasonNumber}" else "S${season.seasonNumber}")
+                                itemsIndexed(s.details.seasons.filter { it.seasonNumber > 0 }) { index, season ->
+                                    MoovieButton(
+                                        onClick = { onSelectSeason(season.seasonNumber) },
+                                        modifier = if (index == 0) Modifier.focusRequester(primaryFocus) else Modifier,
+                                    ) {
+                                        Text(if (season.seasonNumber == s.season) "● S${season.seasonNumber}" else "S${season.seasonNumber}")
+                                    }
+                                }
+                                // En fin de rangée (atteignable au D-pad) : œil = marquer la
+                                // saison vue / non vue (outline verte quand tout est vu).
+                                item {
+                                    MoovieIconButton(
+                                        onClick = onToggleSeasonWatched,
+                                        icon = if (seasonAllWatched) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                        contentDescription = if (seasonAllWatched) stringResource(Res.string.mark_season_unwatched) else stringResource(Res.string.mark_season_watched),
+                                        selected = seasonAllWatched,
+                                    )
+                                }
                             }
                         }
-                        // En fin de rangée (atteignable au D-pad) : œil = marquer la
-                        // saison vue / non vue (outline verte quand tout est vu).
-                        item {
-                            MoovieIconButton(
-                                onClick = onToggleSeasonWatched,
-                                icon = if (seasonAllWatched) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                                contentDescription = if (seasonAllWatched) stringResource(Res.string.mark_season_unwatched) else stringResource(Res.string.mark_season_watched),
-                                selected = seasonAllWatched,
-                            )
-                        }
-                    }
-                    Text(stringResource(Res.string.details_episodes_season, s.season), style = MaterialTheme.typography.titleMedium, modifier = hPad)
-                    s.episodes.forEach { ep ->
-                        val key = episodeKey(s.season, ep.episodeNumber)
-                        Box(modifier = hPad) {
-                            EpisodeRow(
-                                ep = ep,
-                                isWatched = key in watched,
-                                progress = resume[key]?.progress,
-                                // Clic = lecture directe (meilleure source dans la langue
-                                // préférée) ; le panneau ne s'ouvre qu'en secours.
-                                onSources = { onQuickPlayEpisode(s.season, ep.episodeNumber) },
-                                onToggleWatched = { onToggleWatched(key) },
-                            )
+                        Text(stringResource(Res.string.details_episodes_season, s.season), style = MaterialTheme.typography.titleMedium, modifier = hPad)
+                        s.episodes.forEach { ep ->
+                            val key = episodeKey(s.season, ep.episodeNumber)
+                            Box(modifier = hPad) {
+                                EpisodeRow(
+                                    ep = ep,
+                                    isWatched = key in watched,
+                                    progress = resume[key]?.progress,
+                                    // OK = fiche de l'épisode (comme un film) ;
+                                    // OK long = bascule vu / non vu.
+                                    onOpen = { onOpenEpisode(s.season, ep) },
+                                    onToggleWatched = { onToggleWatched(key) },
+                                )
+                            }
                         }
                     }
                 }
@@ -522,17 +562,122 @@ private fun WatchedBadge(modifier: Modifier = Modifier) {
     }
 }
 
+/**
+ * Fiche détaillée d'un épisode : le pendant de la fiche d'un film (visuel,
+ * synopsis complet, Lire / Sources / Marquer vu) pour que le comportement du
+ * bouton OK soit le même partout.
+ */
+@Composable
+private fun EpisodeDetail(
+    showName: String,
+    season: Int,
+    ep: Episode,
+    isWatched: Boolean,
+    hasResume: Boolean,
+    searching: Boolean,
+    primaryFocus: FocusRequester,
+    onPlay: () -> Unit,
+    onOpenSources: () -> Unit,
+    onToggleWatched: () -> Unit,
+) {
+    val hPad = Modifier.padding(horizontal = 48.dp)
+    Row(
+        modifier = hPad.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(28.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .width(420.dp)
+                .aspectRatio(16f / 9f)
+                .clip(RoundedCornerShape(10.dp))
+                .background(Color(0xFF222222)),
+        ) {
+            AsyncImage(
+                model = ep.stillUrlLarge(),
+                contentDescription = ep.name,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                stringResource(Res.string.details_episode_header, showName, season),
+                style = MaterialTheme.typography.labelLarge,
+                color = MOOVIE_ACCENT,
+            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(
+                    "${ep.episodeNumber}. ${ep.name}",
+                    style = MaterialTheme.typography.headlineSmall,
+                )
+                if (isWatched) WatchedBadge()
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                ep.airDate?.takeIf { it.isNotBlank() }?.let {
+                    Text(it, style = MaterialTheme.typography.titleSmall, color = Color(0xFFCCCCCC))
+                }
+                ep.runtime?.let {
+                    Text(
+                        stringResource(Res.string.details_episode_runtime, it),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = Color(0xFFCCCCCC),
+                    )
+                }
+                if (ep.voteAverage > 0) {
+                    Text(
+                        "★ %.1f".format(ep.voteAverage),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = Color(0xFFE6B800),
+                    )
+                }
+            }
+            if (ep.overview.isNotBlank()) {
+                Text(ep.overview, style = MaterialTheme.typography.bodyMedium, color = Color(0xFFDDDDDD))
+            }
+        }
+    }
+    Row(
+        modifier = hPad,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        MoovieButton(onClick = onPlay, modifier = Modifier.focusRequester(primaryFocus)) {
+            if (searching) {
+                CircularProgressIndicator(
+                    color = Color.White,
+                    strokeWidth = 2.dp,
+                    modifier = Modifier.size(14.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(Res.string.details_playing))
+            } else {
+                Text(if (hasResume) stringResource(Res.string.details_resume) else stringResource(Res.string.details_play))
+            }
+        }
+        MoovieButton(onClick = onOpenSources) { Text(stringResource(Res.string.details_sources)) }
+        MoovieIconButton(
+            onClick = onToggleWatched,
+            icon = if (isWatched) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+            contentDescription = if (isWatched) stringResource(Res.string.mark_unwatched) else stringResource(Res.string.mark_watched),
+            selected = isWatched,
+        )
+    }
+}
+
 @Composable
 private fun EpisodeRow(
     ep: Episode,
     isWatched: Boolean,
     progress: Float?,
-    onSources: () -> Unit,
+    onOpen: () -> Unit,
     onToggleWatched: () -> Unit,
 ) {
-    // Clic → sources de l'épisode ; OK long → bascule vu/non vu.
+    // OK → fiche de l'épisode ; OK long → bascule vu/non vu.
     MoovieCard(
-        onClick = onSources,
+        onClick = onOpen,
         onLongClick = onToggleWatched,
         focusedScale = 1.02f,
         modifier = Modifier.fillMaxWidth(),
@@ -567,16 +712,59 @@ private fun EpisodeRow(
                 }
             }
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    "${ep.episodeNumber}. ${ep.name}",
+                MoovieMarqueeText(
+                    text = "${ep.episodeNumber}. ${ep.name}",
                     style = MaterialTheme.typography.titleSmall,
                     color = if (isWatched) Color(0xFF9A9A9A) else Color.White,
                 )
                 if (ep.overview.isNotBlank()) {
-                    Text(ep.overview, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    ScrollingSynopsis(ep.overview)
                 }
             }
         }
+    }
+}
+
+/**
+ * Synopsis d'une carte d'épisode : borné à [lines] lignes au repos, déroulé en
+ * boucle tant que la carte est focalisée. Sans ça la fin du résumé est
+ * inatteignable à la télécommande (texte simplement tronqué).
+ */
+@Composable
+private fun ScrollingSynopsis(text: String, lines: Int = 2, modifier: Modifier = Modifier) {
+    val active = LocalMoovieCardActive.current
+    val scroll = rememberScrollState()
+    val style = MaterialTheme.typography.bodySmall
+    val density = LocalDensity.current
+    val height = remember(style, lines, density) {
+        val lineSp = if (style.lineHeight.isSp) style.lineHeight.value else style.fontSize.value * 1.4f
+        with(density) { (lineSp * lines).sp.toDp() }
+    }
+
+    LaunchedEffect(active, text) {
+        if (!active) {
+            scroll.scrollTo(0)
+            return@LaunchedEffect
+        }
+        delay(900)
+        while (true) {
+            if (scroll.maxValue > 0) {
+                // Vitesse constante : la durée suit la hauteur à parcourir.
+                scroll.animateScrollTo(
+                    scroll.maxValue,
+                    tween(durationMillis = (scroll.maxValue * 14).coerceIn(1200, 9000), easing = LinearEasing),
+                )
+                delay(1500)
+                scroll.animateScrollTo(0, tween(400))
+                delay(1500)
+            } else {
+                delay(600)
+            }
+        }
+    }
+
+    Box(modifier = modifier.height(height)) {
+        Text(text, style = style, modifier = Modifier.verticalScroll(scroll, enabled = false))
     }
 }
 
@@ -587,7 +775,10 @@ private fun CastRow(cast: List<CastMember>) {
     Column {
         Text(stringResource(Res.string.details_cast), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 48.dp))
         Spacer(Modifier.height(8.dp))
+        val castState = rememberLazyListState()
+        MoovieRail(castState) {
         LazyRow(
+            state = castState,
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             contentPadding = PaddingValues(horizontal = 48.dp),
         ) {
@@ -627,6 +818,7 @@ private fun CastRow(cast: List<CastMember>) {
                     }
                 }
             }
+        }
         }
     }
 }

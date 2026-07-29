@@ -3,6 +3,7 @@ package fr.moovie.tv.ui.components
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -18,19 +19,34 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ProvideTextStyle
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /** Vert « actif/sélectionné » (outline), commun à tous les contrôles. */
 val SELECTED_GREEN = Color(0xFF4CAF50)
@@ -41,6 +57,7 @@ val MOOVIE_ACCENT = Color(0xFFB5302C)
 private val BUTTON_SHAPE = RoundedCornerShape(10.dp)
 private val REST_BG = Color(0xFF1E1E1E)
 private val REST_FG = Color(0xFFEDEDED)
+private val DISABLED_FG = Color(0xFF5A5A5A)
 private val PRESSED_BG = Color(0xFF8E2523)
 
 /**
@@ -53,6 +70,7 @@ fun MoovieButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     selected: Boolean = false,
+    enabled: Boolean = true,
     contentPadding: PaddingValues = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
     content: @Composable RowScope.() -> Unit,
 ) {
@@ -60,15 +78,19 @@ fun MoovieButton(
     val focused by interaction.collectIsFocusedAsState()
     val hovered by interaction.collectIsHoveredAsState()
     val pressed by interaction.collectIsPressedAsState()
-    val active = focused || hovered
+    val active = enabled && (focused || hovered)
     val scale by animateFloatAsState(if (active) 1.05f else 1f)
 
     val bg = when {
-        pressed -> PRESSED_BG
+        pressed && enabled -> PRESSED_BG
         active -> MOOVIE_ACCENT
         else -> REST_BG
     }
-    val fg = if (active || pressed) Color.White else REST_FG
+    val fg = when {
+        !enabled -> DISABLED_FG
+        active || pressed -> Color.White
+        else -> REST_FG
+    }
 
     Row(
         modifier = modifier
@@ -79,7 +101,7 @@ fun MoovieButton(
             .clip(BUTTON_SHAPE)
             .background(bg)
             .then(if (selected) Modifier.border(2.dp, SELECTED_GREEN, BUTTON_SHAPE) else Modifier)
-            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+            .clickable(interactionSource = interaction, indication = null, enabled = enabled, onClick = onClick)
             .padding(contentPadding),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -102,11 +124,13 @@ fun MoovieIconButton(
     contentDescription: String?,
     modifier: Modifier = Modifier,
     selected: Boolean = false,
+    enabled: Boolean = true,
 ) {
     MoovieButton(
         onClick = onClick,
         modifier = modifier,
         selected = selected,
+        enabled = enabled,
         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
     ) {
         Icon(
@@ -116,6 +140,42 @@ fun MoovieIconButton(
         )
     }
 }
+
+/**
+ * Vrai quand la [MoovieCard] parente est focalisée (D-pad) ou survolée (souris).
+ * Permet au contenu de réagir sans que chaque carte ait à propager l'état :
+ * titres qui défilent, synopsis qui se déroule…
+ */
+val LocalMoovieCardActive = compositionLocalOf { false }
+
+/** Touches « OK » d'une télécommande / d'un clavier. */
+private val CONFIRM_KEYS = setOf(Key.DirectionCenter, Key.Enter, Key.NumPadEnter)
+
+/**
+ * Suivi d'un appui OK au D-pad (mutable hors composition : ces champs ne
+ * pilotent aucun rendu). [watchdog] relâche l'état si le KeyUp n'arrive jamais
+ * — c'est le cas quand l'appui long ouvre une popup, qui capte la fin de
+ * l'événement : sans lui la carte resterait bloquée et ne répondrait plus.
+ */
+private class ConfirmKeyPress {
+    var downs = 0
+    var fired = false
+    var watchdog: Job? = null
+
+    fun reset() {
+        watchdog?.cancel()
+        watchdog = null
+        downs = 0
+        fired = false
+    }
+}
+
+/**
+ * Silence au-delà duquel la touche est considérée relâchée. Doit rester
+ * nettement supérieur à l'intervalle de répétition d'Android (~50 ms) et au
+ * délai avant la 1re répétition (~400 ms).
+ */
+private const val CONFIRM_RELEASE_MS = 700L
 
 /**
  * Carte cliquable (affiches, épisodes…) : zoom + bordure accent au focus/survol.
@@ -138,6 +198,46 @@ fun MoovieCard(
     val scale by animateFloatAsState(if (active) focusedScale else 1f)
     val shape = RoundedCornerShape(10.dp)
 
+    // `combinedClickable` ne déclenche onLongClick qu'au pointeur : sur une
+    // télécommande, maintenir OK ne produisait rien. Android répète les KeyDown
+    // tant que la touche est tenue — on les compte, et on avale le KeyUp final
+    // pour que le clic simple ne parte pas en plus de l'appui long.
+    val confirm = remember { ConfirmKeyPress() }
+    val scope = rememberCoroutineScope()
+    DisposableEffect(confirm) { onDispose { confirm.reset() } }
+    val longPressKeys = if (onLongClick == null) {
+        Modifier
+    } else {
+        Modifier.onPreviewKeyEvent { event ->
+            if (event.key !in CONFIRM_KEYS) return@onPreviewKeyEvent false
+            when (event.type) {
+                KeyEventType.KeyDown -> {
+                    confirm.downs++
+                    if (!confirm.fired && confirm.downs >= 2) {
+                        confirm.fired = true
+                        onLongClick()
+                    }
+                    // Chaque répétition repousse le relâchement présumé.
+                    confirm.watchdog?.cancel()
+                    confirm.watchdog = scope.launch {
+                        delay(CONFIRM_RELEASE_MS)
+                        confirm.downs = 0
+                        confirm.fired = false
+                    }
+                    // Une fois l'appui long parti, on avale les répétitions puis
+                    // le KeyUp pour que le clic simple ne se déclenche pas aussi.
+                    confirm.fired
+                }
+                KeyEventType.KeyUp -> {
+                    val consumed = confirm.fired
+                    confirm.reset()
+                    consumed
+                }
+                else -> false
+            }
+        }
+    }
+
     androidx.compose.foundation.layout.Box(
         modifier = modifier
             .graphicsLayer {
@@ -147,6 +247,7 @@ fun MoovieCard(
             .clip(shape)
             .background(Color(0xFF181818))
             .then(if (active) Modifier.border(3.dp, MOOVIE_ACCENT, shape) else Modifier)
+            .then(longPressKeys)
             .combinedClickable(
                 interactionSource = interaction,
                 indication = null,
@@ -154,6 +255,41 @@ fun MoovieCard(
                 onLongClick = onLongClick,
             ),
     ) {
-        content()
+        CompositionLocalProvider(LocalMoovieCardActive provides active) {
+            content()
+        }
     }
+}
+
+/**
+ * Titre d'une carte : tronqué au repos, défile horizontalement quand la carte
+ * est focalisée/survolée (les titres longs sont illisibles sur une carte
+ * étroite). Ne défile que si le texte déborde réellement.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun MoovieMarqueeText(
+    text: String,
+    modifier: Modifier = Modifier,
+    style: TextStyle = LocalTextStyle.current,
+    color: Color = Color.Unspecified,
+) {
+    val active = LocalMoovieCardActive.current
+    Text(
+        text = text,
+        style = style,
+        color = color,
+        maxLines = 1,
+        softWrap = false,
+        overflow = if (active) TextOverflow.Clip else TextOverflow.Ellipsis,
+        modifier = if (active) {
+            modifier.basicMarquee(
+                iterations = Int.MAX_VALUE,
+                initialDelayMillis = 900,
+                repeatDelayMillis = 900,
+            )
+        } else {
+            modifier
+        },
+    )
 }

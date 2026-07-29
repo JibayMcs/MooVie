@@ -8,6 +8,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import fr.moovie.tv.ui.navigation.Screen
 
 /**
  * Wrapper Android : branche le [DetailsViewModel] (TMDB, sources, suivi de
@@ -19,7 +20,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 fun DetailsScreen(
     tmdbId: Int,
     isTv: Boolean,
-    onPlay: (streamUrl: String, headers: Map<String, String>, mediaKey: String, subtitles: Map<String, String>) -> Unit,
+    onPlay: (Screen.Player) -> Unit,
     onBack: () -> Unit,
     autoSources: Boolean = false,
     resumeSeason: Int = 0,
@@ -35,6 +36,7 @@ fun DetailsScreen(
     val resume by viewModel.resume.collectAsStateWithLifecycle()
     val quickPlay by viewModel.quickPlay.collectAsStateWithLifecycle()
     val panelVisible by viewModel.panelVisible.collectAsStateWithLifecycle()
+    val selectedEpisode by viewModel.selectedEpisode.collectAsStateWithLifecycle()
     // Reprise depuis l'accueil : lance la lecture directe une seule fois, dès que la fiche est chargée.
     val autoConsumed = remember { mutableStateOf(false) }
 
@@ -61,14 +63,26 @@ fun DetailsScreen(
                 // Ferme le panneau avant de partir : au retour (ou sur une autre
                 // fiche, le ViewModel étant partagé), il ne doit pas rester ouvert.
                 viewModel.closePanel()
-                onPlay(s.url, s.headers, viewModel.playbackKey, s.subtitleUrls)
+                onPlay(
+                    Screen.Player(
+                        streamUrl = s.url,
+                        headers = s.headers,
+                        mediaKey = viewModel.playbackKey,
+                        subtitles = s.subtitleUrls,
+                        title = viewModel.playbackTitle,
+                        subtitle = viewModel.playbackSubtitle,
+                    ),
+                )
             }
             viewModel.consumeResolved()
         }
     }
 
-    // Retour ferme d'abord le panneau des sources (sinon retour à l'accueil).
-    BackHandler(enabled = panelVisible) { viewModel.closePanel() }
+    // Retour : ferme d'abord le panneau des sources, puis la fiche d'épisode,
+    // et seulement ensuite remonte à l'accueil (BackHandler de MainActivity).
+    BackHandler(enabled = panelVisible || selectedEpisode != null) {
+        if (panelVisible) viewModel.closePanel() else viewModel.closeEpisode()
+    }
 
     DetailsScreenContent(
         state = state,
@@ -79,11 +93,14 @@ fun DetailsScreen(
         resume = resume,
         quickPlay = quickPlay,
         panelVisible = panelVisible,
+        selectedEpisode = selectedEpisode,
         movieKey = viewModel.movieKey(),
         episodeKey = viewModel::episodeKey,
         onQuickPlayMovie = viewModel::quickPlayMovie,
         onQuickPlayEpisode = viewModel::quickPlayEpisode,
         onSelectSeason = viewModel::selectSeason,
+        onOpenEpisode = viewModel::openEpisode,
+        onOpenEpisodePanel = viewModel::openEpisodePanel,
         onToggleWatched = viewModel::toggleWatched,
         onToggleSeasonWatched = viewModel::toggleSeasonWatched,
         onOpenPanel = viewModel::openPanel,

@@ -47,6 +47,8 @@
     <string name="mark_season_watched">Mark season watched</string>
     <string name="mark_season_unwatched">Mark season unwatched</string>
     <string name="details_episodes_season">Episodes (season %1$d)</string>
+    <string name="details_episode_header">%1$s · Season %2$d</string>
+    <string name="details_episode_runtime">%1$d min</string>
     <string name="details_no_player">No %1$s player worked.</string>
     <string name="details_lang_missing">No %1$s source — other languages available.</string>
     <string name="details_no_sources">No source available for this title.</string>
@@ -58,6 +60,26 @@
     <!-- Player -->
     <string name="player_skip_intro">Skip intro</string>
     <string name="player_skip_outro">Skip credits</string>
+    <string name="player_play">Play</string>
+    <string name="player_pause">Pause</string>
+    <string name="player_seek_back">Rewind 15 seconds</string>
+    <string name="player_seek_forward">Forward 15 seconds</string>
+    <string name="player_next_episode">Next episode</string>
+    <string name="player_prev_episode">Previous episode</string>
+    <string name="player_progress">Progress bar</string>
+    <string name="player_scrub_hint">OK to confirm</string>
+    <string name="player_subtitles">Subtitles</string>
+    <string name="player_subtitles_off">Off</string>
+    <string name="player_audio">Audio track</string>
+    <string name="player_settings">Settings</string>
+    <string name="player_speed">Playback speed</string>
+    <string name="player_mute">Mute</string>
+    <string name="player_unmute">Unmute</string>
+    <string name="player_fullscreen">Fullscreen</string>
+    <string name="player_fullscreen_exit">Exit fullscreen</string>
+    <string name="player_error">Playback failed — try another host from the Sources panel.</string>
+    <string name="player_vlc_missing">VLC not found</string>
+    <string name="player_vlc_help">The desktop player relies on libVLC. Install VLC then restart:\nLinux: sudo apt install vlc — Windows/macOS: videolan.org</string>
 
     <!-- Update -->
     <string name="update_available">Update v%1$s available</string>

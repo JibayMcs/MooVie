@@ -65,6 +65,7 @@ import fr.moovie.tv.ui.components.MOOVIE_ACCENT
 import fr.moovie.tv.ui.components.MoovieButton
 import fr.moovie.tv.ui.components.MoovieCard
 import fr.moovie.tv.ui.components.MoovieIconButton
+import fr.moovie.tv.ui.components.MoovieMarqueeText
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -249,10 +250,8 @@ private fun ResultCard(item: TmdbItem, onClick: () -> Unit, modifier: Modifier =
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxWidth().aspectRatio(2f / 3f).background(Color(0xFF222222)),
             )
-            Text(
+            MoovieMarqueeText(
                 text = item.displayTitle,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(8.dp),
                 style = MaterialTheme.typography.bodySmall,
             )

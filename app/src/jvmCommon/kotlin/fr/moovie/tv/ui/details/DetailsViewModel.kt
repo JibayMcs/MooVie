@@ -9,6 +9,7 @@ import fr.moovie.tv.data.sources.EmbedLink
 import fr.moovie.tv.data.sources.ExtractorRegistry
 import fr.moovie.tv.data.sources.PlayableStream
 import fr.moovie.tv.data.sources.ProviderRegistry
+import fr.moovie.tv.data.tmdb.Episode
 import fr.moovie.tv.data.tmdb.TmdbRepository
 import fr.moovie.tv.data.watch.ResumeEntry
 import fr.moovie.tv.data.watch.WatchProgressRepository
@@ -60,6 +61,14 @@ class DetailsViewModel : ViewModel() {
     private val _quickPlay = MutableStateFlow<QuickPlayState>(QuickPlayState.Idle)
     val quickPlay: StateFlow<QuickPlayState> = _quickPlay
 
+    /**
+     * Épisode ouvert en fiche détaillée. Non nul = la fiche série affiche
+     * l'épisode (visuel, synopsis complet, Lire / Sources / Marquer vu) au lieu
+     * de la liste — même logique que la fiche d'un film.
+     */
+    private val _selectedEpisode = MutableStateFlow<EpisodeSelection?>(null)
+    val selectedEpisode: StateFlow<EpisodeSelection?> = _selectedEpisode
+
     private var quickPlayJob: Job? = null
 
     /** Langue de stream préférée de l'utilisateur (pour trier/prioriser les sources). */
@@ -105,6 +114,7 @@ class DetailsViewModel : ViewModel() {
         _sources.value = SourcesState.Idle
         _resolveError.value = null
         _resolved.value = null
+        _selectedEpisode.value = null
         pendingMeta = null
         this.tmdbId = tmdbId
         this.isTv = isTv
@@ -135,6 +145,7 @@ class DetailsViewModel : ViewModel() {
 
     fun selectSeason(season: Int) {
         val tv = _state.value as? DetailsState.Tv ?: return
+        _selectedEpisode.value = null
         viewModelScope.launch {
             val apiKey = settings.tmdbApiKey.first()
             val repo = TmdbRepository(currentTmdbLanguage())
@@ -143,14 +154,40 @@ class DetailsViewModel : ViewModel() {
         }
     }
 
+    /** Ouvre la fiche détaillée d'un épisode (clic / OK sur sa carte). */
+    fun openEpisode(season: Int, episode: Episode) {
+        _selectedEpisode.value = EpisodeSelection(season, episode)
+    }
+
+    /** Referme la fiche d'épisode et revient à la liste (Retour / Échap). */
+    fun closeEpisode() {
+        _selectedEpisode.value = null
+    }
+
+    /** Panneau des sources d'un épisode (bouton « Sources » de sa fiche). */
+    fun openEpisodePanel(season: Int, episode: Int) {
+        loadEpisodeSourcesAt(season, episode)
+        _panelVisible.value = true
+    }
+
     /** Clé de reprise du contenu dont on charge les sources (film ou épisode). */
     var playbackKey: String = ""
+        private set
+
+    /** Titre affiché par le lecteur (film ou série). */
+    var playbackTitle: String = ""
+        private set
+
+    /** Sous-titre du lecteur : année (film) ou « S1 · E3 — Nom » (épisode). */
+    var playbackSubtitle: String = ""
         private set
 
     /** Charge les sources du film courant, en streaming par provider. */
     fun loadMovieSources() {
         val movie = _state.value as? DetailsState.Movie ?: return
         playbackKey = movieKey()
+        playbackTitle = movie.details.title
+        playbackSubtitle = movie.details.year.orEmpty()
         pendingMeta = ResumeEntry(
             key = playbackKey,
             tmdbId = tmdbId,
@@ -174,8 +211,11 @@ class DetailsViewModel : ViewModel() {
     fun loadEpisodeSourcesAt(season: Int, episode: Int) {
         val tv = _state.value as? DetailsState.Tv ?: return
         playbackKey = episodeKey(season, episode)
-        val still = tv.episodes.takeIf { tv.season == season }
-            ?.firstOrNull { it.episodeNumber == episode }?.stillUrl()
+        val ep = tv.episodes.takeIf { tv.season == season }
+            ?.firstOrNull { it.episodeNumber == episode }
+        val still = ep?.stillUrl()
+        playbackTitle = tv.details.name
+        playbackSubtitle = "S$season · E$episode" + (ep?.name?.takeIf { it.isNotBlank() }?.let { " — $it" } ?: "")
         pendingMeta = ResumeEntry(
             key = playbackKey,
             tmdbId = tmdbId,
@@ -218,6 +258,11 @@ class DetailsViewModel : ViewModel() {
      */
     private fun startSourceLoad(query: suspend (fr.moovie.tv.data.sources.SourceProvider) -> List<EmbedLink>) {
         val generation = ++loadGeneration
+        // Bascule en Active AVANT toute suspension : la lecture rapide lit
+        // `_sources` juste après cet appel et repartait sur l'ancien `Idle`
+        // (la liste des providers n'arrive qu'après lecture des réglages), d'où
+        // l'obligation d'appuyer deux fois sur OK pour lancer un épisode.
+        _sources.value = SourcesState.Active(links = emptyList(), providers = emptyList())
         viewModelScope.launch {
             // Réglages utilisateur : providers désactivés + ordre de priorité.
             val disabled = settings.disabledProviders.first()
@@ -306,6 +351,8 @@ class DetailsViewModel : ViewModel() {
             _quickPlay.value = QuickPlayState.Searching(if (label.isBlank()) lang else "$label · $lang")
             _resolveError.value = null
             val tried = mutableSetOf<String>()
+            // Tours passés à attendre que la liste des providers soit publiée.
+            var startupWaits = 0
             while (true) {
                 val active = _sources.value as? SourcesState.Active
                 if (active == null) {
@@ -338,6 +385,12 @@ class DetailsViewModel : ViewModel() {
                         }
                     }
                     _quickPlay.value = QuickPlayState.Idle
+                    return@launch
+                }
+                // Garde-fou : si la liste des providers n'est jamais publiée
+                // (lecture des réglages en échec), ne pas boucler sans fin.
+                if (active.providers.isEmpty() && ++startupWaits > 40) {
+                    _quickPlay.value = QuickPlayState.Unavailable(lang)
                     return@launch
                 }
                 delay(250)

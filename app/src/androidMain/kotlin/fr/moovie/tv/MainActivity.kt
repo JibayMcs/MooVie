@@ -103,7 +103,7 @@ class MainActivity : ComponentActivity() {
                             is Screen.Details -> DetailsScreen(
                                 tmdbId = s.tmdbId,
                                 isTv = s.isTv,
-                                onPlay = { url, headers, key, subs -> screen = Screen.Player(url, headers, key, subs) },
+                                onPlay = { player -> screen = player },
                                 onBack = { screen = Screen.Home },
                                 autoSources = s.autoSources,
                                 resumeSeason = s.resumeSeason,
@@ -114,6 +114,8 @@ class MainActivity : ComponentActivity() {
                                 headers = s.headers,
                                 mediaKey = s.mediaKey,
                                 subtitles = s.subtitles,
+                                title = s.title,
+                                subtitle = s.subtitle,
                                 onBack = { screen = Screen.Home },
                                 // Passer le générique d'un épisode → enchaîne le
                                 // suivant via la fiche (résolution + lecture auto).
