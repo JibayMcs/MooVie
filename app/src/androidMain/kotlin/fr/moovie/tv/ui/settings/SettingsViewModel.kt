@@ -14,8 +14,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-/** Ligne d'affichage d'un provider dans les réglages. */
-data class ProviderSetting(val name: String, val enabled: Boolean)
+// ProviderSetting vit désormais dans jvmCommon (ui/settings/ProviderSetting.kt),
+// partagé avec l'écran de réglages commun.
 
 class SettingsViewModel(app: Application) : AndroidViewModel(app) {
 

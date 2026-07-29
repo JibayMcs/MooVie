@@ -13,13 +13,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import java.io.File
 
-/** États de la bannière de mise à jour. */
-sealed interface UpdateState {
-    data object None : UpdateState
-    data class Available(val version: String, val apkUrl: String) : UpdateState
-    data class Downloading(val version: String, val progress: Float) : UpdateState
-    data class Error(val message: String) : UpdateState
-}
+// UpdateState vit désormais dans jvmCommon (ui/update/UpdateState.kt), partagé
+// avec la bannière commune.
 
 /**
  * Vérifie une fois par démarrage la dernière release GitHub. « Plus tard »

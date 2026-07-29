@@ -1,8 +1,6 @@
 package fr.moovie.tv.ui.home
 
-import androidx.compose.ui.res.stringResource
 import androidx.compose.animation.Crossfade
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,15 +17,18 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -41,45 +42,52 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.tv.material3.Border
-import androidx.tv.material3.Card
-import androidx.tv.material3.CardDefaults
-import androidx.tv.material3.ExperimentalTvMaterial3Api
-import androidx.tv.material3.Icon
-import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.Text
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.ui.window.Dialog
-import coil.compose.AsyncImage
-import fr.moovie.tv.R
+import coil3.compose.AsyncImage
 import fr.moovie.tv.data.tmdb.TmdbItem
 import fr.moovie.tv.data.watch.ResumeEntry
+import fr.moovie.tv.resources.Res
+import fr.moovie.tv.resources.common_loading
+import fr.moovie.tv.resources.home_continue_watching
+import fr.moovie.tv.resources.home_in_progress
+import fr.moovie.tv.resources.home_minutes_left
+import fr.moovie.tv.resources.home_open_settings
+import fr.moovie.tv.resources.home_search
+import fr.moovie.tv.resources.home_settings
+import fr.moovie.tv.resources.mark_watched
+import fr.moovie.tv.resources.resume_remove
+import fr.moovie.tv.ui.components.MOOVIE_ACCENT
 import fr.moovie.tv.ui.components.MoovieButton
+import fr.moovie.tv.ui.components.MoovieCard
 import fr.moovie.tv.ui.components.MoovieIconButton
+import org.jetbrains.compose.resources.stringResource
 
+/**
+ * Écran d'accueil partagé TV + desktop : état hoisté (le ViewModel reste
+ * côté plateforme tant que les repos DataStore vivent en androidMain).
+ */
 @Composable
-fun HomeScreen(
+fun HomeScreenContent(
+    state: HomeState,
+    resume: List<ResumeEntry>,
+    watched: Set<String>,
     onOpenTitle: (tmdbId: Int, isTv: Boolean) -> Unit,
     onResume: (ResumeEntry) -> Unit,
     onOpenSettings: () -> Unit,
     onOpenSearch: () -> Unit,
-    viewModel: HomeViewModel = viewModel(),
+    onRemoveResume: (String) -> Unit,
+    onMarkResumeWatched: (String) -> Unit,
 ) {
-    val state by viewModel.state.collectAsStateWithLifecycle()
-    val resume by viewModel.resume.collectAsStateWithLifecycle()
-    val watched by viewModel.watched.collectAsStateWithLifecycle()
     // Élément survolé (focus D-pad) → alimente le hero et le fond dynamique.
     var focused by remember { mutableStateOf<TmdbItem?>(null) }
     // Cible de descente depuis l'en-tête : sans ça, le focus reste bloqué sur
@@ -136,13 +144,13 @@ fun HomeScreen(
                     MoovieIconButton(
                         onClick = onOpenSearch,
                         icon = Icons.Default.Search,
-                        contentDescription = stringResource(R.string.home_search),
+                        contentDescription = stringResource(Res.string.home_search),
                         modifier = headerDown,
                     )
                     MoovieIconButton(
                         onClick = onOpenSettings,
                         icon = Icons.Default.Settings,
-                        contentDescription = stringResource(R.string.home_settings),
+                        contentDescription = stringResource(Res.string.home_settings),
                         modifier = headerDown,
                     )
                 }
@@ -150,11 +158,11 @@ fun HomeScreen(
             Spacer(Modifier.height(16.dp))
 
             when (val s = state) {
-                HomeState.Loading -> Text(stringResource(R.string.common_loading), modifier = Modifier.padding(horizontal = 32.dp))
+                HomeState.Loading -> Text(stringResource(Res.string.common_loading), modifier = Modifier.padding(horizontal = 32.dp))
                 is HomeState.NeedsApiKey -> Column(modifier = Modifier.padding(horizontal = 32.dp)) {
                     Text(s.reason)
                     Spacer(Modifier.height(16.dp))
-                    MoovieButton(onClick = onOpenSettings) { Text(stringResource(R.string.home_open_settings)) }
+                    MoovieButton(onClick = onOpenSettings) { Text(stringResource(Res.string.home_open_settings)) }
                 }
                 is HomeState.Ready -> LazyColumn(
                     verticalArrangement = Arrangement.spacedBy(24.dp),
@@ -190,8 +198,8 @@ fun HomeScreen(
             ResumeMenuDialog(
                 entry = entry,
                 onDismiss = { resumeMenuFor = null },
-                onRemove = { viewModel.removeResume(entry.key) },
-                onMarkWatched = { viewModel.markResumeWatched(entry.key) },
+                onRemove = { onRemoveResume(entry.key) },
+                onMarkWatched = { onMarkResumeWatched(entry.key) },
             )
         }
     }
@@ -232,7 +240,7 @@ private fun ResumeRow(
 ) {
     Column {
         Text(
-            stringResource(R.string.home_continue_watching),
+            stringResource(Res.string.home_continue_watching),
             style = MaterialTheme.typography.titleLarge,
             modifier = Modifier.padding(horizontal = 32.dp),
         )
@@ -280,7 +288,7 @@ private fun ResumeMenuDialog(
             ) {
                 Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(10.dp))
-                Text(stringResource(R.string.resume_remove))
+                Text(stringResource(Res.string.resume_remove))
             }
             MoovieButton(
                 onClick = { onMarkWatched(); onDismiss() },
@@ -288,14 +296,13 @@ private fun ResumeMenuDialog(
             ) {
                 Icon(Icons.Default.Visibility, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(10.dp))
-                Text(stringResource(R.string.mark_watched))
+                Text(stringResource(Res.string.mark_watched))
             }
         }
     }
     LaunchedEffect(Unit) { runCatching { firstAction.requestFocus() } }
 }
 
-@OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 private fun ResumeCard(
     entry: ResumeEntry,
@@ -304,17 +311,11 @@ private fun ResumeCard(
     modifier: Modifier = Modifier,
 ) {
     val remainMin = ((entry.durationMs - entry.positionMs) / 60_000).coerceAtLeast(0)
-    Card(
+    MoovieCard(
         onClick = onClick,
         onLongClick = onLongClick,
+        focusedScale = 1.08f,
         modifier = modifier.width(260.dp),
-        scale = CardDefaults.scale(focusedScale = 1.08f),
-        border = CardDefaults.border(
-            focusedBorder = Border(
-                border = BorderStroke(3.dp, Color(0xFFB5302C)),
-                shape = RoundedCornerShape(10.dp),
-            ),
-        ),
     ) {
         Column {
             Box(
@@ -330,8 +331,8 @@ private fun ResumeCard(
                     modifier = Modifier.fillMaxSize(),
                 )
                 LinearProgressIndicator(
-                    progress = entry.progress,
-                    color = Color(0xFFB5302C),
+                    progress = { entry.progress },
+                    color = MOOVIE_ACCENT,
                     trackColor = Color(0x99000000),
                     modifier = Modifier.fillMaxWidth().height(4.dp).align(Alignment.BottomCenter),
                 )
@@ -346,8 +347,8 @@ private fun ResumeCard(
                 Text(
                     text = listOfNotNull(
                         entry.episodeLabel,
-                        if (entry.durationMs > 0) stringResource(R.string.home_minutes_left, remainMin) else null,
-                    ).joinToString(" · ").ifBlank { stringResource(R.string.home_in_progress) },
+                        if (entry.durationMs > 0) stringResource(Res.string.home_minutes_left, remainMin) else null,
+                    ).joinToString(" · ").ifBlank { stringResource(Res.string.home_in_progress) },
                     style = MaterialTheme.typography.labelSmall,
                     color = Color(0xFF9A9A9A),
                 )
@@ -389,7 +390,6 @@ private fun CatalogRow(
     }
 }
 
-@OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 private fun PosterCard(
     item: TmdbItem,
@@ -398,18 +398,11 @@ private fun PosterCard(
     onFocusItem: (TmdbItem) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Card(
+    MoovieCard(
         onClick = onClick,
         modifier = modifier
             .width(150.dp)
             .onFocusChanged { if (it.isFocused) onFocusItem(item) },
-        scale = CardDefaults.scale(focusedScale = 1.1f),
-        border = CardDefaults.border(
-            focusedBorder = Border(
-                border = BorderStroke(3.dp, Color(0xFFB5302C)),
-                shape = RoundedCornerShape(10.dp),
-            ),
-        ),
     ) {
         Column {
             Box {

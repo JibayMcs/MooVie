@@ -6,7 +6,6 @@ import androidx.lifecycle.viewModelScope
 import fr.moovie.tv.data.search.SearchHistoryRepository
 import fr.moovie.tv.data.settings.LocaleManager
 import fr.moovie.tv.data.settings.SettingsRepository
-import fr.moovie.tv.data.tmdb.TmdbItem
 import fr.moovie.tv.data.tmdb.TmdbRepository
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,13 +18,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-sealed interface SearchState {
-    data object Idle : SearchState
-    data object Loading : SearchState
-    data object NeedsKey : SearchState
-    data object Empty : SearchState
-    data class Results(val items: List<TmdbItem>) : SearchState
-}
+// SearchState vit désormais dans jvmCommon (ui/search/SearchState.kt), partagé
+// avec l'écran commun.
 
 @OptIn(FlowPreview::class)
 class SearchViewModel(app: Application) : AndroidViewModel(app) {

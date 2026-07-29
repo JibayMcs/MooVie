@@ -6,7 +6,6 @@ import androidx.lifecycle.viewModelScope
 import fr.moovie.tv.R
 import fr.moovie.tv.data.settings.LocaleManager
 import fr.moovie.tv.data.settings.SettingsRepository
-import fr.moovie.tv.data.tmdb.TmdbItem
 import fr.moovie.tv.data.tmdb.TmdbRepository
 import fr.moovie.tv.data.watch.ResumeEntry
 import fr.moovie.tv.data.watch.WatchProgressRepository
@@ -17,13 +16,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-data class HomeRow(val title: String, val items: List<TmdbItem>)
-
-sealed interface HomeState {
-    data object Loading : HomeState
-    data class Ready(val rows: List<HomeRow>) : HomeState
-    data class NeedsApiKey(val reason: String) : HomeState
-}
+// HomeRow / HomeState vivent désormais dans jvmCommon (ui/home/HomeState.kt),
+// partagés avec l'écran d'accueil commun.
 
 /**
  * Charge les rangées de l'accueil depuis TMDB. Sans clé API configurée,

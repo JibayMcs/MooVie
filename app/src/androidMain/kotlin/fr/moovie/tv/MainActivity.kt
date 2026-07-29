@@ -32,6 +32,7 @@ import fr.moovie.tv.ui.player.PlayerScreen
 import fr.moovie.tv.ui.search.SearchScreen
 import fr.moovie.tv.ui.settings.SettingsScreen
 import fr.moovie.tv.ui.theme.MooVieTheme
+import fr.moovie.tv.ui.theme.MooVieTvMaterialTheme
 import fr.moovie.tv.ui.update.UpdateBanner
 import fr.moovie.tv.ui.update.UpdateViewModel
 import kotlinx.coroutines.launch
@@ -54,6 +55,8 @@ class MainActivity : ComponentActivity() {
         handleTmdbKey(intent)
 
         setContent {
+            // Thème tv-material (PlayerScreen) autour du thème material3 partagé.
+            MooVieTvMaterialTheme {
             MooVieTheme {
                 // Fixe la couleur de contenu par défaut (sinon les Text libres
                 // héritent d'une couleur sombre sans Surface parent → invisibles).
@@ -128,6 +131,7 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 }
+            }
             }
         }
     }

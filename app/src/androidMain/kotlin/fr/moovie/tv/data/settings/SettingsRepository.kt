@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.map
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "moovie_settings")
 
 /** Langue de stream préférée (piste audio par défaut). */
-enum class StreamLanguage { VF, VOSTFR, VO }
+// StreamLanguage vit désormais dans jvmCommon (data/settings/StreamLanguage.kt).
 
 /**
  * Réglages utilisateur persistés. Tout ce qui doit être saisi/choisi par

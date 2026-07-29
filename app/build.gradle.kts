@@ -39,6 +39,9 @@ kotlin {
                 implementation(compose.runtime)
                 implementation(compose.foundation)
                 implementation(compose.ui)
+                implementation(compose.material3)
+                implementation(compose.materialIconsExtended)
+                implementation(compose.components.resources)
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
             }
         }
@@ -56,6 +59,9 @@ kotlin {
                 // DNS-over-HTTPS : contourne le blocage DNS des FAI sur les domaines sources
                 implementation("com.squareup.okhttp3:okhttp-dnsoverhttps:4.12.0")
                 implementation("org.jsoup:jsoup:1.18.1")
+                // Images multiplateforme (Coil 3), fetcher réseau OkHttp
+                implementation("io.coil-kt.coil3:coil-compose:3.0.4")
+                implementation("io.coil-kt.coil3:coil-network-okhttp:3.0.4")
             }
         }
 
@@ -71,9 +77,7 @@ kotlin {
                 implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.6")
                 implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.6")
 
-                // Compose for TV
-                implementation("androidx.compose.material:material-icons-extended")
-                implementation("androidx.compose.material3:material3") // uniquement pour les indicateurs de progression
+                // Compose for TV (en cours de retrait au profit des composants partagés)
                 implementation("androidx.tv:tv-material:1.0.0")
 
                 // Lecture vidéo native (Android uniquement — VLCJ prévu côté desktop)
@@ -84,9 +88,6 @@ kotlin {
                 implementation("androidx.media3:media3-datasource-okhttp:1.4.1")
                 implementation("androidx.media3:media3-session:1.4.1")
 
-                // Images
-                implementation("io.coil-kt:coil-compose:2.7.0")
-
                 // Réglages persistants
                 implementation("androidx.datastore:datastore-preferences:1.1.1")
             }
@@ -96,7 +97,7 @@ kotlin {
             dependsOn(jvmCommon)
             dependencies {
                 implementation(compose.desktop.currentOs)
-                implementation(compose.material3)
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.9.0")
             }
         }
     }
@@ -145,6 +146,11 @@ android {
         compose = true
         buildConfig = true
     }
+}
+
+compose.resources {
+    // Res accessible depuis jvmCommon (strings FR/EN/ES partagées TV + desktop)
+    packageOfResClass = "fr.moovie.tv.resources"
 }
 
 compose.desktop {

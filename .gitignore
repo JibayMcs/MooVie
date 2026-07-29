@@ -12,3 +12,4 @@
 !debug.keystore
 keystore.properties
 /.env
+/graphify-out/

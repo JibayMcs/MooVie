@@ -1,7 +1,5 @@
 package fr.moovie.tv.ui.details
 
-import androidx.compose.ui.res.stringResource
-import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -12,7 +10,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -35,8 +32,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -53,90 +55,74 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.tv.material3.Border
-import androidx.tv.material3.Card
-import androidx.tv.material3.CardDefaults
-import androidx.tv.material3.ExperimentalTvMaterial3Api
-import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.Text
-import coil.compose.AsyncImage
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
-import fr.moovie.tv.R
+import coil3.compose.AsyncImage
 import fr.moovie.tv.data.settings.StreamLanguage
 import fr.moovie.tv.data.sources.EmbedLink
 import fr.moovie.tv.data.tmdb.CastMember
 import fr.moovie.tv.data.tmdb.Episode
+import fr.moovie.tv.data.watch.ResumeEntry
+import fr.moovie.tv.resources.Res
+import fr.moovie.tv.resources.common_back
+import fr.moovie.tv.resources.common_loading
+import fr.moovie.tv.resources.details_cast
+import fr.moovie.tv.resources.details_episodes_season
+import fr.moovie.tv.resources.details_lang_missing
+import fr.moovie.tv.resources.details_lang_unavailable
+import fr.moovie.tv.resources.details_no_sources
+import fr.moovie.tv.resources.details_play
+import fr.moovie.tv.resources.details_playing
+import fr.moovie.tv.resources.details_resume
+import fr.moovie.tv.resources.details_runtime
+import fr.moovie.tv.resources.details_searching
+import fr.moovie.tv.resources.details_searching_source
+import fr.moovie.tv.resources.details_seasons
+import fr.moovie.tv.resources.details_sources
+import fr.moovie.tv.resources.mark_season_unwatched
+import fr.moovie.tv.resources.mark_season_watched
+import fr.moovie.tv.resources.mark_unwatched
+import fr.moovie.tv.resources.mark_watched
+import fr.moovie.tv.ui.components.MOOVIE_ACCENT
 import fr.moovie.tv.ui.components.MoovieButton
+import fr.moovie.tv.ui.components.MoovieCard
 import fr.moovie.tv.ui.components.MoovieIconButton
+import kotlinx.coroutines.delay
+import org.jetbrains.compose.resources.stringResource
 
-private val ACCENT = Color(0xFFB5302C)
-
+/**
+ * Fiche film/série partagée TV + desktop : état hoisté (le ViewModel reste côté
+ * plateforme — chargement TMDB, résolution de sources, suivi de lecture).
+ */
 @Composable
-fun DetailsScreen(
-    tmdbId: Int,
-    isTv: Boolean,
-    onPlay: (streamUrl: String, headers: Map<String, String>, mediaKey: String, subtitles: Map<String, String>) -> Unit,
+fun DetailsScreenContent(
+    state: DetailsState,
+    sources: SourcesState,
+    resolveError: String?,
+    streamLang: StreamLanguage,
+    watched: Set<String>,
+    resume: Map<String, ResumeEntry>,
+    quickPlay: QuickPlayState,
+    panelVisible: Boolean,
+    movieKey: String,
+    episodeKey: (season: Int, episode: Int) -> String,
+    onQuickPlayMovie: () -> Unit,
+    onQuickPlayEpisode: (season: Int, episode: Int) -> Unit,
+    onSelectSeason: (Int) -> Unit,
+    onToggleWatched: (String) -> Unit,
+    onToggleSeasonWatched: () -> Unit,
+    onOpenPanel: () -> Unit,
+    onPickSource: (EmbedLink) -> Unit,
+    onDismissQuickPlay: () -> Unit,
     onBack: () -> Unit,
-    autoSources: Boolean = false,
-    resumeSeason: Int = 0,
-    resumeEpisode: Int = 0,
-    viewModel: DetailsViewModel = viewModel(),
 ) {
-    val state by viewModel.state.collectAsStateWithLifecycle()
-    val sources by viewModel.sources.collectAsStateWithLifecycle()
-    val resolved by viewModel.resolved.collectAsStateWithLifecycle()
-    val resolveError by viewModel.resolveError.collectAsStateWithLifecycle()
-    val streamLang by viewModel.streamLanguage.collectAsStateWithLifecycle()
-    val watched by viewModel.watched.collectAsStateWithLifecycle()
-    val resume by viewModel.resume.collectAsStateWithLifecycle()
-    val quickPlay by viewModel.quickPlay.collectAsStateWithLifecycle()
-    val panelVisible by viewModel.panelVisible.collectAsStateWithLifecycle()
     val primaryFocus = remember { FocusRequester() }
-    // Reprise depuis l'accueil : lance la lecture directe une seule fois, dès que la fiche est chargée.
-    val autoConsumed = remember { mutableStateOf(false) }
-
-    LaunchedEffect(tmdbId, isTv) { viewModel.start(tmdbId, isTv) }
     LaunchedEffect(state) {
         if (state is DetailsState.Movie || state is DetailsState.Tv) {
             runCatching { primaryFocus.requestFocus() }
-        }
-        if (autoSources && !autoConsumed.value) {
-            when (state) {
-                is DetailsState.Movie -> {
-                    autoConsumed.value = true
-                    viewModel.quickPlayMovie()
-                }
-                is DetailsState.Tv -> {
-                    autoConsumed.value = true
-                    viewModel.selectSeason(resumeSeason)
-                    viewModel.quickPlayEpisode(resumeSeason, resumeEpisode)
-                }
-                else -> Unit
-            }
-        }
-    }
-    LaunchedEffect(resolved) {
-        resolved?.let { s ->
-            if (s.url.isNotBlank()) {
-                // Ferme le panneau avant de partir : au retour (ou sur une autre
-                // fiche, le ViewModel étant partagé), il ne doit pas rester ouvert.
-                viewModel.closePanel()
-                onPlay(s.url, s.headers, viewModel.playbackKey, s.subtitleUrls)
-            }
-            viewModel.consumeResolved()
         }
     }
 
     val backdrop = (state as? DetailsState.Movie)?.details?.backdropUrl()
         ?: (state as? DetailsState.Tv)?.details?.backdropUrl()
-    val panelOpen = panelVisible
-
-    // Retour ferme d'abord le panneau des sources (sinon retour à l'accueil).
-    BackHandler(enabled = panelOpen) { viewModel.closePanel() }
 
     Box(modifier = Modifier.fillMaxSize()) {
         backdrop?.let { url ->
@@ -161,13 +147,13 @@ fun DetailsScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             when (val s = state) {
-                DetailsState.Loading -> Text(stringResource(R.string.common_loading), modifier = hPad)
+                DetailsState.Loading -> Text(stringResource(Res.string.common_loading), modifier = hPad)
                 is DetailsState.Error -> {
                     Text(s.message, modifier = hPad)
-                    MoovieButton(onClick = onBack, modifier = hPad) { Text(stringResource(R.string.common_back)) }
+                    MoovieButton(onClick = onBack, modifier = hPad) { Text(stringResource(Res.string.common_back)) }
                 }
                 is DetailsState.Movie -> {
-                    val movieWatched = viewModel.movieKey() in watched
+                    val movieWatched = movieKey in watched
                     Row(
                         modifier = hPad,
                         verticalAlignment = Alignment.CenterVertically,
@@ -176,7 +162,7 @@ fun DetailsScreen(
                         Text(s.details.title, style = MaterialTheme.typography.headlineMedium)
                         if (movieWatched) WatchedBadge()
                     }
-                    s.details.year?.let { Text(stringResource(R.string.details_runtime, it, s.details.runtime?.toString() ?: "?"), modifier = hPad) }
+                    s.details.year?.let { Text(stringResource(Res.string.details_runtime, it, s.details.runtime?.toString() ?: "?"), modifier = hPad) }
                     Text(s.details.overview, style = MaterialTheme.typography.bodyMedium, modifier = hPad)
                     CastRow(s.details.credits?.cast.orEmpty())
 
@@ -196,7 +182,7 @@ fun DetailsScreen(
                             onClick = {
                                 // Cliquable aussi pendant le chargement : la lecture
                                 // démarrera dès qu'une source arrive.
-                                if (prefReady || loadingSources) viewModel.quickPlayMovie()
+                                if (prefReady || loadingSources) onQuickPlayMovie()
                             },
                             modifier = Modifier.focusRequester(primaryFocus),
                         ) {
@@ -208,29 +194,29 @@ fun DetailsScreen(
                                         modifier = Modifier.size(14.dp),
                                     )
                                     Spacer(Modifier.width(8.dp))
-                                    Text(stringResource(R.string.details_playing))
+                                    Text(stringResource(Res.string.details_playing))
                                 }
                                 prefReady -> Text(
-                                    if (resume.containsKey(viewModel.movieKey())) stringResource(R.string.details_resume) else stringResource(R.string.details_play),
+                                    if (resume.containsKey(movieKey)) stringResource(Res.string.details_resume) else stringResource(Res.string.details_play),
                                 )
                                 loadingSources -> {
                                     CircularProgressIndicator(
-                                        color = ACCENT,
+                                        color = MOOVIE_ACCENT,
                                         strokeWidth = 2.dp,
                                         modifier = Modifier.size(14.dp),
                                     )
                                     Spacer(Modifier.width(8.dp))
-                                    Text(stringResource(R.string.details_searching, streamLang.name))
+                                    Text(stringResource(Res.string.details_searching, streamLang.name))
                                 }
-                                else -> Text(stringResource(R.string.details_lang_unavailable, streamLang.name), color = Color(0xFF8A8A8A))
+                                else -> Text(stringResource(Res.string.details_lang_unavailable, streamLang.name), color = Color(0xFF8A8A8A))
                             }
                         }
-                        MoovieButton(onClick = { viewModel.openPanel() }) { Text(stringResource(R.string.details_sources)) }
+                        MoovieButton(onClick = onOpenPanel) { Text(stringResource(Res.string.details_sources)) }
                         // Œil = marquer vu / non vu (outline verte quand vu).
                         MoovieIconButton(
-                            onClick = { viewModel.toggleWatched(viewModel.movieKey()) },
+                            onClick = { onToggleWatched(movieKey) },
                             icon = if (movieWatched) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                            contentDescription = if (movieWatched) stringResource(R.string.mark_unwatched) else stringResource(R.string.mark_watched),
+                            contentDescription = if (movieWatched) stringResource(Res.string.mark_unwatched) else stringResource(Res.string.mark_watched),
                             selected = movieWatched,
                         )
                     }
@@ -240,15 +226,15 @@ fun DetailsScreen(
                     s.details.year?.let { Text(it, modifier = hPad) }
                     Text(s.details.overview, style = MaterialTheme.typography.bodyMedium, maxLines = 4, overflow = TextOverflow.Ellipsis, modifier = hPad)
                     val seasonAllWatched = s.episodes.isNotEmpty() &&
-                        s.episodes.all { viewModel.episodeKey(s.season, it.episodeNumber) in watched }
-                    Text(stringResource(R.string.details_seasons), style = MaterialTheme.typography.titleMedium, modifier = hPad)
+                        s.episodes.all { episodeKey(s.season, it.episodeNumber) in watched }
+                    Text(stringResource(Res.string.details_seasons), style = MaterialTheme.typography.titleMedium, modifier = hPad)
                     LazyRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         contentPadding = PaddingValues(horizontal = 48.dp),
                     ) {
                         itemsIndexed(s.details.seasons.filter { it.seasonNumber > 0 }) { index, season ->
                             MoovieButton(
-                                onClick = { viewModel.selectSeason(season.seasonNumber) },
+                                onClick = { onSelectSeason(season.seasonNumber) },
                                 modifier = if (index == 0) Modifier.focusRequester(primaryFocus) else Modifier,
                             ) {
                                 Text(if (season.seasonNumber == s.season) "● S${season.seasonNumber}" else "S${season.seasonNumber}")
@@ -258,16 +244,16 @@ fun DetailsScreen(
                         // saison vue / non vue (outline verte quand tout est vu).
                         item {
                             MoovieIconButton(
-                                onClick = { viewModel.toggleSeasonWatched() },
+                                onClick = onToggleSeasonWatched,
                                 icon = if (seasonAllWatched) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                                contentDescription = if (seasonAllWatched) stringResource(R.string.mark_season_unwatched) else stringResource(R.string.mark_season_watched),
+                                contentDescription = if (seasonAllWatched) stringResource(Res.string.mark_season_unwatched) else stringResource(Res.string.mark_season_watched),
                                 selected = seasonAllWatched,
                             )
                         }
                     }
-                    Text(stringResource(R.string.details_episodes_season, s.season), style = MaterialTheme.typography.titleMedium, modifier = hPad)
+                    Text(stringResource(Res.string.details_episodes_season, s.season), style = MaterialTheme.typography.titleMedium, modifier = hPad)
                     s.episodes.forEach { ep ->
-                        val key = viewModel.episodeKey(s.season, ep.episodeNumber)
+                        val key = episodeKey(s.season, ep.episodeNumber)
                         Box(modifier = hPad) {
                             EpisodeRow(
                                 ep = ep,
@@ -275,8 +261,8 @@ fun DetailsScreen(
                                 progress = resume[key]?.progress,
                                 // Clic = lecture directe (meilleure source dans la langue
                                 // préférée) ; le panneau ne s'ouvre qu'en secours.
-                                onSources = { viewModel.quickPlayEpisode(s.season, ep.episodeNumber) },
-                                onToggleWatched = { viewModel.toggleWatched(key) },
+                                onSources = { onQuickPlayEpisode(s.season, ep.episodeNumber) },
+                                onToggleWatched = { onToggleWatched(key) },
                             )
                         }
                     }
@@ -290,13 +276,13 @@ fun DetailsScreen(
         val lastActive = remember { mutableStateOf<SourcesState.Active?>(null) }
         (sources as? SourcesState.Active)?.let { lastActive.value = it }
         AnimatedVisibility(
-            visible = panelOpen,
+            visible = panelVisible,
             enter = slideInHorizontally(initialOffsetX = { it }) + fadeIn(),
             exit = slideOutHorizontally(targetOffsetX = { it }) + fadeOut(),
             modifier = Modifier.align(Alignment.CenterEnd),
         ) {
             lastActive.value?.let { active ->
-                SourcesSlideOver(state = active, preferred = streamLang, resolveError = resolveError, onPick = viewModel::play)
+                SourcesSlideOver(state = active, preferred = streamLang, resolveError = resolveError, onPick = onPickSource)
             }
         }
 
@@ -305,8 +291,8 @@ fun DetailsScreen(
         val q = quickPlay
         if (q is QuickPlayState.Unavailable) {
             LaunchedEffect(q) {
-                kotlinx.coroutines.delay(4000)
-                viewModel.dismissQuickPlay()
+                delay(4000)
+                onDismissQuickPlay()
             }
         }
         AnimatedVisibility(
@@ -326,14 +312,14 @@ fun DetailsScreen(
                 when (q) {
                     is QuickPlayState.Searching -> {
                         CircularProgressIndicator(
-                            color = ACCENT,
+                            color = MOOVIE_ACCENT,
                             strokeWidth = 2.dp,
                             modifier = Modifier.size(16.dp),
                         )
-                        Text(stringResource(R.string.details_searching_source, q.label), style = MaterialTheme.typography.bodyMedium)
+                        Text(stringResource(Res.string.details_searching_source, q.label), style = MaterialTheme.typography.bodyMedium)
                     }
                     is QuickPlayState.Unavailable -> Text(
-                        stringResource(R.string.details_lang_unavailable, q.lang),
+                        stringResource(Res.string.details_lang_unavailable, q.lang),
                         style = MaterialTheme.typography.bodyMedium,
                         color = Color(0xFFE0A0A0),
                     )
@@ -374,12 +360,12 @@ private fun SourcesSlideOver(
             .padding(vertical = 28.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(stringResource(R.string.details_sources), style = MaterialTheme.typography.titleLarge, modifier = pPad)
+        Text(stringResource(Res.string.details_sources), style = MaterialTheme.typography.titleLarge, modifier = pPad)
 
         // Barre de progression tant qu'au moins un provider charge.
         if (state.anyLoading) {
             LinearProgressIndicator(
-                color = ACCENT,
+                color = MOOVIE_ACCENT,
                 trackColor = Color(0xFF2A2A2A),
                 modifier = Modifier.fillMaxWidth().then(pPad),
             )
@@ -391,7 +377,7 @@ private fun SourcesSlideOver(
         }
         if (prefMissing) {
             Text(
-                stringResource(R.string.details_lang_missing, preferred.name),
+                stringResource(Res.string.details_lang_missing, preferred.name),
                 style = MaterialTheme.typography.labelMedium,
                 color = Color(0xFFE0A0A0),
                 modifier = pPad,
@@ -402,7 +388,7 @@ private fun SourcesSlideOver(
         when {
             links.isEmpty() && state.anyLoading -> SkeletonRows(modifier = pPad)
             links.isEmpty() -> Text(
-                stringResource(R.string.details_no_sources),
+                stringResource(Res.string.details_no_sources),
                 color = Color(0xFFE0A0A0),
                 modifier = pPad,
             )
@@ -415,7 +401,7 @@ private fun SourcesSlideOver(
                         Text(
                             lang,
                             style = MaterialTheme.typography.titleMedium,
-                            color = ACCENT,
+                            color = MOOVIE_ACCENT,
                             modifier = Modifier.padding(top = if (sectionIndex == 0) 0.dp else 8.dp),
                         )
                     }
@@ -451,7 +437,7 @@ private fun ProviderChips(providers: List<ProviderProgress>, modifier: Modifier 
             ) {
                 when (p.status) {
                     ProviderStatus.LOADING -> CircularProgressIndicator(
-                        color = ACCENT,
+                        color = MOOVIE_ACCENT,
                         strokeWidth = 2.dp,
                         modifier = Modifier.size(12.dp),
                     )
@@ -502,7 +488,6 @@ private fun WatchedBadge(modifier: Modifier = Modifier) {
     }
 }
 
-@OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 private fun EpisodeRow(
     ep: Episode,
@@ -512,14 +497,11 @@ private fun EpisodeRow(
     onToggleWatched: () -> Unit,
 ) {
     // Clic → sources de l'épisode ; OK long → bascule vu/non vu.
-    Card(
+    MoovieCard(
         onClick = onSources,
         onLongClick = onToggleWatched,
+        focusedScale = 1.02f,
         modifier = Modifier.fillMaxWidth(),
-        scale = CardDefaults.scale(focusedScale = 1.02f),
-        border = CardDefaults.border(
-            focusedBorder = Border(BorderStroke(2.dp, ACCENT), shape = RoundedCornerShape(8.dp)),
-        ),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(8.dp),
@@ -543,8 +525,8 @@ private fun EpisodeRow(
                 // Épisode commencé : mini-barre de progression sur la vignette.
                 if (!isWatched && progress != null && progress > 0f) {
                     LinearProgressIndicator(
-                        progress = progress,
-                        color = ACCENT,
+                        progress = { progress },
+                        color = MOOVIE_ACCENT,
                         trackColor = Color(0x66000000),
                         modifier = Modifier.fillMaxWidth().height(4.dp).align(Alignment.BottomCenter),
                     )
@@ -569,7 +551,7 @@ private fun CastRow(cast: List<CastMember>) {
     val members = cast.take(15)
     if (members.isEmpty()) return
     Column {
-        Text(stringResource(R.string.details_cast), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 48.dp))
+        Text(stringResource(Res.string.details_cast), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 48.dp))
         Spacer(Modifier.height(8.dp))
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(16.dp),

@@ -1,6 +1,5 @@
 package fr.moovie.tv.ui.update
 
-import androidx.compose.ui.res.stringResource
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
@@ -14,18 +13,24 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.SystemUpdateAlt
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import androidx.tv.material3.Icon
-import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.Text
-import fr.moovie.tv.R
+import fr.moovie.tv.resources.Res
+import fr.moovie.tv.resources.update_available
+import fr.moovie.tv.resources.update_downloading
+import fr.moovie.tv.resources.update_install
+import fr.moovie.tv.resources.update_later
+import fr.moovie.tv.resources.update_retry
 import fr.moovie.tv.ui.components.MoovieButton
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * Bannière de mise à jour, tout en haut de l'écran sur toutes les pages.
@@ -60,7 +65,7 @@ fun UpdateBanner(
             when (state) {
                 is UpdateState.Available -> {
                     Text(
-                        stringResource(R.string.update_available, state.version),
+                        stringResource(Res.string.update_available, state.version),
                         style = MaterialTheme.typography.titleMedium,
                         color = Color.White,
                         modifier = Modifier.weight(1f),
@@ -72,18 +77,18 @@ fun UpdateBanner(
                             modifier = Modifier.size(18.dp),
                         )
                         Spacer(Modifier.width(10.dp))
-                        Text(stringResource(R.string.update_install))
+                        Text(stringResource(Res.string.update_install))
                     }
-                    MoovieButton(onClick = onDismiss) { Text(stringResource(R.string.update_later)) }
+                    MoovieButton(onClick = onDismiss) { Text(stringResource(Res.string.update_later)) }
                 }
                 is UpdateState.Downloading -> {
                     Text(
-                        stringResource(R.string.update_downloading, state.version, (state.progress * 100).toInt()),
+                        stringResource(Res.string.update_downloading, state.version, (state.progress * 100).toInt()),
                         style = MaterialTheme.typography.titleMedium,
                         color = Color.White,
                     )
                     LinearProgressIndicator(
-                        progress = state.progress,
+                        progress = { state.progress },
                         color = Color.White,
                         trackColor = Color(0x66000000),
                         modifier = Modifier.weight(1f),
@@ -96,8 +101,8 @@ fun UpdateBanner(
                         color = Color.White,
                         modifier = Modifier.weight(1f),
                     )
-                    MoovieButton(onClick = onInstall) { Text(stringResource(R.string.update_retry)) }
-                    MoovieButton(onClick = onDismiss) { Text(stringResource(R.string.update_later)) }
+                    MoovieButton(onClick = onInstall) { Text(stringResource(Res.string.update_retry)) }
+                    MoovieButton(onClick = onDismiss) { Text(stringResource(Res.string.update_later)) }
                 }
                 UpdateState.None -> Unit
             }

@@ -14,7 +14,9 @@ private val MooVieColors = darkColorScheme(
     onSurface = Color(0xFFEDEDED),
 )
 
+// Thème tv-material résiduel : englobe le thème material3 partagé tant que des
+// écrans tv-material subsistent (PlayerScreen). À supprimer avec eux.
 @Composable
-fun MooVieTheme(content: @Composable () -> Unit) {
+fun MooVieTvMaterialTheme(content: @Composable () -> Unit) {
     MaterialTheme(colorScheme = MooVieColors, content = content)
 }
