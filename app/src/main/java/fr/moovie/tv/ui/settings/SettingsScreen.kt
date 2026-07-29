@@ -1,6 +1,5 @@
 package fr.moovie.tv.ui.settings
 
-import android.app.Activity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -78,6 +77,11 @@ fun SettingsScreen(
     val dohProvider by viewModel.dohProvider.collectAsStateWithLifecycle()
     val skipIntroOutro by viewModel.skipIntroOutro.collectAsStateWithLifecycle()
 
+    // Focus initial sur le 1er bouton (pas le champ clé) : sinon le champ texte
+    // s'auto-focalise à l'entrée et ouvre le clavier — mauvaise UX sur TV.
+    val firstFocus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { firstFocus.requestFocus() } }
+
     Column(
         // Scroll pleine page puis marges : les boutons agrandis au focus débordent
         // dans la marge au lieu d'être rognés par le conteneur défilant.
@@ -95,10 +99,11 @@ fun SettingsScreen(
         SettingsCategory(stringResource(R.string.settings_cat_playback)) {
             Text(stringResource(R.string.settings_stream_lang), style = MaterialTheme.typography.titleMedium)
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                fr.moovie.tv.data.settings.StreamLanguage.entries.forEach { lang ->
+                fr.moovie.tv.data.settings.StreamLanguage.entries.forEachIndexed { index, lang ->
                     MoovieButton(
                         onClick = { viewModel.setStreamLanguage(lang) },
                         selected = lang == streamLang,
+                        modifier = if (index == 0) Modifier.focusRequester(firstFocus) else Modifier,
                     ) { Text(lang.name) }
                 }
             }
@@ -240,9 +245,11 @@ private fun LanguageSelector() {
                     val selected = language == current
                     MoovieButton(
                         onClick = {
-                            LocaleManager.set(context, language)
                             open = false
-                            (context as? Activity)?.recreate()
+                            // Redémarrage à froid : recharge l'UI + les données
+                            // TMDB dans la nouvelle langue (recreate ne suffit pas,
+                            // les ViewModels survivent avec leurs données en cache).
+                            LocaleManager.applyAndRestart(context, language)
                         },
                         selected = selected,
                         modifier = Modifier
