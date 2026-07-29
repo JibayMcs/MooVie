@@ -1,6 +1,7 @@
 package fr.moovie.tv.data.settings
 
 import android.content.Context
+import android.content.Intent
 import android.content.res.Configuration
 import java.util.Locale
 
@@ -28,8 +29,36 @@ object LocaleManager {
     }
 
     fun set(context: Context, language: AppLanguage) {
+        // commit() synchrone (pas apply()) : la préférence doit être flushée sur
+        // disque AVANT le redémarrage du process, sinon elle est perdue.
         context.getSharedPreferences(PREF, Context.MODE_PRIVATE).edit()
-            .putString(KEY, language.tag).apply()
+            .putString(KEY, language.tag).commit()
+    }
+
+    /**
+     * Enregistre la langue puis redémarre l'app à froid. Un simple recreate()
+     * ne suffit pas : les ViewModels (scope Activity) survivent et gardent leurs
+     * données déjà chargées (titres de rangées, métadonnées TMDB) dans l'ancienne
+     * langue. Un redémarrage complet recharge tout dans la nouvelle langue.
+     *
+     * NB : on utilise l'intent Leanback (app TV, catégorie LEANBACK_LAUNCHER) —
+     * `getLaunchIntentForPackage` cherche CATEGORY_LAUNCHER et renverrait null,
+     * ce qui tuerait le process sans le relancer (= crash apparent).
+     */
+    fun applyAndRestart(context: Context, language: AppLanguage) {
+        set(context, language)
+        val app = context.applicationContext
+        val pm = app.packageManager
+        val launch = pm.getLeanbackLaunchIntentForPackage(app.packageName)
+            ?: pm.getLaunchIntentForPackage(app.packageName)
+        val component = launch?.component
+        if (component != null) {
+            app.startActivity(Intent.makeRestartActivityTask(component))
+            Runtime.getRuntime().exit(0)
+        } else {
+            // Garde-fou : jamais tuer le process sans chemin de relance fiable.
+            (context as? android.app.Activity)?.recreate()
+        }
     }
 
     /** Enveloppe le contexte avec la locale choisie (no-op si SYSTEM). */
