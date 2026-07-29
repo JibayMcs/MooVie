@@ -33,6 +33,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -58,7 +59,11 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import fr.moovie.tv.data.settings.SettingsRepository
 import fr.moovie.tv.data.watch.WatchProgressRepository
+import fr.moovie.tv.resources.Res
+import fr.moovie.tv.resources.common_cancel
+import fr.moovie.tv.resources.player_next_in
 import fr.moovie.tv.ui.components.MOOVIE_ACCENT
 import fr.moovie.tv.ui.components.MoovieButton
 import fr.moovie.tv.ui.components.MoovieIconButton
@@ -67,6 +72,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.stringResource
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.ColorAlphaType
 import org.jetbrains.skia.ColorType
@@ -142,11 +148,16 @@ internal fun DesktopPlayerScreen(
     subtitles: Map<String, String>,
     title: String,
     subtitle: String,
+    nextSeason: Int,
+    nextEpisode: Int,
     isFullscreen: Boolean,
     onToggleFullscreen: () -> Unit,
     onBack: () -> Unit,
+    onNextEpisode: (season: Int, episode: Int) -> Unit,
 ) {
     val progress = remember { WatchProgressRepository() }
+    val settings = remember { SettingsRepository() }
+    val autoPlayNext by settings.autoPlayNext.collectAsState(initial = true)
     val saveScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.IO) }
     val surface = remember { ComposeVideoSurface() }
 
@@ -192,10 +203,18 @@ internal fun DesktopPlayerScreen(
     // après 3 s d'inactivité pendant la lecture, toujours visibles en pause.
     var controlsVisible by remember { mutableStateOf(true) }
     var activityTick by remember { mutableStateOf(0) }
+    // Secondes restantes du décompte d'enchaînement (null = pas de décompte).
+    var autoNextSeconds by remember(streamUrl) { mutableStateOf<Int?>(null) }
 
     fun showControls() {
         controlsVisible = true
         activityTick++
+    }
+
+    /** Interrompt l'enchaînement : `finished` à false annule la coroutine. */
+    fun cancelAutoNext() {
+        autoNextSeconds = null
+        finished = false
     }
 
     fun togglePause() {
@@ -281,12 +300,26 @@ internal fun DesktopPlayerScreen(
         controlsVisible = false
     }
 
-    // Fin de lecture : marque terminé (bascule en « vu ») puis retour.
+    // Fin de lecture : marque terminé (sort de « Reprendre », bascule en « vu »)
+    // puis enchaîne l'épisode suivant après un décompte annulable. Sans suite
+    // (film, fin de série) ou auto-play coupé : simple retour.
     LaunchedEffect(finished) {
-        if (finished) {
-            if (mediaKey.isNotBlank() && lengthMs > 0) progress.save(mediaKey, lengthMs, lengthMs)
+        if (!finished) return@LaunchedEffect
+        if (mediaKey.isNotBlank() && lengthMs > 0) progress.save(mediaKey, lengthMs, lengthMs)
+        val hasNext = nextSeason > 0 && nextEpisode > 0
+        if (!hasNext || !autoPlayNext) {
             onBack()
+            return@LaunchedEffect
         }
+        showControls()
+        var remaining = AUTO_NEXT_SECONDS
+        while (remaining > 0) {
+            autoNextSeconds = remaining
+            delay(1000)
+            remaining--
+        }
+        autoNextSeconds = null
+        onNextEpisode(nextSeason, nextEpisode)
     }
 
     // Sortie : sauvegarde la position puis libère le lecteur.
@@ -327,6 +360,11 @@ internal fun DesktopPlayerScreen(
             .focusable()
             .onPreviewKeyEvent { event ->
                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                // Décompte en cours : la 1re touche l'interrompt, quelle qu'elle soit.
+                if (autoNextSeconds != null) {
+                    cancelAutoNext()
+                    return@onPreviewKeyEvent true
+                }
                 showControls()
                 when (event.key) {
                     Key.Spacebar -> { togglePause(); true }
@@ -382,6 +420,27 @@ internal fun DesktopPlayerScreen(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
+                }
+            }
+        }
+
+        // Décompte d'enchaînement, au-dessus de la barre de contrôles.
+        autoNextSeconds?.let { seconds ->
+            Row(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 24.dp, bottom = 96.dp)
+                    .background(Color(0xF21E1E1E))
+                    .padding(horizontal = 20.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Text(
+                    stringResource(Res.string.player_next_in, seconds),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                MoovieButton(onClick = { cancelAutoNext() }) {
+                    Text(stringResource(Res.string.common_cancel))
                 }
             }
         }
@@ -486,6 +545,9 @@ private fun MissingVlc(onBack: () -> Unit) {
         MoovieButton(onClick = onBack) { Text("Retour") }
     }
 }
+
+/** Durée du décompte avant l'enchaînement de l'épisode suivant. */
+private const val AUTO_NEXT_SECONDS = 10
 
 private fun formatTime(ms: Long): String {
     val totalSec = ms / 1000

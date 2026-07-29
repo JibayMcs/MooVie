@@ -172,9 +172,24 @@ private fun DesktopApp(
                     subtitles = s.subtitles,
                     title = s.title,
                     subtitle = s.subtitle,
+                    nextSeason = s.nextSeason,
+                    nextEpisode = s.nextEpisode,
                     isFullscreen = isFullscreen,
                     onToggleFullscreen = onToggleFullscreen,
                     onBack = backFromPlayer,
+                    // Enchaînement : repasse par la fiche, qui résout la source
+                    // du nouvel épisode puis relance le lecteur.
+                    onNextEpisode = { season, episode ->
+                        lastDetails?.let { d ->
+                            onNavigate(
+                                d.copy(
+                                    autoSources = true,
+                                    resumeSeason = season,
+                                    resumeEpisode = episode,
+                                ),
+                            )
+                        } ?: onNavigate(Screen.Home)
+                    },
                 )
             }
         }

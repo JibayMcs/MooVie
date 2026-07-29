@@ -3,6 +3,7 @@
     <!-- Common -->
     <string name="common_loading">Loading…</string>
     <string name="common_back">Back</string>
+    <string name="common_cancel">Cancel</string>
     <string name="common_enabled">On</string>
     <string name="common_disabled">Off</string>
     <string name="mark_watched">Mark as watched</string>
@@ -60,6 +61,7 @@
     <!-- Player -->
     <string name="player_skip_intro">Skip intro</string>
     <string name="player_skip_outro">Skip credits</string>
+    <string name="player_next_in">Next episode in %1$d s</string>
     <string name="player_play">Play</string>
     <string name="player_pause">Pause</string>
     <string name="player_seek_back">Rewind 15 seconds</string>
@@ -99,6 +101,8 @@
     <string name="settings_stream_lang">Default stream language</string>
     <string name="settings_language">App language</string>
     <string name="settings_cat_intro">Intro &amp; credits</string>
+    <string name="settings_autoplay">Auto-play next episode</string>
+    <string name="settings_autoplay_help">When an episode ends, plays the next one after a 10 s countdown (cancel with any key). Rolls over to the next season at the end of a season.</string>
     <string name="settings_intro_help">Shows “Skip intro / credits” buttons during playback (TheIntroDB data). Skipping credits plays the next episode (show) or returns home (movie).</string>
     <string name="settings_cat_dns">Network (DNS)</string>
     <string name="settings_dns_help">Source domains are often DNS-blocked by ISPs. DNS-over-HTTPS (DoH) bypasses that. Keep it on if sources stay unavailable.</string>

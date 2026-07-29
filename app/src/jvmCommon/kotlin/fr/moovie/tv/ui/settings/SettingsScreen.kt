@@ -48,6 +48,8 @@ import fr.moovie.tv.resources.common_disabled
 import fr.moovie.tv.resources.common_enabled
 import fr.moovie.tv.resources.settings_cat_api
 import fr.moovie.tv.resources.settings_cat_dns
+import fr.moovie.tv.resources.settings_autoplay
+import fr.moovie.tv.resources.settings_autoplay_help
 import fr.moovie.tv.resources.settings_cat_intro
 import fr.moovie.tv.resources.settings_cat_playback
 import fr.moovie.tv.resources.settings_cat_sources
@@ -82,12 +84,14 @@ fun SettingsScreenContent(
     apiKey: String,
     streamLang: StreamLanguage,
     skipIntroOutro: Boolean,
+    autoPlayNext: Boolean,
     dohEnabled: Boolean,
     dohProvider: DohProvider,
     providers: List<ProviderSetting>,
     onSetApiKey: (String) -> Unit,
     onSetStreamLanguage: (StreamLanguage) -> Unit,
     onSetSkipIntroOutro: (Boolean) -> Unit,
+    onSetAutoPlayNext: (Boolean) -> Unit,
     onSetDohEnabled: (Boolean) -> Unit,
     onSetDohProvider: (DohProvider) -> Unit,
     onToggleProvider: (name: String, enabled: Boolean) -> Unit,
@@ -141,6 +145,19 @@ fun SettingsScreenContent(
                 MoovieButton(
                     onClick = { onSetSkipIntroOutro(false) },
                     selected = !skipIntroOutro,
+                ) { Text(stringResource(Res.string.common_disabled)) }
+            }
+            Spacer(Modifier.height(12.dp))
+            Text(stringResource(Res.string.settings_autoplay), style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(Res.string.settings_autoplay_help), style = MaterialTheme.typography.bodySmall)
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                MoovieButton(
+                    onClick = { onSetAutoPlayNext(true) },
+                    selected = autoPlayNext,
+                ) { Text(stringResource(Res.string.common_enabled)) }
+                MoovieButton(
+                    onClick = { onSetAutoPlayNext(false) },
+                    selected = !autoPlayNext,
                 ) { Text(stringResource(Res.string.common_disabled)) }
             }
         }

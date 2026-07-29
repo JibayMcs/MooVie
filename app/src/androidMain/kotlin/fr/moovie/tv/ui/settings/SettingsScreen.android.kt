@@ -54,17 +54,20 @@ fun SettingsScreen(
     val dohEnabled by viewModel.dohEnabled.collectAsStateWithLifecycle()
     val dohProvider by viewModel.dohProvider.collectAsStateWithLifecycle()
     val skipIntroOutro by viewModel.skipIntroOutro.collectAsStateWithLifecycle()
+    val autoPlayNext by viewModel.autoPlayNext.collectAsStateWithLifecycle()
 
     SettingsScreenContent(
         apiKey = apiKey,
         streamLang = streamLang,
         skipIntroOutro = skipIntroOutro,
+        autoPlayNext = autoPlayNext,
         dohEnabled = dohEnabled,
         dohProvider = dohProvider,
         providers = providers,
         onSetApiKey = viewModel::setTmdbApiKey,
         onSetStreamLanguage = viewModel::setStreamLanguage,
         onSetSkipIntroOutro = viewModel::setSkipIntroOutro,
+        onSetAutoPlayNext = viewModel::setAutoPlayNext,
         onSetDohEnabled = viewModel::setDohEnabled,
         onSetDohProvider = viewModel::setDohProvider,
         onToggleProvider = viewModel::toggleProvider,

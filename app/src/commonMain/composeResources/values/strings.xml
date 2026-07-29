@@ -5,6 +5,7 @@
     <!-- Commun -->
     <string name="common_loading">Chargement…</string>
     <string name="common_back">Retour</string>
+    <string name="common_cancel">Annuler</string>
     <string name="common_enabled">Activé</string>
     <string name="common_disabled">Désactivé</string>
     <string name="mark_watched">Marquer comme vu</string>
@@ -62,6 +63,7 @@
     <!-- Lecteur -->
     <string name="player_skip_intro">Passer l'intro</string>
     <string name="player_skip_outro">Passer le générique</string>
+    <string name="player_next_in">Épisode suivant dans %1$d s</string>
     <string name="player_play">Lecture</string>
     <string name="player_pause">Pause</string>
     <string name="player_seek_back">Reculer de 15 secondes</string>
@@ -101,6 +103,8 @@
     <string name="settings_stream_lang">Langue du stream par défaut</string>
     <string name="settings_language">Langue de l'application</string>
     <string name="settings_cat_intro">Intro &amp; générique</string>
+    <string name="settings_autoplay">Lecture automatique de l'épisode suivant</string>
+    <string name="settings_autoplay_help">À la fin d'un épisode, enchaîne le suivant après un décompte de 10 s (annulable avec n'importe quelle touche). Passe à la saison suivante en fin de saison.</string>
     <string name="settings_intro_help">Affiche des boutons « Passer l'intro / le générique » pendant la lecture (données TheIntroDB). Passer le générique enchaîne l'épisode suivant (série) ou revient à l'accueil (film).</string>
     <string name="settings_cat_dns">Réseau (DNS)</string>
     <string name="settings_dns_help">Les domaines des sources sont souvent bloqués par DNS chez les FAI. Le DNS-over-HTTPS (DoH) contourne ce blocage. Laisse activé si les sources restent introuvables.</string>

@@ -86,6 +86,8 @@ import fr.moovie.tv.data.settings.SettingsRepository
 import fr.moovie.tv.data.watch.WatchProgressRepository
 import fr.moovie.tv.resources.Res
 import fr.moovie.tv.resources.common_back
+import fr.moovie.tv.resources.common_cancel
+import fr.moovie.tv.resources.player_next_in
 import fr.moovie.tv.resources.player_audio
 import fr.moovie.tv.resources.player_next_episode
 import fr.moovie.tv.resources.player_pause
@@ -133,6 +135,9 @@ private const val SCRUB_STEP_MS = 10_000L
 /** Vitesses proposées dans le menu Paramètres. */
 private val SPEEDS = listOf(0.75f, 1f, 1.25f, 1.5f, 2f)
 
+/** Durée du décompte avant l'enchaînement de l'épisode suivant. */
+private const val AUTO_NEXT_SECONDS = 10
+
 private enum class PlayerDialog { SUBTITLES, SETTINGS }
 
 /**
@@ -154,6 +159,8 @@ fun PlayerScreen(
     subtitles: Map<String, String> = emptyMap(),
     title: String = "",
     subtitle: String = "",
+    nextSeason: Int = 0,
+    nextEpisode: Int = 0,
     onBack: () -> Unit,
     onNextEpisode: (tmdbId: Int, season: Int, episode: Int) -> Unit = { _, _, _ -> },
 ) {
@@ -162,6 +169,7 @@ fun PlayerScreen(
     val introRepo = remember { IntroDbRepository() }
     val settings = remember { SettingsRepository() }
     val skipEnabled by settings.skipIntroOutro.collectAsStateWithLifecycle(initialValue = true)
+    val autoPlayNext by settings.autoPlayNext.collectAsStateWithLifecycle(initialValue = true)
 
     val player = remember {
         val httpFactory = DefaultHttpDataSource.Factory().apply {
@@ -207,6 +215,10 @@ fun PlayerScreen(
     var dialog by remember { mutableStateOf<PlayerDialog?>(null) }
     // Position en cours de réglage à la télécommande (null = pas en mode réglage).
     var scrubTarget by remember { mutableStateOf<Long?>(null) }
+    // Fin de lecture atteinte : déclenche l'enchaînement (remis à false = annulé).
+    var ended by remember(streamUrl) { mutableStateOf(false) }
+    // Secondes restantes du décompte (null = pas de décompte en cours).
+    var autoNextSeconds by remember(streamUrl) { mutableStateOf<Int?>(null) }
 
     fun wake() {
         controlsVisible = true
@@ -305,6 +317,10 @@ fun PlayerScreen(
             override fun onTracksChanged(newTracks: Tracks) {
                 tracks = newTracks
             }
+
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                if (playbackState == Player.STATE_ENDED) ended = true
+            }
         }
         isPlaying = player.isPlaying
         playerView.keepScreenOn = player.isPlaying
@@ -337,13 +353,45 @@ fun PlayerScreen(
     val wakeFocus = remember { FocusRequester() }
     val playFocus = remember { FocusRequester() }
     val skipFocus = remember { FocusRequester() }
+    val autoNextFocus = remember { FocusRequester() }
+
+    /** Interrompt l'enchaînement : `ended` à false annule la coroutine en cours. */
+    fun cancelAutoNext() {
+        autoNextSeconds = null
+        ended = false
+    }
+
+    // Fin d'un média : on le marque terminé (il sort de « Reprendre » et passe
+    // en vu), puis on enchaîne l'épisode suivant après un décompte annulable.
+    // Sans suite (film, fin de série) ou auto-play coupé : simple retour.
+    LaunchedEffect(ended) {
+        if (!ended) return@LaunchedEffect
+        val duration = player.duration.let { if (it == C.TIME_UNSET) 0L else it }
+        if (mediaKey.isNotBlank() && duration > 0) progress.save(mediaKey, duration, duration)
+
+        val hasNext = pid != null && pid.isTv && nextSeason > 0 && nextEpisode > 0
+        if (!hasNext || !autoPlayNext) {
+            onBack()
+            return@LaunchedEffect
+        }
+        controlsVisible = true
+        var remaining = AUTO_NEXT_SECONDS
+        while (remaining > 0) {
+            autoNextSeconds = remaining
+            delay(1000)
+            remaining--
+        }
+        autoNextSeconds = null
+        onNextEpisode(pid.tmdbId, nextSeason, nextEpisode)
+    }
 
     // Le focus suit l'état : barre visible → bouton Lecture ; barre masquée avec
     // un bouton « Passer » → ce bouton ; sinon la couche de réveil plein écran.
-    LaunchedEffect(controlsVisible, activeSkip != null) {
+    LaunchedEffect(controlsVisible, activeSkip != null, autoNextSeconds != null) {
         delay(60)
         runCatching {
             when {
+                autoNextSeconds != null -> autoNextFocus.requestFocus()
                 controlsVisible -> playFocus.requestFocus()
                 activeSkip != null -> skipFocus.requestFocus()
                 else -> wakeFocus.requestFocus()
@@ -373,6 +421,12 @@ fun PlayerScreen(
             .background(Color.Black)
             .onPreviewKeyEvent { event ->
                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                // Décompte en cours : la 1re touche l'interrompt, quelle qu'elle
+                // soit — on ne subit pas l'enchaînement en réveillant les contrôles.
+                if (autoNextSeconds != null) {
+                    cancelAutoNext()
+                    return@onPreviewKeyEvent true
+                }
                 if (!controlsVisible) {
                     // Barre masquée : la 1re touche ne fait que réveiller les
                     // contrôles (play/pause agit quand même), elle n'est pas
@@ -456,6 +510,31 @@ fun PlayerScreen(
                         stringResource(Res.string.player_skip_outro)
                     },
                 )
+            }
+        }
+
+        // Décompte d'enchaînement, au-dessus de la barre de contrôles.
+        autoNextSeconds?.let { seconds ->
+            Row(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 48.dp, bottom = 128.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(Color(0xF21E1E1E))
+                    .padding(horizontal = 20.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Text(
+                    stringResource(Res.string.player_next_in, seconds),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                MoovieButton(
+                    onClick = { cancelAutoNext() },
+                    modifier = Modifier.focusRequester(autoNextFocus),
+                ) {
+                    Text(stringResource(Res.string.common_cancel))
+                }
             }
         }
 

@@ -116,6 +116,8 @@ class MainActivity : ComponentActivity() {
                                 subtitles = s.subtitles,
                                 title = s.title,
                                 subtitle = s.subtitle,
+                                nextSeason = s.nextSeason,
+                                nextEpisode = s.nextEpisode,
                                 onBack = { screen = Screen.Home },
                                 // Passer le générique d'un épisode → enchaîne le
                                 // suivant via la fiche (résolution + lecture auto).

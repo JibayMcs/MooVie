@@ -35,6 +35,13 @@ class SettingsViewModel : ViewModel() {
     val skipIntroOutro: StateFlow<Boolean> =
         repo.skipIntroOutro.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
 
+    val autoPlayNext: StateFlow<Boolean> =
+        repo.autoPlayNext.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+
+    fun setAutoPlayNext(value: Boolean) {
+        viewModelScope.launch { repo.setAutoPlayNext(value) }
+    }
+
     fun setSkipIntroOutro(value: Boolean) = viewModelScope.launch { repo.setSkipIntroOutro(value) }
 
     /** Providers dans l'ordre de priorité effectif, avec leur état on/off. */

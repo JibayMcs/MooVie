@@ -71,6 +71,8 @@ fun DetailsScreen(
                         subtitles = s.subtitleUrls,
                         title = viewModel.playbackTitle,
                         subtitle = viewModel.playbackSubtitle,
+                        nextSeason = viewModel.playbackNext?.first ?: 0,
+                        nextEpisode = viewModel.playbackNext?.second ?: 0,
                     ),
                 )
             }

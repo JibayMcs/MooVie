@@ -11,6 +11,7 @@ import fr.moovie.tv.data.sources.PlayableStream
 import fr.moovie.tv.data.sources.ProviderRegistry
 import fr.moovie.tv.data.tmdb.Episode
 import fr.moovie.tv.data.tmdb.TmdbRepository
+import fr.moovie.tv.data.tmdb.TvDetails
 import fr.moovie.tv.data.watch.ResumeEntry
 import fr.moovie.tv.data.watch.WatchProgressRepository
 import fr.moovie.tv.resources.Res
@@ -182,12 +183,34 @@ class DetailsViewModel : ViewModel() {
     var playbackSubtitle: String = ""
         private set
 
+    /**
+     * Épisode à enchaîner en fin de lecture (saison, numéro), null s'il n'y en
+     * a pas : film, ou dernier épisode de la dernière saison. Calculé ici car
+     * le lecteur ne connaît que la clé du média, pas le catalogue TMDB.
+     */
+    var playbackNext: Pair<Int, Int>? = null
+        private set
+
+    /**
+     * Épisode suivant : le numéro d'après dans la saison courante, sinon le
+     * premier épisode de la saison suivante si elle existe. On se fie à
+     * `episodeCount` de TMDB, disponible pour toutes les saisons — la liste
+     * `episodes` chargée ne concerne que la saison affichée.
+     */
+    private fun nextEpisodeAfter(tv: TvDetails, season: Int, episode: Int): Pair<Int, Int>? {
+        val current = tv.seasons.firstOrNull { it.seasonNumber == season }
+        if (current != null && episode < current.episodeCount) return season to (episode + 1)
+        val next = tv.seasons.firstOrNull { it.seasonNumber == season + 1 && it.episodeCount > 0 }
+        return next?.let { it.seasonNumber to 1 }
+    }
+
     /** Charge les sources du film courant, en streaming par provider. */
     fun loadMovieSources() {
         val movie = _state.value as? DetailsState.Movie ?: return
         playbackKey = movieKey()
         playbackTitle = movie.details.title
         playbackSubtitle = movie.details.year.orEmpty()
+        playbackNext = null
         pendingMeta = ResumeEntry(
             key = playbackKey,
             tmdbId = tmdbId,
@@ -216,6 +239,7 @@ class DetailsViewModel : ViewModel() {
         val still = ep?.stillUrl()
         playbackTitle = tv.details.name
         playbackSubtitle = "S$season · E$episode" + (ep?.name?.takeIf { it.isNotBlank() }?.let { " — $it" } ?: "")
+        playbackNext = nextEpisodeAfter(tv.details, season, episode)
         pendingMeta = ResumeEntry(
             key = playbackKey,
             tmdbId = tmdbId,

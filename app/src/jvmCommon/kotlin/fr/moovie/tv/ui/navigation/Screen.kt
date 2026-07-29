@@ -30,5 +30,8 @@ sealed interface Screen {
         val subtitles: Map<String, String> = emptyMap(),
         val title: String = "",
         val subtitle: String = "",
+        /** Épisode à enchaîner en fin de lecture (0 = aucun : film ou fin de série). */
+        val nextSeason: Int = 0,
+        val nextEpisode: Int = 0,
     ) : Screen
 }

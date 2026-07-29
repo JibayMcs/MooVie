@@ -88,17 +88,20 @@ internal fun DesktopSettingsScreen(onBack: () -> Unit) {
     val dohEnabled by vm.dohEnabled.collectAsState()
     val dohProvider by vm.dohProvider.collectAsState()
     val skipIntroOutro by vm.skipIntroOutro.collectAsState()
+    val autoPlayNext by vm.autoPlayNext.collectAsState()
 
     SettingsScreenContent(
         apiKey = apiKey,
         streamLang = streamLang,
         skipIntroOutro = skipIntroOutro,
+        autoPlayNext = autoPlayNext,
         dohEnabled = dohEnabled,
         dohProvider = dohProvider,
         providers = providers,
         onSetApiKey = vm::setTmdbApiKey,
         onSetStreamLanguage = vm::setStreamLanguage,
         onSetSkipIntroOutro = vm::setSkipIntroOutro,
+        onSetAutoPlayNext = vm::setAutoPlayNext,
         onSetDohEnabled = vm::setDohEnabled,
         onSetDohProvider = vm::setDohProvider,
         onToggleProvider = vm::toggleProvider,
@@ -162,6 +165,8 @@ internal fun DesktopDetailsScreen(
                         subtitles = s.subtitleUrls,
                         title = vm.playbackTitle,
                         subtitle = vm.playbackSubtitle,
+                        nextSeason = vm.playbackNext?.first ?: 0,
+                        nextEpisode = vm.playbackNext?.second ?: 0,
                     ),
                 )
             }
