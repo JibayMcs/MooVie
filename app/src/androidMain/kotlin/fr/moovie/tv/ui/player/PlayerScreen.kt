@@ -84,6 +84,7 @@ import androidx.media3.session.MediaSession
 import androidx.media3.ui.PlayerView
 import fr.moovie.tv.data.intro.IntroDbRepository
 import fr.moovie.tv.data.intro.IntroMedia
+import fr.moovie.tv.data.settings.ScreensaverDelay
 import fr.moovie.tv.data.settings.SettingsRepository
 import fr.moovie.tv.data.watch.WatchProgressRepository
 import fr.moovie.tv.resources.Res
@@ -109,6 +110,7 @@ import fr.moovie.tv.resources.player_update_chip
 import fr.moovie.tv.ui.components.MOOVIE_ACCENT
 import fr.moovie.tv.ui.components.MoovieButton
 import fr.moovie.tv.ui.components.MoovieIconButton
+import fr.moovie.tv.ui.components.MoovieScreensaver
 import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.stringResource
 
@@ -144,6 +146,9 @@ private const val AUTO_NEXT_SECONDS = 10
 /** Durée d'affichage spontané de la pastille de mise à jour. */
 private const val UPDATE_CHIP_MS = 10_000L
 
+/** Durée max pendant laquelle la veille maintient l'écran allumé. */
+private const val SCREENSAVER_AWAKE_MS = 2 * 60 * 60 * 1000L
+
 private enum class PlayerDialog { SUBTITLES, SETTINGS }
 
 /**
@@ -170,6 +175,8 @@ fun PlayerScreen(
     /** Version disponible, ou null : affiche une pastille discrète en lecture. */
     updateVersion: String? = null,
     onUpdateSelected: () -> Unit = {},
+    /** Affiche du titre, utilisée par l'écran de veille. */
+    posterUrl: String = "",
     onBack: () -> Unit,
     onNextEpisode: (tmdbId: Int, season: Int, episode: Int) -> Unit = { _, _, _ -> },
 ) {
@@ -179,6 +186,9 @@ fun PlayerScreen(
     val settings = remember { SettingsRepository() }
     val skipEnabled by settings.skipIntroOutro.collectAsStateWithLifecycle(initialValue = true)
     val autoPlayNext by settings.autoPlayNext.collectAsStateWithLifecycle(initialValue = true)
+    val screensaverDelay by settings.screensaverDelay.collectAsStateWithLifecycle(
+        initialValue = ScreensaverDelay.M15,
+    )
 
     val player = remember {
         val httpFactory = DefaultHttpDataSource.Factory().apply {
@@ -230,6 +240,8 @@ fun PlayerScreen(
     var autoNextSeconds by remember(streamUrl) { mutableStateOf<Int?>(null) }
     // Fenêtre d'apparition initiale de la pastille de mise à jour.
     var updateChipFresh by remember(updateVersion) { mutableStateOf(updateVersion != null) }
+    // Écran de veille affiché (lecture en pause depuis le délai choisi).
+    var screensaverOn by remember { mutableStateOf(false) }
 
     fun wake() {
         controlsVisible = true
@@ -376,6 +388,25 @@ fun PlayerScreen(
         updateChipFresh = false
     }
     val showUpdateChip = updateVersion != null && (updateChipFresh || controlsVisible)
+
+    // Veille : uniquement sur une lecture en pause, et repoussée à chaque appui
+    // (activityTick est incrémenté par le gestionnaire de touches racine).
+    LaunchedEffect(isPlaying, screensaverDelay, activityTick) {
+        screensaverOn = false
+        if (isPlaying || screensaverDelay == ScreensaverDelay.NEVER) return@LaunchedEffect
+        delay(screensaverDelay.minutes * 60_000L)
+        screensaverOn = true
+    }
+
+    // Garde l'écran allumé pendant la veille, sinon la TV s'éteindrait avant
+    // même qu'elle apparaisse. Borné : une pause oubliée ne doit pas laisser la
+    // dalle allumée toute la nuit.
+    LaunchedEffect(screensaverOn) {
+        if (!screensaverOn) return@LaunchedEffect
+        playerView.keepScreenOn = true
+        delay(SCREENSAVER_AWAKE_MS)
+        playerView.keepScreenOn = false
+    }
 
     /** Interrompt l'enchaînement : `ended` à false annule la coroutine en cours. */
     fun cancelAutoNext() {
@@ -657,6 +688,19 @@ fun PlayerScreen(
                 onDismiss = { dialog = null },
             )
             null -> Unit
+        }
+
+        // Écran de veille : recouvre tout, y compris la barre de contrôles qui
+        // reste ouverte en pause. Toute touche le referme et rend la main au
+        // lecteur, toujours en pause.
+        if (screensaverOn) {
+            MoovieScreensaver(
+                posterUrl = posterUrl.takeIf { it.isNotBlank() },
+                onDismiss = {
+                    screensaverOn = false
+                    activityTick++
+                },
+            )
         }
     }
 }

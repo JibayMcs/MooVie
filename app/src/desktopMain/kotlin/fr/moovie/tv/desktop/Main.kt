@@ -186,6 +186,7 @@ private fun DesktopApp(
                     nextEpisode = s.nextEpisode,
                     updateVersion = (updateState as? UpdateState.Available)?.version,
                     onUpdateSelected = { bannerOnPlayer = true },
+                    posterUrl = s.posterUrl,
                     isFullscreen = isFullscreen,
                     onToggleFullscreen = onToggleFullscreen,
                     onBack = backFromPlayer,

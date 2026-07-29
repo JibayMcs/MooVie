@@ -48,11 +48,18 @@ import fr.moovie.tv.resources.common_disabled
 import fr.moovie.tv.resources.common_enabled
 import fr.moovie.tv.resources.settings_cat_api
 import fr.moovie.tv.resources.settings_cat_dns
+import fr.moovie.tv.data.settings.ScreensaverDelay
 import fr.moovie.tv.data.settings.UpdateInterval
 import fr.moovie.tv.resources.settings_autoplay
 import fr.moovie.tv.resources.settings_autoplay_help
 import fr.moovie.tv.resources.settings_cat_intro
+import fr.moovie.tv.resources.settings_cat_screensaver
 import fr.moovie.tv.resources.settings_cat_update
+import fr.moovie.tv.resources.settings_screensaver_delay
+import fr.moovie.tv.resources.settings_screensaver_help
+import fr.moovie.tv.resources.screensaver_after_hours
+import fr.moovie.tv.resources.screensaver_after_minutes
+import fr.moovie.tv.resources.screensaver_never
 import fr.moovie.tv.resources.settings_update_help
 import fr.moovie.tv.resources.settings_update_interval
 import fr.moovie.tv.resources.update_every_hours
@@ -94,6 +101,7 @@ fun SettingsScreenContent(
     skipIntroOutro: Boolean,
     autoPlayNext: Boolean,
     updateInterval: UpdateInterval,
+    screensaverDelay: ScreensaverDelay,
     dohEnabled: Boolean,
     dohProvider: DohProvider,
     providers: List<ProviderSetting>,
@@ -102,6 +110,7 @@ fun SettingsScreenContent(
     onSetSkipIntroOutro: (Boolean) -> Unit,
     onSetAutoPlayNext: (Boolean) -> Unit,
     onSetUpdateInterval: (UpdateInterval) -> Unit,
+    onSetScreensaverDelay: (ScreensaverDelay) -> Unit,
     onSetDohEnabled: (Boolean) -> Unit,
     onSetDohProvider: (DohProvider) -> Unit,
     onToggleProvider: (name: String, enabled: Boolean) -> Unit,
@@ -170,6 +179,17 @@ fun SettingsScreenContent(
                     selected = !autoPlayNext,
                 ) { Text(stringResource(Res.string.common_disabled)) }
             }
+        }
+
+        SettingsCategory(stringResource(Res.string.settings_cat_screensaver)) {
+            Text(stringResource(Res.string.settings_screensaver_help), style = MaterialTheme.typography.bodySmall)
+            MoovieSelect(
+                title = stringResource(Res.string.settings_screensaver_delay),
+                options = ScreensaverDelay.entries.toList(),
+                selected = screensaverDelay,
+                label = { screensaverDelayLabel(it) },
+                onSelect = onSetScreensaverDelay,
+            )
         }
 
         SettingsCategory(stringResource(Res.string.settings_cat_update)) {
@@ -257,6 +277,14 @@ fun SettingsScreenContent(
 
         MoovieButton(onClick = onBack) { Text(stringResource(Res.string.common_back)) }
     }
+}
+
+/** Libellé lisible d'un délai de mise en veille. */
+@Composable
+private fun screensaverDelayLabel(delay: ScreensaverDelay): String = when {
+    delay == ScreensaverDelay.NEVER -> stringResource(Res.string.screensaver_never)
+    delay.minutes < 60 -> stringResource(Res.string.screensaver_after_minutes, delay.minutes)
+    else -> stringResource(Res.string.screensaver_after_hours, delay.minutes / 60)
 }
 
 /** Libellé lisible d'une fréquence de vérification. */

@@ -90,6 +90,7 @@ internal fun DesktopSettingsScreen(onBack: () -> Unit) {
     val skipIntroOutro by vm.skipIntroOutro.collectAsState()
     val autoPlayNext by vm.autoPlayNext.collectAsState()
     val updateInterval by vm.updateInterval.collectAsState()
+    val screensaverDelay by vm.screensaverDelay.collectAsState()
 
     SettingsScreenContent(
         apiKey = apiKey,
@@ -97,6 +98,7 @@ internal fun DesktopSettingsScreen(onBack: () -> Unit) {
         skipIntroOutro = skipIntroOutro,
         autoPlayNext = autoPlayNext,
         updateInterval = updateInterval,
+        screensaverDelay = screensaverDelay,
         dohEnabled = dohEnabled,
         dohProvider = dohProvider,
         providers = providers,
@@ -105,6 +107,7 @@ internal fun DesktopSettingsScreen(onBack: () -> Unit) {
         onSetSkipIntroOutro = vm::setSkipIntroOutro,
         onSetAutoPlayNext = vm::setAutoPlayNext,
         onSetUpdateInterval = vm::setUpdateInterval,
+        onSetScreensaverDelay = vm::setScreensaverDelay,
         onSetDohEnabled = vm::setDohEnabled,
         onSetDohProvider = vm::setDohProvider,
         onToggleProvider = vm::toggleProvider,
@@ -170,6 +173,7 @@ internal fun DesktopDetailsScreen(
                         subtitle = vm.playbackSubtitle,
                         nextSeason = vm.playbackNext?.first ?: 0,
                         nextEpisode = vm.playbackNext?.second ?: 0,
+                        posterUrl = vm.playbackPoster,
                     ),
                 )
             }

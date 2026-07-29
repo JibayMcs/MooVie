@@ -59,6 +59,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import fr.moovie.tv.data.settings.ScreensaverDelay
 import fr.moovie.tv.data.settings.SettingsRepository
 import fr.moovie.tv.data.watch.WatchProgressRepository
 import fr.moovie.tv.resources.Res
@@ -68,6 +69,7 @@ import fr.moovie.tv.resources.player_update_chip
 import fr.moovie.tv.ui.components.MOOVIE_ACCENT
 import fr.moovie.tv.ui.components.MoovieButton
 import fr.moovie.tv.ui.components.MoovieIconButton
+import fr.moovie.tv.ui.components.MoovieScreensaver
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -154,6 +156,8 @@ internal fun DesktopPlayerScreen(
     /** Version disponible, ou null : affiche une pastille discrète en lecture. */
     updateVersion: String? = null,
     onUpdateSelected: () -> Unit = {},
+    /** Affiche du titre, utilisée par l'écran de veille. */
+    posterUrl: String = "",
     isFullscreen: Boolean,
     onToggleFullscreen: () -> Unit,
     onBack: () -> Unit,
@@ -162,6 +166,7 @@ internal fun DesktopPlayerScreen(
     val progress = remember { WatchProgressRepository() }
     val settings = remember { SettingsRepository() }
     val autoPlayNext by settings.autoPlayNext.collectAsState(initial = true)
+    val screensaverDelay by settings.screensaverDelay.collectAsState(initial = ScreensaverDelay.M15)
     val saveScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.IO) }
     val surface = remember { ComposeVideoSurface() }
 
@@ -211,6 +216,8 @@ internal fun DesktopPlayerScreen(
     var autoNextSeconds by remember(streamUrl) { mutableStateOf<Int?>(null) }
     // Fenêtre d'apparition initiale de la pastille de mise à jour.
     var updateChipFresh by remember(updateVersion) { mutableStateOf(updateVersion != null) }
+    // Écran de veille affiché (lecture en pause depuis le délai choisi).
+    var screensaverOn by remember { mutableStateOf(false) }
 
     fun showControls() {
         controlsVisible = true
@@ -348,6 +355,14 @@ internal fun DesktopPlayerScreen(
         updateChipFresh = false
     }
     val showUpdateChip = updateVersion != null && (updateChipFresh || controlsVisible)
+
+    // Veille : uniquement sur une lecture en pause, repoussée à chaque activité.
+    LaunchedEffect(isPlaying, screensaverDelay, activityTick) {
+        screensaverOn = false
+        if (isPlaying || screensaverDelay == ScreensaverDelay.NEVER) return@LaunchedEffect
+        delay(screensaverDelay.minutes * 60_000L)
+        screensaverOn = true
+    }
 
     val keyFocus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { keyFocus.requestFocus() } }
@@ -554,6 +569,19 @@ internal fun DesktopPlayerScreen(
                     )
                 }
             }
+        }
+
+        // Écran de veille : recouvre tout, y compris la barre de contrôles qui
+        // reste ouverte en pause. Toute touche ou mouvement de souris le referme
+        // et rend la main au lecteur, toujours en pause.
+        if (screensaverOn) {
+            MoovieScreensaver(
+                posterUrl = posterUrl.takeIf { it.isNotBlank() },
+                onDismiss = {
+                    screensaverOn = false
+                    showControls()
+                },
+            )
         }
     }
 }

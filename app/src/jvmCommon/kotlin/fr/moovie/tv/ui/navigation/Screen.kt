@@ -33,5 +33,7 @@ sealed interface Screen {
         /** Épisode à enchaîner en fin de lecture (0 = aucun : film ou fin de série). */
         val nextSeason: Int = 0,
         val nextEpisode: Int = 0,
+        /** Affiche du titre, utilisée par l'écran de veille. */
+        val posterUrl: String = "",
     ) : Screen
 }

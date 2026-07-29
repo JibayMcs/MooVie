@@ -100,6 +100,14 @@
     <string name="update_error">Téléchargement impossible. Réessaie.</string>
     <string name="update_retry">Réessayer</string>
 
+    <!-- Écran de veille -->
+    <string name="settings_cat_screensaver">Écran de veille</string>
+    <string name="settings_screensaver_delay">Délai avant la veille</string>
+    <string name="settings_screensaver_help">Quand la lecture reste en pause, l'affiche du titre se met à rebondir à l'écran, comme le logo d'un lecteur DVD. N'importe quelle touche ramène au lecteur. L'écran reste allumé pendant la veille, au maximum 2 h.</string>
+    <string name="screensaver_never">Jamais</string>
+    <string name="screensaver_after_minutes">Après %1$d min</string>
+    <string name="screensaver_after_hours">Après %1$d h</string>
+
     <!-- Réglages -->
     <string name="settings_title">Réglages</string>
     <string name="settings_cat_api">API &amp; Clés</string>

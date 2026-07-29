@@ -194,6 +194,10 @@ class DetailsViewModel : ViewModel() {
     var playbackNext: Pair<Int, Int>? = null
         private set
 
+    /** Affiche du titre en lecture, pour l'écran de veille. */
+    var playbackPoster: String = ""
+        private set
+
     /**
      * Épisode suivant : le numéro d'après dans la saison courante, sinon le
      * premier épisode de la saison suivante si elle existe. On se fie à
@@ -214,6 +218,7 @@ class DetailsViewModel : ViewModel() {
         playbackTitle = movie.details.title
         playbackSubtitle = movie.details.year.orEmpty()
         playbackNext = null
+        playbackPoster = movie.details.posterUrl() ?: movie.details.backdropUrl().orEmpty()
         pendingMeta = ResumeEntry(
             key = playbackKey,
             tmdbId = tmdbId,
@@ -243,6 +248,7 @@ class DetailsViewModel : ViewModel() {
         playbackTitle = tv.details.name
         playbackSubtitle = "S$season · E$episode" + (ep?.name?.takeIf { it.isNotBlank() }?.let { " — $it" } ?: "")
         playbackNext = nextEpisodeAfter(tv.details, season, episode)
+        playbackPoster = tv.details.posterUrl() ?: tv.details.backdropUrl().orEmpty()
         pendingMeta = ResumeEntry(
             key = playbackKey,
             tmdbId = tmdbId,

@@ -98,6 +98,14 @@
     <string name="update_error">Descarga fallida. Inténtalo de nuevo.</string>
     <string name="update_retry">Reintentar</string>
 
+    <!-- Salvapantallas -->
+    <string name="settings_cat_screensaver">Salvapantallas</string>
+    <string name="settings_screensaver_delay">Retardo de inactividad</string>
+    <string name="settings_screensaver_help">Cuando la reproducción queda en pausa, el póster del título rebota por la pantalla, como el logo de un reproductor de DVD. Cualquier tecla vuelve al reproductor. La pantalla permanece encendida durante el salvapantallas, hasta 2 h.</string>
+    <string name="screensaver_never">Nunca</string>
+    <string name="screensaver_after_minutes">Tras %1$d min</string>
+    <string name="screensaver_after_hours">Tras %1$d h</string>
+
     <!-- Ajustes -->
     <string name="settings_title">Ajustes</string>
     <string name="settings_cat_api">API y Claves</string>

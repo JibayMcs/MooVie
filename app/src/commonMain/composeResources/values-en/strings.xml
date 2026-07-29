@@ -98,6 +98,14 @@
     <string name="update_error">Download failed. Try again.</string>
     <string name="update_retry">Retry</string>
 
+    <!-- Screensaver -->
+    <string name="settings_cat_screensaver">Screensaver</string>
+    <string name="settings_screensaver_delay">Idle delay</string>
+    <string name="settings_screensaver_help">When playback stays paused, the title poster starts bouncing around the screen, like a DVD player logo. Any key returns to the player. The screen stays awake during the screensaver, for up to 2 h.</string>
+    <string name="screensaver_never">Never</string>
+    <string name="screensaver_after_minutes">After %1$d min</string>
+    <string name="screensaver_after_hours">After %1$d h</string>
+
     <!-- Settings -->
     <string name="settings_title">Settings</string>
     <string name="settings_cat_api">API &amp; Keys</string>

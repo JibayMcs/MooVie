@@ -3,6 +3,7 @@ package fr.moovie.tv.ui.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import fr.moovie.tv.data.net.DohProvider
+import fr.moovie.tv.data.settings.ScreensaverDelay
 import fr.moovie.tv.data.settings.SettingsRepository
 import fr.moovie.tv.data.settings.StreamLanguage
 import fr.moovie.tv.data.settings.UpdateInterval
@@ -48,6 +49,13 @@ class SettingsViewModel : ViewModel() {
 
     fun setUpdateInterval(value: UpdateInterval) {
         viewModelScope.launch { repo.setUpdateInterval(value) }
+    }
+
+    val screensaverDelay: StateFlow<ScreensaverDelay> =
+        repo.screensaverDelay.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ScreensaverDelay.M15)
+
+    fun setScreensaverDelay(value: ScreensaverDelay) {
+        viewModelScope.launch { repo.setScreensaverDelay(value) }
     }
 
     fun setSkipIntroOutro(value: Boolean) = viewModelScope.launch { repo.setSkipIntroOutro(value) }

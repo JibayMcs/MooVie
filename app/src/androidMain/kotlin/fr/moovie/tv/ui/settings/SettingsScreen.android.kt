@@ -56,6 +56,7 @@ fun SettingsScreen(
     val skipIntroOutro by viewModel.skipIntroOutro.collectAsStateWithLifecycle()
     val autoPlayNext by viewModel.autoPlayNext.collectAsStateWithLifecycle()
     val updateInterval by viewModel.updateInterval.collectAsStateWithLifecycle()
+    val screensaverDelay by viewModel.screensaverDelay.collectAsStateWithLifecycle()
 
     SettingsScreenContent(
         apiKey = apiKey,
@@ -63,6 +64,7 @@ fun SettingsScreen(
         skipIntroOutro = skipIntroOutro,
         autoPlayNext = autoPlayNext,
         updateInterval = updateInterval,
+        screensaverDelay = screensaverDelay,
         dohEnabled = dohEnabled,
         dohProvider = dohProvider,
         providers = providers,
@@ -71,6 +73,7 @@ fun SettingsScreen(
         onSetSkipIntroOutro = viewModel::setSkipIntroOutro,
         onSetAutoPlayNext = viewModel::setAutoPlayNext,
         onSetUpdateInterval = viewModel::setUpdateInterval,
+        onSetScreensaverDelay = viewModel::setScreensaverDelay,
         onSetDohEnabled = viewModel::setDohEnabled,
         onSetDohProvider = viewModel::setDohProvider,
         onToggleProvider = viewModel::toggleProvider,

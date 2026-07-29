@@ -131,6 +131,7 @@ class MainActivity : ComponentActivity() {
                                 nextEpisode = s.nextEpisode,
                                 updateVersion = (updateState as? UpdateState.Available)?.version,
                                 onUpdateSelected = { bannerOnPlayer = true },
+                                posterUrl = s.posterUrl,
                                 onBack = { screen = Screen.Home },
                                 // Passer le générique d'un épisode → enchaîne le
                                 // suivant via la fiche (résolution + lecture auto).

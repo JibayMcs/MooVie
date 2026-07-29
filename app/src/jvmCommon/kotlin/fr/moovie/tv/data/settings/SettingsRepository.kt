@@ -69,6 +69,16 @@ class SettingsRepository {
     suspend fun setUpdateInterval(value: UpdateInterval) =
         store.edit { it[UPDATE_INTERVAL] = value.name }
 
+    /** Délai avant l'écran de veille en pause (15 min par défaut). */
+    val screensaverDelay: Flow<ScreensaverDelay> =
+        store.data.map {
+            runCatching { ScreensaverDelay.valueOf(it[SCREENSAVER_DELAY] ?: "M15") }
+                .getOrDefault(ScreensaverDelay.M15)
+        }
+
+    suspend fun setScreensaverDelay(value: ScreensaverDelay) =
+        store.edit { it[SCREENSAVER_DELAY] = value.name }
+
     /** Enchaînement automatique de l'épisode suivant en fin de lecture. */
     val autoPlayNext: Flow<Boolean> =
         store.data.map { it[AUTO_PLAY_NEXT] ?: true }
@@ -109,5 +119,6 @@ class SettingsRepository {
         val SKIP_INTRO_OUTRO = booleanPreferencesKey("skip_intro_outro")
         val AUTO_PLAY_NEXT = booleanPreferencesKey("auto_play_next")
         val UPDATE_INTERVAL = stringPreferencesKey("update_interval")
+        val SCREENSAVER_DELAY = stringPreferencesKey("screensaver_delay")
     }
 }
