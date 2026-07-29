@@ -1,7 +1,6 @@
 package fr.moovie.tv.ui.settings
 
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import fr.moovie.tv.data.net.DohProvider
 import fr.moovie.tv.data.settings.SettingsRepository
@@ -14,10 +13,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-// ProviderSetting vit désormais dans jvmCommon (ui/settings/ProviderSetting.kt),
-// partagé avec l'écran de réglages commun.
-
-class SettingsViewModel(app: Application) : AndroidViewModel(app) {
+class SettingsViewModel : ViewModel() {
 
     private val repo = SettingsRepository()
 

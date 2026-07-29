@@ -11,6 +11,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -52,6 +53,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -110,6 +112,7 @@ fun DetailsScreenContent(
     onToggleWatched: (String) -> Unit,
     onToggleSeasonWatched: () -> Unit,
     onOpenPanel: () -> Unit,
+    onClosePanel: () -> Unit,
     onPickSource: (EmbedLink) -> Unit,
     onDismissQuickPlay: () -> Unit,
     onBack: () -> Unit,
@@ -275,6 +278,15 @@ fun DetailsScreenContent(
         // sortie animée (où `sources` repasse à Idle).
         val lastActive = remember { mutableStateOf<SourcesState.Active?>(null) }
         (sources as? SourcesState.Active)?.let { lastActive.value = it }
+        // Scrim de fermeture : un clic/tap hors du panneau le ferme (souris sur
+        // desktop, touch éventuel). Pointer uniquement — invisible au D-pad TV.
+        if (panelVisible) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInput(Unit) { detectTapGestures { onClosePanel() } },
+            )
+        }
         AnimatedVisibility(
             visible = panelVisible,
             enter = slideInHorizontally(initialOffsetX = { it }) + fadeIn(),
@@ -357,6 +369,9 @@ private fun SourcesSlideOver(
             .fillMaxHeight()
             .width(380.dp)
             .background(Color(0xF2121212))
+            // Avale les clics : cliquer dans le panneau ne doit pas atteindre
+            // le scrim de fermeture situé derrière.
+            .pointerInput(Unit) { detectTapGestures { } }
             .padding(vertical = 28.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {

@@ -65,6 +65,9 @@ kotlin {
                 // Réglages persistants (artefact KMP ; le chemin du fichier est
                 // fourni par expect/actual moovieDataStoreFile)
                 implementation("androidx.datastore:datastore-preferences-core:1.1.1")
+                // ViewModels multiplateformes (androidx.lifecycle réel côté Android,
+                // port JetBrains côté desktop)
+                implementation("org.jetbrains.androidx.lifecycle:lifecycle-viewmodel:2.8.4")
             }
         }
 

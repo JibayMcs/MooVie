@@ -1,0 +1,188 @@
+package fr.moovie.tv.desktop
+
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.Color
+import fr.moovie.tv.data.watch.ResumeEntry
+import fr.moovie.tv.ui.details.DetailsScreenContent
+import fr.moovie.tv.ui.details.DetailsState
+import fr.moovie.tv.ui.details.DetailsViewModel
+import fr.moovie.tv.ui.home.HomeScreenContent
+import fr.moovie.tv.ui.home.HomeViewModel
+import fr.moovie.tv.ui.navigation.Screen
+import fr.moovie.tv.ui.search.SearchScreenContent
+import fr.moovie.tv.ui.search.SearchViewModel
+import fr.moovie.tv.ui.settings.SettingsScreenContent
+import fr.moovie.tv.ui.settings.SettingsViewModel
+
+/**
+ * ViewModels à l'échelle de la fenêtre (équivalent du scope Activity sur
+ * Android) : survivent à la navigation, le process les emporte en quittant.
+ */
+private object Vm {
+    val home by lazy { HomeViewModel() }
+    val search by lazy { SearchViewModel() }
+    val settings by lazy { SettingsViewModel() }
+    val details by lazy { DetailsViewModel() }
+}
+
+@Composable
+internal fun DesktopHomeScreen(
+    onOpenTitle: (tmdbId: Int, isTv: Boolean) -> Unit,
+    onResume: (ResumeEntry) -> Unit,
+    onOpenSettings: () -> Unit,
+    onOpenSearch: () -> Unit,
+) {
+    val vm = Vm.home
+    val state by vm.state.collectAsState()
+    val resume by vm.resume.collectAsState()
+    val watched by vm.watched.collectAsState()
+
+    HomeScreenContent(
+        state = state,
+        resume = resume,
+        watched = watched,
+        onOpenTitle = onOpenTitle,
+        onResume = onResume,
+        onOpenSettings = onOpenSettings,
+        onOpenSearch = onOpenSearch,
+        onRemoveResume = vm::removeResume,
+        onMarkResumeWatched = vm::markResumeWatched,
+    )
+}
+
+@Composable
+internal fun DesktopSearchScreen(
+    onOpenTitle: (tmdbId: Int, isTv: Boolean) -> Unit,
+) {
+    val vm = Vm.search
+    val query by vm.query.collectAsState()
+    val results by vm.results.collectAsState()
+    val history by vm.history.collectAsState()
+
+    SearchScreenContent(
+        query = query,
+        results = results,
+        history = history,
+        onQueryChange = vm::setQuery,
+        onOpen = { item ->
+            vm.remember()
+            onOpenTitle(item.id, item.isTv)
+        },
+        onRemoveHistory = vm::removeHistory,
+        onClearHistory = vm::clearHistory,
+    )
+}
+
+@Composable
+internal fun DesktopSettingsScreen(onBack: () -> Unit) {
+    val vm = Vm.settings
+    val apiKey by vm.tmdbApiKey.collectAsState()
+    val streamLang by vm.streamLanguage.collectAsState()
+    val providers by vm.providers.collectAsState()
+    val dohEnabled by vm.dohEnabled.collectAsState()
+    val dohProvider by vm.dohProvider.collectAsState()
+    val skipIntroOutro by vm.skipIntroOutro.collectAsState()
+
+    SettingsScreenContent(
+        apiKey = apiKey,
+        streamLang = streamLang,
+        skipIntroOutro = skipIntroOutro,
+        dohEnabled = dohEnabled,
+        dohProvider = dohProvider,
+        providers = providers,
+        onSetApiKey = vm::setTmdbApiKey,
+        onSetStreamLanguage = vm::setStreamLanguage,
+        onSetSkipIntroOutro = vm::setSkipIntroOutro,
+        onSetDohEnabled = vm::setDohEnabled,
+        onSetDohProvider = vm::setDohProvider,
+        onToggleProvider = vm::toggleProvider,
+        onMoveProviderUp = vm::moveProviderUp,
+        onMoveProviderDown = vm::moveProviderDown,
+        onBack = onBack,
+        languageSelector = {
+            // Desktop : locale système pour l'instant (pas de sélecteur).
+            Text("Langue du système", color = Color(0xFF9A9A9A))
+        },
+    )
+}
+
+@Composable
+internal fun DesktopDetailsScreen(
+    params: Screen.Details,
+    onPlay: (streamUrl: String, headers: Map<String, String>, mediaKey: String, subtitles: Map<String, String>) -> Unit,
+    onBack: () -> Unit,
+    onRegisterBack: ((() -> Unit)?) -> Unit,
+) {
+    val vm = Vm.details
+    val state by vm.state.collectAsState()
+    val sources by vm.sources.collectAsState()
+    val resolved by vm.resolved.collectAsState()
+    val resolveError by vm.resolveError.collectAsState()
+    val streamLang by vm.streamLanguage.collectAsState()
+    val watched by vm.watched.collectAsState()
+    val resume by vm.resume.collectAsState()
+    val quickPlay by vm.quickPlay.collectAsState()
+    val panelVisible by vm.panelVisible.collectAsState()
+    // Reprise depuis l'accueil : lance la lecture directe une seule fois.
+    val autoConsumed = remember { mutableStateOf(false) }
+
+    LaunchedEffect(params.tmdbId, params.isTv) { vm.start(params.tmdbId, params.isTv) }
+    LaunchedEffect(state) {
+        if (params.autoSources && !autoConsumed.value) {
+            when (state) {
+                is DetailsState.Movie -> {
+                    autoConsumed.value = true
+                    vm.quickPlayMovie()
+                }
+                is DetailsState.Tv -> {
+                    autoConsumed.value = true
+                    vm.selectSeason(params.resumeSeason)
+                    vm.quickPlayEpisode(params.resumeSeason, params.resumeEpisode)
+                }
+                else -> Unit
+            }
+        }
+    }
+    LaunchedEffect(resolved) {
+        resolved?.let { s ->
+            if (s.url.isNotBlank()) {
+                vm.closePanel()
+                onPlay(s.url, s.headers, vm.playbackKey, s.subtitleUrls)
+            }
+            vm.consumeResolved()
+        }
+    }
+    // Échap ferme d'abord le panneau des sources, sinon retour à l'accueil.
+    LaunchedEffect(panelVisible) {
+        onRegisterBack(if (panelVisible) vm::closePanel else onBack)
+    }
+
+    DetailsScreenContent(
+        state = state,
+        sources = sources,
+        resolveError = resolveError,
+        streamLang = streamLang,
+        watched = watched,
+        resume = resume,
+        quickPlay = quickPlay,
+        panelVisible = panelVisible,
+        movieKey = vm.movieKey(),
+        episodeKey = vm::episodeKey,
+        onQuickPlayMovie = vm::quickPlayMovie,
+        onQuickPlayEpisode = vm::quickPlayEpisode,
+        onSelectSeason = vm::selectSeason,
+        onToggleWatched = vm::toggleWatched,
+        onToggleSeasonWatched = vm::toggleSeasonWatched,
+        onOpenPanel = vm::openPanel,
+        onClosePanel = vm::closePanel,
+        onPickSource = vm::play,
+        onDismissQuickPlay = vm::dismissQuickPlay,
+        onBack = onBack,
+    )
+}

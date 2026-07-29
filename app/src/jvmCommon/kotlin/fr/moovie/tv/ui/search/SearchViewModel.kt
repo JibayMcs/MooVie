@@ -1,11 +1,10 @@
 package fr.moovie.tv.ui.search
 
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import fr.moovie.tv.data.search.SearchHistoryRepository
-import fr.moovie.tv.data.settings.LocaleManager
 import fr.moovie.tv.data.settings.SettingsRepository
+import fr.moovie.tv.data.settings.currentTmdbLanguage
 import fr.moovie.tv.data.tmdb.TmdbRepository
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,11 +17,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-// SearchState vit désormais dans jvmCommon (ui/search/SearchState.kt), partagé
-// avec l'écran commun.
-
 @OptIn(FlowPreview::class)
-class SearchViewModel(app: Application) : AndroidViewModel(app) {
+class SearchViewModel : ViewModel() {
 
     private val settings = SettingsRepository()
     private val historyRepo = SearchHistoryRepository()
@@ -51,7 +47,7 @@ class SearchViewModel(app: Application) : AndroidViewModel(app) {
                     _results.value = SearchState.NeedsKey
                     return@collectLatest
                 }
-                val repo = TmdbRepository(LocaleManager.tmdbLanguage(getApplication()))
+                val repo = TmdbRepository(currentTmdbLanguage())
                 runCatching { repo.search(apiKey, term) }
                     .onSuccess { _results.value = if (it.isEmpty()) SearchState.Empty else SearchState.Results(it) }
                     .onFailure { _results.value = SearchState.Empty }

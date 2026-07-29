@@ -1,29 +1,31 @@
 package fr.moovie.tv.ui.home
 
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import fr.moovie.tv.R
-import fr.moovie.tv.data.settings.LocaleManager
 import fr.moovie.tv.data.settings.SettingsRepository
+import fr.moovie.tv.data.settings.currentTmdbLanguage
 import fr.moovie.tv.data.tmdb.TmdbRepository
 import fr.moovie.tv.data.watch.ResumeEntry
 import fr.moovie.tv.data.watch.WatchProgressRepository
+import fr.moovie.tv.resources.Res
+import fr.moovie.tv.resources.home_needs_key
+import fr.moovie.tv.resources.home_no_results_key
+import fr.moovie.tv.resources.home_row_top_movies
+import fr.moovie.tv.resources.home_row_trending_movies
+import fr.moovie.tv.resources.home_row_trending_tv
+import fr.moovie.tv.resources.home_tmdb_error
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-
-// HomeRow / HomeState vivent désormais dans jvmCommon (ui/home/HomeState.kt),
-// partagés avec l'écran d'accueil commun.
+import org.jetbrains.compose.resources.getString
 
 /**
  * Charge les rangées de l'accueil depuis TMDB. Sans clé API configurée,
  * renvoie NeedsApiKey pour renvoyer l'utilisateur vers les réglages.
  */
-class HomeViewModel(app: Application) : AndroidViewModel(app) {
+class HomeViewModel : ViewModel() {
 
     private val settings = SettingsRepository()
     private val watchRepo = WatchProgressRepository()
@@ -54,7 +56,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             settings.tmdbApiKey.collect { apiKey ->
                 if (apiKey.isBlank()) {
-                    _state.value = HomeState.NeedsApiKey(str(R.string.home_needs_key))
+                    _state.value = HomeState.NeedsApiKey(getString(Res.string.home_needs_key))
                 } else {
                     loadRows(apiKey)
                 }
@@ -64,21 +66,19 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
     private suspend fun loadRows(apiKey: String) {
         _state.value = HomeState.Loading
-        val repo = TmdbRepository(LocaleManager.tmdbLanguage(getApplication()))
+        val repo = TmdbRepository(currentTmdbLanguage())
         runCatching {
             listOf(
-                HomeRow(str(R.string.home_row_trending_movies), repo.trendingMovies(apiKey)),
-                HomeRow(str(R.string.home_row_trending_tv), repo.trendingTv(apiKey)),
-                HomeRow(str(R.string.home_row_top_movies), repo.topRatedMovies(apiKey)),
+                HomeRow(getString(Res.string.home_row_trending_movies), repo.trendingMovies(apiKey)),
+                HomeRow(getString(Res.string.home_row_trending_tv), repo.trendingTv(apiKey)),
+                HomeRow(getString(Res.string.home_row_top_movies), repo.topRatedMovies(apiKey)),
             ).filter { it.items.isNotEmpty() }
         }.onSuccess { rows ->
             _state.value =
-                if (rows.isEmpty()) HomeState.NeedsApiKey(str(R.string.home_no_results_key))
+                if (rows.isEmpty()) HomeState.NeedsApiKey(getString(Res.string.home_no_results_key))
                 else HomeState.Ready(rows)
         }.onFailure {
-            _state.value = HomeState.NeedsApiKey(str(R.string.home_tmdb_error, it.message ?: ""))
+            _state.value = HomeState.NeedsApiKey(getString(Res.string.home_tmdb_error, it.message ?: ""))
         }
     }
-
-    private fun str(resId: Int, vararg args: Any) = getApplication<Application>().getString(resId, *args)
 }

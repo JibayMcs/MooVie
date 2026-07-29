@@ -1,22 +1,22 @@
 package fr.moovie.tv.ui.details
 
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import fr.moovie.tv.R
-import fr.moovie.tv.data.settings.LocaleManager
 import fr.moovie.tv.data.settings.SettingsRepository
 import fr.moovie.tv.data.settings.StreamLanguage
+import fr.moovie.tv.data.settings.currentTmdbLanguage
 import fr.moovie.tv.data.sources.EmbedLink
 import fr.moovie.tv.data.sources.ExtractorRegistry
 import fr.moovie.tv.data.sources.PlayableStream
 import fr.moovie.tv.data.sources.ProviderRegistry
-import fr.moovie.tv.data.tmdb.Episode
-import fr.moovie.tv.data.tmdb.MovieDetails
 import fr.moovie.tv.data.tmdb.TmdbRepository
-import fr.moovie.tv.data.tmdb.TvDetails
 import fr.moovie.tv.data.watch.ResumeEntry
 import fr.moovie.tv.data.watch.WatchProgressRepository
+import fr.moovie.tv.resources.Res
+import fr.moovie.tv.resources.details_needs_key
+import fr.moovie.tv.resources.details_no_player
+import fr.moovie.tv.resources.details_resolve_error
+import fr.moovie.tv.resources.details_tmdb_error
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -29,15 +29,12 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
-
-// DetailsState / SourcesState / QuickPlayState / ProviderProgress vivent
-// désormais dans jvmCommon (ui/details/DetailsState.kt), partagés avec l'écran
-// de fiche commun.
+import org.jetbrains.compose.resources.getString
 
 /** Délai max par provider avant de le marquer en échec (n'affecte que ce provider). */
 private const val PROVIDER_TIMEOUT_MS = 12000L
 
-class DetailsViewModel(app: Application) : AndroidViewModel(app) {
+class DetailsViewModel : ViewModel() {
 
     private val settings = SettingsRepository()
 
@@ -114,10 +111,10 @@ class DetailsViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val apiKey = settings.tmdbApiKey.first()
             if (apiKey.isBlank()) {
-                _state.value = DetailsState.Error(str(R.string.details_needs_key))
+                _state.value = DetailsState.Error(getString(Res.string.details_needs_key))
                 return@launch
             }
-            val repo = TmdbRepository(LocaleManager.tmdbLanguage(getApplication()))
+            val repo = TmdbRepository(currentTmdbLanguage())
             runCatching {
                 if (isTv) {
                     val d = repo.tvDetails(apiKey, tmdbId)
@@ -132,7 +129,7 @@ class DetailsViewModel(app: Application) : AndroidViewModel(app) {
                 // Fiche film : sources chargées immédiatement en arrière-plan
                 // pour que le bouton « Lire » soit prêt sans ouvrir le panneau.
                 if (it is DetailsState.Movie) loadMovieSources()
-            }.onFailure { _state.value = DetailsState.Error(str(R.string.details_tmdb_error, it.message ?: "")) }
+            }.onFailure { _state.value = DetailsState.Error(getString(Res.string.details_tmdb_error, it.message ?: "")) }
         }
     }
 
@@ -140,7 +137,7 @@ class DetailsViewModel(app: Application) : AndroidViewModel(app) {
         val tv = _state.value as? DetailsState.Tv ?: return
         viewModelScope.launch {
             val apiKey = settings.tmdbApiKey.first()
-            val repo = TmdbRepository(LocaleManager.tmdbLanguage(getApplication()))
+            val repo = TmdbRepository(currentTmdbLanguage())
             runCatching { repo.season(apiKey, tmdbId, season).episodes }
                 .onSuccess { _state.value = tv.copy(season = season, episodes = it) }
         }
@@ -210,15 +207,15 @@ class DetailsViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { watchRepo.setAllWatched(keys, markWatched) }
     }
 
+    /** Génération de chargement : invalide les résultats des fiches précédentes. */
+    private var loadGeneration = 0
+
     /**
      * Ouvre le panneau immédiatement (tous providers en LOADING) puis interroge
      * chaque provider en parallèle ; chaque résultat met à jour l'état de façon
      * atomique → les sources apparaissent au fil de l'eau. Un provider lent/mort
      * passe en FAILED après [PROVIDER_TIMEOUT_MS] sans bloquer les autres.
      */
-    /** Génération de chargement : invalide les résultats des fiches précédentes. */
-    private var loadGeneration = 0
-
     private fun startSourceLoad(query: suspend (fr.moovie.tv.data.sources.SourceProvider) -> List<EmbedLink>) {
         val generation = ++loadGeneration
         viewModelScope.launch {
@@ -331,7 +328,7 @@ class DetailsViewModel(app: Application) : AndroidViewModel(app) {
                 if (!active.anyLoading) {
                     when {
                         tried.isNotEmpty() -> {
-                            _resolveError.value = str(R.string.details_no_player, lang)
+                            _resolveError.value = getString(Res.string.details_no_player, lang)
                             _panelVisible.value = true
                         }
                         active.links.isNotEmpty() -> _panelVisible.value = true
@@ -362,12 +359,10 @@ class DetailsViewModel(app: Application) : AndroidViewModel(app) {
                 pendingMeta?.let { watchRepo.register(it) }
                 _resolved.value = stream
             } else {
-                _resolveError.value = str(R.string.details_resolve_error, link.hoster)
+                _resolveError.value = getString(Res.string.details_resolve_error, link.hoster)
             }
         }
     }
 
     fun consumeResolved() { _resolved.value = null }
-
-    private fun str(resId: Int, vararg args: Any) = getApplication<Application>().getString(resId, *args)
 }

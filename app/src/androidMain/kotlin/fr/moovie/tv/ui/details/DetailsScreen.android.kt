@@ -87,6 +87,7 @@ fun DetailsScreen(
         onToggleWatched = viewModel::toggleWatched,
         onToggleSeasonWatched = viewModel::toggleSeasonWatched,
         onOpenPanel = viewModel::openPanel,
+        onClosePanel = viewModel::closePanel,
         onPickSource = viewModel::play,
         onDismissQuickPlay = viewModel::dismissQuickPlay,
         onBack = onBack,
