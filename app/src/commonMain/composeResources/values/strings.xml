@@ -118,6 +118,7 @@
     <string name="settings_stream_lang">Langue du stream par défaut</string>
     <string name="settings_language">Langue de l'application</string>
     <string name="settings_cat_intro">Intro &amp; générique</string>
+    <string name="settings_skip_intro">Boutons « Passer l'intro / le générique »</string>
     <string name="settings_autoplay">Lecture automatique de l'épisode suivant</string>
     <string name="settings_autoplay_help">À la fin d'un épisode, enchaîne le suivant après un décompte de 10 s (annulable avec n'importe quelle touche). Passe à la saison suivante en fin de saison.</string>
     <string name="settings_intro_help">Affiche des boutons « Passer l'intro / le générique » pendant la lecture (données TheIntroDB). Passer le générique enchaîne l'épisode suivant (série) ou revient à l'accueil (film).</string>

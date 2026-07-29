@@ -116,6 +116,7 @@
     <string name="settings_stream_lang">Idioma de stream por defecto</string>
     <string name="settings_language">Idioma de la aplicación</string>
     <string name="settings_cat_intro">Intro y créditos</string>
+    <string name="settings_skip_intro">Botones «Saltar intro / créditos»</string>
     <string name="settings_autoplay">Reproducción automática del siguiente episodio</string>
     <string name="settings_autoplay_help">Al terminar un episodio, reproduce el siguiente tras una cuenta atrás de 10 s (cancelable con cualquier tecla). Pasa a la temporada siguiente al final de una temporada.</string>
     <string name="settings_intro_help">Muestra botones «Saltar intro / créditos» durante la reproducción (datos de TheIntroDB). Saltar los créditos reproduce el siguiente episodio (serie) o vuelve al inicio (película).</string>

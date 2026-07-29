@@ -116,6 +116,7 @@
     <string name="settings_stream_lang">Default stream language</string>
     <string name="settings_language">App language</string>
     <string name="settings_cat_intro">Intro &amp; credits</string>
+    <string name="settings_skip_intro">“Skip intro / credits” buttons</string>
     <string name="settings_autoplay">Auto-play next episode</string>
     <string name="settings_autoplay_help">When an episode ends, plays the next one after a 10 s countdown (cancel with any key). Rolls over to the next season at the end of a season.</string>
     <string name="settings_intro_help">Shows “Skip intro / credits” buttons during playback (TheIntroDB data). Skipping credits plays the next episode (show) or returns home (movie).</string>
