@@ -2,93 +2,91 @@
   <img src=".github/banner.png" alt="Moo-vie" width="100%" />
 </p>
 
-# Moo-vie — application Android TV native
+# Moo-Vie
 
-Application de streaming pour Android TV, **native Kotlin** (Jetpack Compose for TV
-+ Media3/ExoPlayer), façon SmartTube : front pensé pour la télécommande, lecture
-native, extraction des sources **on-device** — pas de backend, pas de compte,
-100 % open source.
+Streaming app for **Android TV** and **desktop** (Linux, Windows, macOS), built from a
+single Kotlin Multiplatform codebase. Source extraction runs **on-device**: no backend,
+no account, no ads.
 
-## Fonctionnalités
+🇫🇷 [Version française](README.fr.md)
 
-- **Accueil** : hero dynamique, rail « Reprendre la lecture » (progression et
-  reprise au timecode), rangées tendances / mieux notés (TMDB), badges vus.
-- **Recherche** : résultats en grille, historique persistant (suppression
-  unitaire ou totale), flux clavier → résultats au D-pad.
-- **Fiches film & série** : casting, saisons/épisodes avec vignettes, marquage
-  vu/non vu (épisode, saison entière ou film), progression par épisode.
-- **Lecture directe** : les sources chargent dès l'ouverture de la fiche ; un
-  seul bouton **Lire/Reprendre** joue la meilleure source dans ta langue
-  (VF/VOSTFR/VO). Panneau de sources détaillé en secours ou au choix manuel.
-- **Lecteur** : Media3/ExoPlayer (HLS, DASH, MP4), reprise de lecture,
-  sous-titres externes, sélection de pistes, touches média de la télécommande
-  (MediaSession), seek 5 s / 15 s.
-- **Passer intro & générique** (TheIntroDB) : boutons « Passer l'intro / le
-  générique » pendant la lecture — passer le générique enchaîne l'épisode
-  suivant (série) ou revient à l'accueil (film). Activable dans les réglages.
-- **Réglages** : clé TMDB, langue de stream par défaut, langue d'interface,
-  sources activables/désactivables et ordonnables par priorité.
-- **Mises à jour intégrées** : l'app vérifie les releases GitHub au démarrage et
-  propose l'installation en un clic depuis la TV (bannière dismissable).
+## Screenshots
 
-## Installation
+| Home | Trending |
+|:---:|:---:|
+| ![Home](.github/screenshots/01-home.jpg) | ![Trending rails](.github/screenshots/02-rails.jpg) |
+| **Search** | **Movie details** |
+| ![Search](.github/screenshots/05-search.jpg) | ![Movie details](.github/screenshots/03-movie.jpg) |
+| **Show details** | **Episode details** |
+| ![Show details](.github/screenshots/06-tv.jpg) | ![Episode details](.github/screenshots/07-episode.jpg) |
+| **Sources panel** | **Player** |
+| ![Sources panel](.github/screenshots/04-sources.jpg) | ![Player](.github/screenshots/08-player.jpg) |
+| **Settings** | **Screensaver** |
+| ![Settings](.github/screenshots/09-settings.jpg) | ![Screensaver](.github/screenshots/10-screensaver.jpg) |
 
-Télécharger le dernier `moovie-vX.Y.Z.apk` depuis les
-[Releases](https://github.com/JibayMcs/MooVie/releases) et l'installer sur
-l'appareil (sideload). Au premier lancement, renseigner une clé TMDB (gratuite,
-[themoviedb.org](https://www.themoviedb.org/settings/api)) dans
-**Réglages → API & Clés**. Les mises à jour suivantes se font directement
-depuis l'app.
+> UI available in French, English and Spanish.
 
-## Pourquoi natif (et pas une WebView)
+## Features
 
-Une app native n'a ni CORS ni pubs par construction : elle envoie des requêtes
-HTTP directes avec les en-têtes voulus (Referer/Origin/User-Agent) et lit le
-flux. Aucun proxy, aucun serveur : le boîtier ne fait tourner que l'app.
+- **Home** — contextual hero, *Continue watching* rail with per-episode progress,
+  trending and top-rated rails (TMDB), watched badges.
+- **Search** — result grid, persistent history, D-pad flow from keyboard to results.
+- **Movies & shows** — cast, seasons and episodes with stills, per-episode details page,
+  watched/unwatched marking (episode, whole season or movie).
+- **One-press playback** — sources load as soon as a title opens; a single
+  **Play / Resume** picks the best source in your language (VF / VOSTFR / VO). A sources
+  panel is there for manual host selection.
+- **Player** — resume at timecode, subtitle and audio track selection, playback speed,
+  15 s seek, scrub mode on the progress bar, remote media keys.
+- **Skip intro & credits** (TheIntroDB) — skipping credits rolls into the next episode.
+- **Auto-play next episode** — 10 s countdown at the end of an episode, cancellable,
+  rolling over to the next season.
+- **Screensaver** — the poster bounces around the screen while playback stays paused.
+- **Offline-friendly** — TMDB responses and resolved source links are cached on disk.
+- **In-app updates** — periodic check against GitHub Releases; a banner on the home
+  screen, a discreet chip during playback.
 
 ## Stack
 
-| Couche | Techno |
-|--------|--------|
-| UI | Jetpack Compose for TV (`androidx.tv:tv-material`) |
-| Lecture | Media3 / ExoPlayer (HLS, DASH, MP4) + MediaSession |
-| Réseau | Retrofit + OkHttp + kotlinx.serialization |
-| Extraction | OkHttp + Jsoup + crypto Java (déobfuscation packer, AES) |
-| Réglages / données | DataStore Preferences |
-| Images | Coil |
-| CI / release | GitHub Actions : tag `vX.Y.Z` → APK signé en Release |
+| Layer | Tech |
+|---|---|
+| Language / build | Kotlin 2.0, Kotlin Multiplatform (`androidMain` / `desktopMain` / shared `jvmCommon`) |
+| UI | Compose Multiplatform, shared design system (`MoovieButton`, rails, dialogs) |
+| Playback | Media3 / ExoPlayer on Android · libVLC (VLCJ) on desktop |
+| Network | Retrofit + OkHttp + kotlinx.serialization, DNS-over-HTTPS |
+| Extraction | OkHttp + Jsoup + Java crypto (packer deobfuscation, AES) |
+| Storage | DataStore Preferences, OkHttp disk cache |
+| Images | Coil 3 |
+| CI | GitHub Actions: a `vX.Y.Z` tag builds the signed APK, `.deb`, `.msi` and `.dmg` |
 
-## Architecture
+## Install
 
-```
-app/src/main/java/fr/moovie/tv/
-├── MainActivity.kt            # Activity unique + navigation par état + bannière de mise à jour
-├── MooVieApp.kt               # Application
-├── ui/
-│   ├── theme/                 # MooVieTheme (couleurs TV)
-│   ├── components/            # MoovieButton / MoovieIconButton (design system)
-│   ├── navigation/Screen.kt   # destinations
-│   ├── home/                  # accueil : hero, rail reprise, rangées TMDB
-│   ├── search/                # recherche + historique
-│   ├── details/               # fiches film/série, lecture directe, slide-over sources
-│   ├── player/                # lecteur Media3 (reprise, pistes, MediaSession)
-│   ├── settings/              # réglages par catégories
-│   └── update/                # bannière + ViewModel de mise à jour
-└── data/
-    ├── tmdb/                  # API + modèles + repository TMDB
-    ├── search/                # historique de recherche
-    ├── settings/              # SettingsRepository (DataStore)
-    ├── sources/               # providers de sources + extracteurs d'hébergeurs
-    ├── update/                # UpdateRepository (GitHub Releases)
-    └── watch/                 # progression de lecture + vu/non vu
-```
+Grab the latest build from [Releases](https://github.com/JibayMcs/MooVie/releases):
+
+- **Android TV** — sideload `moovie-vX.Y.Z.apk`
+- **Linux** — `moovie-vX.Y.Z.deb`
+- **Windows** — `moovie-vX.Y.Z.msi`
+- **macOS** — `moovie-vX.Y.Z.dmg`
+
+Desktop playback needs **VLC** installed on the machine.
+
+On first launch, paste a free [TMDB API key](https://www.themoviedb.org/settings/api)
+under **Settings → API & Keys**. Later updates are handled from inside the app.
 
 ## Build
 
 ```bash
-./gradlew assembleDebug     # build de dev
-./gradlew assembleRelease   # nécessite keystore.properties (voir release.yml)
+./gradlew assembleDebug              # Android debug APK
+./gradlew assembleRelease            # signed APK (needs keystore.properties)
+./gradlew :app:run                   # desktop app
+./gradlew :app:packageDistributionForCurrentOS
 ```
 
-Un émulateur Android TV préconfiguré et des scripts de test sont fournis dans
-`emulator/` (voir son README).
+Layout: `app/src/commonMain` (resources), `app/src/jvmCommon` (ViewModels, repositories,
+shared UI), `app/src/androidMain`, `app/src/desktopMain`. A preconfigured Android TV
+emulator and its test scripts live in `emulator/`.
+
+## License
+
+Open source, for personal use. Moo-vie hosts no content: it only resolves links that are
+already publicly reachable.
