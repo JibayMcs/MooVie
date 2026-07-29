@@ -9,6 +9,7 @@ import fr.moovie.tv.data.sources.EmbedLink
 import fr.moovie.tv.data.sources.ExtractorRegistry
 import fr.moovie.tv.data.sources.PlayableStream
 import fr.moovie.tv.data.sources.ProviderRegistry
+import fr.moovie.tv.data.sources.SourceCacheRepository
 import fr.moovie.tv.data.tmdb.Episode
 import fr.moovie.tv.data.tmdb.TmdbRepository
 import fr.moovie.tv.data.tmdb.TvDetails
@@ -21,6 +22,7 @@ import fr.moovie.tv.resources.details_resolve_error
 import fr.moovie.tv.resources.details_tmdb_error
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -77,6 +79,7 @@ class DetailsViewModel : ViewModel() {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), StreamLanguage.VF)
 
     private val watchRepo = WatchProgressRepository()
+    private val sourceCache = SourceCacheRepository()
 
     /** Clés marquées vues (badge ✓ sur les épisodes / le film). */
     val watched: StateFlow<Set<String>> = watchRepo.watched
@@ -274,20 +277,49 @@ class DetailsViewModel : ViewModel() {
     /** Génération de chargement : invalide les résultats des fiches précédentes. */
     private var loadGeneration = 0
 
+    /** Vrai si les sources affichées viennent du cache et non d'une recherche. */
+    private var servedFromCache = false
+
+    /** Dernière requête de recherche, pour pouvoir la rejouer sans le cache. */
+    private var lastSourceQuery: (suspend (fr.moovie.tv.data.sources.SourceProvider) -> List<EmbedLink>)? = null
+
     /**
      * Ouvre le panneau immédiatement (tous providers en LOADING) puis interroge
      * chaque provider en parallèle ; chaque résultat met à jour l'état de façon
      * atomique → les sources apparaissent au fil de l'eau. Un provider lent/mort
      * passe en FAILED après [PROVIDER_TIMEOUT_MS] sans bloquer les autres.
      */
-    private fun startSourceLoad(query: suspend (fr.moovie.tv.data.sources.SourceProvider) -> List<EmbedLink>) {
+    private fun startSourceLoad(
+        skipCache: Boolean = false,
+        query: suspend (fr.moovie.tv.data.sources.SourceProvider) -> List<EmbedLink>,
+    ) {
         val generation = ++loadGeneration
+        val cacheKey = playbackKey
+        lastSourceQuery = query
+        servedFromCache = false
         // Bascule en Active AVANT toute suspension : la lecture rapide lit
         // `_sources` juste après cet appel et repartait sur l'ancien `Idle`
         // (la liste des providers n'arrive qu'après lecture des réglages), d'où
         // l'obligation d'appuyer deux fois sur OK pour lancer un épisode.
         _sources.value = SourcesState.Active(links = emptyList(), providers = emptyList())
         viewModelScope.launch {
+            // Fiche déjà consultée : on ressert les liens connus au lieu de
+            // réinterroger les providers (plusieurs secondes). Le flux jouable,
+            // lui, sera de toute façon ré-extrait au moment de lire.
+            if (!skipCache) {
+                val cached = sourceCache.get(cacheKey)
+                val cachedProviders = cached?.mapNotNull { it.provider }?.distinct().orEmpty()
+                if (cached != null && cachedProviders.isNotEmpty()) {
+                    if (generation != loadGeneration) return@launch
+                    servedFromCache = true
+                    _sources.value = SourcesState.Active(
+                        links = cached,
+                        providers = cachedProviders.map { ProviderProgress(it, ProviderStatus.DONE) },
+                    )
+                    return@launch
+                }
+            }
+
             // Réglages utilisateur : providers désactivés + ordre de priorité.
             val disabled = settings.disabledProviders.first()
             val order = settings.providerOrder.first()
@@ -302,33 +334,41 @@ class DetailsViewModel : ViewModel() {
                 links = emptyList(),
                 providers = providers.map { ProviderProgress(it.name, ProviderStatus.LOADING) },
             )
-            providers.forEach { provider ->
-                launch(Dispatchers.IO) {
-                    val result = runCatching {
-                        withTimeoutOrNull(PROVIDER_TIMEOUT_MS) { query(provider) }
-                    }
-                    if (generation != loadGeneration) return@launch
-                    _sources.update { st ->
-                        val active = st as? SourcesState.Active ?: return@update st
-                        val links = result.getOrNull().orEmpty().map { it.copy(provider = provider.name) }
-                        val status = when {
-                            result.isFailure || result.getOrNull() == null -> ProviderStatus.FAILED
-                            links.isEmpty() -> ProviderStatus.EMPTY
-                            else -> ProviderStatus.DONE
+            // coroutineScope : suspend jusqu'à ce que tous les providers aient
+            // répondu, pour ne mettre en cache qu'une liste complète.
+            coroutineScope {
+                providers.forEach { provider ->
+                    launch(Dispatchers.IO) {
+                        val result = runCatching {
+                            withTimeoutOrNull(PROVIDER_TIMEOUT_MS) { query(provider) }
                         }
-                        active.copy(
-                            // Tri stable par priorité de provider (l'ordre d'arrivée
-                            // est conservé au sein d'un même provider).
-                            links = (active.links + links)
-                                .distinctBy { it.url }
-                                .sortedBy { rank[it.provider] ?: Int.MAX_VALUE },
-                            providers = active.providers.map {
-                                if (it.name == provider.name) it.copy(status = status) else it
-                            },
-                        )
+                        if (generation != loadGeneration) return@launch
+                        _sources.update { st ->
+                            val active = st as? SourcesState.Active ?: return@update st
+                            val links = result.getOrNull().orEmpty().map { it.copy(provider = provider.name) }
+                            val status = when {
+                                result.isFailure || result.getOrNull() == null -> ProviderStatus.FAILED
+                                links.isEmpty() -> ProviderStatus.EMPTY
+                                else -> ProviderStatus.DONE
+                            }
+                            active.copy(
+                                // Tri stable par priorité de provider (l'ordre d'arrivée
+                                // est conservé au sein d'un même provider).
+                                links = (active.links + links)
+                                    .distinctBy { it.url }
+                                    .sortedBy { rank[it.provider] ?: Int.MAX_VALUE },
+                                providers = active.providers.map {
+                                    if (it.name == provider.name) it.copy(status = status) else it
+                                },
+                            )
+                        }
                     }
                 }
             }
+
+            if (generation != loadGeneration) return@launch
+            val found = (_sources.value as? SourcesState.Active)?.links.orEmpty()
+            sourceCache.put(cacheKey, found)
         }
     }
 
@@ -377,6 +417,8 @@ class DetailsViewModel : ViewModel() {
             val tried = mutableSetOf<String>()
             // Tours passés à attendre que la liste des providers soit publiée.
             var startupWaits = 0
+            // Une seule reprise autorisée après purge d'un cache périmé.
+            var retriedWithoutCache = false
             while (true) {
                 val active = _sources.value as? SourcesState.Active
                 if (active == null) {
@@ -397,6 +439,22 @@ class DetailsViewModel : ViewModel() {
                     continue
                 }
                 if (!active.anyLoading) {
+                    // Aucun lien du cache n'a pu être lu : ils sont probablement
+                    // tous morts. On purge et on refait une vraie recherche
+                    // plutôt que de renvoyer l'utilisateur sur un échec — sans
+                    // ce garde-fou, le cache dégraderait le comportement.
+                    if (tried.isNotEmpty() && servedFromCache && !retriedWithoutCache) {
+                        retriedWithoutCache = true
+                        sourceCache.invalidate(playbackKey)
+                        val replay = lastSourceQuery
+                        if (replay != null) {
+                            startSourceLoad(skipCache = true, query = replay)
+                            tried.clear()
+                            startupWaits = 0
+                            delay(250)
+                            continue
+                        }
+                    }
                     when {
                         tried.isNotEmpty() -> {
                             _resolveError.value = getString(Res.string.details_no_player, lang)

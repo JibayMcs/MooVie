@@ -20,7 +20,11 @@ data class PlayableStream(
     val subtitleUrls: Map<String, String> = emptyMap(),
 )
 
-/** Métadonnées d'un embed à résoudre (le lien d'hébergeur trouvé par un provider). */
+/**
+ * Métadonnées d'un embed à résoudre (le lien d'hébergeur trouvé par un provider).
+ * Sérialisable pour le cache disque des sources (voir SourceCacheRepository).
+ */
+@kotlinx.serialization.Serializable
 data class EmbedLink(
     val url: String,
     val hoster: String,
