@@ -1,6 +1,5 @@
 package fr.moovie.tv.data.sources
 
-import android.util.Base64
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -12,6 +11,8 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.jsoup.Jsoup
 import java.text.Normalizer
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 
 /**
  * Provider Coflix (coflix.trade) — port de API/Mainapi/routes/coflix.js.
@@ -21,6 +22,9 @@ import java.text.Normalizer
  * ⚠️ L'étape « lecteur » passe par CycleTLS/proxy côté backend (anti-bot). En
  * natif on tente en direct ; si Cloudflare bloque, la liste sera vide.
  */
+// Base64 multiplateforme (kotlin.io.encoding) : android.util.Base64 n'existe pas
+// sur desktop et java.util.Base64 exigerait minSdk 26.
+@OptIn(ExperimentalEncodingApi::class)
 class CoflixProvider(private val http: OkHttpClient) : SourceProvider {
 
     override val name = "coflix"
@@ -77,7 +81,7 @@ class CoflixProvider(private val http: OkHttpClient) : SourceProvider {
         return items.mapNotNull { el ->
             val onclick = el.attr("onclick")
             val b64 = SHOW_VIDEO.find(onclick)?.groupValues?.get(1) ?: return@mapNotNull null
-            val url = runCatching { String(Base64.decode(b64, Base64.DEFAULT), Charsets.UTF_8) }.getOrNull()
+            val url = runCatching { Base64.Mime.decode(b64).decodeToString() }.getOrNull()
                 ?.takeIf { it.startsWith("http") } ?: return@mapNotNull null
             val info = el.selectFirst("p")?.text()?.lowercase().orEmpty()
             val lang = when {
