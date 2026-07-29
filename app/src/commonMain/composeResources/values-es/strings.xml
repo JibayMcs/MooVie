@@ -81,9 +81,16 @@
     <string name="player_fullscreen_exit">Salir de pantalla completa</string>
     <string name="player_error">No se pudo reproducir — prueba otro reproductor desde el panel Fuentes.</string>
     <string name="player_vlc_missing">VLC no encontrado</string>
-    <string name="player_vlc_help">El reproductor de escritorio usa libVLC. Instala VLC y reinicia:\nLinux: sudo apt install vlc — Windows/macOS: videolan.org</string>
+    <string name="player_vlc_help">El reproductor de escritorio usa libVLC. Instala VLC y reinicia — Linux: sudo apt install vlc, Windows/macOS: videolan.org</string>
 
     <!-- Actualización -->
+    <string name="settings_cat_update">Actualizaciones</string>
+    <string name="settings_update_interval">Frecuencia de comprobación</string>
+    <string name="settings_update_help">Comprueba si hay una nueva versión a intervalos regulares. Durante la reproducción el aviso aparece como una pastilla discreta en vez de un banner. «Nunca» desactiva la comprobación por completo.</string>
+    <string name="update_never">Nunca</string>
+    <string name="update_every_minutes">Cada %1$d min</string>
+    <string name="update_every_hours">Cada %1$d h</string>
+    <string name="player_update_chip">Actualización v%1$s</string>
     <string name="update_available">Actualización v%1$s disponible</string>
     <string name="update_install">Instalar</string>
     <string name="update_later">Más tarde</string>

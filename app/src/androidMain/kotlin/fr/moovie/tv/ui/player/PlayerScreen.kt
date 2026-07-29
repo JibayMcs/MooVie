@@ -37,7 +37,9 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SystemUpdateAlt
 import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -103,6 +105,7 @@ import fr.moovie.tv.resources.player_skip_outro
 import fr.moovie.tv.resources.player_speed
 import fr.moovie.tv.resources.player_subtitles
 import fr.moovie.tv.resources.player_subtitles_off
+import fr.moovie.tv.resources.player_update_chip
 import fr.moovie.tv.ui.components.MOOVIE_ACCENT
 import fr.moovie.tv.ui.components.MoovieButton
 import fr.moovie.tv.ui.components.MoovieIconButton
@@ -138,6 +141,9 @@ private val SPEEDS = listOf(0.75f, 1f, 1.25f, 1.5f, 2f)
 /** Durée du décompte avant l'enchaînement de l'épisode suivant. */
 private const val AUTO_NEXT_SECONDS = 10
 
+/** Durée d'affichage spontané de la pastille de mise à jour. */
+private const val UPDATE_CHIP_MS = 10_000L
+
 private enum class PlayerDialog { SUBTITLES, SETTINGS }
 
 /**
@@ -161,6 +167,9 @@ fun PlayerScreen(
     subtitle: String = "",
     nextSeason: Int = 0,
     nextEpisode: Int = 0,
+    /** Version disponible, ou null : affiche une pastille discrète en lecture. */
+    updateVersion: String? = null,
+    onUpdateSelected: () -> Unit = {},
     onBack: () -> Unit,
     onNextEpisode: (tmdbId: Int, season: Int, episode: Int) -> Unit = { _, _, _ -> },
 ) {
@@ -219,6 +228,8 @@ fun PlayerScreen(
     var ended by remember(streamUrl) { mutableStateOf(false) }
     // Secondes restantes du décompte (null = pas de décompte en cours).
     var autoNextSeconds by remember(streamUrl) { mutableStateOf<Int?>(null) }
+    // Fenêtre d'apparition initiale de la pastille de mise à jour.
+    var updateChipFresh by remember(updateVersion) { mutableStateOf(updateVersion != null) }
 
     fun wake() {
         controlsVisible = true
@@ -354,6 +365,17 @@ fun PlayerScreen(
     val playFocus = remember { FocusRequester() }
     val skipFocus = remember { FocusRequester() }
     val autoNextFocus = remember { FocusRequester() }
+
+    // Pastille de mise à jour : visible quelques secondes à la détection, puis
+    // seulement avec la barre de contrôles — on prévient sans imposer un
+    // élément fixe à l'écran pendant tout le film.
+    LaunchedEffect(updateVersion) {
+        if (updateVersion == null) return@LaunchedEffect
+        updateChipFresh = true
+        delay(UPDATE_CHIP_MS)
+        updateChipFresh = false
+    }
+    val showUpdateChip = updateVersion != null && (updateChipFresh || controlsVisible)
 
     /** Interrompt l'enchaînement : `ended` à false annule la coroutine en cours. */
     fun cancelAutoNext() {
@@ -510,6 +532,29 @@ fun PlayerScreen(
                         stringResource(Res.string.player_skip_outro)
                     },
                 )
+            }
+        }
+
+        // Pastille de mise à jour, en haut à droite (le titre occupe la gauche).
+        // Cliquer met en pause et laisse la bannière habituelle demander
+        // confirmation : rien ne s'installe sur une simple erreur de visée.
+        if (showUpdateChip && updateVersion != null) {
+            MoovieButton(
+                onClick = {
+                    player.playWhenReady = false
+                    onUpdateSelected()
+                },
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(end = 48.dp, top = 32.dp),
+            ) {
+                Icon(
+                    Icons.Default.SystemUpdateAlt,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(Modifier.width(10.dp))
+                Text(stringResource(Res.string.player_update_chip, updateVersion))
             }
         }
 

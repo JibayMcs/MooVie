@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import fr.moovie.tv.data.net.DohProvider
 import fr.moovie.tv.data.settings.SettingsRepository
 import fr.moovie.tv.data.settings.StreamLanguage
+import fr.moovie.tv.data.settings.UpdateInterval
 import fr.moovie.tv.data.sources.ProviderRegistry
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -40,6 +41,13 @@ class SettingsViewModel : ViewModel() {
 
     fun setAutoPlayNext(value: Boolean) {
         viewModelScope.launch { repo.setAutoPlayNext(value) }
+    }
+
+    val updateInterval: StateFlow<UpdateInterval> =
+        repo.updateInterval.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), UpdateInterval.M30)
+
+    fun setUpdateInterval(value: UpdateInterval) {
+        viewModelScope.launch { repo.setUpdateInterval(value) }
     }
 
     fun setSkipIntroOutro(value: Boolean) = viewModelScope.launch { repo.setSkipIntroOutro(value) }

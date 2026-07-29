@@ -59,6 +59,16 @@ class SettingsRepository {
     suspend fun setSkipIntroOutro(value: Boolean) =
         store.edit { it[SKIP_INTRO_OUTRO] = value }
 
+    /** Fréquence de vérification des mises à jour (30 min par défaut). */
+    val updateInterval: Flow<UpdateInterval> =
+        store.data.map {
+            runCatching { UpdateInterval.valueOf(it[UPDATE_INTERVAL] ?: "M30") }
+                .getOrDefault(UpdateInterval.M30)
+        }
+
+    suspend fun setUpdateInterval(value: UpdateInterval) =
+        store.edit { it[UPDATE_INTERVAL] = value.name }
+
     /** Enchaînement automatique de l'épisode suivant en fin de lecture. */
     val autoPlayNext: Flow<Boolean> =
         store.data.map { it[AUTO_PLAY_NEXT] ?: true }
@@ -98,5 +108,6 @@ class SettingsRepository {
         val DOH_PROVIDER = stringPreferencesKey("doh_provider")
         val SKIP_INTRO_OUTRO = booleanPreferencesKey("skip_intro_outro")
         val AUTO_PLAY_NEXT = booleanPreferencesKey("auto_play_next")
+        val UPDATE_INTERVAL = stringPreferencesKey("update_interval")
     }
 }

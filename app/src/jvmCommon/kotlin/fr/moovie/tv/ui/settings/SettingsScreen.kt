@@ -48,9 +48,16 @@ import fr.moovie.tv.resources.common_disabled
 import fr.moovie.tv.resources.common_enabled
 import fr.moovie.tv.resources.settings_cat_api
 import fr.moovie.tv.resources.settings_cat_dns
+import fr.moovie.tv.data.settings.UpdateInterval
 import fr.moovie.tv.resources.settings_autoplay
 import fr.moovie.tv.resources.settings_autoplay_help
 import fr.moovie.tv.resources.settings_cat_intro
+import fr.moovie.tv.resources.settings_cat_update
+import fr.moovie.tv.resources.settings_update_help
+import fr.moovie.tv.resources.settings_update_interval
+import fr.moovie.tv.resources.update_every_hours
+import fr.moovie.tv.resources.update_every_minutes
+import fr.moovie.tv.resources.update_never
 import fr.moovie.tv.resources.settings_cat_playback
 import fr.moovie.tv.resources.settings_cat_sources
 import fr.moovie.tv.resources.settings_disable
@@ -70,6 +77,7 @@ import fr.moovie.tv.resources.settings_tmdb_help
 import fr.moovie.tv.resources.settings_tmdb_hint
 import fr.moovie.tv.resources.settings_tmdb_key
 import fr.moovie.tv.ui.components.MoovieButton
+import fr.moovie.tv.ui.components.MoovieSelect
 import fr.moovie.tv.ui.components.MoovieIconButton
 import org.jetbrains.compose.resources.stringResource
 
@@ -85,6 +93,7 @@ fun SettingsScreenContent(
     streamLang: StreamLanguage,
     skipIntroOutro: Boolean,
     autoPlayNext: Boolean,
+    updateInterval: UpdateInterval,
     dohEnabled: Boolean,
     dohProvider: DohProvider,
     providers: List<ProviderSetting>,
@@ -92,6 +101,7 @@ fun SettingsScreenContent(
     onSetStreamLanguage: (StreamLanguage) -> Unit,
     onSetSkipIntroOutro: (Boolean) -> Unit,
     onSetAutoPlayNext: (Boolean) -> Unit,
+    onSetUpdateInterval: (UpdateInterval) -> Unit,
     onSetDohEnabled: (Boolean) -> Unit,
     onSetDohProvider: (DohProvider) -> Unit,
     onToggleProvider: (name: String, enabled: Boolean) -> Unit,
@@ -160,6 +170,17 @@ fun SettingsScreenContent(
                     selected = !autoPlayNext,
                 ) { Text(stringResource(Res.string.common_disabled)) }
             }
+        }
+
+        SettingsCategory(stringResource(Res.string.settings_cat_update)) {
+            Text(stringResource(Res.string.settings_update_help), style = MaterialTheme.typography.bodySmall)
+            MoovieSelect(
+                title = stringResource(Res.string.settings_update_interval),
+                options = UpdateInterval.entries.toList(),
+                selected = updateInterval,
+                label = { updateIntervalLabel(it) },
+                onSelect = onSetUpdateInterval,
+            )
         }
 
         SettingsCategory(stringResource(Res.string.settings_cat_dns)) {
@@ -236,6 +257,14 @@ fun SettingsScreenContent(
 
         MoovieButton(onClick = onBack) { Text(stringResource(Res.string.common_back)) }
     }
+}
+
+/** Libellé lisible d'une fréquence de vérification. */
+@Composable
+private fun updateIntervalLabel(interval: UpdateInterval): String = when {
+    interval == UpdateInterval.NEVER -> stringResource(Res.string.update_never)
+    interval.minutes < 60 -> stringResource(Res.string.update_every_minutes, interval.minutes)
+    else -> stringResource(Res.string.update_every_hours, interval.minutes / 60)
 }
 
 @Composable

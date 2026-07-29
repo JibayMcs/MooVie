@@ -7,9 +7,13 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import fr.moovie.tv.BuildConfig
 import fr.moovie.tv.R
+import fr.moovie.tv.data.settings.SettingsRepository
+import fr.moovie.tv.data.settings.UpdateInterval
 import fr.moovie.tv.data.update.UpdateRepository
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -17,13 +21,15 @@ import java.io.File
 // avec la bannière commune.
 
 /**
- * Vérifie une fois par démarrage la dernière release GitHub. « Plus tard »
- * masque la bannière pour la session uniquement (état en mémoire process) :
- * elle réapparaît au prochain démarrage de l'app.
+ * Vérifie la dernière release GitHub au démarrage, puis à l'intervalle choisi
+ * dans les réglages. « Plus tard » écarte **cette version** pour la session
+ * (état en mémoire process) : sans ça la vérification périodique la
+ * reproposerait quelques minutes plus tard.
  */
 class UpdateViewModel(app: Application) : AndroidViewModel(app) {
 
     private val repo = UpdateRepository()
+    private val settings = SettingsRepository()
 
     private val _state = MutableStateFlow<UpdateState>(UpdateState.None)
     val state: StateFlow<UpdateState> = _state
@@ -31,21 +37,43 @@ class UpdateViewModel(app: Application) : AndroidViewModel(app) {
     /** Mémorise la mise à jour trouvée (pour Réessayer après une erreur). */
     private var available: UpdateState.Available? = null
 
+    /** Version écartée par « Plus tard », à ne plus proposer d'ici la fin de session. */
+    private var dismissedVersion: String? = null
+
     init {
         viewModelScope.launch {
-            val release = repo.latestRelease() ?: return@launch
-            if (release.draft || release.prerelease) return@launch
-            val apk = release.assets.firstOrNull { it.name.endsWith(".apk") } ?: return@launch
-            if (repo.isNewer(release.tagName, BuildConfig.VERSION_NAME)) {
-                val found = UpdateState.Available(release.tagName.removePrefix("v"), apk.downloadUrl)
-                available = found
-                _state.value = found
+            // collectLatest : changer l'intervalle dans les réglages relance
+            // aussitôt la boucle avec la nouvelle valeur.
+            settings.updateInterval.collectLatest { interval ->
+                if (interval == UpdateInterval.NEVER) {
+                    if (_state.value is UpdateState.Available) _state.value = UpdateState.None
+                    return@collectLatest
+                }
+                while (true) {
+                    check()
+                    delay(interval.minutes * 60_000L)
+                }
             }
         }
     }
 
-    /** « Plus tard » : masque jusqu'au prochain démarrage de l'app. */
+    private suspend fun check() {
+        // Ne pas écraser un téléchargement en cours ni une erreur affichée.
+        if (_state.value is UpdateState.Downloading || _state.value is UpdateState.Error) return
+        val release = repo.latestRelease() ?: return
+        if (release.draft || release.prerelease) return
+        val apk = release.assets.firstOrNull { it.name.endsWith(".apk") } ?: return
+        if (!repo.isNewer(release.tagName, BuildConfig.VERSION_NAME)) return
+        val version = release.tagName.removePrefix("v")
+        if (version == dismissedVersion) return
+        val found = UpdateState.Available(version, apk.downloadUrl)
+        available = found
+        _state.value = found
+    }
+
+    /** « Plus tard » : masque cette version jusqu'au prochain démarrage. */
     fun dismiss() {
+        dismissedVersion = available?.version
         _state.value = UpdateState.None
     }
 

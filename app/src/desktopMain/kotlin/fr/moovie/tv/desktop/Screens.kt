@@ -89,12 +89,14 @@ internal fun DesktopSettingsScreen(onBack: () -> Unit) {
     val dohProvider by vm.dohProvider.collectAsState()
     val skipIntroOutro by vm.skipIntroOutro.collectAsState()
     val autoPlayNext by vm.autoPlayNext.collectAsState()
+    val updateInterval by vm.updateInterval.collectAsState()
 
     SettingsScreenContent(
         apiKey = apiKey,
         streamLang = streamLang,
         skipIntroOutro = skipIntroOutro,
         autoPlayNext = autoPlayNext,
+        updateInterval = updateInterval,
         dohEnabled = dohEnabled,
         dohProvider = dohProvider,
         providers = providers,
@@ -102,6 +104,7 @@ internal fun DesktopSettingsScreen(onBack: () -> Unit) {
         onSetStreamLanguage = vm::setStreamLanguage,
         onSetSkipIntroOutro = vm::setSkipIntroOutro,
         onSetAutoPlayNext = vm::setAutoPlayNext,
+        onSetUpdateInterval = vm::setUpdateInterval,
         onSetDohEnabled = vm::setDohEnabled,
         onSetDohProvider = vm::setDohProvider,
         onToggleProvider = vm::toggleProvider,

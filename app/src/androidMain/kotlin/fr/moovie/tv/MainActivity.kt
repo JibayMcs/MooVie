@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -34,6 +35,7 @@ import fr.moovie.tv.ui.settings.SettingsScreen
 import fr.moovie.tv.ui.theme.MooVieTheme
 import fr.moovie.tv.ui.theme.MooVieTvMaterialTheme
 import fr.moovie.tv.ui.update.UpdateBanner
+import fr.moovie.tv.ui.update.UpdateState
 import fr.moovie.tv.ui.update.UpdateViewModel
 import kotlinx.coroutines.launch
 
@@ -62,17 +64,26 @@ class MainActivity : ComponentActivity() {
                 // héritent d'une couleur sombre sans Surface parent → invisibles).
                 CompositionLocalProvider(LocalContentColor provides Color.White) {
                     Column(modifier = Modifier.fillMaxSize().background(Color(0xFF0A0A0A))) {
-                        // Bannière de mise à jour : tout en haut, sur toutes les pages.
                         val updateViewModel: UpdateViewModel = viewModel()
                         val updateState by updateViewModel.state.collectAsStateWithLifecycle()
+                        var screen: Screen by remember { mutableStateOf(Screen.Home) }
+                        // Pendant la lecture, la bannière rétrécirait la vidéo :
+                        // le lecteur affiche une pastille discrète à la place, et
+                        // la bannière n'apparaît qu'une fois celle-ci activée.
+                        val onPlayer = screen is Screen.Player
+                        var bannerOnPlayer by remember { mutableStateOf(false) }
+                        LaunchedEffect(onPlayer) { if (!onPlayer) bannerOnPlayer = false }
+
                         UpdateBanner(
-                            state = updateState,
+                            state = if (onPlayer && !bannerOnPlayer) UpdateState.None else updateState,
                             onInstall = updateViewModel::install,
-                            onDismiss = updateViewModel::dismiss,
+                            onDismiss = {
+                                bannerOnPlayer = false
+                                updateViewModel.dismiss()
+                            },
                         )
 
                         Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
-                        var screen: Screen by remember { mutableStateOf(Screen.Home) }
 
                         // Bouton Retour de la télécommande : revient à l'accueil
                         // depuis n'importe quel écran (pas de bouton Retour à l'écran).
@@ -118,6 +129,8 @@ class MainActivity : ComponentActivity() {
                                 subtitle = s.subtitle,
                                 nextSeason = s.nextSeason,
                                 nextEpisode = s.nextEpisode,
+                                updateVersion = (updateState as? UpdateState.Available)?.version,
+                                onUpdateSelected = { bannerOnPlayer = true },
                                 onBack = { screen = Screen.Home },
                                 // Passer le générique d'un épisode → enchaîne le
                                 // suivant via la fiche (résolution + lecture auto).

@@ -81,9 +81,16 @@
     <string name="player_fullscreen_exit">Exit fullscreen</string>
     <string name="player_error">Playback failed — try another host from the Sources panel.</string>
     <string name="player_vlc_missing">VLC not found</string>
-    <string name="player_vlc_help">The desktop player relies on libVLC. Install VLC then restart:\nLinux: sudo apt install vlc — Windows/macOS: videolan.org</string>
+    <string name="player_vlc_help">The desktop player relies on libVLC. Install VLC then restart — Linux: sudo apt install vlc, Windows/macOS: videolan.org</string>
 
     <!-- Update -->
+    <string name="settings_cat_update">Updates</string>
+    <string name="settings_update_interval">Check frequency</string>
+    <string name="settings_update_help">Checks for a new version at a regular interval. During playback the notice appears as a discreet chip instead of a banner. “Never” disables checking entirely.</string>
+    <string name="update_never">Never</string>
+    <string name="update_every_minutes">Every %1$d min</string>
+    <string name="update_every_hours">Every %1$d h</string>
+    <string name="player_update_chip">Update v%1$s</string>
     <string name="update_available">Update v%1$s available</string>
     <string name="update_install">Install</string>
     <string name="update_later">Later</string>

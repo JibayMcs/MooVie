@@ -55,12 +55,14 @@ fun SettingsScreen(
     val dohProvider by viewModel.dohProvider.collectAsStateWithLifecycle()
     val skipIntroOutro by viewModel.skipIntroOutro.collectAsStateWithLifecycle()
     val autoPlayNext by viewModel.autoPlayNext.collectAsStateWithLifecycle()
+    val updateInterval by viewModel.updateInterval.collectAsStateWithLifecycle()
 
     SettingsScreenContent(
         apiKey = apiKey,
         streamLang = streamLang,
         skipIntroOutro = skipIntroOutro,
         autoPlayNext = autoPlayNext,
+        updateInterval = updateInterval,
         dohEnabled = dohEnabled,
         dohProvider = dohProvider,
         providers = providers,
@@ -68,6 +70,7 @@ fun SettingsScreen(
         onSetStreamLanguage = viewModel::setStreamLanguage,
         onSetSkipIntroOutro = viewModel::setSkipIntroOutro,
         onSetAutoPlayNext = viewModel::setAutoPlayNext,
+        onSetUpdateInterval = viewModel::setUpdateInterval,
         onSetDohEnabled = viewModel::setDohEnabled,
         onSetDohProvider = viewModel::setDohProvider,
         onToggleProvider = viewModel::toggleProvider,

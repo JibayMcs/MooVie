@@ -64,6 +64,7 @@ import fr.moovie.tv.data.watch.WatchProgressRepository
 import fr.moovie.tv.resources.Res
 import fr.moovie.tv.resources.common_cancel
 import fr.moovie.tv.resources.player_next_in
+import fr.moovie.tv.resources.player_update_chip
 import fr.moovie.tv.ui.components.MOOVIE_ACCENT
 import fr.moovie.tv.ui.components.MoovieButton
 import fr.moovie.tv.ui.components.MoovieIconButton
@@ -150,6 +151,9 @@ internal fun DesktopPlayerScreen(
     subtitle: String,
     nextSeason: Int,
     nextEpisode: Int,
+    /** Version disponible, ou null : affiche une pastille discrète en lecture. */
+    updateVersion: String? = null,
+    onUpdateSelected: () -> Unit = {},
     isFullscreen: Boolean,
     onToggleFullscreen: () -> Unit,
     onBack: () -> Unit,
@@ -205,6 +209,8 @@ internal fun DesktopPlayerScreen(
     var activityTick by remember { mutableStateOf(0) }
     // Secondes restantes du décompte d'enchaînement (null = pas de décompte).
     var autoNextSeconds by remember(streamUrl) { mutableStateOf<Int?>(null) }
+    // Fenêtre d'apparition initiale de la pastille de mise à jour.
+    var updateChipFresh by remember(updateVersion) { mutableStateOf(updateVersion != null) }
 
     fun showControls() {
         controlsVisible = true
@@ -335,6 +341,14 @@ internal fun DesktopPlayerScreen(
         }
     }
 
+    LaunchedEffect(updateVersion) {
+        if (updateVersion == null) return@LaunchedEffect
+        updateChipFresh = true
+        delay(UPDATE_CHIP_MS)
+        updateChipFresh = false
+    }
+    val showUpdateChip = updateVersion != null && (updateChipFresh || controlsVisible)
+
     val keyFocus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { keyFocus.requestFocus() } }
 
@@ -421,6 +435,21 @@ internal fun DesktopPlayerScreen(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
+            }
+        }
+
+        // Pastille de mise à jour : quelques secondes à la détection, puis avec
+        // les contrôles. Cliquer met en pause et laisse la bannière habituelle
+        // demander confirmation.
+        if (showUpdateChip && updateVersion != null) {
+            MoovieButton(
+                onClick = {
+                    player.controls().setPause(true)
+                    onUpdateSelected()
+                },
+                modifier = Modifier.align(Alignment.TopEnd).padding(24.dp),
+            ) {
+                Text(stringResource(Res.string.player_update_chip, updateVersion))
             }
         }
 
@@ -548,6 +577,9 @@ private fun MissingVlc(onBack: () -> Unit) {
 
 /** Durée du décompte avant l'enchaînement de l'épisode suivant. */
 private const val AUTO_NEXT_SECONDS = 10
+
+/** Durée d'affichage spontané de la pastille de mise à jour. */
+private const val UPDATE_CHIP_MS = 10_000L
 
 private fun formatTime(ms: Long): String {
     val totalSec = ms / 1000

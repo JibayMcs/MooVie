@@ -35,6 +35,7 @@ import fr.moovie.tv.ui.components.MoovieButton
 import fr.moovie.tv.ui.navigation.Screen
 import fr.moovie.tv.ui.theme.MooVieTheme
 import fr.moovie.tv.ui.update.UpdateBanner
+import fr.moovie.tv.ui.update.UpdateState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -123,13 +124,22 @@ private fun DesktopApp(
     var lastDetails by remember { mutableStateOf<Screen.Details?>(null) }
 
     Column(modifier = Modifier.fillMaxSize().background(Color(0xFF0A0A0A))) {
-        // Bannière de mise à jour : tout en haut, sur toutes les pages.
         val updateViewModel = remember { DesktopUpdateViewModel() }
         val updateState by updateViewModel.state.collectAsState()
+        // Pendant la lecture, la bannière rétrécirait la vidéo : le lecteur
+        // affiche une pastille discrète, et la bannière n'apparaît qu'une fois
+        // celle-ci activée.
+        val onPlayer = screen is Screen.Player
+        var bannerOnPlayer by remember { mutableStateOf(false) }
+        LaunchedEffect(onPlayer) { if (!onPlayer) bannerOnPlayer = false }
+
         UpdateBanner(
-            state = updateState,
+            state = if (onPlayer && !bannerOnPlayer) UpdateState.None else updateState,
             onInstall = updateViewModel::install,
-            onDismiss = updateViewModel::dismiss,
+            onDismiss = {
+                bannerOnPlayer = false
+                updateViewModel.dismiss()
+            },
         )
 
         when (val s = screen) {
@@ -174,6 +184,8 @@ private fun DesktopApp(
                     subtitle = s.subtitle,
                     nextSeason = s.nextSeason,
                     nextEpisode = s.nextEpisode,
+                    updateVersion = (updateState as? UpdateState.Available)?.version,
+                    onUpdateSelected = { bannerOnPlayer = true },
                     isFullscreen = isFullscreen,
                     onToggleFullscreen = onToggleFullscreen,
                     onBack = backFromPlayer,

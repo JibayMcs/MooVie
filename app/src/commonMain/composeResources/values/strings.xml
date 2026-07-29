@@ -83,9 +83,16 @@
     <string name="player_fullscreen_exit">Quitter le plein écran</string>
     <string name="player_error">Lecture impossible — essaie un autre lecteur depuis le panneau Sources.</string>
     <string name="player_vlc_missing">VLC introuvable</string>
-    <string name="player_vlc_help">Le lecteur desktop s\'appuie sur libVLC. Installe VLC puis relance :\nLinux : sudo apt install vlc — Windows/macOS : videolan.org</string>
+    <string name="player_vlc_help">Le lecteur desktop s'appuie sur libVLC. Installe VLC puis relance — Linux : sudo apt install vlc, Windows/macOS : videolan.org</string>
 
     <!-- Mise à jour -->
+    <string name="settings_cat_update">Mises à jour</string>
+    <string name="settings_update_interval">Fréquence de vérification</string>
+    <string name="settings_update_help">Vérifie si une nouvelle version est disponible, à intervalle régulier. Pendant la lecture, l'information s'affiche en pastille discrète plutôt qu'en bandeau. « Jamais » désactive complètement la vérification.</string>
+    <string name="update_never">Jamais</string>
+    <string name="update_every_minutes">Toutes les %1$d min</string>
+    <string name="update_every_hours">Toutes les %1$d h</string>
+    <string name="player_update_chip">Mise à jour v%1$s</string>
     <string name="update_available">Mise à jour v%1$s disponible</string>
     <string name="update_install">Installer</string>
     <string name="update_later">Plus tard</string>
