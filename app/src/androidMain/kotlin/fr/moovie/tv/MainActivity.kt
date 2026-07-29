@@ -149,7 +149,7 @@ class MainActivity : ComponentActivity() {
      */
     private fun handleTmdbKey(intent: Intent?) {
         intent?.getStringExtra("tmdb_key")?.takeIf { it.isNotBlank() }?.let { key ->
-            lifecycleScope.launch { SettingsRepository(applicationContext).setTmdbApiKey(key) }
+            lifecycleScope.launch { SettingsRepository().setTmdbApiKey(key) }
         }
     }
 }

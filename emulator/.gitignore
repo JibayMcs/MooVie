@@ -3,3 +3,4 @@ avd/
 *.log
 *.pid
 *.png
+/graphify-out/

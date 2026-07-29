@@ -25,8 +25,8 @@ import kotlinx.coroutines.launch
  */
 class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
-    private val settings = SettingsRepository(app)
-    private val watchRepo = WatchProgressRepository(app)
+    private val settings = SettingsRepository()
+    private val watchRepo = WatchProgressRepository()
     private val _state = MutableStateFlow<HomeState>(HomeState.Loading)
     val state: StateFlow<HomeState> = _state
 

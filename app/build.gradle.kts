@@ -62,6 +62,9 @@ kotlin {
                 // Images multiplateforme (Coil 3), fetcher réseau OkHttp
                 implementation("io.coil-kt.coil3:coil-compose:3.0.4")
                 implementation("io.coil-kt.coil3:coil-network-okhttp:3.0.4")
+                // Réglages persistants (artefact KMP ; le chemin du fichier est
+                // fourni par expect/actual moovieDataStoreFile)
+                implementation("androidx.datastore:datastore-preferences-core:1.1.1")
             }
         }
 
@@ -87,9 +90,6 @@ kotlin {
                 implementation("androidx.media3:media3-ui:1.4.1")
                 implementation("androidx.media3:media3-datasource-okhttp:1.4.1")
                 implementation("androidx.media3:media3-session:1.4.1")
-
-                // Réglages persistants
-                implementation("androidx.datastore:datastore-preferences:1.1.1")
             }
         }
 

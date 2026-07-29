@@ -19,7 +19,7 @@ import kotlinx.coroutines.launch
 
 class SettingsViewModel(app: Application) : AndroidViewModel(app) {
 
-    private val repo = SettingsRepository(app)
+    private val repo = SettingsRepository()
 
     val tmdbApiKey: StateFlow<String> =
         repo.tmdbApiKey.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "")

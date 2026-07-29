@@ -24,8 +24,8 @@ import kotlinx.coroutines.launch
 @OptIn(FlowPreview::class)
 class SearchViewModel(app: Application) : AndroidViewModel(app) {
 
-    private val settings = SettingsRepository(app)
-    private val historyRepo = SearchHistoryRepository(app)
+    private val settings = SettingsRepository()
+    private val historyRepo = SearchHistoryRepository()
 
     private val _query = MutableStateFlow("")
     val query: StateFlow<String> = _query

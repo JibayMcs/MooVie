@@ -89,9 +89,9 @@ fun PlayerScreen(
     onNextEpisode: (tmdbId: Int, season: Int, episode: Int) -> Unit = { _, _, _ -> },
 ) {
     val context = LocalContext.current
-    val progress = remember { WatchProgressRepository(context) }
+    val progress = remember { WatchProgressRepository() }
     val introRepo = remember { IntroDbRepository() }
-    val settings = remember { SettingsRepository(context) }
+    val settings = remember { SettingsRepository() }
     val skipEnabled by settings.skipIntroOutro.collectAsStateWithLifecycle(initialValue = true)
 
     val player = remember {

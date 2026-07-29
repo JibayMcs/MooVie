@@ -5,6 +5,7 @@ import android.content.Context
 import fr.moovie.tv.data.net.AppDns
 import fr.moovie.tv.data.settings.LocaleManager
 import fr.moovie.tv.data.settings.SettingsRepository
+import fr.moovie.tv.data.store.appContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -24,12 +25,15 @@ class MooVieApp : Application() {
     // résolues côté ViewModel (getApplication().getString(), ex. titres de rangées)
     // resteraient dans la locale système même après un changement de langue.
     override fun attachBaseContext(base: Context) {
+        // Contexte pour les repos jvmCommon (chemin des fichiers DataStore) :
+        // posé ici, avant toute création de ViewModel.
+        appContext = base
         super.attachBaseContext(LocaleManager.wrap(base))
     }
 
     override fun onCreate() {
         super.onCreate()
-        val settings = SettingsRepository(this)
+        val settings = SettingsRepository()
         scope.launch {
             combine(settings.dohEnabled, settings.dohProvider) { enabled, provider ->
                 enabled to provider

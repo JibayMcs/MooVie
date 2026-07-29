@@ -39,7 +39,7 @@ private const val PROVIDER_TIMEOUT_MS = 12000L
 
 class DetailsViewModel(app: Application) : AndroidViewModel(app) {
 
-    private val settings = SettingsRepository(app)
+    private val settings = SettingsRepository()
 
     private val _state = MutableStateFlow<DetailsState>(DetailsState.Loading)
     val state: StateFlow<DetailsState> = _state
@@ -69,7 +69,7 @@ class DetailsViewModel(app: Application) : AndroidViewModel(app) {
     val streamLanguage: StateFlow<StreamLanguage> = settings.streamLanguage
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), StreamLanguage.VF)
 
-    private val watchRepo = WatchProgressRepository(app)
+    private val watchRepo = WatchProgressRepository()
 
     /** Clés marquées vues (badge ✓ sur les épisodes / le film). */
     val watched: StateFlow<Set<String>> = watchRepo.watched
