@@ -35,8 +35,14 @@ object ExtractorRegistry {
 
     fun canResolve(url: String): Boolean = extractorFor(url) != null
 
+    // try/catch défensif : un extracteur qui lève (regex, parsing, réseau) ne doit
+    // pas tuer la boucle de résolution — on passe simplement au lien suivant.
     suspend fun resolve(link: EmbedLink): PlayableStream? =
-        extractorFor(link.url)?.extract(link)
+        try {
+            extractorFor(link.url)?.extract(link)
+        } catch (_: Throwable) {
+            null
+        }
 }
 
 /**

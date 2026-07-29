@@ -6,9 +6,12 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 
 /**
- * Extracteur uqload — port de _extract_uqload_mp4_url (API/proxiesembed/server.py).
- * Normalise l'URL en `embed-<id>.html`, essaie la variante sans `embed-`, puis
- * extrait l'URL `.../v.mp4` du HTML.
+ * Extracteur uqload — port de uqload_utils.py + _extract_uqload_media_url
+ * (commit Movix 4d74237 « restore Fsvid, Vidzy and Uqload extraction »).
+ *
+ * Nouveautés vs l'ancien portage : multi-TLD (uqload.is/.bz/.cx/…), extraction
+ * **HLS** (master.m3u8) en plus du MP4, dé-package Dean Edwards, et en-têtes
+ * Referer/Origin alignés sur le domaine réel du lien.
  */
 class UqloadExtractor(private val http: OkHttpClient) : SourceExtractor {
 
@@ -17,8 +20,10 @@ class UqloadExtractor(private val http: OkHttpClient) : SourceExtractor {
     override fun canHandle(url: String): Boolean = url.contains("uqload", ignoreCase = true)
 
     override suspend fun extract(link: EmbedLink): PlayableStream? = withContext(Dispatchers.IO) {
-        val validated = validateUrl(link.url) ?: return@withContext null
-        val candidates = listOf(validated, validated.replace("embed-", ""))
+        val validated = normalizeEmbedUrl(link.url) ?: return@withContext null
+        val origin = siteOrigin(validated) ?: return@withContext null
+        // On tente l'URL embed puis sa variante sans `/embed-` (page directe).
+        val candidates = listOf(validated, validated.replace("/embed-", "/"))
 
         val html = candidates.firstNotNullOfOrNull { url ->
             runCatching {
@@ -26,38 +31,83 @@ class UqloadExtractor(private val http: OkHttpClient) : SourceExtractor {
                     .url(url)
                     .header("User-Agent", Ua.BROWSER)
                     .header("Accept", "text/html,*/*")
+                    .header("Referer", "$origin/")
+                    .header("Origin", origin)
                     .build()
                 http.newCall(req).execute().use { if (it.isSuccessful) it.body?.string() else null }
             }.getOrNull()
         } ?: return@withContext null
 
         if ("File was deleted" in html) return@withContext null
-        val mp4 = MP4.find(html)?.value ?: return@withContext null
+        val media = extractMediaUrl(html) ?: return@withContext null
+        val isHls = media.contains(".m3u8", ignoreCase = true)
 
         PlayableStream(
-            url = mp4,
-            format = StreamFormat.MP4,
+            url = media,
+            format = if (isHls) StreamFormat.HLS else StreamFormat.MP4,
             headers = mapOf(
-                "Referer" to "https://uqload.net/",
+                "Referer" to "$origin/",
+                "Origin" to origin,
                 "User-Agent" to Ua.BROWSER,
             ),
             language = link.language,
         )
     }
 
-    /** Normalise en `<base>/embed-<id>.html` (port de _validate_uqload_url). */
-    private fun validateUrl(url: String): String? {
-        if (url.length < 12) return null
-        val parts = url.split("/")
-        val base = parts.dropLast(1).joinToString("/").ifEmpty { "https://uqload.bz" }
-        var videoId = parts.last()
-        if (!videoId.contains(".html")) videoId += ".html"
-        if (!videoId.contains("embed-")) videoId = "embed-$videoId"
-        val full = "$base/$videoId"
-        return if (full.contains("uqload")) full else null
+    /** Normalise en `https://<host>/embed-<id>.html`, ou null si domaine non autorisé. */
+    private fun normalizeEmbedUrl(raw: String): String? {
+        val url = raw.trim()
+        val host = hostOf(url) ?: return null
+        if (rootOf(host) == null) return null
+        val last = url.substringBefore('?').substringBefore('#').trimEnd('/').substringAfterLast('/')
+        val id = last.replace(EMBED_PREFIX, "").replace(HTML_SUFFIX, "")
+        if (!VIDEO_ID.matches(id)) return null
+        return "https://$host/embed-$id.html"
+    }
+
+    private fun siteOrigin(url: String): String? = rootOf(hostOf(url))?.let { "https://$it" }
+
+    /** Collecte les URLs uqload (HTML brut + script dé-packé) et privilégie le HLS. */
+    private fun extractMediaUrl(html: String): String? {
+        val candidates = mutableListOf<String>()
+        collectUrls(html, candidates)
+        PackedJs.unpackHtml(html)?.let { collectUrls(it, candidates) }
+        for (pat in MEDIA_PRIORITY) {
+            candidates.firstOrNull { pat.containsMatchIn(it) }?.let { return it }
+        }
+        return null
+    }
+
+    private fun collectUrls(text: String, out: MutableList<String>) {
+        val norm = text.replace("""\/""", "/")
+        for (m in HTTPS_URL.findAll(norm)) {
+            val c = m.value.trimEnd(')', ',', ';')
+            if (rootOf(hostOf(c)) != null) out.add(c)
+        }
+    }
+
+    private fun hostOf(url: String): String? =
+        HOST.find(url)?.groupValues?.get(1)?.lowercase()?.trimEnd('.')
+
+    private fun rootOf(host: String?): String? {
+        if (host == null) return null
+        return ROOT_DOMAINS.firstOrNull { host == it || host.endsWith(".$it") }
     }
 
     companion object {
-        private val MP4 = Regex("""https?://[^\s"']+/v\.mp4""")
+        private val ROOT_DOMAINS = listOf(
+            "uqload.is", "uqload.bz", "uqload.cx", "uqload.com",
+            "uqload.net", "uqload.org", "uqload.to", "uqload.io", "uqload.co",
+        )
+        private val HOST = Regex("""^https://([^/:]+)""", RegexOption.IGNORE_CASE)
+        private val EMBED_PREFIX = Regex("""^embed-""", RegexOption.IGNORE_CASE)
+        private val HTML_SUFFIX = Regex("""\.html$""", RegexOption.IGNORE_CASE)
+        private val VIDEO_ID = Regex("""^[a-z0-9_-]+$""", RegexOption.IGNORE_CASE)
+        private val HTTPS_URL = Regex("""https://[^\s"'\\<>]+""", RegexOption.IGNORE_CASE)
+        private val MEDIA_PRIORITY = listOf(
+            Regex("""/master\.m3u8([?#]|$)""", RegexOption.IGNORE_CASE),
+            Regex("""\.m3u8([?#]|$)""", RegexOption.IGNORE_CASE),
+            Regex("""/v\.mp4([?#]|$)""", RegexOption.IGNORE_CASE),
+        )
     }
 }

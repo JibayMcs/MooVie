@@ -41,8 +41,7 @@ class FstreamProvider(private val http: OkHttpClient) : SourceProvider {
         season: Int,
         episode: Int,
     ): List<EmbedLink> = withContext(Dispatchers.IO) {
-        val query = "$title - Saison $season"
-        val page = searchBestMatch(query, year, season = season) ?: return@withContext emptyList()
+        val page = searchBestMatch(title, year, season = season) ?: return@withContext emptyList()
         val pageId = extractPageId(page.link) ?: return@withContext emptyList()
         episodePlayers(pageId, page.link, episode)
     }
@@ -51,14 +50,40 @@ class FstreamProvider(private val http: OkHttpClient) : SourceProvider {
 
     private data class SearchResult(val title: String, val link: String, val year: String?, val season: Int?)
 
-    private fun searchBestMatch(query: String, year: String?, season: Int?): SearchResult? {
-        val results = search(query)
+    /**
+     * Choisit le meilleur résultat pour un titre donné. On matche D'ABORD le titre
+     * (le nom de base, année/saison retirées) : sans ça, chercher « Dune » et filtrer
+     * uniquement par année 2021 renvoyait « Dune Dreams (2021) » — un autre film.
+     * On départage ensuite par saison (séries) puis par année.
+     */
+    private fun searchBestMatch(title: String, year: String?, season: Int?): SearchResult? {
+        val results = search(title)
         if (results.isEmpty()) return null
-        val bySeason = if (season != null) results.filter { it.season == null || it.season == season } else results
-        val pool = bySeason.ifEmpty { results }
-        // Priorité à l'année si connue, sinon premier résultat.
-        return year?.let { y -> pool.firstOrNull { it.year == y } } ?: pool.first()
+        val target = normalizeTitle(title)
+        // 1) titres dont le nom de base correspond exactement ; sinon repli sur tout.
+        val titled = results.filter { baseTitle(it.title) == target }
+        val pool = titled.ifEmpty { results }
+        // 2) filtre saison (séries).
+        val bySeason = if (season != null) pool.filter { it.season == null || it.season == season } else pool
+        val pool2 = bySeason.ifEmpty { pool }
+        // 3) préférence à l'année, sinon premier.
+        return year?.let { y -> pool2.firstOrNull { it.year == y } } ?: pool2.first()
     }
+
+    /** Nom de base d'un titre de résultat : retire « (2021) » et « - Saison N ». */
+    private fun baseTitle(raw: String): String {
+        val noYear = raw.substringBefore(" (")
+        val noSeason = SEASON_SUFFIX.replace(noYear, "")
+        return normalizeTitle(noSeason)
+    }
+
+    /** Normalise pour comparaison : sans accents, minuscules, alphanumérique seulement. */
+    private fun normalizeTitle(s: String): String =
+        java.text.Normalizer.normalize(s, java.text.Normalizer.Form.NFD)
+            .replace(Regex("""\p{Mn}+"""), "")
+            .lowercase()
+            .replace(Regex("""[^a-z0-9]+"""), " ")
+            .trim()
 
     private fun search(query: String): List<SearchResult> {
         val body = FormBody.Builder().add("query", query).add("page", "1").build()
@@ -173,6 +198,7 @@ class FstreamProvider(private val http: OkHttpClient) : SourceProvider {
         private val YEAR_PAREN = Regex("""\((\d{4})\)""")
         private val YEAR_URL = Regex("""-(\d{4})\.html""")
         private val SEASON = Regex("""Saison\s+(\d+)""", RegexOption.IGNORE_CASE)
+        private val SEASON_SUFFIX = Regex("""\s*-\s*Saison\s+\d+.*$""", RegexOption.IGNORE_CASE)
         private val PAGE_ID = Regex("""/(\d+)-[^/]+\.html""")
     }
 }
