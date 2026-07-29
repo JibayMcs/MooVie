@@ -10,6 +10,10 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization")
 }
 
+// Version unique Android + desktop (l'updater compare les tags GitHub à cette
+// valeur ; côté desktop elle est injectée en propriété système moovie.version).
+val appVersion = "1.0.6"
+
 // Signature release : keystore.properties en local (gitignoré), variables
 // d'environnement en CI (KEYSTORE_FILE / KEYSTORE_PASSWORD / KEY_ALIAS).
 val keystoreProps = Properties().apply {
@@ -101,6 +105,8 @@ kotlin {
             dependencies {
                 implementation(compose.desktop.currentOs)
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.9.0")
+                // Lecture vidéo desktop via libVLC (VLC doit être installé)
+                implementation("uk.co.caprica:vlcj:4.8.3")
             }
         }
     }
@@ -115,7 +121,7 @@ android {
         minSdk = 23
         targetSdk = 34
         versionCode = 8
-        versionName = "1.0.6"
+        versionName = appVersion
     }
 
     signingConfigs {
@@ -159,12 +165,16 @@ compose.resources {
 compose.desktop {
     application {
         mainClass = "fr.moovie.tv.desktop.MainKt"
+        // Version lue au runtime par l'updater desktop (bannière de mise à jour).
+        jvmArgs += "-Dmoovie.version=$appVersion"
 
         nativeDistributions {
             targetFormats(TargetFormat.Deb, TargetFormat.Msi, TargetFormat.Dmg)
             packageName = "Moo-vie"
-            packageVersion = "1.0.5"
+            packageVersion = appVersion
             description = "Moo-vie — streaming, extraction de sources on-device"
+            // JNA (vlcj) a besoin de sun.misc.Unsafe dans l'image jpackage.
+            modules("jdk.unsupported")
         }
     }
 }

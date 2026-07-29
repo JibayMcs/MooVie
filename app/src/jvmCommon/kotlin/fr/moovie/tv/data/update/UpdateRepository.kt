@@ -18,6 +18,7 @@ data class GithubAsset(
 @Serializable
 data class GithubRelease(
     @SerialName("tag_name") val tagName: String,
+    @SerialName("html_url") val htmlUrl: String = "",
     val assets: List<GithubAsset> = emptyList(),
     val prerelease: Boolean = false,
     val draft: Boolean = false,

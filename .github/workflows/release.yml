@@ -1,7 +1,8 @@
-name: Release APK
+name: Release
 
-# Publie un APK signé en GitHub Release à chaque tag vX.Y.Z.
-# L'auto-updater in-app lit releases/latest pour proposer la mise à jour.
+# Publie à chaque tag vX.Y.Z : APK Android signé + paquets desktop natifs
+# (deb Linux, msi Windows, dmg macOS) sur la même GitHub Release.
+# L'auto-updater in-app (Android et desktop) lit releases/latest.
 on:
   push:
     tags: ['v*']
@@ -10,7 +11,7 @@ permissions:
   contents: write
 
 jobs:
-  release:
+  apk:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -35,8 +36,46 @@ jobs:
       - name: Renommer l'APK
         run: cp app/build/outputs/apk/release/app-release.apk moovie-${{ github.ref_name }}.apk
 
-      - name: Créer la release GitHub
+      - name: Publier sur la release GitHub
         uses: softprops/action-gh-release@v2
         with:
           files: moovie-*.apk
+          generate_release_notes: true
+
+  desktop:
+    strategy:
+      # Un OS en échec ne bloque pas les autres paquets.
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            ext: deb
+          - os: windows-latest
+            ext: msi
+          - os: macos-latest
+            ext: dmg
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build paquet desktop (${{ matrix.ext }})
+        run: ./gradlew packageDistributionForCurrentOS --no-daemon
+
+      - name: Renommer le paquet
+        shell: bash
+        run: |
+          src=$(find app/build/compose/binaries -name "*.${{ matrix.ext }}" | head -1)
+          cp "$src" "moovie-${{ github.ref_name }}.${{ matrix.ext }}"
+
+      - name: Publier sur la release GitHub
+        uses: softprops/action-gh-release@v2
+        with:
+          files: moovie-*.${{ matrix.ext }}
           generate_release_notes: true

@@ -9,6 +9,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -22,6 +23,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
+import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import fr.moovie.tv.data.net.AppDns
@@ -29,6 +31,7 @@ import fr.moovie.tv.data.settings.SettingsRepository
 import fr.moovie.tv.ui.components.MoovieButton
 import fr.moovie.tv.ui.navigation.Screen
 import fr.moovie.tv.ui.theme.MooVieTheme
+import fr.moovie.tv.ui.update.UpdateBanner
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -53,21 +56,35 @@ fun main() {
     }
 
     application {
-        var screen: Screen by remember { mutableStateOf(Screen.Home) }
+        // Crochet de dev : MOOVIE_TEST_STREAM=<url> ouvre directement le lecteur
+        // (test du pipeline VLCJ sans dépendre des hébergeurs).
+        val testStream = remember { System.getenv("MOOVIE_TEST_STREAM") }
+        var screen: Screen by remember {
+            mutableStateOf(if (testStream.isNullOrBlank()) Screen.Home else Screen.Player(testStream))
+        }
         // Retour arrière piloté par l'écran courant (Échap) — le panneau des
         // sources de la fiche est fermé par son propre wrapper.
         var backHandler: (() -> Unit)? by remember { mutableStateOf(null) }
+        val windowState = rememberWindowState(width = 1280.dp, height = 720.dp)
+        val isFullscreen = windowState.placement == WindowPlacement.Fullscreen
 
         Window(
             onCloseRequest = ::exitApplication,
             title = "Moo-vie",
-            state = rememberWindowState(width = 1280.dp, height = 720.dp),
+            state = windowState,
             onPreviewKeyEvent = { event ->
-                if (event.type == KeyEventType.KeyDown && event.key == Key.Escape && screen != Screen.Home) {
-                    backHandler?.invoke() ?: run { screen = Screen.Home }
-                    true
-                } else {
-                    false
+                if (event.type != KeyEventType.KeyDown || event.key != Key.Escape) return@Window false
+                // Échap quitte d'abord le plein écran, puis fait retour.
+                when {
+                    isFullscreen -> {
+                        windowState.placement = WindowPlacement.Floating
+                        true
+                    }
+                    screen != Screen.Home -> {
+                        backHandler?.invoke() ?: run { screen = Screen.Home }
+                        true
+                    }
+                    else -> false
                 }
             },
         ) {
@@ -76,6 +93,11 @@ fun main() {
                     screen = screen,
                     onNavigate = { screen = it },
                     onRegisterBack = { backHandler = it },
+                    isFullscreen = isFullscreen,
+                    onToggleFullscreen = {
+                        windowState.placement =
+                            if (isFullscreen) WindowPlacement.Floating else WindowPlacement.Fullscreen
+                    },
                 )
             }
         }
@@ -87,8 +109,23 @@ private fun DesktopApp(
     screen: Screen,
     onNavigate: (Screen) -> Unit,
     onRegisterBack: ((() -> Unit)?) -> Unit,
+    isFullscreen: Boolean,
+    onToggleFullscreen: () -> Unit,
 ) {
+    // Fiche d'origine de la lecture en cours : le retour du lecteur revient
+    // dessus (sans relancer l'auto-lecture) au lieu de l'accueil.
+    var lastDetails by remember { mutableStateOf<Screen.Details?>(null) }
+
     Column(modifier = Modifier.fillMaxSize().background(Color(0xFF0A0A0A))) {
+        // Bannière de mise à jour : tout en haut, sur toutes les pages.
+        val updateViewModel = remember { DesktopUpdateViewModel() }
+        val updateState by updateViewModel.state.collectAsState()
+        UpdateBanner(
+            state = updateState,
+            onInstall = updateViewModel::install,
+            onDismiss = updateViewModel::dismiss,
+        )
+
         when (val s = screen) {
             Screen.Home -> DesktopHomeScreen(
                 onOpenTitle = { id, isTv -> onNavigate(Screen.Details(id, isTv)) },
@@ -112,36 +149,31 @@ private fun DesktopApp(
             )
             is Screen.Details -> DesktopDetailsScreen(
                 params = s,
-                onPlay = { url, headers, key, subs -> onNavigate(Screen.Player(url, headers, key, subs)) },
+                onPlay = { url, headers, key, subs ->
+                    lastDetails = s.copy(autoSources = false)
+                    onNavigate(Screen.Player(url, headers, key, subs))
+                },
                 onBack = { onNavigate(Screen.Home) },
                 onRegisterBack = onRegisterBack,
             )
-            is Screen.Player -> PlayerPlaceholder(
-                streamUrl = s.streamUrl,
-                onBack = { onNavigate(Screen.Home) },
-            )
+            is Screen.Player -> {
+                val backFromPlayer = { onNavigate(lastDetails ?: Screen.Home) }
+                LaunchedEffect(s) { onRegisterBack(backFromPlayer) }
+                DesktopPlayerScreen(
+                    streamUrl = s.streamUrl,
+                    headers = s.headers,
+                    mediaKey = s.mediaKey,
+                    subtitles = s.subtitles,
+                    isFullscreen = isFullscreen,
+                    onToggleFullscreen = onToggleFullscreen,
+                    onBack = backFromPlayer,
+                )
+            }
         }
     }
-    // Hors fiche, Échap revient simplement à l'accueil.
+    // Hors fiche et lecteur, Échap revient simplement à l'accueil.
     LaunchedEffect(screen) {
-        if (screen !is Screen.Details) onRegisterBack(null)
+        if (screen !is Screen.Details && screen !is Screen.Player) onRegisterBack(null)
     }
 }
 
-/** Écran d'attente du lecteur desktop (VLCJ à venir — chantier player). */
-@Composable
-private fun PlayerPlaceholder(streamUrl: String, onBack: () -> Unit) {
-    Column(
-        modifier = Modifier.fillMaxSize().padding(48.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text("Lecteur desktop à venir (VLCJ)", style = MaterialTheme.typography.headlineMedium)
-        Text(
-            "Flux résolu : $streamUrl",
-            style = MaterialTheme.typography.bodySmall,
-            color = Color(0xFF9A9A9A),
-        )
-        MoovieButton(onClick = onBack) { Text("Retour") }
-    }
-}

@@ -184,5 +184,6 @@ internal fun DesktopDetailsScreen(
         onPickSource = vm::play,
         onDismissQuickPlay = vm::dismissQuickPlay,
         onBack = onBack,
+        showBackButton = true,
     )
 }

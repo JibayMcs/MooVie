@@ -34,6 +34,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.CircularProgressIndicator
@@ -116,6 +117,9 @@ fun DetailsScreenContent(
     onPickSource: (EmbedLink) -> Unit,
     onDismissQuickPlay: () -> Unit,
     onBack: () -> Unit,
+    // Desktop uniquement : bouton retour à l'écran (sur TV, la télécommande a
+    // sa propre touche Retour, pas besoin d'un bouton).
+    showBackButton: Boolean = false,
 ) {
     val primaryFocus = remember { FocusRequester() }
     LaunchedEffect(state) {
@@ -145,8 +149,12 @@ fun DetailsScreenContent(
         // Scroll pleine largeur + marges portées par les enfants : les éléments
         // agrandis au focus débordent dans la marge au lieu d'être rognés.
         val hPad = Modifier.padding(horizontal = 48.dp)
+        // Marge haute agrandie sur desktop pour que le titre passe sous le
+        // bouton retour en overlay (sinon ils se chevauchent).
+        val topPad = if (showBackButton) 96.dp else 48.dp
         Column(
-            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(vertical = 48.dp),
+            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+                .padding(top = topPad, bottom = 48.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             when (val s = state) {
@@ -271,6 +279,17 @@ fun DetailsScreenContent(
                     }
                 }
             }
+        }
+
+        // Bouton retour desktop, en overlay haut-gauche (masqué quand le panneau
+        // des sources est ouvert : Échap/clic-extérieur le ferme d'abord).
+        if (showBackButton && !panelVisible) {
+            MoovieIconButton(
+                onClick = onBack,
+                icon = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = stringResource(Res.string.common_back),
+                modifier = Modifier.align(Alignment.TopStart).padding(24.dp),
+            )
         }
 
         // Panneau des sources : s'ouvre dès le clic, se remplit en streaming.
