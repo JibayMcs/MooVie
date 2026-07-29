@@ -1,5 +1,6 @@
 package fr.moovie.tv.ui.details
 
+import androidx.compose.ui.res.stringResource
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.RepeatMode
@@ -64,6 +65,7 @@ import coil.compose.AsyncImage
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import fr.moovie.tv.R
 import fr.moovie.tv.data.settings.StreamLanguage
 import fr.moovie.tv.data.sources.EmbedLink
 import fr.moovie.tv.data.tmdb.CastMember
@@ -159,10 +161,10 @@ fun DetailsScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             when (val s = state) {
-                DetailsState.Loading -> Text("Chargement…", modifier = hPad)
+                DetailsState.Loading -> Text(stringResource(R.string.common_loading), modifier = hPad)
                 is DetailsState.Error -> {
                     Text(s.message, modifier = hPad)
-                    MoovieButton(onClick = onBack, modifier = hPad) { Text("Retour") }
+                    MoovieButton(onClick = onBack, modifier = hPad) { Text(stringResource(R.string.common_back)) }
                 }
                 is DetailsState.Movie -> {
                     val movieWatched = viewModel.movieKey() in watched
@@ -174,7 +176,7 @@ fun DetailsScreen(
                         Text(s.details.title, style = MaterialTheme.typography.headlineMedium)
                         if (movieWatched) WatchedBadge()
                     }
-                    s.details.year?.let { Text("$it • ${s.details.runtime ?: "?"} min", modifier = hPad) }
+                    s.details.year?.let { Text(stringResource(R.string.details_runtime, it, s.details.runtime?.toString() ?: "?"), modifier = hPad) }
                     Text(s.details.overview, style = MaterialTheme.typography.bodyMedium, modifier = hPad)
                     CastRow(s.details.credits?.cast.orEmpty())
 
@@ -206,10 +208,10 @@ fun DetailsScreen(
                                         modifier = Modifier.size(14.dp),
                                     )
                                     Spacer(Modifier.width(8.dp))
-                                    Text("Lecture…")
+                                    Text(stringResource(R.string.details_playing))
                                 }
                                 prefReady -> Text(
-                                    if (resume.containsKey(viewModel.movieKey())) "▶  Reprendre" else "▶  Lire",
+                                    if (resume.containsKey(viewModel.movieKey())) stringResource(R.string.details_resume) else stringResource(R.string.details_play),
                                 )
                                 loadingSources -> {
                                     CircularProgressIndicator(
@@ -218,17 +220,17 @@ fun DetailsScreen(
                                         modifier = Modifier.size(14.dp),
                                     )
                                     Spacer(Modifier.width(8.dp))
-                                    Text("Recherche ${streamLang.name}…")
+                                    Text(stringResource(R.string.details_searching, streamLang.name))
                                 }
-                                else -> Text("${streamLang.name} indisponible", color = Color(0xFF8A8A8A))
+                                else -> Text(stringResource(R.string.details_lang_unavailable, streamLang.name), color = Color(0xFF8A8A8A))
                             }
                         }
-                        MoovieButton(onClick = { viewModel.openPanel() }) { Text("Sources") }
+                        MoovieButton(onClick = { viewModel.openPanel() }) { Text(stringResource(R.string.details_sources)) }
                         // Œil = marquer vu / non vu (outline verte quand vu).
                         MoovieIconButton(
                             onClick = { viewModel.toggleWatched(viewModel.movieKey()) },
                             icon = if (movieWatched) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                            contentDescription = if (movieWatched) "Marquer non vu" else "Marquer comme vu",
+                            contentDescription = if (movieWatched) stringResource(R.string.mark_unwatched) else stringResource(R.string.mark_watched),
                             selected = movieWatched,
                         )
                     }
@@ -239,7 +241,7 @@ fun DetailsScreen(
                     Text(s.details.overview, style = MaterialTheme.typography.bodyMedium, maxLines = 4, overflow = TextOverflow.Ellipsis, modifier = hPad)
                     val seasonAllWatched = s.episodes.isNotEmpty() &&
                         s.episodes.all { viewModel.episodeKey(s.season, it.episodeNumber) in watched }
-                    Text("Saisons", style = MaterialTheme.typography.titleMedium, modifier = hPad)
+                    Text(stringResource(R.string.details_seasons), style = MaterialTheme.typography.titleMedium, modifier = hPad)
                     LazyRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         contentPadding = PaddingValues(horizontal = 48.dp),
@@ -258,12 +260,12 @@ fun DetailsScreen(
                             MoovieIconButton(
                                 onClick = { viewModel.toggleSeasonWatched() },
                                 icon = if (seasonAllWatched) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                                contentDescription = if (seasonAllWatched) "Marquer la saison non vue" else "Marquer la saison vue",
+                                contentDescription = if (seasonAllWatched) stringResource(R.string.mark_season_unwatched) else stringResource(R.string.mark_season_watched),
                                 selected = seasonAllWatched,
                             )
                         }
                     }
-                    Text("Épisodes (saison ${s.season})", style = MaterialTheme.typography.titleMedium, modifier = hPad)
+                    Text(stringResource(R.string.details_episodes_season, s.season), style = MaterialTheme.typography.titleMedium, modifier = hPad)
                     s.episodes.forEach { ep ->
                         val key = viewModel.episodeKey(s.season, ep.episodeNumber)
                         Box(modifier = hPad) {
@@ -328,10 +330,10 @@ fun DetailsScreen(
                             strokeWidth = 2.dp,
                             modifier = Modifier.size(16.dp),
                         )
-                        Text("Recherche d'une source… ${q.label}", style = MaterialTheme.typography.bodyMedium)
+                        Text(stringResource(R.string.details_searching_source, q.label), style = MaterialTheme.typography.bodyMedium)
                     }
                     is QuickPlayState.Unavailable -> Text(
-                        q.label,
+                        stringResource(R.string.details_lang_unavailable, q.lang),
                         style = MaterialTheme.typography.bodyMedium,
                         color = Color(0xFFE0A0A0),
                     )
@@ -372,7 +374,7 @@ private fun SourcesSlideOver(
             .padding(vertical = 28.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("Sources", style = MaterialTheme.typography.titleLarge, modifier = pPad)
+        Text(stringResource(R.string.details_sources), style = MaterialTheme.typography.titleLarge, modifier = pPad)
 
         // Barre de progression tant qu'au moins un provider charge.
         if (state.anyLoading) {
@@ -389,7 +391,7 @@ private fun SourcesSlideOver(
         }
         if (prefMissing) {
             Text(
-                "Aucune source en ${preferred.name} — autres langues disponibles.",
+                stringResource(R.string.details_lang_missing, preferred.name),
                 style = MaterialTheme.typography.labelMedium,
                 color = Color(0xFFE0A0A0),
                 modifier = pPad,
@@ -400,7 +402,7 @@ private fun SourcesSlideOver(
         when {
             links.isEmpty() && state.anyLoading -> SkeletonRows(modifier = pPad)
             links.isEmpty() -> Text(
-                "Aucune source disponible pour ce titre.",
+                stringResource(R.string.details_no_sources),
                 color = Color(0xFFE0A0A0),
                 modifier = pPad,
             )
@@ -567,7 +569,7 @@ private fun CastRow(cast: List<CastMember>) {
     val members = cast.take(15)
     if (members.isEmpty()) return
     Column {
-        Text("Casting", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 48.dp))
+        Text(stringResource(R.string.details_cast), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 48.dp))
         Spacer(Modifier.height(8.dp))
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(16.dp),

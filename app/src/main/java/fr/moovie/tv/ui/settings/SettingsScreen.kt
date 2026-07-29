@@ -1,5 +1,7 @@
 package fr.moovie.tv.ui.settings
 
+import android.app.Activity
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -10,14 +12,31 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.RoundedCornerShape as RoundedShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.key.Key
@@ -25,30 +44,27 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.background
-import androidx.compose.foundation.shape.RoundedCornerShape as RoundedShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.PowerSettingsNew
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import fr.moovie.tv.ui.components.MoovieButton
-import fr.moovie.tv.ui.components.MoovieIconButton
+import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import fr.moovie.tv.R
 import fr.moovie.tv.data.net.DohProvider
-import fr.moovie.tv.data.settings.StreamLanguage
+import fr.moovie.tv.data.settings.AppLanguage
+import fr.moovie.tv.data.settings.LocaleManager
+import fr.moovie.tv.ui.components.MoovieButton
+import fr.moovie.tv.ui.components.MoovieIconButton
 
 /**
- * Écran de réglages, groupé par catégories. V1 : API (clé TMDB), Lecture
- * (langue de stream), Langue d'interface. À étendre (Sources & hébergeurs,
- * Interface, Données) au fil du portage.
+ * Écran de réglages, groupé par catégories : API (clé TMDB), Lecture & Langue
+ * (langue de stream + langue de l'app), Intro/générique, Réseau (DNS), Sources.
  */
 @Composable
 fun SettingsScreen(
@@ -57,7 +73,6 @@ fun SettingsScreen(
 ) {
     val apiKey by viewModel.tmdbApiKey.collectAsStateWithLifecycle()
     val streamLang by viewModel.streamLanguage.collectAsStateWithLifecycle()
-    val uiLang by viewModel.uiLanguage.collectAsStateWithLifecycle()
     val providers by viewModel.providers.collectAsStateWithLifecycle()
     val dohEnabled by viewModel.dohEnabled.collectAsStateWithLifecycle()
     val dohProvider by viewModel.dohProvider.collectAsStateWithLifecycle()
@@ -69,21 +84,18 @@ fun SettingsScreen(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(48.dp),
         verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
-        Text("Réglages", style = MaterialTheme.typography.headlineMedium)
+        Text(stringResource(R.string.settings_title), style = MaterialTheme.typography.headlineMedium)
 
-        SettingsCategory("API & Clés") {
-            Text("Clé API TMDB", style = MaterialTheme.typography.titleMedium)
+        SettingsCategory(stringResource(R.string.settings_cat_api)) {
+            Text(stringResource(R.string.settings_tmdb_key), style = MaterialTheme.typography.titleMedium)
             ApiKeyField(value = apiKey, onValueChange = viewModel::setTmdbApiKey)
-            Text(
-                "Crée une clé gratuite sur themoviedb.org (API v3).",
-                style = MaterialTheme.typography.bodySmall,
-            )
+            Text(stringResource(R.string.settings_tmdb_help), style = MaterialTheme.typography.bodySmall)
         }
 
-        SettingsCategory("Lecture & Langue") {
-            Text("Langue du stream par défaut", style = MaterialTheme.typography.titleMedium)
+        SettingsCategory(stringResource(R.string.settings_cat_playback)) {
+            Text(stringResource(R.string.settings_stream_lang), style = MaterialTheme.typography.titleMedium)
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                StreamLanguage.entries.forEach { lang ->
+                fr.moovie.tv.data.settings.StreamLanguage.entries.forEach { lang ->
                     MoovieButton(
                         onClick = { viewModel.setStreamLanguage(lang) },
                         selected = lang == streamLang,
@@ -91,24 +103,53 @@ fun SettingsScreen(
                 }
             }
             Spacer(Modifier.height(8.dp))
-            Text("Langue de l'interface (TMDB)", style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.settings_language), style = MaterialTheme.typography.titleMedium)
+            LanguageSelector()
+        }
+
+        SettingsCategory(stringResource(R.string.settings_cat_intro)) {
+            Text(stringResource(R.string.settings_intro_help), style = MaterialTheme.typography.bodySmall)
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                listOf("fr-FR" to "Français", "en-US" to "English").forEach { (code, label) ->
-                    MoovieButton(
-                        onClick = { viewModel.setUiLanguage(code) },
-                        selected = code == uiLang,
-                    ) { Text(label) }
+                MoovieButton(
+                    onClick = { viewModel.setSkipIntroOutro(true) },
+                    selected = skipIntroOutro,
+                ) { Text(stringResource(R.string.common_enabled)) }
+                MoovieButton(
+                    onClick = { viewModel.setSkipIntroOutro(false) },
+                    selected = !skipIntroOutro,
+                ) { Text(stringResource(R.string.common_disabled)) }
+            }
+        }
+
+        SettingsCategory(stringResource(R.string.settings_cat_dns)) {
+            Text(stringResource(R.string.settings_dns_help), style = MaterialTheme.typography.bodySmall)
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                MoovieButton(
+                    onClick = { viewModel.setDohEnabled(true) },
+                    selected = dohEnabled,
+                ) { Text(stringResource(R.string.settings_doh_on)) }
+                MoovieButton(
+                    onClick = { viewModel.setDohEnabled(false) },
+                    selected = !dohEnabled,
+                ) { Text(stringResource(R.string.settings_doh_off)) }
+            }
+            if (dohEnabled) {
+                Spacer(Modifier.height(8.dp))
+                Text(stringResource(R.string.settings_doh_resolver), style = MaterialTheme.typography.titleMedium)
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    DohProvider.entries.forEach { provider ->
+                        MoovieButton(
+                            onClick = { viewModel.setDohProvider(provider) },
+                            selected = provider == dohProvider,
+                        ) { Text(provider.label) }
+                    }
                 }
             }
         }
 
-        SettingsCategory("Sources & hébergeurs") {
-            Text(
-                "Ordre = priorité de lecture (le premier est essayé d'abord).",
-                style = MaterialTheme.typography.bodySmall,
-            )
-            // Liste « stripped » : nom à gauche, actions icône à droite
-            // (monter / descendre / activer-désactiver).
+        SettingsCategory(stringResource(R.string.settings_cat_sources)) {
+            Text(stringResource(R.string.settings_sources_help), style = MaterialTheme.typography.bodySmall)
+            // Liste « stripped » : nom à gauche, actions icône à droite.
             providers.forEachIndexed { index, p ->
                 Row(
                     modifier = Modifier
@@ -129,20 +170,22 @@ fun SettingsScreen(
                             MoovieIconButton(
                                 onClick = { viewModel.moveProviderUp(p.name) },
                                 icon = Icons.Default.KeyboardArrowUp,
-                                contentDescription = "Monter ${p.name}",
+                                contentDescription = stringResource(R.string.settings_move_up, p.name),
                             )
                         }
                         if (index < providers.lastIndex) {
                             MoovieIconButton(
                                 onClick = { viewModel.moveProviderDown(p.name) },
                                 icon = Icons.Default.KeyboardArrowDown,
-                                contentDescription = "Descendre ${p.name}",
+                                contentDescription = stringResource(R.string.settings_move_down, p.name),
                             )
                         }
                         MoovieIconButton(
                             onClick = { viewModel.toggleProvider(p.name, !p.enabled) },
                             icon = Icons.Default.PowerSettingsNew,
-                            contentDescription = if (p.enabled) "Désactiver ${p.name}" else "Activer ${p.name}",
+                            contentDescription = if (p.enabled)
+                                stringResource(R.string.settings_disable, p.name)
+                            else stringResource(R.string.settings_enable, p.name),
                             selected = p.enabled,
                         )
                     }
@@ -150,56 +193,72 @@ fun SettingsScreen(
             }
         }
 
-        SettingsCategory("Intro & générique") {
-            Text(
-                "Affiche des boutons « Passer l'intro / le générique » pendant la lecture " +
-                    "(données TheIntroDB). Passer le générique enchaîne l'épisode suivant (série) " +
-                    "ou revient à l'accueil (film).",
-                style = MaterialTheme.typography.bodySmall,
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                MoovieButton(
-                    onClick = { viewModel.setSkipIntroOutro(true) },
-                    selected = skipIntroOutro,
-                ) { Text("Activé") }
-                MoovieButton(
-                    onClick = { viewModel.setSkipIntroOutro(false) },
-                    selected = !skipIntroOutro,
-                ) { Text("Désactivé") }
-            }
-        }
+        MoovieButton(onClick = onBack) { Text(stringResource(R.string.common_back)) }
+    }
+}
 
-        SettingsCategory("Réseau (DNS)") {
-            Text(
-                "Les domaines des sources sont souvent bloqués par DNS chez les FAI. " +
-                    "Le DNS-over-HTTPS (DoH) contourne ce blocage. Laisse activé si les sources restent introuvables.",
-                style = MaterialTheme.typography.bodySmall,
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                MoovieButton(
-                    onClick = { viewModel.setDohEnabled(true) },
-                    selected = dohEnabled,
-                ) { Text("DoH activé") }
-                MoovieButton(
-                    onClick = { viewModel.setDohEnabled(false) },
-                    selected = !dohEnabled,
-                ) { Text("DNS système") }
-            }
-            if (dohEnabled) {
-                Spacer(Modifier.height(8.dp))
-                Text("Résolveur", style = MaterialTheme.typography.titleMedium)
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    DohProvider.entries.forEach { provider ->
-                        MoovieButton(
-                            onClick = { viewModel.setDohProvider(provider) },
-                            selected = provider == dohProvider,
-                        ) { Text(provider.label) }
+/** Libellé traduit d'une langue de l'app. */
+@Composable
+private fun languageLabel(language: AppLanguage): String = stringResource(
+    when (language) {
+        AppLanguage.SYSTEM -> R.string.language_system
+        AppLanguage.FRENCH -> R.string.language_fr
+        AppLanguage.ENGLISH -> R.string.language_en
+        AppLanguage.SPANISH -> R.string.language_es
+    },
+)
+
+/**
+ * Sélecteur de langue « select » : un bouton affichant la langue courante ouvre
+ * une liste modale des options. Choisir applique la locale et recrée l'activité.
+ */
+@Composable
+private fun LanguageSelector() {
+    val context = LocalContext.current
+    var open by remember { mutableStateOf(false) }
+    val current = remember { LocaleManager.current(context) }
+
+    MoovieButton(onClick = { open = true }) {
+        Text(languageLabel(current))
+        Spacer(Modifier.width(8.dp))
+        Icon(Icons.Default.ArrowDropDown, contentDescription = null, modifier = Modifier.size(20.dp))
+    }
+
+    if (open) {
+        val firstFocus = remember { FocusRequester() }
+        Dialog(onDismissRequest = { open = false }) {
+            Column(
+                modifier = Modifier
+                    .clip(RoundedShape(14.dp))
+                    .background(Color(0xF5161616))
+                    .padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(stringResource(R.string.settings_language), style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.height(4.dp))
+                AppLanguage.entries.forEachIndexed { index, language ->
+                    val selected = language == current
+                    MoovieButton(
+                        onClick = {
+                            LocaleManager.set(context, language)
+                            open = false
+                            (context as? Activity)?.recreate()
+                        },
+                        selected = selected,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .then(if (index == 0) Modifier.focusRequester(firstFocus) else Modifier),
+                    ) {
+                        if (selected) {
+                            Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(8.dp))
+                        }
+                        Text(languageLabel(language))
                     }
                 }
             }
         }
-
-        MoovieButton(onClick = onBack) { Text("Retour") }
+        LaunchedEffect(Unit) { runCatching { firstFocus.requestFocus() } }
     }
 }
 
@@ -222,7 +281,7 @@ private fun ApiKeyField(value: String, onValueChange: (String) -> Unit) {
             .padding(horizontal = 12.dp, vertical = 10.dp),
     ) {
         if (value.isEmpty()) {
-            Text("Colle ta clé TMDB ici…", color = Color(0xFF888888))
+            Text(stringResource(R.string.settings_tmdb_hint), color = Color(0xFF888888))
         }
         BasicTextField(
             value = value,

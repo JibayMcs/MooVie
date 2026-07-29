@@ -1,5 +1,6 @@
 package fr.moovie.tv.ui.home
 
+import androidx.compose.ui.res.stringResource
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -62,6 +63,7 @@ import androidx.tv.material3.Text
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.ui.window.Dialog
 import coil.compose.AsyncImage
+import fr.moovie.tv.R
 import fr.moovie.tv.data.tmdb.TmdbItem
 import fr.moovie.tv.data.watch.ResumeEntry
 import fr.moovie.tv.ui.components.MoovieButton
@@ -134,13 +136,13 @@ fun HomeScreen(
                     MoovieIconButton(
                         onClick = onOpenSearch,
                         icon = Icons.Default.Search,
-                        contentDescription = "Rechercher",
+                        contentDescription = stringResource(R.string.home_search),
                         modifier = headerDown,
                     )
                     MoovieIconButton(
                         onClick = onOpenSettings,
                         icon = Icons.Default.Settings,
-                        contentDescription = "Réglages",
+                        contentDescription = stringResource(R.string.home_settings),
                         modifier = headerDown,
                     )
                 }
@@ -148,11 +150,11 @@ fun HomeScreen(
             Spacer(Modifier.height(16.dp))
 
             when (val s = state) {
-                HomeState.Loading -> Text("Chargement…", modifier = Modifier.padding(horizontal = 32.dp))
+                HomeState.Loading -> Text(stringResource(R.string.common_loading), modifier = Modifier.padding(horizontal = 32.dp))
                 is HomeState.NeedsApiKey -> Column(modifier = Modifier.padding(horizontal = 32.dp)) {
                     Text(s.reason)
                     Spacer(Modifier.height(16.dp))
-                    MoovieButton(onClick = onOpenSettings) { Text("Ouvrir les réglages") }
+                    MoovieButton(onClick = onOpenSettings) { Text(stringResource(R.string.home_open_settings)) }
                 }
                 is HomeState.Ready -> LazyColumn(
                     verticalArrangement = Arrangement.spacedBy(24.dp),
@@ -230,7 +232,7 @@ private fun ResumeRow(
 ) {
     Column {
         Text(
-            "Reprendre la lecture",
+            stringResource(R.string.home_continue_watching),
             style = MaterialTheme.typography.titleLarge,
             modifier = Modifier.padding(horizontal = 32.dp),
         )
@@ -278,7 +280,7 @@ private fun ResumeMenuDialog(
             ) {
                 Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(10.dp))
-                Text("Retirer de la liste de lecture")
+                Text(stringResource(R.string.resume_remove))
             }
             MoovieButton(
                 onClick = { onMarkWatched(); onDismiss() },
@@ -286,7 +288,7 @@ private fun ResumeMenuDialog(
             ) {
                 Icon(Icons.Default.Visibility, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(10.dp))
-                Text("Marquer comme vu")
+                Text(stringResource(R.string.mark_watched))
             }
         }
     }
@@ -344,8 +346,8 @@ private fun ResumeCard(
                 Text(
                     text = listOfNotNull(
                         entry.episodeLabel,
-                        if (entry.durationMs > 0) "$remainMin min restantes" else null,
-                    ).joinToString(" · ").ifBlank { "En cours" },
+                        if (entry.durationMs > 0) stringResource(R.string.home_minutes_left, remainMin) else null,
+                    ).joinToString(" · ").ifBlank { stringResource(R.string.home_in_progress) },
                     style = MaterialTheme.typography.labelSmall,
                     color = Color(0xFF9A9A9A),
                 )

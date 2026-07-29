@@ -1,4 +1,100 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Moo-vie</string>
+
+    <!-- Commun -->
+    <string name="common_loading">Chargement…</string>
+    <string name="common_back">Retour</string>
+    <string name="common_enabled">Activé</string>
+    <string name="common_disabled">Désactivé</string>
+    <string name="mark_watched">Marquer comme vu</string>
+    <string name="mark_unwatched">Marquer non vu</string>
+
+    <!-- Accueil -->
+    <string name="home_search">Rechercher</string>
+    <string name="home_settings">Réglages</string>
+    <string name="home_row_trending_movies">Films tendances</string>
+    <string name="home_row_trending_tv">Séries tendances</string>
+    <string name="home_row_top_movies">Films les mieux notés</string>
+    <string name="home_needs_key">Renseigne ta clé API TMDB dans les réglages.</string>
+    <string name="home_no_results_key">Aucun résultat — vérifie ta clé TMDB.</string>
+    <string name="home_tmdb_error">Échec du chargement TMDB : %1$s</string>
+    <string name="home_open_settings">Ouvrir les réglages</string>
+    <string name="home_continue_watching">Reprendre la lecture</string>
+    <string name="home_minutes_left">%1$d min restantes</string>
+    <string name="home_in_progress">En cours</string>
+    <string name="resume_remove">Retirer de la liste de lecture</string>
+
+    <!-- Recherche -->
+    <string name="search_title">Recherche</string>
+    <string name="search_hint">Rechercher un film, une série, un anime…</string>
+    <string name="search_loading">Recherche…</string>
+    <string name="search_needs_key">Clé TMDB manquante — renseigne-la dans les réglages.</string>
+    <string name="search_no_results">Aucun résultat pour « %1$s ».</string>
+    <string name="search_recent">Recherches récentes</string>
+    <string name="search_empty_hint">Tape pour rechercher. Ton historique apparaîtra ici.</string>
+    <string name="search_clear_history">Vider l\'historique</string>
+    <string name="search_remove_query">Supprimer « %1$s »</string>
+
+    <!-- Fiche -->
+    <string name="details_runtime">%1$s • %2$s min</string>
+    <string name="details_cast">Casting</string>
+    <string name="details_sources">Sources</string>
+    <string name="details_play">▶  Lire</string>
+    <string name="details_resume">▶  Reprendre</string>
+    <string name="details_searching">Recherche %1$s…</string>
+    <string name="details_playing">Lecture…</string>
+    <string name="details_lang_unavailable">%1$s indisponible</string>
+    <string name="details_seasons">Saisons</string>
+    <string name="mark_season_watched">Marquer la saison vue</string>
+    <string name="mark_season_unwatched">Marquer la saison non vue</string>
+    <string name="details_episodes_season">Épisodes (saison %1$d)</string>
+    <string name="details_no_player">Aucun lecteur %1$s n\'a fonctionné.</string>
+    <string name="details_lang_missing">Aucune source en %1$s — autres langues disponibles.</string>
+    <string name="details_no_sources">Aucune source disponible pour ce titre.</string>
+    <string name="details_searching_source">Recherche d\'une source… %1$s</string>
+    <string name="details_resolve_error">Impossible de lire « %1$s ». Essaie un autre lecteur.</string>
+    <string name="details_needs_key">Clé TMDB manquante (Réglages).</string>
+    <string name="details_tmdb_error">Échec TMDB : %1$s</string>
+
+    <!-- Lecteur -->
+    <string name="player_skip_intro">Passer l\'intro</string>
+    <string name="player_skip_outro">Passer le générique</string>
+
+    <!-- Mise à jour -->
+    <string name="update_available">Mise à jour v%1$s disponible</string>
+    <string name="update_install">Installer</string>
+    <string name="update_later">Plus tard</string>
+    <string name="update_downloading">Téléchargement de v%1$s…  %2$d %%</string>
+    <string name="update_error">Téléchargement impossible. Réessaie.</string>
+    <string name="update_retry">Réessayer</string>
+
+    <!-- Réglages -->
+    <string name="settings_title">Réglages</string>
+    <string name="settings_cat_api">API &amp; Clés</string>
+    <string name="settings_tmdb_key">Clé API TMDB</string>
+    <string name="settings_tmdb_hint">Colle ta clé TMDB ici…</string>
+    <string name="settings_tmdb_help">Crée une clé gratuite sur themoviedb.org (API v3).</string>
+    <string name="settings_cat_playback">Lecture &amp; Langue</string>
+    <string name="settings_stream_lang">Langue du stream par défaut</string>
+    <string name="settings_language">Langue de l\'application</string>
+    <string name="settings_cat_intro">Intro &amp; générique</string>
+    <string name="settings_intro_help">Affiche des boutons « Passer l\'intro / le générique » pendant la lecture (données TheIntroDB). Passer le générique enchaîne l\'épisode suivant (série) ou revient à l\'accueil (film).</string>
+    <string name="settings_cat_dns">Réseau (DNS)</string>
+    <string name="settings_dns_help">Les domaines des sources sont souvent bloqués par DNS chez les FAI. Le DNS-over-HTTPS (DoH) contourne ce blocage. Laisse activé si les sources restent introuvables.</string>
+    <string name="settings_doh_on">DoH activé</string>
+    <string name="settings_doh_off">DNS système</string>
+    <string name="settings_doh_resolver">Résolveur</string>
+    <string name="settings_cat_sources">Sources &amp; hébergeurs</string>
+    <string name="settings_sources_help">Ordre = priorité de lecture (le premier est essayé d\'abord).</string>
+    <string name="settings_move_up">Monter %1$s</string>
+    <string name="settings_move_down">Descendre %1$s</string>
+    <string name="settings_enable">Activer %1$s</string>
+    <string name="settings_disable">Désactiver %1$s</string>
+
+    <!-- Langues -->
+    <string name="language_system">Langue du système</string>
+    <string name="language_fr">Français</string>
+    <string name="language_en">Anglais</string>
+    <string name="language_es">Espagnol</string>
 </resources>

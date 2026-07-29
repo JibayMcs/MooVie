@@ -6,6 +6,7 @@ import androidx.core.content.FileProvider
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import fr.moovie.tv.BuildConfig
+import fr.moovie.tv.R
 import fr.moovie.tv.data.update.UpdateRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -71,7 +72,7 @@ class UpdateViewModel(app: Application) : AndroidViewModel(app) {
                 // retombe sur « disponible » plutôt que de masquer.
                 _state.value = target
             } else {
-                _state.value = UpdateState.Error("Téléchargement impossible. Réessaie.")
+                _state.value = UpdateState.Error(getApplication<Application>().getString(R.string.update_error))
             }
         }
     }

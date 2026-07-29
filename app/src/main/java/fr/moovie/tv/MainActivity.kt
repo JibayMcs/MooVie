@@ -1,5 +1,6 @@
 package fr.moovie.tv
 
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -22,6 +23,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.tv.material3.LocalContentColor
+import fr.moovie.tv.data.settings.LocaleManager
 import fr.moovie.tv.data.settings.SettingsRepository
 import fr.moovie.tv.ui.navigation.Screen
 import fr.moovie.tv.ui.details.DetailsScreen
@@ -39,6 +41,12 @@ import kotlinx.coroutines.launch
  * plus simple à maîtriser sur TV qu'un NavHost).
  */
 class MainActivity : ComponentActivity() {
+
+    // Applique la langue choisie (SYSTEM = locale système) avant toute UI.
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(LocaleManager.wrap(newBase))
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)

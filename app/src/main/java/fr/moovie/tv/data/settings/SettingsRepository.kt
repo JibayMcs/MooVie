@@ -26,9 +26,6 @@ class SettingsRepository(private val context: Context) {
     val tmdbApiKey: Flow<String> =
         context.dataStore.data.map { it[TMDB_API_KEY].orEmpty() }
 
-    val uiLanguage: Flow<String> =
-        context.dataStore.data.map { it[UI_LANGUAGE] ?: "fr-FR" }
-
     val streamLanguage: Flow<StreamLanguage> =
         context.dataStore.data.map {
             runCatching { StreamLanguage.valueOf(it[STREAM_LANGUAGE] ?: "VF") }
@@ -77,9 +74,6 @@ class SettingsRepository(private val context: Context) {
     suspend fun setTmdbApiKey(value: String) =
         context.dataStore.edit { it[TMDB_API_KEY] = value.trim() }
 
-    suspend fun setUiLanguage(value: String) =
-        context.dataStore.edit { it[UI_LANGUAGE] = value }
-
     suspend fun setStreamLanguage(value: StreamLanguage) =
         context.dataStore.edit { it[STREAM_LANGUAGE] = value.name }
 
@@ -96,7 +90,6 @@ class SettingsRepository(private val context: Context) {
 
     private companion object {
         val TMDB_API_KEY = stringPreferencesKey("tmdb_api_key")
-        val UI_LANGUAGE = stringPreferencesKey("ui_language")
         val STREAM_LANGUAGE = stringPreferencesKey("stream_language")
         val DISABLED_PROVIDERS = stringPreferencesKey("disabled_providers")
         val PROVIDER_ORDER = stringPreferencesKey("provider_order")

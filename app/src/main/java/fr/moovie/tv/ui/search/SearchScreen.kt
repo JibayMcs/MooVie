@@ -1,5 +1,6 @@
 package fr.moovie.tv.ui.search
 
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -59,6 +60,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.ui.Alignment
 import coil.compose.AsyncImage
+import fr.moovie.tv.R
 import fr.moovie.tv.data.tmdb.TmdbItem
 import fr.moovie.tv.ui.components.MoovieButton
 import fr.moovie.tv.ui.components.MoovieIconButton
@@ -83,7 +85,7 @@ fun SearchScreen(
     // s'étend jusqu'aux bords et ne rogne plus les cartes agrandies au focus.
     Column(modifier = Modifier.fillMaxSize().padding(vertical = 40.dp)) {
         Text(
-            "Recherche",
+            stringResource(R.string.search_title),
             style = MaterialTheme.typography.headlineMedium,
             modifier = Modifier.padding(horizontal = 40.dp),
         )
@@ -106,13 +108,13 @@ fun SearchScreen(
                 onClear = viewModel::clearHistory,
                 modifier = Modifier.padding(horizontal = 40.dp),
             )
-            results is SearchState.Loading -> Text("Recherche…", color = Color(0xFFBBBBBB), modifier = Modifier.padding(horizontal = 40.dp))
+            results is SearchState.Loading -> Text(stringResource(R.string.search_loading), color = Color(0xFFBBBBBB), modifier = Modifier.padding(horizontal = 40.dp))
             results is SearchState.NeedsKey -> Text(
-                "Clé TMDB manquante — renseigne-la dans les réglages.",
+                stringResource(R.string.search_needs_key),
                 color = Color(0xFFE0A0A0),
                 modifier = Modifier.padding(horizontal = 40.dp),
             )
-            results is SearchState.Empty -> Text("Aucun résultat pour « $query ».", color = Color(0xFFBBBBBB), modifier = Modifier.padding(horizontal = 40.dp))
+            results is SearchState.Empty -> Text(stringResource(R.string.search_no_results, query), color = Color(0xFFBBBBBB), modifier = Modifier.padding(horizontal = 40.dp))
             results is SearchState.Results -> ResultsGrid(
                 items = (results as SearchState.Results).items,
                 firstFocus = firstResultFocus,
@@ -141,7 +143,7 @@ private fun SearchField(
             .padding(horizontal = 16.dp, vertical = 14.dp),
     ) {
         if (value.isEmpty()) {
-            Text("Rechercher un film, une série, un anime…", color = Color(0xFF888888), fontSize = 18.sp)
+            Text(stringResource(R.string.search_hint), color = Color(0xFF888888), fontSize = 18.sp)
         }
         BasicTextField(
             value = value,
@@ -177,7 +179,7 @@ private fun HistorySection(
     modifier: Modifier = Modifier,
 ) {
     if (history.isEmpty()) {
-        Text("Tape pour rechercher. Ton historique apparaîtra ici.", color = Color(0xFF888888), modifier = modifier)
+        Text(stringResource(R.string.search_empty_hint), color = Color(0xFF888888), modifier = modifier)
         return
     }
     Column(modifier = modifier) {
@@ -185,11 +187,11 @@ private fun HistorySection(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text("Recherches récentes", style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.search_recent), style = MaterialTheme.typography.titleMedium)
             MoovieIconButton(
                 onClick = onClear,
                 icon = Icons.Default.DeleteSweep,
-                contentDescription = "Vider l'historique",
+                contentDescription = stringResource(R.string.search_clear_history),
             )
         }
         Spacer(Modifier.height(12.dp))
@@ -207,7 +209,7 @@ private fun HistorySection(
                     MoovieIconButton(
                         onClick = { onRemove(q) },
                         icon = Icons.Default.Close,
-                        contentDescription = "Supprimer « $q »",
+                        contentDescription = stringResource(R.string.search_remove_query, q),
                     )
                 }
             }

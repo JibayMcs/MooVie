@@ -1,5 +1,6 @@
 package fr.moovie.tv.ui.update
 
+import androidx.compose.ui.res.stringResource
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
@@ -23,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import fr.moovie.tv.R
 import fr.moovie.tv.ui.components.MoovieButton
 
 /**
@@ -58,7 +60,7 @@ fun UpdateBanner(
             when (state) {
                 is UpdateState.Available -> {
                     Text(
-                        "Mise à jour v${state.version} disponible",
+                        stringResource(R.string.update_available, state.version),
                         style = MaterialTheme.typography.titleMedium,
                         color = Color.White,
                         modifier = Modifier.weight(1f),
@@ -70,13 +72,13 @@ fun UpdateBanner(
                             modifier = Modifier.size(18.dp),
                         )
                         Spacer(Modifier.width(10.dp))
-                        Text("Installer")
+                        Text(stringResource(R.string.update_install))
                     }
-                    MoovieButton(onClick = onDismiss) { Text("Plus tard") }
+                    MoovieButton(onClick = onDismiss) { Text(stringResource(R.string.update_later)) }
                 }
                 is UpdateState.Downloading -> {
                     Text(
-                        "Téléchargement de v${state.version}…  ${(state.progress * 100).toInt()} %",
+                        stringResource(R.string.update_downloading, state.version, (state.progress * 100).toInt()),
                         style = MaterialTheme.typography.titleMedium,
                         color = Color.White,
                     )
@@ -94,8 +96,8 @@ fun UpdateBanner(
                         color = Color.White,
                         modifier = Modifier.weight(1f),
                     )
-                    MoovieButton(onClick = onInstall) { Text("Réessayer") }
-                    MoovieButton(onClick = onDismiss) { Text("Plus tard") }
+                    MoovieButton(onClick = onInstall) { Text(stringResource(R.string.update_retry)) }
+                    MoovieButton(onClick = onDismiss) { Text(stringResource(R.string.update_later)) }
                 }
                 UpdateState.None -> Unit
             }

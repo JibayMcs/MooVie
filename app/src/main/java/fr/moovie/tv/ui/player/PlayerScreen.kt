@@ -1,5 +1,6 @@
 package fr.moovie.tv.ui.player
 
+import androidx.compose.ui.res.stringResource
 import android.net.Uri
 import android.view.View
 import android.view.ViewGroup
@@ -44,6 +45,7 @@ import androidx.media3.session.MediaSession
 import androidx.media3.ui.PlayerView
 import androidx.tv.material3.Icon
 import androidx.tv.material3.Text
+import fr.moovie.tv.R
 import fr.moovie.tv.data.intro.IntroDbRepository
 import fr.moovie.tv.data.intro.IntroMedia
 import fr.moovie.tv.data.settings.SettingsRepository
@@ -302,7 +304,7 @@ fun PlayerScreen(
             ) {
                 Icon(Icons.Default.SkipNext, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(10.dp))
-                Text(if (skip == SkipKind.INTRO) "Passer l'intro" else "Passer le générique")
+                Text(if (skip == SkipKind.INTRO) stringResource(R.string.player_skip_intro) else stringResource(R.string.player_skip_outro))
             }
         }
     }

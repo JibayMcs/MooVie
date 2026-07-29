@@ -27,9 +27,6 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     val streamLanguage: StateFlow<StreamLanguage> =
         repo.streamLanguage.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), StreamLanguage.VF)
 
-    val uiLanguage: StateFlow<String> =
-        repo.uiLanguage.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "fr-FR")
-
     val dohEnabled: StateFlow<Boolean> =
         repo.dohEnabled.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
 
@@ -52,7 +49,6 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setTmdbApiKey(value: String) = viewModelScope.launch { repo.setTmdbApiKey(value) }
     fun setStreamLanguage(value: StreamLanguage) = viewModelScope.launch { repo.setStreamLanguage(value) }
-    fun setUiLanguage(value: String) = viewModelScope.launch { repo.setUiLanguage(value) }
 
     fun toggleProvider(name: String, enabled: Boolean) =
         viewModelScope.launch { repo.setProviderEnabled(name, enabled) }

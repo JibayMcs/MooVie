@@ -3,6 +3,8 @@ package fr.moovie.tv.ui.home
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import fr.moovie.tv.R
+import fr.moovie.tv.data.settings.LocaleManager
 import fr.moovie.tv.data.settings.SettingsRepository
 import fr.moovie.tv.data.tmdb.TmdbItem
 import fr.moovie.tv.data.tmdb.TmdbRepository
@@ -58,7 +60,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             settings.tmdbApiKey.collect { apiKey ->
                 if (apiKey.isBlank()) {
-                    _state.value = HomeState.NeedsApiKey("Renseigne ta clé API TMDB dans les réglages.")
+                    _state.value = HomeState.NeedsApiKey(str(R.string.home_needs_key))
                 } else {
                     loadRows(apiKey)
                 }
@@ -68,19 +70,21 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
     private suspend fun loadRows(apiKey: String) {
         _state.value = HomeState.Loading
-        val repo = TmdbRepository(settings.uiLanguage.first())
+        val repo = TmdbRepository(LocaleManager.tmdbLanguage(getApplication()))
         runCatching {
             listOf(
-                HomeRow("Films tendances", repo.trendingMovies(apiKey)),
-                HomeRow("Séries tendances", repo.trendingTv(apiKey)),
-                HomeRow("Films les mieux notés", repo.topRatedMovies(apiKey)),
+                HomeRow(str(R.string.home_row_trending_movies), repo.trendingMovies(apiKey)),
+                HomeRow(str(R.string.home_row_trending_tv), repo.trendingTv(apiKey)),
+                HomeRow(str(R.string.home_row_top_movies), repo.topRatedMovies(apiKey)),
             ).filter { it.items.isNotEmpty() }
         }.onSuccess { rows ->
             _state.value =
-                if (rows.isEmpty()) HomeState.NeedsApiKey("Aucun résultat — vérifie ta clé TMDB.")
+                if (rows.isEmpty()) HomeState.NeedsApiKey(str(R.string.home_no_results_key))
                 else HomeState.Ready(rows)
         }.onFailure {
-            _state.value = HomeState.NeedsApiKey("Échec du chargement TMDB : ${it.message}")
+            _state.value = HomeState.NeedsApiKey(str(R.string.home_tmdb_error, it.message ?: ""))
         }
     }
+
+    private fun str(resId: Int, vararg args: Any) = getApplication<Application>().getString(resId, *args)
 }

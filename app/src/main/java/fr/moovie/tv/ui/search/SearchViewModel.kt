@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import fr.moovie.tv.data.search.SearchHistoryRepository
+import fr.moovie.tv.data.settings.LocaleManager
 import fr.moovie.tv.data.settings.SettingsRepository
 import fr.moovie.tv.data.tmdb.TmdbItem
 import fr.moovie.tv.data.tmdb.TmdbRepository
@@ -56,7 +57,7 @@ class SearchViewModel(app: Application) : AndroidViewModel(app) {
                     _results.value = SearchState.NeedsKey
                     return@collectLatest
                 }
-                val repo = TmdbRepository(settings.uiLanguage.first())
+                val repo = TmdbRepository(LocaleManager.tmdbLanguage(getApplication()))
                 runCatching { repo.search(apiKey, term) }
                     .onSuccess { _results.value = if (it.isEmpty()) SearchState.Empty else SearchState.Results(it) }
                     .onFailure { _results.value = SearchState.Empty }

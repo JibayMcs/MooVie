@@ -3,6 +3,8 @@ package fr.moovie.tv.ui.details
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import fr.moovie.tv.R
+import fr.moovie.tv.data.settings.LocaleManager
 import fr.moovie.tv.data.settings.SettingsRepository
 import fr.moovie.tv.data.settings.StreamLanguage
 import fr.moovie.tv.data.sources.EmbedLink
@@ -63,8 +65,10 @@ private const val PROVIDER_TIMEOUT_MS = 12000L
  */
 sealed interface QuickPlayState {
     data object Idle : QuickPlayState
+    /** [label] = descripteur technique ("VF" ou "S1E3 · VF"), formaté par l'UI. */
     data class Searching(val label: String) : QuickPlayState
-    data class Unavailable(val label: String) : QuickPlayState
+    /** [lang] = langue manquante ("VF"…), formatée par l'UI. */
+    data class Unavailable(val lang: String) : QuickPlayState
 }
 
 class DetailsViewModel(app: Application) : AndroidViewModel(app) {
@@ -144,10 +148,10 @@ class DetailsViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val apiKey = settings.tmdbApiKey.first()
             if (apiKey.isBlank()) {
-                _state.value = DetailsState.Error("Clé TMDB manquante (Réglages).")
+                _state.value = DetailsState.Error(str(R.string.details_needs_key))
                 return@launch
             }
-            val repo = TmdbRepository(settings.uiLanguage.first())
+            val repo = TmdbRepository(LocaleManager.tmdbLanguage(getApplication()))
             runCatching {
                 if (isTv) {
                     val d = repo.tvDetails(apiKey, tmdbId)
@@ -162,7 +166,7 @@ class DetailsViewModel(app: Application) : AndroidViewModel(app) {
                 // Fiche film : sources chargées immédiatement en arrière-plan
                 // pour que le bouton « Lire » soit prêt sans ouvrir le panneau.
                 if (it is DetailsState.Movie) loadMovieSources()
-            }.onFailure { _state.value = DetailsState.Error("Échec TMDB : ${it.message}") }
+            }.onFailure { _state.value = DetailsState.Error(str(R.string.details_tmdb_error, it.message ?: "")) }
         }
     }
 
@@ -170,7 +174,7 @@ class DetailsViewModel(app: Application) : AndroidViewModel(app) {
         val tv = _state.value as? DetailsState.Tv ?: return
         viewModelScope.launch {
             val apiKey = settings.tmdbApiKey.first()
-            val repo = TmdbRepository(settings.uiLanguage.first())
+            val repo = TmdbRepository(LocaleManager.tmdbLanguage(getApplication()))
             runCatching { repo.season(apiKey, tmdbId, season).episodes }
                 .onSuccess { _state.value = tv.copy(season = season, episodes = it) }
         }
@@ -315,7 +319,7 @@ class DetailsViewModel(app: Application) : AndroidViewModel(app) {
     /** Lecture rapide du film courant (sources déjà en cours de chargement). */
     fun quickPlayMovie() {
         if (_sources.value is SourcesState.Idle) loadMovieSources()
-        startQuickPlay(label = "film")
+        startQuickPlay(label = "")
     }
 
     /** Lecture rapide d'un épisode : charge ses sources puis résout la meilleure. */
@@ -336,7 +340,7 @@ class DetailsViewModel(app: Application) : AndroidViewModel(app) {
         val gen = ++resolveGen
         quickPlayJob = viewModelScope.launch {
             val lang = settings.streamLanguage.first().name
-            _quickPlay.value = QuickPlayState.Searching("$label · $lang")
+            _quickPlay.value = QuickPlayState.Searching(if (label.isBlank()) lang else "$label · $lang")
             _resolveError.value = null
             val tried = mutableSetOf<String>()
             while (true) {
@@ -361,12 +365,12 @@ class DetailsViewModel(app: Application) : AndroidViewModel(app) {
                 if (!active.anyLoading) {
                     when {
                         tried.isNotEmpty() -> {
-                            _resolveError.value = "Aucun lecteur $lang n'a fonctionné."
+                            _resolveError.value = str(R.string.details_no_player, lang)
                             _panelVisible.value = true
                         }
                         active.links.isNotEmpty() -> _panelVisible.value = true
                         else -> {
-                            _quickPlay.value = QuickPlayState.Unavailable("$lang indisponible")
+                            _quickPlay.value = QuickPlayState.Unavailable(lang)
                             return@launch
                         }
                     }
@@ -392,10 +396,12 @@ class DetailsViewModel(app: Application) : AndroidViewModel(app) {
                 pendingMeta?.let { watchRepo.register(it) }
                 _resolved.value = stream
             } else {
-                _resolveError.value = "Impossible de lire « ${link.hoster} ». Essaie un autre lecteur."
+                _resolveError.value = str(R.string.details_resolve_error, link.hoster)
             }
         }
     }
 
     fun consumeResolved() { _resolved.value = null }
+
+    private fun str(resId: Int, vararg args: Any) = getApplication<Application>().getString(resId, *args)
 }
