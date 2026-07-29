@@ -1,9 +1,12 @@
 import java.util.Properties
+import org.jetbrains.compose.desktop.application.dsl.TargetFormat
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.multiplatform")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("org.jetbrains.compose")
     id("org.jetbrains.kotlin.plugin.serialization")
 }
 
@@ -16,6 +19,88 @@ val keystoreProps = Properties().apply {
 
 fun signingValue(propKey: String, envKey: String): String? =
     keystoreProps.getProperty(propKey) ?: System.getenv(envKey)
+
+kotlin {
+    androidTarget {
+        compilerOptions {
+            jvmTarget.set(JvmTarget.JVM_17)
+        }
+    }
+
+    jvm("desktop") {
+        compilerOptions {
+            jvmTarget.set(JvmTarget.JVM_17)
+        }
+    }
+
+    sourceSets {
+        val commonMain by getting {
+            dependencies {
+                implementation(compose.runtime)
+                implementation(compose.foundation)
+                implementation(compose.ui)
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+            }
+        }
+
+        // Libs JVM pures partagées entre Android et desktop (Retrofit, OkHttp,
+        // jsoup…) : pas de variante KMP mais les deux cibles sont JVM →
+        // sourceset intermédiaire commun.
+        val jvmCommon by creating {
+            dependsOn(commonMain)
+            dependencies {
+                implementation("com.squareup.retrofit2:retrofit:2.11.0")
+                implementation("com.squareup.retrofit2:converter-kotlinx-serialization:2.11.0")
+                implementation("com.squareup.okhttp3:okhttp:4.12.0")
+                implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+                // DNS-over-HTTPS : contourne le blocage DNS des FAI sur les domaines sources
+                implementation("com.squareup.okhttp3:okhttp-dnsoverhttps:4.12.0")
+                implementation("org.jsoup:jsoup:1.18.1")
+            }
+        }
+
+        val androidMain by getting {
+            dependsOn(jvmCommon)
+            dependencies {
+                implementation(project.dependencies.platform("androidx.compose:compose-bom:2024.10.01"))
+
+                implementation("androidx.core:core-ktx:1.13.1")
+                implementation("androidx.core:core-splashscreen:1.0.1")
+                implementation("androidx.activity:activity-compose:1.9.3")
+                implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.6")
+                implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.6")
+                implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.6")
+
+                // Compose for TV
+                implementation("androidx.compose.material:material-icons-extended")
+                implementation("androidx.compose.material3:material3") // uniquement pour les indicateurs de progression
+                implementation("androidx.tv:tv-material:1.0.0")
+
+                // Lecture vidéo native (Android uniquement — VLCJ prévu côté desktop)
+                implementation("androidx.media3:media3-exoplayer:1.4.1")
+                implementation("androidx.media3:media3-exoplayer-hls:1.4.1")
+                implementation("androidx.media3:media3-exoplayer-dash:1.4.1")
+                implementation("androidx.media3:media3-ui:1.4.1")
+                implementation("androidx.media3:media3-datasource-okhttp:1.4.1")
+                implementation("androidx.media3:media3-session:1.4.1")
+
+                // Images
+                implementation("io.coil-kt:coil-compose:2.7.0")
+
+                // Réglages persistants
+                implementation("androidx.datastore:datastore-preferences:1.1.1")
+            }
+        }
+
+        val desktopMain by getting {
+            dependsOn(jvmCommon)
+            dependencies {
+                implementation(compose.desktop.currentOs)
+                implementation(compose.material3)
+            }
+        }
+    }
+}
 
 android {
     namespace = "fr.moovie.tv"
@@ -56,53 +141,21 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions {
-        jvmTarget = "17"
-    }
     buildFeatures {
         compose = true
         buildConfig = true
     }
 }
 
-dependencies {
-    val composeBom = platform("androidx.compose:compose-bom:2024.10.01")
-    implementation(composeBom)
+compose.desktop {
+    application {
+        mainClass = "fr.moovie.tv.desktop.MainKt"
 
-    implementation("androidx.core:core-ktx:1.13.1")
-    implementation("androidx.core:core-splashscreen:1.0.1")
-    implementation("androidx.activity:activity-compose:1.9.3")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.6")
-    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.6")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.6")
-
-    // Compose + Compose for TV
-    implementation("androidx.compose.foundation:foundation")
-    implementation("androidx.compose.material:material-icons-extended")
-    implementation("androidx.compose.material3:material3") // uniquement pour les indicateurs de progression
-    implementation("androidx.tv:tv-material:1.0.0")
-
-    // Lecture vidéo native
-    implementation("androidx.media3:media3-exoplayer:1.4.1")
-    implementation("androidx.media3:media3-exoplayer-hls:1.4.1")
-    implementation("androidx.media3:media3-exoplayer-dash:1.4.1")
-    implementation("androidx.media3:media3-ui:1.4.1")
-    implementation("androidx.media3:media3-datasource-okhttp:1.4.1")
-    implementation("androidx.media3:media3-session:1.4.1")
-
-    // Réseau (TMDB + extraction de sources on-device)
-    implementation("com.squareup.retrofit2:retrofit:2.11.0")
-    implementation("com.squareup.retrofit2:converter-kotlinx-serialization:2.11.0")
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
-    // DNS-over-HTTPS : contourne le blocage DNS des FAI sur les domaines sources
-    implementation("com.squareup.okhttp3:okhttp-dnsoverhttps:4.12.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
-    implementation("org.jsoup:jsoup:1.18.1")
-
-    // Images
-    implementation("io.coil-kt:coil-compose:2.7.0")
-
-    // Réglages persistants
-    implementation("androidx.datastore:datastore-preferences:1.1.1")
+        nativeDistributions {
+            targetFormats(TargetFormat.Deb, TargetFormat.Msi, TargetFormat.Dmg)
+            packageName = "Moo-vie"
+            packageVersion = "1.0.5"
+            description = "Moo-vie — streaming, extraction de sources on-device"
+        }
+    }
 }
