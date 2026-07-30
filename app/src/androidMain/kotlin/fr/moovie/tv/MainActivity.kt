@@ -133,7 +133,15 @@ class MainActivity : ComponentActivity() {
                             is Screen.Details -> DetailsScreen(
                                 tmdbId = s.tmdbId,
                                 isTv = s.isTv,
-                                onPlay = { player -> nav.push(player) },
+                                onPlay = { player ->
+                                    // Neutralise l'auto-lecture sur l'entrée de la
+                                    // fiche : sinon en revenir du lecteur relancerait
+                                    // la lecture, qui repousserait le lecteur.
+                                    if (s.autoSources) {
+                                        nav.replace(s.copy(autoSources = false))
+                                    }
+                                    nav.push(player)
+                                },
                                 onBack = { nav.pop() },
                                 autoSources = s.autoSources,
                                 resumeSeason = s.resumeSeason,

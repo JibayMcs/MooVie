@@ -370,8 +370,17 @@ internal fun DesktopPlayerScreen(
             if (mediaKey.isNotBlank() && t > 0) {
                 saveScope.launch { progress.save(mediaKey, t, d) }
             }
-            player.release()
-            factory.release()
+            // Libération hors du thread UI, et stop() AVANT release() : libVLC
+            // appelle notre callback de rendu depuis son thread vidéo, et le
+            // relâcher pendant qu'un appel est en vol fige la fenêtre ou tue le
+            // process. stop() coupe d'abord ces callbacks. Sur un flux bloqué
+            // (écran noir, « buffer deadlock prevented » côté VLC) c'était
+            // systématique au clic sur Retour.
+            saveScope.launch {
+                runCatching { player.controls().stop() }
+                runCatching { player.release() }
+                runCatching { factory.release() }
+            }
         }
     }
 

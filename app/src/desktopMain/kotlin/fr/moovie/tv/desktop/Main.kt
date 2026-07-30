@@ -123,9 +123,6 @@ private fun DesktopApp(
     isFullscreen: Boolean,
     onToggleFullscreen: () -> Unit,
 ) {
-    // Fiche d'origine de la lecture en cours : le retour du lecteur revient
-    // dessus (sans relancer l'auto-lecture) au lieu de l'accueil.
-
     Column(modifier = Modifier.fillMaxSize().background(Color(0xFF0A0A0A))) {
         val updateViewModel = remember { DesktopUpdateViewModel() }
         val updateState by updateViewModel.state.collectAsState()
@@ -168,7 +165,13 @@ private fun DesktopApp(
             )
             is Screen.Details -> DesktopDetailsScreen(
                 params = s,
-                onPlay = { player -> nav.push(player) },
+                onPlay = { player ->
+                    // Neutralise l'auto-lecture sur l'entrée de la fiche avant
+                    // d'empiler le lecteur : sinon en revenir relancerait la
+                    // lecture, qui repousserait le lecteur — boucle sans issue.
+                    if (s.autoSources) nav.replace(s.copy(autoSources = false))
+                    nav.push(player)
+                },
                 onBack = { nav.pop() },
                 onRegisterBack = onRegisterBack,
             )
