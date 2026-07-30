@@ -43,6 +43,7 @@ internal fun DesktopHomeScreen(
     val state by vm.state.collectAsState()
     val resume by vm.resume.collectAsState()
     val watched by vm.watched.collectAsState()
+    val watchlist by vm.watchlist.collectAsState()
 
     HomeScreenContent(
         state = state,
@@ -54,6 +55,9 @@ internal fun DesktopHomeScreen(
         onOpenSearch = onOpenSearch,
         onRemoveResume = vm::removeResume,
         onMarkResumeWatched = vm::markResumeWatched,
+        watchlist = watchlist,
+        onRemoveFromWatchlist = vm::removeFromWatchlist,
+        onAddToWatchlist = vm::addToWatchlist,
     )
 }
 
@@ -65,6 +69,7 @@ internal fun DesktopSearchScreen(
     val query by vm.query.collectAsState()
     val results by vm.results.collectAsState()
     val history by vm.history.collectAsState()
+    val watchlistKeys by vm.watchlistKeys.collectAsState()
 
     SearchScreenContent(
         query = query,
@@ -75,6 +80,9 @@ internal fun DesktopSearchScreen(
             vm.remember()
             onOpenTitle(item.id, item.isTv)
         },
+        watchlistKeys = watchlistKeys,
+        onAddToWatchlist = vm::addToWatchlist,
+        onRemoveFromWatchlist = vm::removeFromWatchlist,
         onRemoveHistory = vm::removeHistory,
         onClearHistory = vm::clearHistory,
     )
@@ -133,6 +141,7 @@ internal fun DesktopDetailsScreen(
     val state by vm.state.collectAsState()
     val sources by vm.sources.collectAsState()
     val resolved by vm.resolved.collectAsState()
+    val inWatchlist by vm.inWatchlist.collectAsState()
     val resolveError by vm.resolveError.collectAsState()
     val streamLang by vm.streamLanguage.collectAsState()
     val watched by vm.watched.collectAsState()
@@ -217,6 +226,8 @@ internal fun DesktopDetailsScreen(
         onOpenEpisodePanel = vm::openEpisodePanel,
         onToggleWatched = vm::toggleWatched,
         onToggleSeasonWatched = vm::toggleSeasonWatched,
+        inWatchlist = inWatchlist,
+        onToggleWatchlist = vm::toggleWatchlist,
         onOpenPanel = vm::openPanel,
         onClosePanel = vm::closePanel,
         onPickSource = vm::play,

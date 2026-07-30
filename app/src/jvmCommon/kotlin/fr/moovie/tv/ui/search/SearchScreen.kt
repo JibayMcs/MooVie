@@ -67,6 +67,18 @@ import fr.moovie.tv.ui.components.MoovieCard
 import fr.moovie.tv.ui.components.MoovieIconButton
 import fr.moovie.tv.ui.components.MoovieMarqueeText
 import org.jetbrains.compose.resources.stringResource
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material3.Icon
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.window.Dialog
+import fr.moovie.tv.resources.watchlist_add
+import fr.moovie.tv.resources.watchlist_remove
 
 /**
  * Écran de recherche partagé TV + desktop : état hoisté (le ViewModel reste
@@ -81,9 +93,54 @@ fun SearchScreenContent(
     onOpen: (TmdbItem) -> Unit,
     onRemoveHistory: (String) -> Unit,
     onClearHistory: () -> Unit,
+    /** Clés « titre » déjà mises de côté, pour le badge et le libellé du menu. */
+    watchlistKeys: Set<String> = emptySet(),
+    onAddToWatchlist: (TmdbItem) -> Unit = {},
+    onRemoveFromWatchlist: (String) -> Unit = {},
 ) {
+    var menuFor by remember { mutableStateOf<TmdbItem?>(null) }
     val fieldFocus = remember { FocusRequester() }
     val firstResultFocus = remember { FocusRequester() }
+
+    // Dialogue déclaré tôt dans le corps : un Dialog se dessine en surimpression
+    // quelle que soit sa position dans la composition.
+    menuFor?.let { item ->
+        val key = if (item.isTv) "tv:${item.id}" else "movie:${item.id}"
+        val inList = key in watchlistKeys
+        val action = remember { FocusRequester() }
+        Dialog(onDismissRequest = { menuFor = null }) {
+            Column(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(Color(0xF5161616))
+                    .padding(28.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                Text(item.displayTitle, style = MaterialTheme.typography.titleMedium)
+                MoovieButton(
+                    onClick = {
+                        if (inList) onRemoveFromWatchlist(key) else onAddToWatchlist(item)
+                        menuFor = null
+                    },
+                    modifier = Modifier.fillMaxWidth().focusRequester(action),
+                    selected = inList,
+                ) {
+                    Icon(
+                        if (inList) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        stringResource(
+                            if (inList) Res.string.watchlist_remove else Res.string.watchlist_add,
+                        ),
+                    )
+                }
+            }
+        }
+        LaunchedEffect(item) { runCatching { action.requestFocus() } }
+    }
 
     LaunchedEffect(Unit) { runCatching { fieldFocus.requestFocus() } }
 
@@ -125,6 +182,8 @@ fun SearchScreenContent(
                 items = results.items,
                 firstFocus = firstResultFocus,
                 onOpen = onOpen,
+                watchlistKeys = watchlistKeys,
+                onMenu = { menuFor = it },
             )
             else -> Unit
         }
@@ -221,7 +280,13 @@ private fun HistorySection(
 }
 
 @Composable
-private fun ResultsGrid(items: List<TmdbItem>, firstFocus: FocusRequester, onOpen: (TmdbItem) -> Unit) {
+private fun ResultsGrid(
+    items: List<TmdbItem>,
+    firstFocus: FocusRequester,
+    onOpen: (TmdbItem) -> Unit,
+    watchlistKeys: Set<String> = emptySet(),
+    onMenu: (TmdbItem) -> Unit = {},
+) {
     LazyVerticalGrid(
         columns = GridCells.Fixed(6),
         horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -232,6 +297,8 @@ private fun ResultsGrid(items: List<TmdbItem>, firstFocus: FocusRequester, onOpe
     ) {
         itemsIndexed(items, key = { _, it -> "${it.id}_${it.isTv}" }) { index, item ->
             ResultCard(
+                inWatchlist = (if (item.isTv) "tv:${item.id}" else "movie:${item.id}") in watchlistKeys,
+                onLongClick = { onMenu(item) },
                 item = item,
                 onClick = { onOpen(item) },
                 modifier = if (index == 0) Modifier.focusRequester(firstFocus) else Modifier,
@@ -241,8 +308,14 @@ private fun ResultsGrid(items: List<TmdbItem>, firstFocus: FocusRequester, onOpe
 }
 
 @Composable
-private fun ResultCard(item: TmdbItem, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    MoovieCard(onClick = onClick, modifier = modifier.fillMaxWidth()) {
+private fun ResultCard(
+    item: TmdbItem,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    inWatchlist: Boolean = false,
+    onLongClick: (() -> Unit)? = null,
+) {
+    MoovieCard(onClick = onClick, onLongClick = onLongClick, modifier = modifier.fillMaxWidth()) {
         Column {
             AsyncImage(
                 model = item.posterUrl(),

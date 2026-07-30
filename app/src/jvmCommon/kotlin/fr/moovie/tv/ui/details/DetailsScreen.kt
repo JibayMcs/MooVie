@@ -38,6 +38,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.CircularProgressIndicator
@@ -92,6 +94,8 @@ import fr.moovie.tv.resources.mark_season_unwatched
 import fr.moovie.tv.resources.mark_season_watched
 import fr.moovie.tv.resources.mark_unwatched
 import fr.moovie.tv.resources.mark_watched
+import fr.moovie.tv.resources.watchlist_add
+import fr.moovie.tv.resources.watchlist_remove
 import fr.moovie.tv.ui.components.LocalMoovieCardActive
 import fr.moovie.tv.ui.components.MOOVIE_ACCENT
 import fr.moovie.tv.ui.components.MoovieButton
@@ -126,6 +130,9 @@ fun DetailsScreenContent(
     onOpenEpisodePanel: (season: Int, episode: Int) -> Unit,
     onToggleWatched: (String) -> Unit,
     onToggleSeasonWatched: () -> Unit,
+    /** Titre présent dans « À regarder plus tard ». */
+    inWatchlist: Boolean = false,
+    onToggleWatchlist: () -> Unit = {},
     onOpenPanel: () -> Unit,
     onClosePanel: () -> Unit,
     onPickSource: (EmbedLink) -> Unit,
@@ -246,6 +253,17 @@ fun DetailsScreenContent(
                             contentDescription = if (movieWatched) stringResource(Res.string.mark_unwatched) else stringResource(Res.string.mark_watched),
                             selected = movieWatched,
                         )
+                        // Signet = « À regarder plus tard ». Plein + outline verte
+                        // quand le titre y est déjà, comme l'œil juste avant :
+                        // l'état se lit sans avoir à ouvrir quoi que ce soit.
+                        MoovieIconButton(
+                            onClick = onToggleWatchlist,
+                            icon = if (inWatchlist) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                            contentDescription = stringResource(
+                                if (inWatchlist) Res.string.watchlist_remove else Res.string.watchlist_add,
+                            ),
+                            selected = inWatchlist,
+                        )
                     }
                 }
                 is DetailsState.Tv -> {
@@ -298,6 +316,20 @@ fun DetailsScreenContent(
                                         icon = if (seasonAllWatched) Icons.Default.VisibilityOff else Icons.Default.Visibility,
                                         contentDescription = if (seasonAllWatched) stringResource(Res.string.mark_season_unwatched) else stringResource(Res.string.mark_season_watched),
                                         selected = seasonAllWatched,
+                                    )
+                                }
+                                // Signet de la série. La fiche série n'a pas de
+                                // rangée d'actions comme celle d'un film : la
+                                // rangée des saisons est le seul endroit à
+                                // portée du D-pad pour une action de titre.
+                                item {
+                                    MoovieIconButton(
+                                        onClick = onToggleWatchlist,
+                                        icon = if (inWatchlist) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                                        contentDescription = stringResource(
+                                            if (inWatchlist) Res.string.watchlist_remove else Res.string.watchlist_add,
+                                        ),
+                                        selected = inWatchlist,
                                     )
                                 }
                             }

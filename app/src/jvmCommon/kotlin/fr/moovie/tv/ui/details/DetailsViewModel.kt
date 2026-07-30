@@ -16,6 +16,7 @@ import fr.moovie.tv.data.tmdb.TmdbRepository
 import fr.moovie.tv.data.tmdb.TvDetails
 import fr.moovie.tv.data.watch.ResumeEntry
 import fr.moovie.tv.data.watch.WatchProgressRepository
+import fr.moovie.tv.data.watch.WatchlistEntry
 import fr.moovie.tv.resources.Res
 import fr.moovie.tv.resources.details_needs_key
 import fr.moovie.tv.resources.details_no_player
@@ -99,6 +100,16 @@ class DetailsViewModel : ViewModel() {
     val watched: StateFlow<Set<String>> = watchRepo.watched
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
 
+    /**
+     * Titre courant présent dans « À regarder plus tard ».
+     *
+     * Dérivé du flux du dépôt plutôt que d'un booléen local : le titre peut en
+     * sortir tout seul quand il est marqué vu, et le bouton doit suivre.
+     */
+    val inWatchlist: StateFlow<Boolean> = watchRepo.watchlist
+        .map { list -> list.any { it.key == watchlistKey() } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
     /** Progression en cours par clé (mini-barre sur les épisodes commencés). */
     val resume: StateFlow<Map<String, ResumeEntry>> = watchRepo.continueWatching
         .map { list -> list.associateBy { it.key } }
@@ -156,6 +167,10 @@ class DetailsViewModel : ViewModel() {
                 }
             }.onSuccess {
                 _state.value = it
+                // Une série mise de côté depuis une affiche du catalogue n'a pas
+                // de total d'épisodes : sans lui elle ne sortirait jamais seule
+                // de la liste. On le complète dès qu'on connaît ses saisons.
+                if (it is DetailsState.Tv) completeWatchlistEntry(it)
                 // Fiche film : sources chargées immédiatement en arrière-plan
                 // pour que le bouton « Lire » soit prêt sans ouvrir le panneau.
                 if (it is DetailsState.Movie) loadMovieSources()
@@ -442,6 +457,53 @@ class DetailsViewModel : ViewModel() {
         // main dès qu'il a émis un flux), rejectedLinks fait le reste.
         startQuickPlay(quickPlayLabel)
         return true
+    }
+
+    /** Renseigne le total d'épisodes d'une série déjà en liste, s'il manque. */
+    private suspend fun completeWatchlistEntry(tv: DetailsState.Tv) {
+        val key = WatchlistEntry.tvKey(tmdbId)
+        val existing = watchRepo.watchlist.first().firstOrNull { it.key == key } ?: return
+        if (existing.totalEpisodes > 0) return
+        val total = tv.details.seasons.filter { it.seasonNumber > 0 }.sumOf { it.episodeCount }
+        if (total > 0) watchRepo.addToWatchlist(existing.copy(totalEpisodes = total))
+    }
+
+    /** Clé « titre » de la watchlist : sans saison ni épisode. */
+    private fun watchlistKey() =
+        if (isTv) WatchlistEntry.tvKey(tmdbId) else WatchlistEntry.movieKey(tmdbId)
+
+    /** Ajoute ou retire le titre courant de « À regarder plus tard ». */
+    fun toggleWatchlist() {
+        val key = watchlistKey()
+        viewModelScope.launch {
+            if (inWatchlist.value) {
+                watchRepo.removeFromWatchlist(key)
+                return@launch
+            }
+            val entry = when (val st = _state.value) {
+                is DetailsState.Movie -> WatchlistEntry(
+                    key = key,
+                    tmdbId = tmdbId,
+                    isTv = false,
+                    title = st.details.title,
+                    imageUrl = st.details.posterUrl() ?: st.details.backdropUrl(),
+                )
+                is DetailsState.Tv -> WatchlistEntry(
+                    key = key,
+                    tmdbId = tmdbId,
+                    isTv = true,
+                    title = st.details.name,
+                    imageUrl = st.details.posterUrl() ?: st.details.backdropUrl(),
+                    // Total d'épisodes su au moment de l'ajout : c'est lui qui
+                    // permettra de sortir la série de la liste une fois vue.
+                    totalEpisodes = st.details.seasons
+                        .filter { it.seasonNumber > 0 }
+                        .sumOf { it.episodeCount },
+                )
+                else -> return@launch
+            }
+            watchRepo.addToWatchlist(entry)
+        }
     }
 
     /** Efface la bannière « indisponible » de la lecture rapide. */

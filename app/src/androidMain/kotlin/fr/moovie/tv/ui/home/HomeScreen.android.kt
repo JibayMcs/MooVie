@@ -21,6 +21,7 @@ fun HomeScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val resume by viewModel.resume.collectAsStateWithLifecycle()
     val watched by viewModel.watched.collectAsStateWithLifecycle()
+    val watchlist by viewModel.watchlist.collectAsStateWithLifecycle()
 
     HomeScreenContent(
         state = state,
@@ -32,5 +33,8 @@ fun HomeScreen(
         onOpenSearch = onOpenSearch,
         onRemoveResume = viewModel::removeResume,
         onMarkResumeWatched = viewModel::markResumeWatched,
+        watchlist = watchlist,
+        onRemoveFromWatchlist = viewModel::removeFromWatchlist,
+        onAddToWatchlist = viewModel::addToWatchlist,
     )
 }

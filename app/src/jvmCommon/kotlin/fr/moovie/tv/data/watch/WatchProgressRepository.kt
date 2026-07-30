@@ -1,5 +1,6 @@
 package fr.moovie.tv.data.watch
 
+import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -12,6 +13,7 @@ import kotlinx.serialization.json.Json
 
 private const val RESUME_PREFIX = "resume:"
 private const val SEEN_PREFIX = "seen:"
+private const val LATER_PREFIX = "later:"
 
 /**
  * Suivi de lecture : reprise (position + métadonnées) et statut vu/non vu.
@@ -41,8 +43,29 @@ class WatchProgressRepository {
             .toSet()
     }
 
+    /** Titres mis de côté, de l'ajout le plus récent au plus ancien. */
+    val watchlist: Flow<List<WatchlistEntry>> = store.data.map { prefs ->
+        prefs.asMap().mapNotNull { (k, v) ->
+            if (!k.name.startsWith(LATER_PREFIX)) return@mapNotNull null
+            runCatching { json.decodeFromString<WatchlistEntry>(v as String) }.getOrNull()
+        }.sortedByDescending { it.addedAt }
+    }
+
     /** Position sauvegardée en ms (0 si aucune / terminé). */
     suspend fun position(key: String): Long = entry(key)?.positionMs ?: 0L
+
+    /** Ajoute un titre à « À regarder plus tard » (ou rafraîchit ses métadonnées). */
+    suspend fun addToWatchlist(entry: WatchlistEntry) {
+        store.edit { prefs ->
+            prefs[stringPreferencesKey(LATER_PREFIX + entry.key)] =
+                json.encodeToString(entry.copy(addedAt = System.currentTimeMillis()))
+        }
+    }
+
+    /** Retire un titre de « À regarder plus tard ». */
+    suspend fun removeFromWatchlist(key: String) {
+        store.edit { it.remove(stringPreferencesKey(LATER_PREFIX + key)) }
+    }
 
     /**
      * Enregistre les métadonnées du contenu qu'on s'apprête à lire (appelé au
@@ -75,6 +98,7 @@ class WatchProgressRepository {
                 durationMs > 0 && positionMs >= durationMs - 10_000 -> {
                     prefs.remove(k)
                     prefs[booleanPreferencesKey(SEEN_PREFIX + key)] = true
+                    prefs.pruneWatchlist(key)
                 }
                 positionMs > 5_000 -> prefs[k] = json.encodeToString(
                     existing.copy(
@@ -98,6 +122,7 @@ class WatchProgressRepository {
             if (watched) {
                 prefs[booleanPreferencesKey(SEEN_PREFIX + key)] = true
                 prefs.remove(stringPreferencesKey(RESUME_PREFIX + key))
+                prefs.pruneWatchlist(key)
             } else {
                 prefs.remove(booleanPreferencesKey(SEEN_PREFIX + key))
             }
@@ -115,7 +140,45 @@ class WatchProgressRepository {
                     prefs.remove(booleanPreferencesKey(SEEN_PREFIX + key))
                 }
             }
+            // Après le lot : le total d'épisodes vus n'est atteint qu'une fois
+            // toutes les clés posées.
+            if (watched) keys.firstOrNull()?.let { prefs.pruneWatchlist(it) }
         }
+    }
+
+    /**
+     * Sort un titre de « À regarder plus tard » dès qu'il est terminé : un film
+     * marqué vu, une série dont tous les épisodes le sont. Sans ça, la liste se
+     * remplissait de contenus déjà regardés et demandait un ménage manuel.
+     *
+     * Appelé depuis les trois endroits qui posent un « vu » — marquage manuel,
+     * marquage en lot d'une saison, et fin de lecture détectée par [save] —
+     * pour que la règle vaille aussi quand le titre est terminé depuis le
+     * lecteur, sans repasser par la fiche.
+     */
+    private fun MutablePreferences.pruneWatchlist(watchedKey: String) {
+        val titleKey = when {
+            watchedKey.startsWith("movie:") -> watchedKey
+            // "tv:<id>:s1e2" → "tv:<id>" : la liste est au niveau du titre.
+            watchedKey.startsWith("tv:") -> watchedKey.split(":").take(2).joinToString(":")
+            else -> return
+        }
+        val laterKey = stringPreferencesKey(LATER_PREFIX + titleKey)
+        val entry = this[laterKey]?.let {
+            runCatching { json.decodeFromString<WatchlistEntry>(it) }.getOrNull()
+        } ?: return
+
+        if (!entry.isTv) {
+            if (this[booleanPreferencesKey(SEEN_PREFIX + titleKey)] == true) remove(laterKey)
+            return
+        }
+        // Sans total connu, on ne peut pas conclure : on garde la série plutôt
+        // que de la faire disparaître au premier épisode vu.
+        if (entry.totalEpisodes <= 0) return
+        val seen = asMap().keys.count {
+            it.name.startsWith("$SEEN_PREFIX$titleKey:")
+        }
+        if (seen >= entry.totalEpisodes) remove(laterKey)
     }
 
     private suspend fun entry(key: String): ResumeEntry? =

@@ -30,6 +30,7 @@ fun DetailsScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val sources by viewModel.sources.collectAsStateWithLifecycle()
     val resolved by viewModel.resolved.collectAsStateWithLifecycle()
+    val inWatchlist by viewModel.inWatchlist.collectAsStateWithLifecycle()
     val resolveError by viewModel.resolveError.collectAsStateWithLifecycle()
     val streamLang by viewModel.streamLanguage.collectAsStateWithLifecycle()
     val watched by viewModel.watched.collectAsStateWithLifecycle()
@@ -106,6 +107,8 @@ fun DetailsScreen(
         onOpenEpisodePanel = viewModel::openEpisodePanel,
         onToggleWatched = viewModel::toggleWatched,
         onToggleSeasonWatched = viewModel::toggleSeasonWatched,
+        inWatchlist = inWatchlist,
+        onToggleWatchlist = viewModel::toggleWatchlist,
         onOpenPanel = viewModel::openPanel,
         onClosePanel = viewModel::closePanel,
         onPickSource = viewModel::play,

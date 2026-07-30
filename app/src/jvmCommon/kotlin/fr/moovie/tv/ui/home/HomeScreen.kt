@@ -22,6 +22,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
@@ -57,6 +59,7 @@ import androidx.compose.ui.window.Dialog
 import coil3.compose.AsyncImage
 import fr.moovie.tv.data.tmdb.TmdbItem
 import fr.moovie.tv.data.watch.ResumeEntry
+import fr.moovie.tv.data.watch.WatchlistEntry
 import fr.moovie.tv.resources.Res
 import fr.moovie.tv.resources.common_loading
 import fr.moovie.tv.resources.home_continue_watching
@@ -67,6 +70,10 @@ import fr.moovie.tv.resources.home_search
 import fr.moovie.tv.resources.home_settings
 import fr.moovie.tv.resources.mark_watched
 import fr.moovie.tv.resources.resume_remove
+import fr.moovie.tv.resources.watchlist_add
+import fr.moovie.tv.resources.watchlist_open
+import fr.moovie.tv.resources.watchlist_remove
+import fr.moovie.tv.resources.watchlist_row
 import fr.moovie.tv.ui.components.MOOVIE_ACCENT
 import fr.moovie.tv.ui.components.MoovieButton
 import fr.moovie.tv.ui.components.MoovieCard
@@ -90,9 +97,17 @@ fun HomeScreenContent(
     onOpenSearch: () -> Unit,
     onRemoveResume: (String) -> Unit,
     onMarkResumeWatched: (String) -> Unit,
+    watchlist: List<WatchlistEntry> = emptyList(),
+    onRemoveFromWatchlist: (String) -> Unit = {},
+    onAddToWatchlist: (TmdbItem) -> Unit = {},
 ) {
     // Élément focalisé (D-pad) ou survolé → alimente le hero et le fond.
     var focused by remember { mutableStateOf<HeroTarget?>(null) }
+    var watchlistMenuFor by remember { mutableStateOf<WatchlistEntry?>(null) }
+    var catalogMenuFor by remember { mutableStateOf<TmdbItem?>(null) }
+    // Clés déjà mises de côté : sert au badge des affiches du catalogue et au
+    // libellé du menu (ajouter / retirer).
+    val watchlistKeys = remember(watchlist) { watchlist.map { it.key }.toSet() }
     // Cible de descente depuis l'en-tête : sans ça, le focus reste bloqué sur
     // les boutons (les cartes sont hors du faisceau vertical du D-pad).
     val firstContentFocus = remember { FocusRequester() }
@@ -190,19 +205,58 @@ fun HomeScreenContent(
                             )
                         }
                     }
+                    // Juste après « Reprendre » : ce qu'on a mis de côté vient
+                    // avant le catalogue, qui est de la découverte.
+                    if (watchlist.isNotEmpty()) {
+                        item {
+                            WatchlistRow(
+                                entries = watchlist,
+                                onOpenTitle = onOpenTitle,
+                                onMenu = { watchlistMenuFor = it },
+                                firstFocus = if (resume.isEmpty()) firstContentFocus else null,
+                            )
+                        }
+                    }
                     itemsIndexed(s.rows) { rowIndex, row ->
                         CatalogRow(
                             row = row,
                             watched = watched,
                             onOpenTitle = onOpenTitle,
                             onFocusItem = { focused = HeroTarget.Catalog(it) },
-                            // Sans rail Reprendre, la 1re rangée devient la cible
-                            // de descente depuis l'en-tête.
-                            firstFocus = if (resume.isEmpty() && rowIndex == 0) firstContentFocus else null,
+                            watchlistKeys = watchlistKeys,
+                            onMenu = { catalogMenuFor = it },
+                            // Sans rail Reprendre ni watchlist, la 1re rangée
+                            // devient la cible de descente depuis l'en-tête.
+                            firstFocus = if (resume.isEmpty() && watchlist.isEmpty() && rowIndex == 0) {
+                                firstContentFocus
+                            } else {
+                                null
+                            },
                         )
                     }
                 }
             }
+        }
+
+        catalogMenuFor?.let { item ->
+            val key = if (item.isTv) "tv:${item.id}" else "movie:${item.id}"
+            CatalogMenuDialog(
+                title = item.displayTitle,
+                inWatchlist = key in watchlistKeys,
+                onDismiss = { catalogMenuFor = null },
+                onToggle = {
+                    if (key in watchlistKeys) onRemoveFromWatchlist(key) else onAddToWatchlist(item)
+                },
+            )
+        }
+
+        watchlistMenuFor?.let { entry ->
+            WatchlistMenuDialog(
+                entry = entry,
+                onDismiss = { watchlistMenuFor = null },
+                onOpen = { onOpenTitle(entry.tmdbId, entry.isTv) },
+                onRemove = { onRemoveFromWatchlist(entry.key) },
+            )
         }
 
         resumeMenuFor?.let { entry ->
@@ -464,6 +518,8 @@ private fun CatalogRow(
     watched: Set<String>,
     onOpenTitle: (Int, Boolean) -> Unit,
     onFocusItem: (TmdbItem) -> Unit,
+    watchlistKeys: Set<String> = emptySet(),
+    onMenu: (TmdbItem) -> Unit = {},
     firstFocus: FocusRequester? = null,
 ) {
     Column {
@@ -485,7 +541,9 @@ private fun CatalogRow(
                         item = item,
                         // Badge ✓ seulement pour les films (une série n'a pas de clé unique).
                         isWatched = !item.isTv && "movie:${item.id}" in watched,
+                        inWatchlist = (if (item.isTv) "tv:${item.id}" else "movie:${item.id}") in watchlistKeys,
                         onClick = { onOpenTitle(item.id, item.isTv) },
+                        onLongClick = { onMenu(item) },
                         onFocusItem = onFocusItem,
                         modifier = if (index == 0 && firstFocus != null) Modifier.focusRequester(firstFocus) else Modifier,
                     )
@@ -501,10 +559,13 @@ private fun PosterCard(
     isWatched: Boolean,
     onClick: () -> Unit,
     onFocusItem: (TmdbItem) -> Unit,
+    inWatchlist: Boolean = false,
+    onLongClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     MoovieCard(
         onClick = onClick,
+        onLongClick = onLongClick,
         modifier = modifier
             .width(150.dp)
             .onFocusChanged { if (it.isFocused) onFocusItem(item) },
@@ -532,6 +593,26 @@ private fun PosterCard(
                         Text("✓", color = Color(0xFF5FD98A), style = MaterialTheme.typography.labelSmall)
                     }
                 }
+                // Signet en bas : l'ajout depuis une rangée doit se voir tout de
+                // suite, sans quoi rien ne distingue une carte déjà mise de côté.
+                if (inWatchlist) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(6.dp)
+                            .size(22.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xCC0A0A0A)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            Icons.Default.Bookmark,
+                            contentDescription = null,
+                            tint = MOOVIE_ACCENT,
+                            modifier = Modifier.size(13.dp),
+                        )
+                    }
+                }
             }
             MoovieMarqueeText(
                 text = item.displayTitle,
@@ -540,4 +621,166 @@ private fun PosterCard(
             )
         }
     }
+}
+
+/**
+ * Rail « À regarder plus tard » : affiches, sans barre de progression — rien
+ * n'a encore été lu, contrairement au rail « Reprendre » juste au-dessus.
+ */
+@Composable
+private fun WatchlistRow(
+    entries: List<WatchlistEntry>,
+    onOpenTitle: (Int, Boolean) -> Unit,
+    onMenu: (WatchlistEntry) -> Unit,
+    firstFocus: FocusRequester? = null,
+) {
+    Column {
+        Text(
+            stringResource(Res.string.watchlist_row),
+            style = MaterialTheme.typography.titleLarge,
+            modifier = Modifier.padding(horizontal = 32.dp),
+        )
+        Spacer(Modifier.height(8.dp))
+        val listState = rememberLazyListState()
+        MoovieRail(listState) {
+            LazyRow(
+                state = listState,
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                contentPadding = PaddingValues(horizontal = 32.dp, vertical = 12.dp),
+            ) {
+                itemsIndexed(entries, key = { _, e -> e.key }) { index, entry ->
+                    WatchlistCard(
+                        entry = entry,
+                        onClick = { onOpenTitle(entry.tmdbId, entry.isTv) },
+                        onLongClick = { onMenu(entry) },
+                        modifier = if (index == 0 && firstFocus != null) {
+                            Modifier.focusRequester(firstFocus)
+                        } else {
+                            Modifier
+                        },
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** Affiche d'un titre mis de côté, avec le signet qui rappelle d'où il vient. */
+@Composable
+private fun WatchlistCard(
+    entry: WatchlistEntry,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    MoovieCard(onClick = onClick, onLongClick = onLongClick, modifier = modifier.width(150.dp)) {
+        Column {
+            Box {
+                AsyncImage(
+                    model = entry.imageUrl,
+                    contentDescription = entry.title,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxWidth().aspectRatio(2f / 3f),
+                )
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(6.dp)
+                        .size(22.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xCC0A0A0A)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.Default.Bookmark,
+                        contentDescription = null,
+                        tint = MOOVIE_ACCENT,
+                        modifier = Modifier.size(13.dp),
+                    )
+                }
+            }
+            MoovieMarqueeText(
+                text = entry.title,
+                modifier = Modifier.padding(8.dp),
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+    }
+}
+
+/** Menu contextuel d'un titre mis de côté : ouvrir sa fiche ou le retirer. */
+@Composable
+private fun WatchlistMenuDialog(
+    entry: WatchlistEntry,
+    onDismiss: () -> Unit,
+    onOpen: () -> Unit,
+    onRemove: () -> Unit,
+) {
+    val firstAction = remember { FocusRequester() }
+    Dialog(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .clip(RoundedCornerShape(14.dp))
+                .background(Color(0xF5161616))
+                .padding(28.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Text(entry.title, style = MaterialTheme.typography.titleMedium)
+            MoovieButton(
+                onClick = { onOpen(); onDismiss() },
+                modifier = Modifier.fillMaxWidth().focusRequester(firstAction),
+            ) {
+                Text(stringResource(Res.string.watchlist_open))
+            }
+            MoovieButton(
+                onClick = { onRemove(); onDismiss() },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(10.dp))
+                Text(stringResource(Res.string.watchlist_remove))
+            }
+        }
+    }
+    LaunchedEffect(Unit) { runCatching { firstAction.requestFocus() } }
+}
+
+/** Menu d'appui long sur une affiche du catalogue : mise de côté du titre. */
+@Composable
+private fun CatalogMenuDialog(
+    title: String,
+    inWatchlist: Boolean,
+    onDismiss: () -> Unit,
+    onToggle: () -> Unit,
+) {
+    val firstAction = remember { FocusRequester() }
+    Dialog(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .clip(RoundedCornerShape(14.dp))
+                .background(Color(0xF5161616))
+                .padding(28.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Text(title, style = MaterialTheme.typography.titleMedium)
+            MoovieButton(
+                onClick = { onToggle(); onDismiss() },
+                modifier = Modifier.fillMaxWidth().focusRequester(firstAction),
+                selected = inWatchlist,
+            ) {
+                Icon(
+                    if (inWatchlist) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    stringResource(
+                        if (inWatchlist) Res.string.watchlist_remove else Res.string.watchlist_add,
+                    ),
+                )
+            }
+        }
+    }
+    LaunchedEffect(Unit) { runCatching { firstAction.requestFocus() } }
 }

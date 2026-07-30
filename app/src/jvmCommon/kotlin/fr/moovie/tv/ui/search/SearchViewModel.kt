@@ -16,6 +16,10 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import fr.moovie.tv.data.watch.WatchProgressRepository
+import fr.moovie.tv.data.watch.WatchlistEntry
+import kotlinx.coroutines.flow.map
+import fr.moovie.tv.data.tmdb.TmdbItem
 
 @OptIn(FlowPreview::class)
 class SearchViewModel : ViewModel() {
@@ -53,6 +57,33 @@ class SearchViewModel : ViewModel() {
                     .onFailure { _results.value = SearchState.Empty }
             }
         }
+    }
+
+    private val watchRepo = WatchProgressRepository()
+
+    /** Clés des titres déjà mis de côté (badge + libellé du menu d'appui long). */
+    val watchlistKeys: StateFlow<Set<String>> = watchRepo.watchlist
+        .map { list -> list.map { it.key }.toSet() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
+
+    /** Met un résultat de recherche de côté. */
+    fun addToWatchlist(item: TmdbItem) {
+        viewModelScope.launch {
+            watchRepo.addToWatchlist(
+                WatchlistEntry(
+                    key = if (item.isTv) WatchlistEntry.tvKey(item.id) else WatchlistEntry.movieKey(item.id),
+                    tmdbId = item.id,
+                    isTv = item.isTv,
+                    title = item.displayTitle,
+                    imageUrl = item.posterUrl(),
+                ),
+            )
+        }
+    }
+
+    /** Retire un titre de la liste. */
+    fun removeFromWatchlist(key: String) {
+        viewModelScope.launch { watchRepo.removeFromWatchlist(key) }
     }
 
     fun setQuery(q: String) { _query.value = q }

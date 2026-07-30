@@ -18,6 +18,7 @@ fun SearchScreen(
     val query by viewModel.query.collectAsStateWithLifecycle()
     val results by viewModel.results.collectAsStateWithLifecycle()
     val history by viewModel.history.collectAsStateWithLifecycle()
+    val watchlistKeys by viewModel.watchlistKeys.collectAsStateWithLifecycle()
 
     SearchScreenContent(
         query = query,
@@ -28,6 +29,9 @@ fun SearchScreen(
             viewModel.remember()
             onOpenTitle(item.id, item.isTv)
         },
+        watchlistKeys = watchlistKeys,
+        onAddToWatchlist = viewModel::addToWatchlist,
+        onRemoveFromWatchlist = viewModel::removeFromWatchlist,
         onRemoveHistory = viewModel::removeHistory,
         onClearHistory = viewModel::clearHistory,
     )

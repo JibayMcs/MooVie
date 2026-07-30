@@ -140,4 +140,9 @@
     <string name="language_fr">Français</string>
     <string name="language_en">Anglais</string>
     <string name="language_es">Espagnol</string>
+    <string name="watchlist_row">À regarder plus tard</string>
+    <string name="watchlist_add">Ajouter à ma liste</string>
+    <string name="watchlist_remove">Retirer de ma liste</string>
+    <string name="watchlist_added">Dans ma liste</string>
+    <string name="watchlist_open">Ouvrir la fiche</string>
 </resources>

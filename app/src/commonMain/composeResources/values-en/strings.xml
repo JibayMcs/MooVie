@@ -138,4 +138,9 @@
     <string name="language_fr">French</string>
     <string name="language_en">English</string>
     <string name="language_es">Spanish</string>
+    <string name="watchlist_row">Watch later</string>
+    <string name="watchlist_add">Add to my list</string>
+    <string name="watchlist_remove">Remove from my list</string>
+    <string name="watchlist_added">In my list</string>
+    <string name="watchlist_open">Open details</string>
 </resources>
