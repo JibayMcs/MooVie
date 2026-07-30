@@ -68,12 +68,11 @@ Grab the latest build from [Releases](https://github.com/JibayMcs/MooVie/release
 - **Windows** — `moovie-vX.Y.Z.msi`
 - **macOS** — `moovie-vX.Y.Z.dmg`
 
-Desktop playback needs **VLC** installed on the machine.
-
-The AppImage bundles its own runtime and libraries, so it runs on any distribution
-(tested on Ubuntu 22.04/24.04, Debian 12 and Arch). It also updates itself from
-inside the app; the Windows installer still sends you to the release page, since
-an `.msi` needs admin rights.
+The Linux AppImage bundles its own Java runtime **and libVLC**, so it runs on any
+distribution with nothing to install (tested on Ubuntu 22.04/24.04, Debian 12 and
+Arch). It also updates itself from inside the app. On **Windows and macOS**, VLC
+must still be installed on the machine, and the installer sends you to the release
+page — an `.msi` needs admin rights.
 
 On first launch, paste a free [TMDB API key](https://www.themoviedb.org/settings/api)
 under **Settings → API & Keys**. Later updates are handled from inside the app.

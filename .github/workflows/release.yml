@@ -99,7 +99,12 @@ jobs:
           apt-get update
           # binutils : jlink appelle objcopy pour --strip-debug, et un conteneur
           # nu ne l'a pas — contrairement à un poste de développement.
-          apt-get install -y openjdk-17-jdk binutils curl file zsync git ca-certificates
+          # vlc-plugin-base / libvlc5 / libvlccore9 : source de la libVLC et des
+          # plugins embarqués dans l'AppImage. Sans eux, packageAppImage échoue
+          # explicitement plutôt que de livrer une image qui exigerait un
+          # « apt install vlc » chez l'utilisateur.
+          apt-get install -y openjdk-17-jdk binutils curl file zsync git ca-certificates \
+            libvlc5 libvlccore9 vlc-plugin-base
 
       - uses: actions/checkout@v4
 
@@ -163,6 +168,30 @@ jobs:
               || true
             apt-get install -y libasound2t64 || apt-get install -y libasound2
           fi
+
+      # libVLC est désormais embarquée : aucune de ces distributions n'a VLC
+      # installé, donc si une dépendance manquait, la lecture casserait chez
+      # l'utilisateur sans que le démarrage ne le révèle. On vérifie donc
+      # séparément que la fermeture ELF de libVLC et de ses plugins se résout.
+      - name: Dépendances de libVLC embarquée sur ${{ matrix.image }}
+        run: |
+          chmod +x moovie-*.AppImage
+          ./moovie-*.AppImage --appimage-extract >/dev/null
+          export LD_LIBRARY_PATH=squashfs-root/usr/lib/bundled
+          miss=0
+          for so in squashfs-root/usr/lib/bundled/libvlc.so.5 \
+                    $(find squashfs-root/usr/lib/vlc/plugins -name '*.so'); do
+            out=$(ldd "$so" 2>/dev/null | grep 'not found' || true)
+            if [ -n "$out" ]; then
+              miss=$((miss+1))
+              echo "$(basename $so): $(echo "$out" | awk '{print $1}' | sort -u | tr '\n' ' ')"
+            fi
+          done
+          echo "plugins en défaut : $miss"
+          # libpulse est volontairement non embarquée (protocole couplé au démon
+          # audio de l'hôte) : ses deux plugins peuvent manquer, VLC bascule
+          # alors sur ALSA. Au-delà, c'est une régression de l'embarquement.
+          [ "$miss" -le 2 ] || { echo "trop de dépendances manquantes"; exit 1; }
 
       - name: Démarrage sur ${{ matrix.image }}
         run: |

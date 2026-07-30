@@ -98,6 +98,7 @@ import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.ColorAlphaType
 import org.jetbrains.skia.ColorType
 import org.jetbrains.skia.ImageInfo
+import com.sun.jna.NativeLibrary
 import uk.co.caprica.vlcj.factory.MediaPlayerFactory
 import uk.co.caprica.vlcj.factory.discovery.NativeDiscovery
 import uk.co.caprica.vlcj.media.MediaSlaveType
@@ -109,6 +110,7 @@ import uk.co.caprica.vlcj.player.embedded.videosurface.callback.BufferFormat
 import uk.co.caprica.vlcj.player.embedded.videosurface.callback.BufferFormatCallback
 import uk.co.caprica.vlcj.player.embedded.videosurface.callback.RenderCallback
 import uk.co.caprica.vlcj.player.embedded.videosurface.callback.format.RV32BufferFormat
+import java.io.File
 import java.nio.ByteBuffer
 
 /**
@@ -193,7 +195,20 @@ internal fun DesktopPlayerScreen(
     // libVLC absent → écran d'erreur plutôt qu'un crash.
     val factory = remember {
         runCatching {
-            NativeDiscovery().discover()
+            // Depuis l'AppImage, AppRun pose MOOVIE_VLC_HOME sur la libvlc
+            // embarquée, et on saute alors la découverte de vlcj : celle-ci
+            // trouve le VLC du système et repositionne jna.library.path
+            // par-dessus le nôtre. On chargeait ainsi la libvlc de l'hôte avec
+            // notre libvlccore et nos plugins — exactement le mélange de
+            // versions que l'embarquement doit supprimer.
+            val home = System.getenv("MOOVIE_VLC_HOME")?.takeIf { File(it, "libvlc.so").exists() }
+            if (home != null) {
+                System.setProperty("jna.library.path", home)
+                NativeLibrary.addSearchPath("vlc", home)
+                NativeLibrary.addSearchPath("vlccore", home)
+            } else {
+                NativeDiscovery().discover()
+            }
             MediaPlayerFactory()
         }.onFailure {
             // Trace en console : indispensable pour diagnostiquer une libVLC

@@ -70,12 +70,11 @@ Récupérer le dernier build depuis les
 - **Windows** — `moovie-vX.Y.Z.msi`
 - **macOS** — `moovie-vX.Y.Z.dmg`
 
-La lecture desktop nécessite **VLC** installé sur la machine.
-
-L'AppImage embarque son runtime et ses bibliothèques : elle tourne sur n'importe
-quelle distribution (vérifié sur Ubuntu 22.04/24.04, Debian 12 et Arch). Elle se
-met aussi à jour depuis l'app ; l'installeur Windows renvoie toujours vers la
-page de release, un `.msi` exigeant les droits administrateur.
+L'AppImage Linux embarque son runtime Java **et libVLC** : elle tourne sur
+n'importe quelle distribution sans rien installer (vérifié sur Ubuntu 22.04/24.04,
+Debian 12 et Arch). Elle se met aussi à jour depuis l'app. Sous **Windows et
+macOS**, VLC doit toujours être installé sur la machine, et l'installeur renvoie
+vers la page de release — un `.msi` exige les droits administrateur.
 
 Au premier lancement, coller une [clé API TMDB](https://www.themoviedb.org/settings/api)
 gratuite dans **Réglages → API & Clés**. Les mises à jour suivantes se font depuis l'app.
