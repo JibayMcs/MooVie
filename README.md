@@ -70,9 +70,11 @@ Grab the latest build from [Releases](https://github.com/JibayMcs/MooVie/release
 
 The Linux AppImage bundles its own Java runtime **and libVLC**, so it runs on any
 distribution with nothing to install (tested on Ubuntu 22.04/24.04, Debian 12 and
-Arch). It also updates itself from inside the app. On **Windows and macOS**, VLC
-must still be installed on the machine, and the installer sends you to the release
-page — an `.msi` needs admin rights.
+Arch), and updates itself from inside the app. On **Windows**, the `.msi` installs
+per user — no admin rights — and adds Start-menu and desktop shortcuts; the in-app
+banner then updates it in place. On **macOS**, the banner opens the release page
+(the `.dmg` is installed by hand). Windows and macOS still need **VLC** installed
+on the machine.
 
 On first launch, paste a free [TMDB API key](https://www.themoviedb.org/settings/api)
 under **Settings → API & Keys**. Later updates are handled from inside the app.
