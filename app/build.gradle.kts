@@ -324,6 +324,11 @@ val packageAppImage by tasks.registering {
             commandLine(tool.absolutePath, appDir.absolutePath, output.absolutePath)
             environment("ARCH", "x86_64")
             environment("VERSION", appVersion)
+            // appimagetool est lui-même une AppImage : sans FUSE (cas des
+            // conteneurs de CI) son runtime ne peut pas se monter et sort en
+            // 127. Ce drapeau le fait s'extraire puis s'exécuter, ce qui
+            // fonctionne aussi bien sur un poste de travail.
+            environment("APPIMAGE_EXTRACT_AND_RUN", "1")
         }.result.get().assertNormalExitValue()
         logger.lifecycle("AppImage écrite : ${output.absolutePath}")
     }

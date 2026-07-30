@@ -97,7 +97,9 @@ jobs:
           DEBIAN_FRONTEND: noninteractive
         run: |
           apt-get update
-          apt-get install -y openjdk-17-jdk curl file zsync git ca-certificates
+          # binutils : jlink appelle objcopy pour --strip-debug, et un conteneur
+          # nu ne l'a pas — contrairement à un poste de développement.
+          apt-get install -y openjdk-17-jdk binutils curl file zsync git ca-certificates
 
       - uses: actions/checkout@v4
 
@@ -108,6 +110,11 @@ jobs:
         env:
           MOOVIE_JPACKAGE_JDK: /usr/lib/jvm/java-17-openjdk-amd64
           JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
+          # Sans locale UTF-8, la JVM d'un conteneur nu décode en ASCII et
+          # jpackage échoue sur le tiret cadratin de la description
+          # (« Input length = 1 »).
+          LANG: C.UTF-8
+          LC_ALL: C.UTF-8
         run: ./gradlew :app:packageAppImage --no-daemon
 
       - name: Renommer
