@@ -170,4 +170,9 @@
     <string name="settings_cat_history">Historial</string>
     <string name="settings_hide_history_widgets">Ocultar los widgets</string>
     <string name="settings_history_help">Abre la página del historial con la cuadrícula a pantalla completa. Desactívalo para mostrar las tarjetas de estadísticas encima.</string>
+
+    <!-- Explorar (página de búsqueda) -->
+    <string name="explore_movies">Películas</string>
+    <string name="explore_series">Series</string>
+    <string name="explore_no_results">No hay títulos en este género.</string>
 </resources>

@@ -75,6 +75,10 @@ internal fun DesktopSearchScreen(
     val results by vm.results.collectAsState()
     val history by vm.history.collectAsState()
     val watchlistKeys by vm.watchlistKeys.collectAsState()
+    val exploreIsTv by vm.exploreIsTv.collectAsState()
+    val genres by vm.genres.collectAsState()
+    val selectedGenre by vm.selectedGenre.collectAsState()
+    val discover by vm.discover.collectAsState()
 
     SearchScreenContent(
         query = query,
@@ -90,6 +94,12 @@ internal fun DesktopSearchScreen(
         onRemoveFromWatchlist = vm::removeFromWatchlist,
         onRemoveHistory = vm::removeHistory,
         onClearHistory = vm::clearHistory,
+        exploreIsTv = exploreIsTv,
+        genres = genres,
+        selectedGenre = selectedGenre,
+        discover = discover,
+        onSetExploreType = vm::setExploreType,
+        onSelectGenre = vm::selectGenre,
     )
 }
 

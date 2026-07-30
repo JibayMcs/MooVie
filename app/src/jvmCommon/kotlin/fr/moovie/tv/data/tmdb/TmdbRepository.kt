@@ -94,6 +94,20 @@ class TmdbRepository(
             .results
             .filter { it.mediaType == "movie" || it.mediaType == "tv" }
 
+    /** Genres du catalogue, dans la langue de l'app (listes distinctes film / série). */
+    suspend fun genres(apiKey: String, isTv: Boolean): List<Genre> =
+        api.genres(if (isTv) "tv" else "movie", apiKey, language).genres
+
+    /** Titres d'un genre, les plus populaires d'abord. */
+    suspend fun discover(apiKey: String, isTv: Boolean, genreId: Int, page: Int = 1): List<TmdbItem> =
+        api.discover(
+            media = if (isTv) "tv" else "movie",
+            apiKey = apiKey,
+            language = language,
+            genreId = genreId,
+            page = page,
+        ).results
+
     suspend fun movieDetails(apiKey: String, id: Int): MovieDetails =
         api.movieDetails(id, apiKey, language)
 

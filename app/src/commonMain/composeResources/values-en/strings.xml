@@ -170,4 +170,9 @@
     <string name="settings_cat_history">History</string>
     <string name="settings_hide_history_widgets">Hide widgets</string>
     <string name="settings_history_help">Opens the history page on the full-height grid. Turn off to show the stat cards above it.</string>
+
+    <!-- Explore (search page) -->
+    <string name="explore_movies">Movies</string>
+    <string name="explore_series">Shows</string>
+    <string name="explore_no_results">No titles in this genre.</string>
 </resources>

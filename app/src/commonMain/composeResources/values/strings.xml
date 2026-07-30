@@ -172,4 +172,9 @@
     <string name="settings_cat_history">Historique</string>
     <string name="settings_hide_history_widgets">Masquer les widgets</string>
     <string name="settings_history_help">Ouvre la page d'historique sur la grille pleine hauteur. Désactive pour afficher les cartes de statistiques au-dessus.</string>
+
+    <!-- Explorer (page de recherche) -->
+    <string name="explore_movies">Films</string>
+    <string name="explore_series">Séries</string>
+    <string name="explore_no_results">Aucun titre dans ce genre.</string>
 </resources>

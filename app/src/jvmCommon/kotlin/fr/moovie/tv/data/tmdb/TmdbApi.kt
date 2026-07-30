@@ -32,6 +32,24 @@ interface TmdbApi {
         @Query("page") page: Int = 1,
     ): TmdbPageResult
 
+    @GET("genre/{media}/list")
+    suspend fun genres(
+        @Path("media") media: String, // "movie" | "tv"
+        @Query("api_key") apiKey: String,
+        @Query("language") language: String,
+    ): GenreListResult
+
+    /** Catalogue filtré par genre — la page « explorer » de la recherche. */
+    @GET("discover/{media}")
+    suspend fun discover(
+        @Path("media") media: String, // "movie" | "tv"
+        @Query("api_key") apiKey: String,
+        @Query("language") language: String,
+        @Query("with_genres") genreId: Int,
+        @Query("sort_by") sortBy: String = "popularity.desc",
+        @Query("page") page: Int = 1,
+    ): TmdbPageResult
+
     @GET("movie/{id}")
     suspend fun movieDetails(
         @Path("id") id: Int,

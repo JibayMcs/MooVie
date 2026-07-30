@@ -14,6 +14,12 @@ data class TmdbPageResult(
     @SerialName("total_pages") val totalPages: Int = 1,
 )
 
+/** Réponse de `/genre/{media}/list` : les genres du catalogue, traduits. */
+@Serializable
+data class GenreListResult(
+    val genres: List<Genre> = emptyList(),
+)
+
 @Serializable
 data class TmdbItem(
     val id: Int,

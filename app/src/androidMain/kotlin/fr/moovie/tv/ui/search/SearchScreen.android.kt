@@ -19,6 +19,10 @@ fun SearchScreen(
     val results by viewModel.results.collectAsStateWithLifecycle()
     val history by viewModel.history.collectAsStateWithLifecycle()
     val watchlistKeys by viewModel.watchlistKeys.collectAsStateWithLifecycle()
+    val exploreIsTv by viewModel.exploreIsTv.collectAsStateWithLifecycle()
+    val genres by viewModel.genres.collectAsStateWithLifecycle()
+    val selectedGenre by viewModel.selectedGenre.collectAsStateWithLifecycle()
+    val discover by viewModel.discover.collectAsStateWithLifecycle()
 
     SearchScreenContent(
         query = query,
@@ -34,5 +38,11 @@ fun SearchScreen(
         onRemoveFromWatchlist = viewModel::removeFromWatchlist,
         onRemoveHistory = viewModel::removeHistory,
         onClearHistory = viewModel::clearHistory,
+        exploreIsTv = exploreIsTv,
+        genres = genres,
+        selectedGenre = selectedGenre,
+        discover = discover,
+        onSetExploreType = viewModel::setExploreType,
+        onSelectGenre = viewModel::selectGenre,
     )
 }
