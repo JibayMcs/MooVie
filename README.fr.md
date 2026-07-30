@@ -72,9 +72,11 @@ Récupérer le dernier build depuis les
 
 L'AppImage Linux embarque son runtime Java **et libVLC** : elle tourne sur
 n'importe quelle distribution sans rien installer (vérifié sur Ubuntu 22.04/24.04,
-Debian 12 et Arch). Elle se met aussi à jour depuis l'app. Sous **Windows et
-macOS**, VLC doit toujours être installé sur la machine, et l'installeur renvoie
-vers la page de release — un `.msi` exige les droits administrateur.
+Debian 12 et Arch) et se met à jour depuis l'app. Sous **Windows**, le `.msi`
+s'installe par utilisateur — sans droits administrateur — et ajoute des raccourcis
+au menu Démarrer et au bureau ; le bandeau intégré le met alors à jour en place.
+Sous **macOS**, le bandeau ouvre la page de release (le `.dmg` s'installe à la
+main). Windows et macOS nécessitent toujours **VLC** installé sur la machine.
 
 Au premier lancement, coller une [clé API TMDB](https://www.themoviedb.org/settings/api)
 gratuite dans **Réglages → API & Clés**. Les mises à jour suivantes se font depuis l'app.
