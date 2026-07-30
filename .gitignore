@@ -18,3 +18,7 @@ keystore.properties
 # Outils de dev locaux, non versionnés (consignes projet)
 /CLAUDE.md
 /.claude/
+/build-tools/
+
+# Outils téléchargés pour l'empaquetage (appimagetool)
+/build-tools/

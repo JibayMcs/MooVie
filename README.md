@@ -57,18 +57,23 @@ no account, no ads.
 | Extraction | OkHttp + Jsoup + Java crypto (packer deobfuscation, AES) |
 | Storage | DataStore Preferences, OkHttp disk cache |
 | Images | Coil 3 |
-| CI | GitHub Actions: a `vX.Y.Z` tag builds the signed APK, `.deb`, `.msi` and `.dmg` |
+| CI | GitHub Actions: a `vX.Y.Z` tag builds the signed APK, AppImage, `.msi` and `.dmg` |
 
 ## Install
 
 Grab the latest build from [Releases](https://github.com/JibayMcs/MooVie/releases):
 
 - **Android TV** — sideload `moovie-vX.Y.Z.apk`
-- **Linux** — `moovie-vX.Y.Z.deb`
+- **Linux** — `moovie-vX.Y.Z-x86_64.AppImage` (`chmod +x`, then run — no install, no root)
 - **Windows** — `moovie-vX.Y.Z.msi`
 - **macOS** — `moovie-vX.Y.Z.dmg`
 
 Desktop playback needs **VLC** installed on the machine.
+
+The AppImage bundles its own runtime and libraries, so it runs on any distribution
+(tested on Ubuntu 22.04/24.04, Debian 12 and Arch). It also updates itself from
+inside the app; the Windows installer still sends you to the release page, since
+an `.msi` needs admin rights.
 
 On first launch, paste a free [TMDB API key](https://www.themoviedb.org/settings/api)
 under **Settings → API & Keys**. Later updates are handled from inside the app.

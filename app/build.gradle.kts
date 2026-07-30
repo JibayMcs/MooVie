@@ -12,7 +12,7 @@ plugins {
 
 // Version unique Android + desktop (l'updater compare les tags GitHub à cette
 // valeur ; côté desktop elle est injectée en propriété système moovie.version).
-val appVersion = "1.2.0"
+val appVersion = "1.3.0"
 
 // Signature release : keystore.properties en local (gitignoré), variables
 // d'environnement en CI (KEYSTORE_FILE / KEYSTORE_PASSWORD / KEY_ALIAS).
@@ -120,7 +120,7 @@ android {
         applicationId = "fr.moovie.tv"
         minSdk = 23
         targetSdk = 34
-        versionCode = 11
+        versionCode = 12
         versionName = appVersion
     }
 
@@ -176,7 +176,11 @@ compose.desktop {
         System.getenv("MOOVIE_JPACKAGE_JDK")?.let { javaHome = it }
 
         nativeDistributions {
-            targetFormats(TargetFormat.Deb, TargetFormat.Msi, TargetFormat.Dmg)
+            // Linux passe par l'AppImage (tâche packageAppImage ci-dessous) :
+            // un .deb ne couvrait qu'Ubuntu, déclarait des dépendances système
+            // héritées de la machine de build, et interdisait la mise à jour
+            // in-app faute de pouvoir s'installer sans root.
+            targetFormats(TargetFormat.Msi, TargetFormat.Dmg)
             packageName = "Moo-vie"
             packageVersion = appVersion
             description = "Moo-vie — streaming, extraction de sources on-device"
@@ -189,95 +193,138 @@ compose.desktop {
             // l'icône Kotlin/Java par défaut. Les fichiers sont versionnés
             // (générés depuis docs/assets/sources/moo_vie_launcher_icon_master_1024x1024.png)
             // car la CI n'a pas d'outil de conversion ico/icns.
-            linux {
-                iconFile.set(project.file("icons/moovie.png"))
-                debMaintainer = "theamateis@gmail.com"
-            }
+            linux { iconFile.set(project.file("icons/moovie.png")) }
             windows { iconFile.set(project.file("icons/moovie.ico")) }
             macOS { iconFile.set(project.file("icons/moovie.icns")) }
         }
     }
 }
 
-// Dépendances Debian du paquet, et le plugin Compose n'expose aucun moyen de les
-// surcharger. Celles que jpackage génère sont exactes mais collées à la machine
-// de build : un build sur Ubuntu 22.04 exige `libpcre3`, parce que la glib de
-// 22.04 s'appuie sur pcre1 alors que celle de 24.04 utilise pcre2. Le paquet ne
-// s'installait donc plus sur 24.04 (`dpkg -i` en échec, état iU).
+
+// ── Paquet Linux : AppImage ──────────────────────────────────────────────────
 //
-// On ne garde ici que les bibliothèques de *tête* et on laisse apt résoudre
-// leurs enfants (libpcre, libbrotli, libharfbuzz, libxcb, libuuid…), dont les
-// noms varient d'une version à l'autre. Les quatre codecs image sont listés
-// explicitement : le runtime les lie dynamiquement et rien d'autre ne les tire —
-// vérifié par la fermeture `ldd` du bundle, pas déduit. Les alternatives
-// `xxx-t64 | xxx` couvrent le renommage dû à la transition time_t de 24.04.
-val debPackageDependencies = listOf(
-    "libc6",
-    "libstdc++6",
-    "libgcc-s1",
-    "zlib1g",
-    "libx11-6",
-    "libxext6",
-    "libxi6",
-    "libxrender1",
-    "libxtst6",
-    "libgl1",
-    "libfontconfig1",
-    "libfreetype6",
-    // Liée directement par le bundle. Sur 22.04 elle arrivait par ricochet, pas
-    // sur 24.04 : sans elle, `libharfbuzz.so.0 => not found` à l'exécution.
-    "libharfbuzz0b",
-    // Codecs image de java.desktop (PNG/JPEG/GIF + gestion des couleurs).
-    // Seul libpng a été renommé par la transition time_t : sur 24.04 c'est
-    // libpng16-16t64 qui fournit libpng16.so.16, et libpng16-16 y existe encore
-    // en paquet installable mais n'est pas celui qui est posé.
-    "libpng16-16t64 | libpng16-16",
-    // Pas d'alternative Debian ici, volontairement : `libjpeg62-turbo` fournit
-    // l'ABI libjpeg.so.62, alors que le runtime est lié contre libjpeg.so.8.
-    // L'alternative satisfaisait apt tout en laissant un symbole manquant à
-    // l'exécution — mieux vaut un échec franc à l'installation. Le paquet cible
-    // Ubuntu et ses dérivées ; Debian demanderait un runtime embarquant sa
-    // propre libjpeg.
-    "libjpeg-turbo8",
-    "libgif7",
-    "liblcms2-2",
-    "libglib2.0-0t64 | libglib2.0-0",
-    "libasound2t64 | libasound2",
-    "xdg-utils",
-).joinToString(", ")
+// jpackage ne sait produire que .deb/.rpm, qui déclarent des dépendances
+// système héritées de la machine de build et exigent root pour s'installer. Un
+// AppImage embarque ses bibliothèques, tourne sur n'importe quelle
+// distribution et, étant un simple fichier chez l'utilisateur, permet à
+// l'app de se mettre à jour elle-même.
+//
+// Attention : la glibc n'est compatible que vers l'avant. L'image doit être
+// construite sur la plus ancienne base visée, sinon elle ne démarrera pas sur
+// les distributions plus anciennes.
 
-/**
- * Réécrit `Depends:` dans le paquet produit par jpackage. Dépaquetage puis
- * reconstruction via dpkg-deb, en place : la CI récupère le `.deb` au même
- * chemin, sans rien changer à son script.
- */
-val rewriteDebDependencies by tasks.registering {
-    description = "Remplace les dépendances devinées par jpackage par un jeu figé."
+private val appImageToolUrl =
+    "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage"
+
+val packageAppImage by tasks.registering {
+    group = "compose desktop"
+    description = "Emballe l'app-image jpackage dans un .AppImage Linux."
+    dependsOn("createDistributable")
+
+    val appDirRoot = layout.buildDirectory.dir("appimage").get().asFile
+    val output = layout.buildDirectory
+        .file("compose/binaries/main/appimage/Moo-vie-$appVersion-x86_64.AppImage").get().asFile
+    outputs.file(output)
+
     doLast {
-        val debDir = layout.buildDirectory.dir("compose/binaries/main/deb").get().asFile
-        val deb = debDir.listFiles()?.singleOrNull { it.name.endsWith(".deb") }
-            ?: error("Aucun .deb unique trouvé dans $debDir")
-        val work = File(temporaryDir, "repack").apply { deleteRecursively(); mkdirs() }
+        val distributable = layout.buildDirectory
+            .dir("compose/binaries/main/app/Moo-vie").get().asFile
+        require(distributable.isDirectory) { "app-image introuvable : $distributable" }
 
-        providers.exec {
-            commandLine("dpkg-deb", "--raw-extract", deb.absolutePath, work.absolutePath)
-        }.result.get().assertNormalExitValue()
-
-        val control = File(work, "DEBIAN/control")
-        val patched = control.readLines().map { line ->
-            if (line.startsWith("Depends:")) "Depends: $debPackageDependencies" else line
+        // Outil téléchargé une fois puis conservé (la CI le remet en cache).
+        val tool = File(appDirRoot.parentFile, "appimagetool")
+        if (!tool.exists()) {
+            tool.parentFile.mkdirs()
+            uri(appImageToolUrl).toURL().openStream().use { input ->
+                tool.outputStream().use { input.copyTo(it) }
+            }
+            tool.setExecutable(true)
         }
-        require(patched.any { it.startsWith("Depends: $debPackageDependencies") }) {
-            "Ligne Depends introuvable dans ${control.absolutePath}"
-        }
-        control.writeText(patched.joinToString("\n", postfix = "\n"))
 
+        // AppDir : l'app sous usr/, plus les trois fichiers exigés à la racine
+        // (AppRun, .desktop, icône).
+        val appDir = File(appDirRoot, "AppDir")
+        appDir.deleteRecursively()
+        File(appDir, "usr").mkdirs()
+        copy {
+            from(distributable)
+            into(File(appDir, "usr"))
+        }
+        copy {
+            from(project.file("icons/moovie.png"))
+            into(appDir)
+            rename { "moovie.png" }
+        }
+        File(appDir, "moovie.desktop").writeText(
+            """
+            [Desktop Entry]
+            Type=Application
+            Name=Moo-vie
+            Comment=Streaming, extraction de sources on-device
+            Exec=Moo-vie
+            Icon=moovie
+            Categories=AudioVideo;Video;Player;
+            Terminal=false
+            """.trimIndent() + "\n",
+        )
+        // $APPDIR n'est pas fiable selon le mode de montage : on résout le
+        // chemin réel de AppRun, qui vit à la racine de l'AppDir.
+        File(appDir, "AppRun").apply {
+            writeText(
+                """
+                #!/bin/sh
+                HERE="${'$'}(dirname "${'$'}(readlink -f "${'$'}0")")"
+                export LD_LIBRARY_PATH="${'$'}HERE/usr/lib/bundled${'$'}{LD_LIBRARY_PATH:+:${'$'}LD_LIBRARY_PATH}"
+                exec "${'$'}HERE/usr/bin/Moo-vie" "${'$'}@"
+                """.trimIndent() + "\n",
+            )
+            setExecutable(true)
+        }
+
+        // Bibliothèques embarquées. On copie la fermeture ELF de ce dont le
+        // bundle a besoin, moins deux familles qu'on ne bundle jamais :
+        //  - graphique et son (libGL, libX*, libasound) : couplés au pilote GPU
+        //    et au serveur graphique de l'hôte, les embarquer casse plus qu'il
+        //    n'aide ; toute session de bureau les fournit ;
+        //  - glibc, libstdc++ et libgcc_s : deux copies de libstdc++ dans un
+        //    même process, c'est exactement ce qui faisait crasher le paquet
+        //    Temurin.
+        // Ce sont les autres (jpeg, gif, png, harfbuzz, fontconfig, freetype,
+        // lcms2) qui ont fait échouer le .deb selon les distributions : les
+        // embarquer supprime cette classe de problème.
+        val excluded = Regex(
+            "^(ld-linux.*|libc|libm|libdl|libpthread|librt|libresolv|libgcc_s|libstdc\\+\\+" +
+                "|libGL.*|libGLX.*|libGLdispatch|libEGL.*|libX11.*|libXext|libXi|libXrender" +
+                "|libXtst|libXau|libXdmcp|libxcb.*|libasound|libdrm.*)\\..*",
+        )
+        val bundled = File(appDir, "usr/lib/bundled").apply { mkdirs() }
+        val seen = mutableSetOf<String>()
+        fun closure(file: File) {
+            val out = providers.exec {
+                commandLine("ldd", file.absolutePath)
+                isIgnoreExitValue = true
+            }.standardOutput.asText.get()
+            out.lineSequence().forEach { line ->
+                val path = Regex("=> (/[^ ]+)").find(line)?.groupValues?.get(1) ?: return@forEach
+                val lib = File(path)
+                if (!lib.isFile || !seen.add(lib.name)) return@forEach
+                if (excluded.containsMatchIn(lib.name)) return@forEach
+                lib.copyTo(File(bundled, lib.name), overwrite = true)
+                closure(lib)
+            }
+        }
+        File(appDir, "usr/lib").walkTopDown()
+            .filter { it.isFile && (it.name.contains(".so") || it.name == "Moo-vie") }
+            .forEach { closure(it) }
+        closure(File(appDir, "usr/bin/Moo-vie"))
+        logger.lifecycle("Bibliothèques embarquées : ${bundled.list()?.size ?: 0}")
+
+        output.parentFile.mkdirs()
         providers.exec {
-            commandLine("dpkg-deb", "--build", work.absolutePath, deb.absolutePath)
+            commandLine(tool.absolutePath, appDir.absolutePath, output.absolutePath)
+            environment("ARCH", "x86_64")
+            environment("VERSION", appVersion)
         }.result.get().assertNormalExitValue()
-        logger.lifecycle("Dépendances du paquet figées : $debPackageDependencies")
+        logger.lifecycle("AppImage écrite : ${output.absolutePath}")
     }
 }
-
-// jpackage ne tourne que sous Linux pour le .deb ; ailleurs la tâche n'existe pas.
-tasks.matching { it.name == "packageDeb" }.configureEach { finalizedBy(rewriteDebDependencies) }

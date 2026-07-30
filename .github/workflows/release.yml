@@ -48,8 +48,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
-            ext: deb
           - os: windows-latest
             ext: msi
           - os: macos-latest
@@ -65,19 +63,6 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      # Le runtime que jpackage embarque dans le paquet ne peut pas être Temurin
-      # sous Linux : libVLC part en SIGSEGV dans son démuxeur adaptive dès le
-      # démarrage d'une lecture (reproduit 7/7 sur Ubuntu 24.04, absent avec
-      # l'OpenJDK de la distribution — bisection A/B sur le même binaire, même
-      # VLC 3.0.20, même Java 17.0.19). Gradle continue de tourner sur Temurin,
-      # seul le runtime jlinké change.
-      - name: Runtime embarqué (OpenJDK de la distribution)
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y openjdk-17-jdk
-          echo "MOOVIE_JPACKAGE_JDK=/usr/lib/jvm/java-17-openjdk-amd64" >> "$GITHUB_ENV"
-
       - name: Build paquet desktop (${{ matrix.ext }})
         run: ./gradlew packageDistributionForCurrentOS --no-daemon
 
@@ -87,93 +72,112 @@ jobs:
           src=$(find app/build/compose/binaries -name "*.${{ matrix.ext }}" | head -1)
           cp "$src" "moovie-${{ github.ref_name }}.${{ matrix.ext }}"
 
-      # Le .deb ne part pas directement en release : il doit d'abord prouver
-      # qu'il s'installe (job verify-deb). msi et dmg publient tout de suite,
-      # faute d'équivalent conteneurisé pour les tester.
       - name: Publier sur la release GitHub
-        if: runner.os != 'Linux'
         uses: softprops/action-gh-release@v2
         with:
           files: moovie-*.${{ matrix.ext }}
           generate_release_notes: true
 
-      - name: Conserver le .deb pour vérification
-        if: runner.os == 'Linux'
-        uses: actions/upload-artifact@v4
+  # Linux passe par un AppImage : il embarque ses bibliothèques, tourne sur
+  # n'importe quelle distribution et, étant un fichier unique chez
+  # l'utilisateur, permet la mise à jour depuis l'app. Le .deb qu'il remplace
+  # ne couvrait qu'Ubuntu et avait déjà été livré une fois avec une dépendance
+  # (libpcre3) absente de la distribution cible.
+  #
+  # Build dans un conteneur 22.04 et non sur ubuntu-latest : la glibc n'est
+  # compatible que vers l'avant, une image construite sur 24.04 ne démarrerait
+  # pas sur les distributions plus anciennes.
+  appimage:
+    runs-on: ubuntu-latest
+    container:
+      image: ubuntu:22.04
+    steps:
+      - name: Dépendances de build
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          apt-get update
+          apt-get install -y openjdk-17-jdk curl file zsync git ca-certificates
+
+      - uses: actions/checkout@v4
+
+      # Le runtime embarqué ne peut pas être Temurin : libVLC part en SIGSEGV
+      # dans son démuxeur adaptive dès le démarrage d'une lecture (reproduit
+      # 7/7, absent avec l'OpenJDK de la distribution).
+      - name: Construire l'AppImage
+        env:
+          MOOVIE_JPACKAGE_JDK: /usr/lib/jvm/java-17-openjdk-amd64
+          JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
+        run: ./gradlew :app:packageAppImage --no-daemon
+
+      - name: Renommer
+        run: |
+          src=$(find app/build/compose/binaries/main/appimage -name '*.AppImage' | head -1)
+          cp "$src" "moovie-${{ github.ref_name }}-x86_64.AppImage"
+
+      - uses: actions/upload-artifact@v4
         with:
-          name: moovie-deb
-          path: moovie-*.deb
+          name: moovie-appimage
+          path: moovie-*.AppImage
           retention-days: 1
 
-  # Le paquet a déjà été livré une fois avec une dépendance (libpcre3) absente de
-  # la distribution cible : `dpkg -i` échouait et l'app restait non configurée.
-  # jpackage dérive ces dépendances de la machine de build, donc rien ne garantit
-  # a priori qu'elles soient satisfaisables ailleurs. On installe donc le paquet
-  # pour de vrai, sur plusieurs bases, avant de le publier.
-  verify-deb:
-    needs: desktop
+  # L'AppImage ne part en release qu'après avoir prouvé qu'elle démarre sur
+  # plusieurs distributions. --appimage-extract-and-run évite d'exiger FUSE,
+  # absent des conteneurs. Sans DISPLAY l'app lève une HeadlessException : cela
+  # prouve que le runtime embarqué et notre main ont bien été atteints, ce qui
+  # est tout ce qu'on peut vérifier sans écran.
+  verify-appimage:
+    needs: appimage
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        # Ubuntu et dérivées uniquement. Debian est volontairement absent : son
-        # libjpeg fournit l'ABI .so.62 quand le runtime attend .so.8, ce que
-        # seule une image embarquant sa propre libjpeg règlerait.
-        image: ['ubuntu:22.04', 'ubuntu:24.04']
+        image: ['ubuntu:22.04', 'ubuntu:24.04', 'debian:12', 'archlinux:latest']
     container:
       image: ${{ matrix.image }}
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: moovie-deb
+          name: moovie-appimage
 
-      # Un conteneur nu n'a ni /usr/share/applications ni desktop-directories, et
-      # le postinst du paquet (xdg-desktop-menu) échoue alors pour une raison qui
-      # n'existe sur aucune machine de bureau. On rend l'environnement
-      # représentatif plutôt que d'assouplir la vérification.
-      - name: Préparer un environnement de bureau minimal
+      # L'AppImage embarque ses bibliothèques sauf la pile graphique et le son :
+      # libGL et libX* sont couplées au pilote GPU et au serveur graphique, on ne
+      # les bundle jamais. Toute session de bureau les fournit ; un conteneur nu
+      # non, d'où cette installation pour rendre l'environnement représentatif.
+      - name: Pile graphique minimale
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
-          apt-get update
-          apt-get install -y desktop-file-utils
-          mkdir -p /usr/share/desktop-directories
-
-      - name: Installer le paquet
-        env:
-          DEBIAN_FRONTEND: noninteractive
-        run: |
-          # `apt-get install ./fichier.deb` résout les dépendances, contrairement
-          # à `dpkg -i` — c'est aussi ce qu'on documente pour l'utilisateur.
-          apt-get install -y ./moovie-*.deb
-          # `ii` = installé et configuré. Sans ce contrôle, un postinst en échec
-          # passerait inaperçu : le paquet resterait en état iU/iF.
-          test "$(dpkg-query -W -f='${db:Status-Abbrev}' moo-vie)" = "ii " \
-            || { dpkg -l moo-vie; echo "Paquet non configuré."; exit 1; }
-
-      - name: Vérifier que rien ne manque à l'exécution
-        run: |
-          R=/opt/moo-vie/lib/runtime/lib
-          export LD_LIBRARY_PATH="$R:$R/server:/opt/moo-vie/lib:/opt/moo-vie/lib/app"
-          missing=$(find /opt/moo-vie -name '*.so' -type f -exec ldd {} \; 2>/dev/null \
-            | grep 'not found' | sort -u)
-          if [ -n "$missing" ]; then
-            echo "Bibliothèques non résolues sur ${{ matrix.image }} :"
-            echo "$missing"
-            exit 1
+          if command -v pacman >/dev/null; then
+            pacman -Sy --noconfirm libgl libx11 libxext libxi libxrender libxtst alsa-lib
+          else
+            apt-get update
+            apt-get install -y libgl1 libx11-6 libxext6 libxi6 libxrender1 libxtst6 \
+              || true
+            apt-get install -y libasound2t64 || apt-get install -y libasound2
           fi
-          echo "Fermeture des dépendances complète sur ${{ matrix.image }}."
 
-  publish-deb:
-    needs: verify-deb
+      - name: Démarrage sur ${{ matrix.image }}
+        run: |
+          chmod +x moovie-*.AppImage
+          out=$(./moovie-*.AppImage --appimage-extract-and-run 2>&1 || true)
+          echo "$out" | head -20
+          echo "$out" | grep -q "HeadlessException" || {
+            echo "L'app n'a pas atteint son point d'entrée sur ${{ matrix.image }}."
+            exit 1
+          }
+          echo "Démarrage confirmé sur ${{ matrix.image }}."
+
+  publish-appimage:
+    needs: verify-appimage
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: moovie-deb
+          name: moovie-appimage
 
       - name: Publier sur la release GitHub
         uses: softprops/action-gh-release@v2
         with:
-          files: moovie-*.deb
+          files: moovie-*.AppImage
           generate_release_notes: true

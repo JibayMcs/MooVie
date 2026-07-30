@@ -58,7 +58,7 @@ depuis une seule base de code Kotlin Multiplatform. L'extraction des sources se 
 | Extraction | OkHttp + Jsoup + crypto Java (déobfuscation packer, AES) |
 | Persistance | DataStore Preferences, cache disque OkHttp |
 | Images | Coil 3 |
-| CI | GitHub Actions : un tag `vX.Y.Z` produit l'APK signé, le `.deb`, le `.msi` et le `.dmg` |
+| CI | GitHub Actions : un tag `vX.Y.Z` produit l'APK signé, l'AppImage, le `.msi` et le `.dmg` |
 
 ## Installation
 
@@ -66,11 +66,16 @@ Récupérer le dernier build depuis les
 [Releases](https://github.com/JibayMcs/MooVie/releases) :
 
 - **Android TV** — sideload de `moovie-vX.Y.Z.apk`
-- **Linux** — `moovie-vX.Y.Z.deb`
+- **Linux** — `moovie-vX.Y.Z-x86_64.AppImage` (`chmod +x` puis lancer — ni installation ni root)
 - **Windows** — `moovie-vX.Y.Z.msi`
 - **macOS** — `moovie-vX.Y.Z.dmg`
 
 La lecture desktop nécessite **VLC** installé sur la machine.
+
+L'AppImage embarque son runtime et ses bibliothèques : elle tourne sur n'importe
+quelle distribution (vérifié sur Ubuntu 22.04/24.04, Debian 12 et Arch). Elle se
+met aussi à jour depuis l'app ; l'installeur Windows renvoie toujours vers la
+page de release, un `.msi` exigeant les droits administrateur.
 
 Au premier lancement, coller une [clé API TMDB](https://www.themoviedb.org/settings/api)
 gratuite dans **Réglages → API & Clés**. Les mises à jour suivantes se font depuis l'app.
