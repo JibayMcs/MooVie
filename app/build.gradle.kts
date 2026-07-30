@@ -195,7 +195,25 @@ compose.desktop {
             // (générés depuis docs/assets/sources/moo_vie_launcher_icon_master_1024x1024.png)
             // car la CI n'a pas d'outil de conversion ico/icns.
             linux { iconFile.set(project.file("icons/moovie.png")) }
-            windows { iconFile.set(project.file("icons/moovie.ico")) }
+            windows {
+                iconFile.set(project.file("icons/moovie.ico"))
+                // Sans raccourci ni groupe de menu, le MSI installait bien l'app
+                // (sous Program Files / LocalAppData) mais ne créait aucune
+                // entrée : ni menu Démarrer, ni bureau, ni icône visible — d'où
+                // l'impression que « l'installation ne marche pas ».
+                // menuGroup crée l'entrée menu Démarrer (menu = true en découle) ;
+                // shortcut ajoute le raccourci bureau.
+                menuGroup = "Moo-vie"
+                shortcut = true
+                // UUID figé : les MSI suivants remplacent l'installation en place
+                // au lieu de s'ajouter côte à côte. Doit rester constant d'une
+                // version à l'autre (comme upgradeUuid l'exige côté WiX).
+                upgradeUuid = "3bb04069-630b-44cc-ae44-8579cc165af4"
+                // Installation par utilisateur (%LOCALAPPDATA%) : pas d'élévation
+                // UAC, et surtout l'updater desktop peut réécrire les fichiers
+                // sans droits admin — cohérent avec la mise à jour in-app.
+                perUserInstall = true
+            }
             macOS { iconFile.set(project.file("icons/moovie.icns")) }
         }
     }
