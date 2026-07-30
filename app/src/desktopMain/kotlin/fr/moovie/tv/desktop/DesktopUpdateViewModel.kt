@@ -142,8 +142,62 @@ class DesktopUpdateViewModel : ViewModel() {
             _state.value = UpdateState.Error(getString(Res.string.update_error))
             return
         }
-        runCatching { ProcessBuilder(target.absolutePath).start() }
+        relaunch(target)
         exitProcess(0)
+    }
+
+    /**
+     * Relance la nouvelle version dans sa propre session, une fois ce processus
+     * mort.
+     *
+     * `setsid` détache l'enfant de la session courante et les sorties sont
+     * jetées : branchées sur des tubes, elles seraient refermées par la mort du
+     * parent. La seconde tentative couvre l'absence de `setsid`, absent de
+     * certaines images minimales.
+     */
+    private fun relaunch(target: File) {
+        // Une seconde d'attente avant de démarrer : le runtime AppImage démonte
+        // son squashfs en sortant, autant le laisser finir.
+        val script = "sleep 1; exec '" + target.absolutePath.replace("'", "'\\''") + "'"
+        val attempts = listOf(
+            listOf("setsid", "--fork", "sh", "-c", script),
+            listOf("sh", "-c", "$script &"),
+        )
+        for (command in attempts) {
+            val started = runCatching {
+                ProcessBuilder(command)
+                    .apply { scrubLauncherEnv(environment()) }
+                    .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                    .redirectError(ProcessBuilder.Redirect.DISCARD)
+                    .start()
+            }
+            if (started.isSuccess) return
+            // Sans cette trace, un échec de relance était totalement muet :
+            // l'app se fermait et rien ne se passait.
+            System.err.println(
+                "MOOVIE: relance impossible via ${command.first()} — " +
+                    "${started.exceptionOrNull()?.message}",
+            )
+        }
+    }
+
+    /**
+     * Purge de l'environnement transmis à la nouvelle instance les variables
+     * qui n'ont de sens que pour le processus courant.
+     *
+     * `_JPACKAGE_LAUNCHER` est la cause du bug qui empêchait l'app de se rouvrir
+     * après mise à jour : le lanceur jpackage se ré-exécute une fois et se passe
+     * les arguments de la JVM par cette variable. En l'héritant, la nouvelle
+     * instance se croyait déjà dans sa seconde passe, ne lisait plus son fichier
+     * `.cfg` et démarrait une JVM sans classe principale — elle affichait l'aide
+     * de `java` et s'arrêtait aussitôt.
+     *
+     * Les variables du runtime AppImage pointent, elles, vers un point de
+     * montage sur le point de disparaître ; le nouveau runtime les repositionne.
+     */
+    private fun scrubLauncherEnv(env: MutableMap<String, String>) {
+        listOf("_JPACKAGE_LAUNCHER", "APPDIR", "APPIMAGE", "ARGV0", "OWD", "LD_LIBRARY_PATH")
+            .forEach(env::remove)
     }
 
     /**

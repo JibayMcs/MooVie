@@ -12,7 +12,7 @@ plugins {
 
 // Version unique Android + desktop (l'updater compare les tags GitHub à cette
 // valeur ; côté desktop elle est injectée en propriété système moovie.version).
-val appVersion = "1.3.0"
+val appVersion = "1.3.1"
 
 // Signature release : keystore.properties en local (gitignoré), variables
 // d'environnement en CI (KEYSTORE_FILE / KEYSTORE_PASSWORD / KEY_ALIAS).
@@ -120,7 +120,7 @@ android {
         applicationId = "fr.moovie.tv"
         minSdk = 23
         targetSdk = 34
-        versionCode = 12
+        versionCode = 13
         versionName = appVersion
     }
 
@@ -222,14 +222,20 @@ val packageAppImage by tasks.registering {
     dependsOn("createDistributable")
 
     val appDirRoot = layout.buildDirectory.dir("appimage").get().asFile
+    val distributable = layout.buildDirectory.dir("compose/binaries/main/app/Moo-vie")
     val output = layout.buildDirectory
         .file("compose/binaries/main/appimage/Moo-vie-$appVersion-x86_64.AppImage").get().asFile
+    // Sans entrée déclarée, Gradle considérait la tâche à jour dès que le
+    // fichier de sortie existait et la sautait : on pouvait alors emballer —
+    // ou pire, publier — une image construite avant les dernières
+    // modifications du code.
+    inputs.dir(distributable)
+    inputs.property("version", appVersion)
     outputs.file(output)
 
     doLast {
-        val distributable = layout.buildDirectory
-            .dir("compose/binaries/main/app/Moo-vie").get().asFile
-        require(distributable.isDirectory) { "app-image introuvable : $distributable" }
+        val appImageDir = distributable.get().asFile
+        require(appImageDir.isDirectory) { "app-image introuvable : $appImageDir" }
 
         // Outil téléchargé une fois puis conservé (la CI le remet en cache).
         val tool = File(appDirRoot.parentFile, "appimagetool")
@@ -247,7 +253,7 @@ val packageAppImage by tasks.registering {
         appDir.deleteRecursively()
         File(appDir, "usr").mkdirs()
         copy {
-            from(distributable)
+            from(appImageDir)
             into(File(appDir, "usr"))
         }
         copy {
