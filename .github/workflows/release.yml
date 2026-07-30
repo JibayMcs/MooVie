@@ -161,10 +161,12 @@ jobs:
           DEBIAN_FRONTEND: noninteractive
         run: |
           if command -v pacman >/dev/null; then
-            pacman -Sy --noconfirm libgl libx11 libxext libxi libxrender libxtst alsa-lib
+            pacman -Sy --noconfirm libgl libx11 libxext libxi libxrender libxtst alsa-lib \
+              libxcb
           else
             apt-get update
             apt-get install -y libgl1 libx11-6 libxext6 libxi6 libxrender1 libxtst6 \
+              libxcb-render0 libxcb-shm0 \
               || true
             apt-get install -y libasound2t64 || apt-get install -y libasound2
           fi
@@ -184,14 +186,24 @@ jobs:
             out=$(ldd "$so" 2>/dev/null | grep 'not found' || true)
             if [ -n "$out" ]; then
               miss=$((miss+1))
+              basename "$so" >> /tmp/failing
               echo "$(basename $so): $(echo "$out" | awk '{print $1}' | sort -u | tr '\n' ' ')"
             fi
           done
+          touch /tmp/failing
           echo "plugins en défaut : $miss"
-          # libpulse est volontairement non embarquée (protocole couplé au démon
-          # audio de l'hôte) : ses deux plugins peuvent manquer, VLC bascule
-          # alors sur ALSA. Au-delà, c'est une régression de l'embarquement.
-          [ "$miss" -le 2 ] || { echo "trop de dépendances manquantes"; exit 1; }
+          # libpulse est volontairement non embarquée (son protocole est couplé
+          # au démon audio de l'hôte) : ses plugins peuvent manquer, VLC bascule
+          # alors sur ALSA. Tout autre plugin en défaut est une régression.
+          [ -z "$(grep -v '^libpulse' /tmp/failing || true)" ] || {
+            echo "des plugins autres que pulse ont une dépendance manquante"
+            exit 1
+          }
+          # Assertion explicite sur le plugin critique : sans lui, aucun
+          # décodage H.264/HEVC, et l'app se contenterait d'un écran noir.
+          ldd squashfs-root/usr/lib/vlc/plugins/codec/libavcodec_plugin.so \
+            | grep 'not found' && { echo "libavcodec_plugin incomplet"; exit 1; }
+          echo "libavcodec_plugin : toutes ses dépendances résolues."
 
       - name: Démarrage sur ${{ matrix.image }}
         run: |

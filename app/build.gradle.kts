@@ -252,6 +252,11 @@ val vlcDroppedPlugins = setOf(
     // libxcb-xv), qu'on n'embarque jamais : elles ne se chargeraient pas. La
     // vidéo passe de toute façon par les callbacks vlcj, donc par vmem.
     "egl_x11", "egl_wl", "xcb_xv",
+    // Décodeur d'images SDL, inutile ici, et seul plugin à lier libpulse-simple.
+    "sdl_image",
+    // Capture d'écran et gestion de fenêtre X : sans objet pour nous, et
+    // dépendantes d'extensions xcb qu'on n'embarque pas.
+    "xcb_screen", "xcb_window",
 )
 
 /**
