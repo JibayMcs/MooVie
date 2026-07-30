@@ -44,6 +44,13 @@ class SettingsViewModel : ViewModel() {
         viewModelScope.launch { repo.setAutoPlayNext(value) }
     }
 
+    val hideHistoryWidgets: StateFlow<Boolean> =
+        repo.hideHistoryWidgets.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+
+    fun setHideHistoryWidgets(value: Boolean) {
+        viewModelScope.launch { repo.setHideHistoryWidgets(value) }
+    }
+
     val updateInterval: StateFlow<UpdateInterval> =
         repo.updateInterval.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), UpdateInterval.M30)
 

@@ -5,6 +5,7 @@ sealed interface Screen {
     data object Home : Screen
     data object Settings : Screen
     data object Search : Screen
+    data object History : Screen
 
     /**
      * Fiche d'un titre. Si [autoSources] est vrai (reprise depuis l'accueil),

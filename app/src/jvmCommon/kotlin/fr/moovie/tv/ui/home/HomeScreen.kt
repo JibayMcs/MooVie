@@ -25,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Visibility
@@ -62,6 +63,7 @@ import fr.moovie.tv.data.watch.ResumeEntry
 import fr.moovie.tv.data.watch.WatchlistEntry
 import fr.moovie.tv.resources.Res
 import fr.moovie.tv.resources.common_loading
+import fr.moovie.tv.resources.history_title
 import fr.moovie.tv.resources.home_continue_watching
 import fr.moovie.tv.resources.home_in_progress
 import fr.moovie.tv.resources.home_minutes_left
@@ -95,6 +97,7 @@ fun HomeScreenContent(
     onResume: (ResumeEntry) -> Unit,
     onOpenSettings: () -> Unit,
     onOpenSearch: () -> Unit,
+    onOpenHistory: () -> Unit,
     onRemoveResume: (String) -> Unit,
     onMarkResumeWatched: (String) -> Unit,
     watchlist: List<WatchlistEntry> = emptyList(),
@@ -170,6 +173,14 @@ fun HomeScreenContent(
                         onClick = onOpenSearch,
                         icon = Icons.Default.Search,
                         contentDescription = stringResource(Res.string.home_search),
+                        modifier = headerDown,
+                    )
+                    // Entre la loupe et l'engrenage : le focus par défaut de la
+                    // barre reste sur la recherche, l'historique est à un cran.
+                    MoovieIconButton(
+                        onClick = onOpenHistory,
+                        icon = Icons.Default.History,
+                        contentDescription = stringResource(Res.string.history_title),
                         modifier = headerDown,
                     )
                     MoovieIconButton(

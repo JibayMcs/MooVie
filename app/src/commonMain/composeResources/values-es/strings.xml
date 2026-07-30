@@ -143,4 +143,31 @@
     <string name="watchlist_remove">Quitar de mi lista</string>
     <string name="watchlist_added">En mi lista</string>
     <string name="watchlist_open">Abrir ficha</string>
+
+    <!-- Historial -->
+    <string name="history_title">Historial</string>
+    <string name="history_empty">Todavía nada. Lo que veas aparecerá aquí, día a día.</string>
+    <string name="history_today">Hoy</string>
+    <string name="history_yesterday">Ayer</string>
+    <string name="history_day_pattern">EEEE d 'de' MMMM</string>
+    <string name="history_unknown_title">Título desconocido</string>
+    <string name="history_remove">Quitar del historial</string>
+    <string name="history_stat_month_genre">Género del mes</string>
+    <plurals name="history_views">
+        <item quantity="one">%1$d visionado</item>
+        <item quantity="other">%1$d visionados</item>
+    </plurals>
+    <plurals name="history_episodes">
+        <item quantity="one">%1$d episodio</item>
+        <item quantity="other">%1$d episodios</item>
+    </plurals>
+    <plurals name="history_movies">
+        <item quantity="one">%1$d película</item>
+        <item quantity="other">%1$d películas</item>
+    </plurals>
+    <string name="history_stat_year">Este año</string>
+    <string name="history_stat_top_series">Serie del momento</string>
+    <string name="settings_cat_history">Historial</string>
+    <string name="settings_hide_history_widgets">Ocultar los widgets</string>
+    <string name="settings_history_help">Abre la página del historial con la cuadrícula a pantalla completa. Desactívalo para mostrar las tarjetas de estadísticas encima.</string>
 </resources>

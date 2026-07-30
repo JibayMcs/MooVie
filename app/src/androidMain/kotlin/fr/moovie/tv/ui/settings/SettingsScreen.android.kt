@@ -55,6 +55,7 @@ fun SettingsScreen(
     val dohProvider by viewModel.dohProvider.collectAsStateWithLifecycle()
     val skipIntroOutro by viewModel.skipIntroOutro.collectAsStateWithLifecycle()
     val autoPlayNext by viewModel.autoPlayNext.collectAsStateWithLifecycle()
+    val hideHistoryWidgets by viewModel.hideHistoryWidgets.collectAsStateWithLifecycle()
     val updateInterval by viewModel.updateInterval.collectAsStateWithLifecycle()
     val screensaverDelay by viewModel.screensaverDelay.collectAsStateWithLifecycle()
 
@@ -63,6 +64,7 @@ fun SettingsScreen(
         streamLang = streamLang,
         skipIntroOutro = skipIntroOutro,
         autoPlayNext = autoPlayNext,
+        hideHistoryWidgets = hideHistoryWidgets,
         updateInterval = updateInterval,
         screensaverDelay = screensaverDelay,
         dohEnabled = dohEnabled,
@@ -72,6 +74,7 @@ fun SettingsScreen(
         onSetStreamLanguage = viewModel::setStreamLanguage,
         onSetSkipIntroOutro = viewModel::setSkipIntroOutro,
         onSetAutoPlayNext = viewModel::setAutoPlayNext,
+        onSetHideHistoryWidgets = viewModel::setHideHistoryWidgets,
         onSetUpdateInterval = viewModel::setUpdateInterval,
         onSetScreensaverDelay = viewModel::setScreensaverDelay,
         onSetDohEnabled = viewModel::setDohEnabled,

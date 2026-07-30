@@ -143,4 +143,31 @@
     <string name="watchlist_remove">Remove from my list</string>
     <string name="watchlist_added">In my list</string>
     <string name="watchlist_open">Open details</string>
+
+    <!-- History -->
+    <string name="history_title">History</string>
+    <string name="history_empty">Nothing yet. What you watch will show up here, day by day.</string>
+    <string name="history_today">Today</string>
+    <string name="history_yesterday">Yesterday</string>
+    <string name="history_day_pattern">EEEE, MMMM d</string>
+    <string name="history_unknown_title">Unknown title</string>
+    <string name="history_remove">Remove from history</string>
+    <string name="history_stat_month_genre">Genre of the month</string>
+    <plurals name="history_views">
+        <item quantity="one">%1$d view</item>
+        <item quantity="other">%1$d views</item>
+    </plurals>
+    <plurals name="history_episodes">
+        <item quantity="one">%1$d episode</item>
+        <item quantity="other">%1$d episodes</item>
+    </plurals>
+    <plurals name="history_movies">
+        <item quantity="one">%1$d movie</item>
+        <item quantity="other">%1$d movies</item>
+    </plurals>
+    <string name="history_stat_year">This year</string>
+    <string name="history_stat_top_series">Show of the moment</string>
+    <string name="settings_cat_history">History</string>
+    <string name="settings_hide_history_widgets">Hide widgets</string>
+    <string name="settings_history_help">Opens the history page on the full-height grid. Turn off to show the stat cards above it.</string>
 </resources>

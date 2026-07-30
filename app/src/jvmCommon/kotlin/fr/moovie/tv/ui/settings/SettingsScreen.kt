@@ -70,7 +70,10 @@ import fr.moovie.tv.resources.settings_dns_help
 import fr.moovie.tv.resources.settings_doh_off
 import fr.moovie.tv.resources.settings_doh_on
 import fr.moovie.tv.resources.settings_doh_resolver
+import fr.moovie.tv.resources.settings_cat_history
 import fr.moovie.tv.resources.settings_enable
+import fr.moovie.tv.resources.settings_hide_history_widgets
+import fr.moovie.tv.resources.settings_history_help
 import fr.moovie.tv.resources.settings_intro_help
 import fr.moovie.tv.resources.settings_language
 import fr.moovie.tv.resources.settings_move_down
@@ -101,7 +104,7 @@ import org.jetbrains.compose.resources.stringResource
 private val NAV_WIDTH = 260.dp
 
 /** Sections de l'écran, dans l'ordre d'affichage du volet gauche. */
-private enum class SettingsSection { API, PLAYBACK, INTRO, SCREENSAVER, UPDATE, DNS, SOURCES }
+private enum class SettingsSection { API, PLAYBACK, INTRO, HISTORY, SCREENSAVER, UPDATE, DNS, SOURCES }
 
 @Composable
 private fun sectionLabel(section: SettingsSection): String = stringResource(
@@ -109,6 +112,7 @@ private fun sectionLabel(section: SettingsSection): String = stringResource(
         SettingsSection.API -> Res.string.settings_cat_api
         SettingsSection.PLAYBACK -> Res.string.settings_cat_playback
         SettingsSection.INTRO -> Res.string.settings_cat_intro
+        SettingsSection.HISTORY -> Res.string.settings_cat_history
         SettingsSection.SCREENSAVER -> Res.string.settings_cat_screensaver
         SettingsSection.UPDATE -> Res.string.settings_cat_update
         SettingsSection.DNS -> Res.string.settings_cat_dns
@@ -134,6 +138,7 @@ fun SettingsScreenContent(
     streamLang: StreamLanguage,
     skipIntroOutro: Boolean,
     autoPlayNext: Boolean,
+    hideHistoryWidgets: Boolean,
     updateInterval: UpdateInterval,
     screensaverDelay: ScreensaverDelay,
     dohEnabled: Boolean,
@@ -143,6 +148,7 @@ fun SettingsScreenContent(
     onSetStreamLanguage: (StreamLanguage) -> Unit,
     onSetSkipIntroOutro: (Boolean) -> Unit,
     onSetAutoPlayNext: (Boolean) -> Unit,
+    onSetHideHistoryWidgets: (Boolean) -> Unit,
     onSetUpdateInterval: (UpdateInterval) -> Unit,
     onSetScreensaverDelay: (ScreensaverDelay) -> Unit,
     onSetDohEnabled: (Boolean) -> Unit,
@@ -244,6 +250,13 @@ fun SettingsScreenContent(
                     ) {
                         OnOff(value = autoPlayNext, onChange = onSetAutoPlayNext)
                     }
+                }
+
+                SettingsSection.HISTORY -> SettingRow(
+                    label = stringResource(Res.string.settings_hide_history_widgets),
+                    help = stringResource(Res.string.settings_history_help),
+                ) {
+                    OnOff(value = hideHistoryWidgets, onChange = onSetHideHistoryWidgets)
                 }
 
                 SettingsSection.SCREENSAVER -> SettingRow(

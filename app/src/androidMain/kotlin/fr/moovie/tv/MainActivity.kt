@@ -30,6 +30,7 @@ import fr.moovie.tv.ui.details.DetailsViewModel
 import fr.moovie.tv.ui.navigation.Screen
 import fr.moovie.tv.ui.navigation.rememberNavStack
 import fr.moovie.tv.ui.details.DetailsScreen
+import fr.moovie.tv.ui.history.HistoryScreen
 import fr.moovie.tv.ui.home.HomeScreen
 import fr.moovie.tv.ui.player.PlayerScreen
 import fr.moovie.tv.ui.search.SearchScreen
@@ -127,9 +128,13 @@ class MainActivity : ComponentActivity() {
                                 },
                                 onOpenSettings = { nav.push(Screen.Settings) },
                                 onOpenSearch = { nav.push(Screen.Search) },
+                                onOpenHistory = { nav.push(Screen.History) },
                             )
                             Screen.Settings -> SettingsScreen(
                                 onBack = { nav.pop() },
+                            )
+                            Screen.History -> HistoryScreen(
+                                onOpenTitle = { id, isTv -> nav.push(Screen.Details(id, isTv)) },
                             )
                             Screen.Search -> SearchScreen(
                                 onOpenTitle = { id, isTv -> nav.push(Screen.Details(id, isTv)) },

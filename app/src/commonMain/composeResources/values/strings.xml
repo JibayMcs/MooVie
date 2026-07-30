@@ -145,4 +145,31 @@
     <string name="watchlist_remove">Retirer de ma liste</string>
     <string name="watchlist_added">Dans ma liste</string>
     <string name="watchlist_open">Ouvrir la fiche</string>
+
+    <!-- Historique -->
+    <string name="history_title">Historique</string>
+    <string name="history_empty">Rien pour l'instant. Ce que tu regardes s'ajoutera ici, jour par jour.</string>
+    <string name="history_today">Aujourd'hui</string>
+    <string name="history_yesterday">Hier</string>
+    <string name="history_day_pattern">EEEE d MMMM</string>
+    <string name="history_unknown_title">Titre inconnu</string>
+    <string name="history_remove">Retirer de l'historique</string>
+    <string name="history_stat_month_genre">Genre du mois</string>
+    <plurals name="history_views">
+        <item quantity="one">%1$d visionnage</item>
+        <item quantity="other">%1$d visionnages</item>
+    </plurals>
+    <plurals name="history_episodes">
+        <item quantity="one">%1$d épisode</item>
+        <item quantity="other">%1$d épisodes</item>
+    </plurals>
+    <plurals name="history_movies">
+        <item quantity="one">%1$d film</item>
+        <item quantity="other">%1$d films</item>
+    </plurals>
+    <string name="history_stat_year">Cette année</string>
+    <string name="history_stat_top_series">Série du moment</string>
+    <string name="settings_cat_history">Historique</string>
+    <string name="settings_hide_history_widgets">Masquer les widgets</string>
+    <string name="settings_history_help">Ouvre la page d'historique sur la grille pleine hauteur. Désactive pour afficher les cartes de statistiques au-dessus.</string>
 </resources>

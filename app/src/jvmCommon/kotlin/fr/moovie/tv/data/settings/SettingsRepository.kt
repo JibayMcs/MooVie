@@ -59,6 +59,17 @@ class SettingsRepository {
     suspend fun setSkipIntroOutro(value: Boolean) =
         store.edit { it[SKIP_INTRO_OUTRO] = value }
 
+    /**
+     * Masque les cartes de statistiques de l'historique — activé par défaut :
+     * la page s'ouvre sur la grille pleine hauteur, les stats ne sont qu'un
+     * bonus qu'on va chercher.
+     */
+    val hideHistoryWidgets: Flow<Boolean> =
+        store.data.map { it[HIDE_HISTORY_WIDGETS] ?: true }
+
+    suspend fun setHideHistoryWidgets(value: Boolean) =
+        store.edit { it[HIDE_HISTORY_WIDGETS] = value }
+
     /** Fréquence de vérification des mises à jour (30 min par défaut). */
     val updateInterval: Flow<UpdateInterval> =
         store.data.map {
@@ -117,6 +128,7 @@ class SettingsRepository {
         val DOH_ENABLED = booleanPreferencesKey("doh_enabled")
         val DOH_PROVIDER = stringPreferencesKey("doh_provider")
         val SKIP_INTRO_OUTRO = booleanPreferencesKey("skip_intro_outro")
+        val HIDE_HISTORY_WIDGETS = booleanPreferencesKey("hide_history_widgets")
         val AUTO_PLAY_NEXT = booleanPreferencesKey("auto_play_next")
         val UPDATE_INTERVAL = stringPreferencesKey("update_interval")
         val SCREENSAVER_DELAY = stringPreferencesKey("screensaver_delay")

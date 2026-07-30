@@ -14,6 +14,8 @@ import kotlinx.serialization.json.Json
 private const val RESUME_PREFIX = "resume:"
 private const val SEEN_PREFIX = "seen:"
 private const val LATER_PREFIX = "later:"
+private const val HIST_PREFIX = "hist:"
+private const val META_PREFIX = "meta:"
 
 /**
  * Suivi de lecture : reprise (position + métadonnées) et statut vu/non vu.
@@ -49,6 +51,27 @@ class WatchProgressRepository {
             if (!k.name.startsWith(LATER_PREFIX)) return@mapNotNull null
             runCatching { json.decodeFromString<WatchlistEntry>(v as String) }.getOrNull()
         }.sortedByDescending { it.addedAt }
+    }
+
+    /** Historique de visionnage, du plus récent au plus ancien. */
+    val history: Flow<List<HistoryEntry>> = store.data.map { prefs ->
+        prefs.asMap().mapNotNull { (k, v) ->
+            if (!k.name.startsWith(HIST_PREFIX)) return@mapNotNull null
+            runCatching { json.decodeFromString<HistoryEntry>(v as String) }.getOrNull()
+        }.sortedByDescending { it.watchedAt }
+    }
+
+    /**
+     * Mémorise le nom, l'image et les genres d'un titre, relevés à l'ouverture
+     * de sa fiche. Voir [TitleMeta] pour le pourquoi de cette table à part.
+     */
+    suspend fun rememberTitle(titleKey: String, meta: TitleMeta) {
+        store.edit { it[stringPreferencesKey(META_PREFIX + titleKey)] = json.encodeToString(meta) }
+    }
+
+    /** Retire une ligne de l'historique (sans toucher au statut vu). */
+    suspend fun removeFromHistory(key: String) {
+        store.edit { it.remove(stringPreferencesKey(HIST_PREFIX + key)) }
     }
 
     /** Position sauvegardée en ms (0 si aucune / terminé). */
@@ -96,6 +119,9 @@ class WatchProgressRepository {
             val existing = prefs[k]?.let { decode(it) } ?: return@edit
             when {
                 durationMs > 0 && positionMs >= durationMs - 10_000 -> {
+                    // Avant le remove : c'est l'entrée de reprise qui porte le
+                    // titre et l'affiche de la ligne d'historique.
+                    prefs.recordHistory(key, System.currentTimeMillis())
                     prefs.remove(k)
                     prefs[booleanPreferencesKey(SEEN_PREFIX + key)] = true
                     prefs.pruneWatchlist(key)
@@ -121,6 +147,7 @@ class WatchProgressRepository {
         store.edit { prefs ->
             if (watched) {
                 prefs[booleanPreferencesKey(SEEN_PREFIX + key)] = true
+                prefs.recordHistory(key, System.currentTimeMillis())
                 prefs.remove(stringPreferencesKey(RESUME_PREFIX + key))
                 prefs.pruneWatchlist(key)
             } else {
@@ -132,9 +159,11 @@ class WatchProgressRepository {
     /** Marque vu/non vu en lot (une saison entière, par exemple). */
     suspend fun setAllWatched(keys: List<String>, watched: Boolean) {
         store.edit { prefs ->
+            val now = System.currentTimeMillis()
             keys.forEach { key ->
                 if (watched) {
                     prefs[booleanPreferencesKey(SEEN_PREFIX + key)] = true
+                    prefs.recordHistory(key, now)
                     prefs.remove(stringPreferencesKey(RESUME_PREFIX + key))
                 } else {
                     prefs.remove(booleanPreferencesKey(SEEN_PREFIX + key))
@@ -144,6 +173,49 @@ class WatchProgressRepository {
             // toutes les clés posées.
             if (watched) keys.firstOrNull()?.let { prefs.pruneWatchlist(it) }
         }
+    }
+
+    /**
+     * Consigne un visionnage.
+     *
+     * Les métadonnées viennent de l'entrée de reprise, présente dès que la
+     * lecture a démarré. Un contenu marqué vu à la main sans avoir jamais été lu
+     * n'en a pas : on retombe alors sur la [TitleMeta] posée par sa fiche —
+     * sans quoi la ligne d'historique serait une vignette vide et sans nom.
+     */
+    private fun MutablePreferences.recordHistory(key: String, now: Long) {
+        val histKey = stringPreferencesKey(HIST_PREFIX + key)
+        // Déjà présent : on ne réécrit pas, la première date de visionnage fait foi.
+        if (this[histKey] != null) return
+        val resume = this[stringPreferencesKey(RESUME_PREFIX + key)]
+            ?.let { runCatching { json.decodeFromString<ResumeEntry>(it) }.getOrNull() }
+        val parts = key.split(":")
+        val isTv = parts.firstOrNull() == "tv"
+        val tmdbId = parts.getOrNull(1)?.toIntOrNull() ?: resume?.tmdbId ?: return
+        val titleKey = if (isTv) "tv:$tmdbId" else "movie:$tmdbId"
+        val meta = this[stringPreferencesKey(META_PREFIX + titleKey)]
+            ?.let { runCatching { json.decodeFromString<TitleMeta>(it) }.getOrNull() }
+        // "tv:<id>:s1e2" → saison 1, épisode 2 quand la reprise fait défaut.
+        val (season, episode) = resume?.let { it.season to it.episode }
+            ?: parseEpisode(parts.getOrNull(2))
+        val entry = HistoryEntry(
+            key = key,
+            tmdbId = tmdbId,
+            isTv = isTv,
+            season = season,
+            episode = episode,
+            title = resume?.title?.takeIf { it.isNotBlank() } ?: meta?.title.orEmpty(),
+            imageUrl = resume?.imageUrl ?: meta?.imageUrl,
+            genres = meta?.genres.orEmpty(),
+            watchedAt = now,
+        )
+        this[histKey] = json.encodeToString(entry)
+    }
+
+    /** "s1e2" → 1 à 2. (0, 0) si le suffixe manque ou ne suit pas la forme. */
+    private fun parseEpisode(suffix: String?): Pair<Int, Int> {
+        val match = suffix?.let { Regex("""s(\d+)e(\d+)""").matchEntire(it) } ?: return 0 to 0
+        return (match.groupValues[1].toIntOrNull() ?: 0) to (match.groupValues[2].toIntOrNull() ?: 0)
     }
 
     /**

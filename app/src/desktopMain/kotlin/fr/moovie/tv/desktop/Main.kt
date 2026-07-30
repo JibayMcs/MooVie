@@ -158,8 +158,12 @@ private fun DesktopApp(
                 },
                 onOpenSettings = { nav.push(Screen.Settings) },
                 onOpenSearch = { nav.push(Screen.Search) },
+                onOpenHistory = { nav.push(Screen.History) },
             )
             Screen.Settings -> DesktopSettingsScreen(onBack = { nav.pop() })
+            Screen.History -> DesktopHistoryScreen(
+                onOpenTitle = { id, isTv -> nav.push(Screen.Details(id, isTv)) },
+            )
             Screen.Search -> DesktopSearchScreen(
                 onOpenTitle = { id, isTv -> nav.push(Screen.Details(id, isTv)) },
             )

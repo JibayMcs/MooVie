@@ -13,6 +13,8 @@ import fr.moovie.tv.data.watch.ResumeEntry
 import fr.moovie.tv.ui.details.DetailsScreenContent
 import fr.moovie.tv.ui.details.DetailsState
 import fr.moovie.tv.ui.details.DetailsViewModel
+import fr.moovie.tv.ui.history.HistoryScreenContent
+import fr.moovie.tv.ui.history.HistoryViewModel
 import fr.moovie.tv.ui.home.HomeScreenContent
 import fr.moovie.tv.ui.home.HomeViewModel
 import fr.moovie.tv.ui.navigation.Screen
@@ -28,6 +30,7 @@ import fr.moovie.tv.ui.settings.SettingsViewModel
 internal object Vm {
     val home by lazy { HomeViewModel() }
     val search by lazy { SearchViewModel() }
+    val history by lazy { HistoryViewModel() }
     val settings by lazy { SettingsViewModel() }
     val details by lazy { DetailsViewModel() }
 }
@@ -38,6 +41,7 @@ internal fun DesktopHomeScreen(
     onResume: (ResumeEntry) -> Unit,
     onOpenSettings: () -> Unit,
     onOpenSearch: () -> Unit,
+    onOpenHistory: () -> Unit,
 ) {
     val vm = Vm.home
     val state by vm.state.collectAsState()
@@ -53,6 +57,7 @@ internal fun DesktopHomeScreen(
         onResume = onResume,
         onOpenSettings = onOpenSettings,
         onOpenSearch = onOpenSearch,
+        onOpenHistory = onOpenHistory,
         onRemoveResume = vm::removeResume,
         onMarkResumeWatched = vm::markResumeWatched,
         watchlist = watchlist,
@@ -89,6 +94,23 @@ internal fun DesktopSearchScreen(
 }
 
 @Composable
+internal fun DesktopHistoryScreen(
+    onOpenTitle: (tmdbId: Int, isTv: Boolean) -> Unit,
+) {
+    val vm = Vm.history
+    val days by vm.days.collectAsState()
+    val stats by vm.stats.collectAsState()
+
+    HistoryScreenContent(
+        days = days,
+        stats = stats,
+        onOpenTitle = onOpenTitle,
+        onRemove = vm::remove,
+        onMarkUnwatched = vm::markUnwatched,
+    )
+}
+
+@Composable
 internal fun DesktopSettingsScreen(onBack: () -> Unit) {
     val vm = Vm.settings
     val apiKey by vm.tmdbApiKey.collectAsState()
@@ -98,6 +120,7 @@ internal fun DesktopSettingsScreen(onBack: () -> Unit) {
     val dohProvider by vm.dohProvider.collectAsState()
     val skipIntroOutro by vm.skipIntroOutro.collectAsState()
     val autoPlayNext by vm.autoPlayNext.collectAsState()
+    val hideHistoryWidgets by vm.hideHistoryWidgets.collectAsState()
     val updateInterval by vm.updateInterval.collectAsState()
     val screensaverDelay by vm.screensaverDelay.collectAsState()
 
@@ -106,6 +129,7 @@ internal fun DesktopSettingsScreen(onBack: () -> Unit) {
         streamLang = streamLang,
         skipIntroOutro = skipIntroOutro,
         autoPlayNext = autoPlayNext,
+        hideHistoryWidgets = hideHistoryWidgets,
         updateInterval = updateInterval,
         screensaverDelay = screensaverDelay,
         dohEnabled = dohEnabled,
@@ -115,6 +139,7 @@ internal fun DesktopSettingsScreen(onBack: () -> Unit) {
         onSetStreamLanguage = vm::setStreamLanguage,
         onSetSkipIntroOutro = vm::setSkipIntroOutro,
         onSetAutoPlayNext = vm::setAutoPlayNext,
+        onSetHideHistoryWidgets = vm::setHideHistoryWidgets,
         onSetUpdateInterval = vm::setUpdateInterval,
         onSetScreensaverDelay = vm::setScreensaverDelay,
         onSetDohEnabled = vm::setDohEnabled,

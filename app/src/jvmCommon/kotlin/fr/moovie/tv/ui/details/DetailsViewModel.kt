@@ -15,6 +15,7 @@ import fr.moovie.tv.data.tmdb.Episode
 import fr.moovie.tv.data.tmdb.TmdbRepository
 import fr.moovie.tv.data.tmdb.TvDetails
 import fr.moovie.tv.data.watch.ResumeEntry
+import fr.moovie.tv.data.watch.TitleMeta
 import fr.moovie.tv.data.watch.WatchProgressRepository
 import fr.moovie.tv.data.watch.WatchlistEntry
 import fr.moovie.tv.resources.Res
@@ -171,6 +172,29 @@ class DetailsViewModel : ViewModel() {
                 // de total d'épisodes : sans lui elle ne sortirait jamais seule
                 // de la liste. On le complète dès qu'on connaît ses saisons.
                 if (it is DetailsState.Tv) completeWatchlistEntry(it)
+                // Nom, image et genres relevés ici une fois pour toutes :
+                // l'historique en a besoin, et ni un épisode marqué vu depuis le
+                // lecteur ni un titre coché sans lecture n'ont de fiche sous la
+                // main au moment où la ligne s'écrit.
+                when (it) {
+                    is DetailsState.Movie -> watchRepo.rememberTitle(
+                        "movie:$tmdbId",
+                        TitleMeta(
+                            title = it.details.title,
+                            imageUrl = it.details.backdropUrl() ?: it.details.posterUrl(),
+                            genres = it.details.genres.map { g -> g.name },
+                        ),
+                    )
+                    is DetailsState.Tv -> watchRepo.rememberTitle(
+                        "tv:$tmdbId",
+                        TitleMeta(
+                            title = it.details.name,
+                            imageUrl = it.details.backdropUrl() ?: it.details.posterUrl(),
+                            genres = it.details.genres.map { g -> g.name },
+                        ),
+                    )
+                    else -> Unit
+                }
                 // Fiche film : sources chargées immédiatement en arrière-plan
                 // pour que le bouton « Lire » soit prêt sans ouvrir le panneau.
                 if (it is DetailsState.Movie) loadMovieSources()
