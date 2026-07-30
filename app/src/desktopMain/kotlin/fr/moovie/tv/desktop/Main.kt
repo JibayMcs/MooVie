@@ -32,7 +32,9 @@ import fr.moovie.tv.data.settings.SettingsRepository
 import fr.moovie.tv.resources.Res
 import fr.moovie.tv.resources.moovie_icon
 import fr.moovie.tv.ui.components.MoovieButton
+import fr.moovie.tv.ui.navigation.NavStack
 import fr.moovie.tv.ui.navigation.Screen
+import fr.moovie.tv.ui.navigation.rememberNavStack
 import fr.moovie.tv.ui.theme.MooVieTheme
 import fr.moovie.tv.ui.update.UpdateBanner
 import fr.moovie.tv.ui.update.UpdateState
@@ -63,12 +65,12 @@ fun main() {
         // Crochet de dev : MOOVIE_TEST_STREAM=<url> ouvre directement le lecteur
         // (test du pipeline VLCJ sans dépendre des hébergeurs).
         val testStream = remember { System.getenv("MOOVIE_TEST_STREAM") }
-        var screen: Screen by remember {
-            mutableStateOf(if (testStream.isNullOrBlank()) Screen.Home else Screen.Player(testStream))
-        }
-        // Retour arrière piloté par l'écran courant (Échap) — le panneau des
-        // sources de la fiche est fermé par son propre wrapper.
-        var backHandler: (() -> Unit)? by remember { mutableStateOf(null) }
+        val nav = rememberNavStack(
+            if (testStream.isNullOrBlank()) Screen.Home else Screen.Player(testStream),
+        )
+        // Retour *interne* à un écran uniquement (panneau des sources, fiche
+        // d'épisode). Null quand l'écran n'a rien à fermer : Échap dépile alors.
+        var innerBack: (() -> Unit)? by remember { mutableStateOf(null) }
         val windowState = rememberWindowState(width = 1280.dp, height = 720.dp)
         val isFullscreen = windowState.placement == WindowPlacement.Fullscreen
 
@@ -87,8 +89,12 @@ fun main() {
                         windowState.placement = WindowPlacement.Floating
                         true
                     }
-                    screen != Screen.Home -> {
-                        backHandler?.invoke() ?: run { screen = Screen.Home }
+                    innerBack != null -> {
+                        innerBack?.invoke()
+                        true
+                    }
+                    nav.canGoBack -> {
+                        nav.pop()
                         true
                     }
                     else -> false
@@ -97,9 +103,8 @@ fun main() {
         ) {
             MooVieTheme {
                 DesktopApp(
-                    screen = screen,
-                    onNavigate = { screen = it },
-                    onRegisterBack = { backHandler = it },
+                    nav = nav,
+                    onRegisterBack = { innerBack = it },
                     isFullscreen = isFullscreen,
                     onToggleFullscreen = {
                         windowState.placement =
@@ -113,15 +118,13 @@ fun main() {
 
 @Composable
 private fun DesktopApp(
-    screen: Screen,
-    onNavigate: (Screen) -> Unit,
+    nav: NavStack,
     onRegisterBack: ((() -> Unit)?) -> Unit,
     isFullscreen: Boolean,
     onToggleFullscreen: () -> Unit,
 ) {
     // Fiche d'origine de la lecture en cours : le retour du lecteur revient
     // dessus (sans relancer l'auto-lecture) au lieu de l'accueil.
-    var lastDetails by remember { mutableStateOf<Screen.Details?>(null) }
 
     Column(modifier = Modifier.fillMaxSize().background(Color(0xFF0A0A0A))) {
         val updateViewModel = remember { DesktopUpdateViewModel() }
@@ -129,7 +132,7 @@ private fun DesktopApp(
         // Pendant la lecture, la bannière rétrécirait la vidéo : le lecteur
         // affiche une pastille discrète, et la bannière n'apparaît qu'une fois
         // celle-ci activée.
-        val onPlayer = screen is Screen.Player
+        val onPlayer = nav.current is Screen.Player
         var bannerOnPlayer by remember { mutableStateOf(false) }
         LaunchedEffect(onPlayer) { if (!onPlayer) bannerOnPlayer = false }
 
@@ -142,11 +145,11 @@ private fun DesktopApp(
             },
         )
 
-        when (val s = screen) {
+        when (val s = nav.current) {
             Screen.Home -> DesktopHomeScreen(
-                onOpenTitle = { id, isTv -> onNavigate(Screen.Details(id, isTv)) },
+                onOpenTitle = { id, isTv -> nav.push(Screen.Details(id, isTv)) },
                 onResume = { e ->
-                    onNavigate(
+                    nav.push(
                         Screen.Details(
                             tmdbId = e.tmdbId,
                             isTv = e.isTv,
@@ -156,25 +159,20 @@ private fun DesktopApp(
                         ),
                     )
                 },
-                onOpenSettings = { onNavigate(Screen.Settings) },
-                onOpenSearch = { onNavigate(Screen.Search) },
+                onOpenSettings = { nav.push(Screen.Settings) },
+                onOpenSearch = { nav.push(Screen.Search) },
             )
-            Screen.Settings -> DesktopSettingsScreen(onBack = { onNavigate(Screen.Home) })
+            Screen.Settings -> DesktopSettingsScreen(onBack = { nav.pop() })
             Screen.Search -> DesktopSearchScreen(
-                onOpenTitle = { id, isTv -> onNavigate(Screen.Details(id, isTv)) },
+                onOpenTitle = { id, isTv -> nav.push(Screen.Details(id, isTv)) },
             )
             is Screen.Details -> DesktopDetailsScreen(
                 params = s,
-                onPlay = { player ->
-                    lastDetails = s.copy(autoSources = false)
-                    onNavigate(player)
-                },
-                onBack = { onNavigate(Screen.Home) },
+                onPlay = { player -> nav.push(player) },
+                onBack = { nav.pop() },
                 onRegisterBack = onRegisterBack,
             )
             is Screen.Player -> {
-                val backFromPlayer = { onNavigate(lastDetails ?: Screen.Home) }
-                LaunchedEffect(s) { onRegisterBack(backFromPlayer) }
                 DesktopPlayerScreen(
                     streamUrl = s.streamUrl,
                     headers = s.headers,
@@ -189,27 +187,25 @@ private fun DesktopApp(
                     posterUrl = s.posterUrl,
                     isFullscreen = isFullscreen,
                     onToggleFullscreen = onToggleFullscreen,
-                    onBack = backFromPlayer,
+                    onBack = { nav.pop() },
                     // Enchaînement : repasse par la fiche, qui résout la source
                     // du nouvel épisode puis relance le lecteur.
+                    // Enchaînement : remplace l'entrée du lecteur par la fiche
+                    // du nouvel épisode, sinon chaque épisode ajouterait une
+                    // marche à remonter pour revenir à la série.
                     onNextEpisode = { season, episode ->
-                        lastDetails?.let { d ->
-                            onNavigate(
-                                d.copy(
-                                    autoSources = true,
-                                    resumeSeason = season,
-                                    resumeEpisode = episode,
-                                ),
-                            )
-                        } ?: onNavigate(Screen.Home)
+                        val details = nav.current as? Screen.Details
+                        nav.replace(
+                            details?.copy(
+                                autoSources = true,
+                                resumeSeason = season,
+                                resumeEpisode = episode,
+                            ) ?: Screen.Home,
+                        )
                     },
                 )
             }
         }
-    }
-    // Hors fiche et lecteur, Échap revient simplement à l'accueil.
-    LaunchedEffect(screen) {
-        if (screen !is Screen.Details && screen !is Screen.Player) onRegisterBack(null)
     }
 }
 

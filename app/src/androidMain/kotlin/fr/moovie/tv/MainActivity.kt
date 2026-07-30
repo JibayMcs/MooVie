@@ -27,6 +27,7 @@ import androidx.tv.material3.LocalContentColor
 import fr.moovie.tv.data.settings.LocaleManager
 import fr.moovie.tv.data.settings.SettingsRepository
 import fr.moovie.tv.ui.navigation.Screen
+import fr.moovie.tv.ui.navigation.rememberNavStack
 import fr.moovie.tv.ui.details.DetailsScreen
 import fr.moovie.tv.ui.home.HomeScreen
 import fr.moovie.tv.ui.player.PlayerScreen
@@ -71,23 +72,21 @@ class MainActivity : ComponentActivity() {
                         // sans dépendre de l'extraction d'une source réelle.
                         // adb shell am start -n fr.moovie.tv/.MainActivity --es test_stream <url>
                         val testStream = remember { intent?.getStringExtra("test_stream") }
-                        var screen: Screen by remember {
-                            mutableStateOf(
-                                if (testStream.isNullOrBlank()) {
-                                    Screen.Home
-                                } else {
-                                    Screen.Player(
-                                        streamUrl = testStream,
-                                        title = "Flux de test",
-                                        subtitle = "S1 · E1 — chrome partagée",
-                                    )
-                                },
-                            )
-                        }
+                        val nav = rememberNavStack(
+                            if (testStream.isNullOrBlank()) {
+                                Screen.Home
+                            } else {
+                                Screen.Player(
+                                    streamUrl = testStream,
+                                    title = "Flux de test",
+                                    subtitle = "S1 · E1 — chrome partagée",
+                                )
+                            },
+                        )
                         // Pendant la lecture, la bannière rétrécirait la vidéo :
                         // le lecteur affiche une pastille discrète à la place, et
                         // la bannière n'apparaît qu'une fois celle-ci activée.
-                        val onPlayer = screen is Screen.Player
+                        val onPlayer = nav.current is Screen.Player
                         var bannerOnPlayer by remember { mutableStateOf(false) }
                         LaunchedEffect(onPlayer) { if (!onPlayer) bannerOnPlayer = false }
 
@@ -102,37 +101,40 @@ class MainActivity : ComponentActivity() {
 
                         Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
 
-                        // Bouton Retour de la télécommande : revient à l'accueil
-                        // depuis n'importe quel écran (pas de bouton Retour à l'écran).
-                        BackHandler(enabled = screen != Screen.Home) { screen = Screen.Home }
+                        // Bouton Retour de la télécommande : dépile. Les retours
+                        // internes à un écran (panneau des sources, fiche d'épisode)
+                        // sont captés avant, par un BackHandler plus profond.
+                        BackHandler(enabled = nav.canGoBack) { nav.pop() }
 
-                        when (val s = screen) {
+                        when (val s = nav.current) {
                             Screen.Home -> HomeScreen(
-                                onOpenTitle = { id, isTv -> screen = Screen.Details(id, isTv) },
+                                onOpenTitle = { id, isTv -> nav.push(Screen.Details(id, isTv)) },
                                 onResume = { e ->
-                                    screen = Screen.Details(
-                                        tmdbId = e.tmdbId,
-                                        isTv = e.isTv,
-                                        autoSources = true,
-                                        resumeSeason = e.season,
-                                        resumeEpisode = e.episode,
+                                    nav.push(
+                                        Screen.Details(
+                                            tmdbId = e.tmdbId,
+                                            isTv = e.isTv,
+                                            autoSources = true,
+                                            resumeSeason = e.season,
+                                            resumeEpisode = e.episode,
+                                        ),
                                     )
                                 },
-                                onOpenSettings = { screen = Screen.Settings },
-                                onOpenSearch = { screen = Screen.Search },
+                                onOpenSettings = { nav.push(Screen.Settings) },
+                                onOpenSearch = { nav.push(Screen.Search) },
                             )
                             Screen.Settings -> SettingsScreen(
-                                onBack = { screen = Screen.Home },
+                                onBack = { nav.pop() },
                             )
                             Screen.Search -> SearchScreen(
-                                onOpenTitle = { id, isTv -> screen = Screen.Details(id, isTv) },
-                                onBack = { screen = Screen.Home },
+                                onOpenTitle = { id, isTv -> nav.push(Screen.Details(id, isTv)) },
+                                onBack = { nav.pop() },
                             )
                             is Screen.Details -> DetailsScreen(
                                 tmdbId = s.tmdbId,
                                 isTv = s.isTv,
-                                onPlay = { player -> screen = player },
-                                onBack = { screen = Screen.Home },
+                                onPlay = { player -> nav.push(player) },
+                                onBack = { nav.pop() },
                                 autoSources = s.autoSources,
                                 resumeSeason = s.resumeSeason,
                                 resumeEpisode = s.resumeEpisode,
@@ -149,16 +151,18 @@ class MainActivity : ComponentActivity() {
                                 updateVersion = (updateState as? UpdateState.Available)?.version,
                                 onUpdateSelected = { bannerOnPlayer = true },
                                 posterUrl = s.posterUrl,
-                                onBack = { screen = Screen.Home },
+                                onBack = { nav.pop() },
                                 // Passer le générique d'un épisode → enchaîne le
                                 // suivant via la fiche (résolution + lecture auto).
                                 onNextEpisode = { tmdbId, season, episode ->
-                                    screen = Screen.Details(
-                                        tmdbId = tmdbId,
-                                        isTv = true,
-                                        autoSources = true,
-                                        resumeSeason = season,
-                                        resumeEpisode = episode,
+                                    nav.replace(
+                                        Screen.Details(
+                                            tmdbId = tmdbId,
+                                            isTv = true,
+                                            autoSources = true,
+                                            resumeSeason = season,
+                                            resumeEpisode = episode,
+                                        ),
                                     )
                                 },
                             )

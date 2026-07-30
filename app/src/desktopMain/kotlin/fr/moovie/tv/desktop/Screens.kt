@@ -2,6 +2,7 @@ package fr.moovie.tv.desktop
 
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -180,16 +181,21 @@ internal fun DesktopDetailsScreen(
             vm.consumeResolved()
         }
     }
-    // Échap ferme d'abord le panneau des sources, puis la fiche d'épisode,
-    // et seulement ensuite revient à l'accueil.
-    LaunchedEffect(panelVisible, selectedEpisode) {
+    // Échap ferme d'abord le panneau des sources, puis la fiche d'épisode.
+    // Quand il n'y a plus rien à fermer on enregistre `null` : la fenêtre dépile
+    // alors la pile de navigation. Enregistrer `onBack` ici masquait la pile et
+    // ramenait à l'accueil en sautant la fiche de la série.
+    DisposableEffect(panelVisible, selectedEpisode) {
         onRegisterBack(
             when {
                 panelVisible -> vm::closePanel
                 selectedEpisode != null -> vm::closeEpisode
-                else -> onBack
+                else -> null
             },
         )
+        // Sans ce nettoyage, le retour interne de la fiche resterait actif après
+        // l'avoir quittée — c'est ce qui faisait dérailler les retours imbriqués.
+        onDispose { onRegisterBack(null) }
     }
 
     DetailsScreenContent(
