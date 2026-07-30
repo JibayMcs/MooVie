@@ -206,7 +206,14 @@ internal fun DesktopPlayerScreen(
     val factory = remember {
         runCatching {
             NativeDiscovery().discover()
-            MediaPlayerFactory()
+            // Décodage matériel désactivé : on rend dans un CallbackVideoSurface,
+            // qui exige du RV32 en mémoire système. Avec VA-API/VDPAU les images
+            // vivent dans des surfaces GPU qu'il faut redescendre et convertir
+            // (VAOP -> I420 -> RV32), chemin sur lequel certains flux ne
+            // rendaient qu'un écran noir — alors que VLC seul, dont la sortie
+            // vidéo consomme ces surfaces directement, les affichait très bien.
+            // On ne perd rien : ce transfert annulait de toute façon le gain.
+            MediaPlayerFactory("--avcodec-hw=none")
         }.onFailure {
             // Trace en console : indispensable pour diagnostiquer une libVLC
             // absente/incompatible (snap, version, JNA…).
