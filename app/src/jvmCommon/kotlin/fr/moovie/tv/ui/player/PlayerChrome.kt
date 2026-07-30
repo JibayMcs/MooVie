@@ -1,0 +1,535 @@
+package fr.moovie.tv.ui.player
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ClosedCaption
+import androidx.compose.material.icons.filled.FastForward
+import androidx.compose.material.icons.filled.FastRewind
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.filled.SystemUpdateAlt
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import fr.moovie.tv.resources.Res
+import fr.moovie.tv.resources.common_back
+import fr.moovie.tv.resources.common_cancel
+import fr.moovie.tv.resources.player_audio
+import fr.moovie.tv.resources.player_next_episode
+import fr.moovie.tv.resources.player_next_in
+import fr.moovie.tv.resources.player_pause
+import fr.moovie.tv.resources.player_play
+import fr.moovie.tv.resources.player_prev_episode
+import fr.moovie.tv.resources.player_progress
+import fr.moovie.tv.resources.player_scrub_hint
+import fr.moovie.tv.resources.player_seek_back
+import fr.moovie.tv.resources.player_seek_forward
+import fr.moovie.tv.resources.player_settings
+import fr.moovie.tv.resources.player_skip_intro
+import fr.moovie.tv.resources.player_skip_outro
+import fr.moovie.tv.resources.player_speed
+import fr.moovie.tv.resources.player_subtitles
+import fr.moovie.tv.resources.player_subtitles_off
+import fr.moovie.tv.resources.player_update_chip
+import fr.moovie.tv.ui.components.MOOVIE_ACCENT
+import fr.moovie.tv.ui.components.MoovieButton
+import fr.moovie.tv.ui.components.MoovieIconButton
+import org.jetbrains.compose.resources.stringResource
+
+// Chrome du lecteur partagée entre Android TV et desktop : barre de contrôles,
+// barre de progression, menus, overlay de titre, boutons « Passer », pastille de
+// mise à jour et décompte d'enchaînement.
+//
+// Tout ici ne manipule que des primitives et des lambdas : aucune dépendance à
+// Media3 ni à VLCJ. Ce qui reste propre à chaque plateforme (surface vidéo,
+// commandes natives, focus D-pad, keepScreenOn, MediaSession) vit dans l'écran
+// appelant, qui fournit un [MooviePlayerController].
+
+// ── Barre de contrôles ──────────────────────────────────────────────────────
+
+/**
+ * Barre du bas : boutons puis position / progression / durée.
+ *
+ * [showEpisodeButtons] n'affiche les flèches épisode précédent/suivant que pour
+ * une série ; [canGoPrevious] les grise en début de saison.
+ */
+@Composable
+fun PlayerControlBar(
+    isPlaying: Boolean,
+    positionMs: Long,
+    durationMs: Long,
+    scrubbing: Boolean,
+    showEpisodeButtons: Boolean,
+    canGoPrevious: Boolean,
+    playFocus: FocusRequester,
+    onBack: () -> Unit,
+    onTogglePause: () -> Unit,
+    onSeekBack: () -> Unit,
+    onSeekForward: () -> Unit,
+    onToggleScrub: () -> Unit,
+    onNudgeScrub: (Long) -> Unit,
+    onCancelScrub: () -> Unit,
+    onPreviousEpisode: () -> Unit,
+    onNextEpisode: () -> Unit,
+    onOpenSubtitles: () -> Unit,
+    onOpenSettings: () -> Unit,
+    onActivity: () -> Unit,
+    /**
+     * Rendu non nul uniquement là où la barre est pilotable au pointeur : active
+     * le clic et le glisser sur la progression. Laissé null sur TV, où le
+     * réglage se fait au D-pad via le mode scrub.
+     */
+    onSeekToFraction: ((Float) -> Unit)? = null,
+    /** Commandes propres à la plateforme, ajoutées à droite (volume, plein écran). */
+    trailing: @Composable RowScope.() -> Unit = {},
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xE6000000))))
+            .padding(horizontal = 32.dp, vertical = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            MoovieIconButton(
+                onClick = onBack,
+                icon = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = stringResource(Res.string.common_back),
+            )
+            MoovieIconButton(
+                onClick = onTogglePause,
+                icon = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                contentDescription = if (isPlaying) {
+                    stringResource(Res.string.player_pause)
+                } else {
+                    stringResource(Res.string.player_play)
+                },
+                modifier = Modifier.focusRequester(playFocus),
+            )
+            MoovieIconButton(
+                onClick = onSeekBack,
+                icon = Icons.Default.FastRewind,
+                contentDescription = stringResource(Res.string.player_seek_back),
+            )
+            MoovieIconButton(
+                onClick = onSeekForward,
+                icon = Icons.Default.FastForward,
+                contentDescription = stringResource(Res.string.player_seek_forward),
+            )
+            if (showEpisodeButtons) {
+                MoovieIconButton(
+                    onClick = onPreviousEpisode,
+                    icon = Icons.Default.SkipPrevious,
+                    contentDescription = stringResource(Res.string.player_prev_episode),
+                    enabled = canGoPrevious,
+                )
+                MoovieIconButton(
+                    onClick = onNextEpisode,
+                    icon = Icons.Default.SkipNext,
+                    contentDescription = stringResource(Res.string.player_next_episode),
+                )
+            }
+            MoovieIconButton(
+                onClick = onOpenSubtitles,
+                icon = Icons.Default.ClosedCaption,
+                contentDescription = stringResource(Res.string.player_subtitles),
+            )
+            MoovieIconButton(
+                onClick = onOpenSettings,
+                icon = Icons.Default.Settings,
+                contentDescription = stringResource(Res.string.player_settings),
+            )
+            trailing()
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Text(
+                formatPlayerTime(positionMs),
+                style = MaterialTheme.typography.labelLarge,
+                color = if (scrubbing) MOOVIE_ACCENT else Color(0xFFCCCCCC),
+            )
+            PlayerSeekBar(
+                fraction = if (durationMs > 0) {
+                    (positionMs.toFloat() / durationMs).coerceIn(0f, 1f)
+                } else {
+                    0f
+                },
+                scrubbing = scrubbing,
+                onToggleScrub = onToggleScrub,
+                onNudgeScrub = onNudgeScrub,
+                onCancelScrub = onCancelScrub,
+                onActivity = onActivity,
+                onSeekToFraction = onSeekToFraction,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                formatPlayerTime(durationMs),
+                style = MaterialTheme.typography.labelLarge,
+                color = Color(0xFFCCCCCC),
+            )
+        }
+    }
+}
+
+/**
+ * Barre de progression pilotable au D-pad. OK entre/sort du « mode réglage » :
+ * hors de ce mode, ←/→ ne sont pas consommées et servent à passer d'un bouton à
+ * l'autre — sinon le focus resterait piégé sur la barre, sans issue possible à
+ * la télécommande.
+ */
+@Composable
+private fun PlayerSeekBar(
+    fraction: Float,
+    scrubbing: Boolean,
+    onToggleScrub: () -> Unit,
+    onNudgeScrub: (Long) -> Unit,
+    onCancelScrub: () -> Unit,
+    onActivity: () -> Unit,
+    onSeekToFraction: ((Float) -> Unit)?,
+    modifier: Modifier = Modifier,
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val focused by interaction.collectIsFocusedAsState()
+
+    // Quitter la barre annule un réglage non validé.
+    LaunchedEffect(focused) { if (!focused) onCancelScrub() }
+
+    val barHeight = if (focused || scrubbing) 10.dp else 6.dp
+    var widthPx by remember { mutableStateOf(1) }
+    Box(
+        modifier = modifier
+            .height(32.dp)
+            .onSizeChanged { widthPx = it.width.coerceAtLeast(1) }
+            // Pointeur : uniquement là où l'appelant le demande (desktop). Le
+            // clic comme le glisser repositionnent directement la lecture, sans
+            // passer par le mode scrub qui n'existe que pour le D-pad.
+            .then(
+                if (onSeekToFraction == null) {
+                    Modifier
+                } else {
+                    Modifier.pointerInput(Unit) {
+                        detectHorizontalDragGestures(
+                            onDragEnd = { onActivity() },
+                        ) { change, _ ->
+                            onActivity()
+                            onSeekToFraction((change.position.x / widthPx).coerceIn(0f, 1f))
+                        }
+                    }.pointerInput(Unit) {
+                        detectTapGestures { offset ->
+                            onActivity()
+                            onSeekToFraction((offset.x / widthPx).coerceIn(0f, 1f))
+                        }
+                    }
+                },
+            )
+            .onKeyEvent { event ->
+                if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
+                onActivity()
+                when (event.key) {
+                    Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
+                        onToggleScrub()
+                        true
+                    }
+                    Key.DirectionLeft -> if (scrubbing) {
+                        onNudgeScrub(-PLAYER_SCRUB_STEP_MS)
+                        true
+                    } else {
+                        false
+                    }
+                    Key.DirectionRight -> if (scrubbing) {
+                        onNudgeScrub(PLAYER_SCRUB_STEP_MS)
+                        true
+                    } else {
+                        false
+                    }
+                    else -> false
+                }
+            }
+            .focusable(interactionSource = interaction),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(barHeight)
+                .clip(CircleShape)
+                .background(if (focused) Color(0x66FFFFFF) else Color(0x40FFFFFF)),
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(fraction)
+                .height(barHeight)
+                .clip(CircleShape)
+                .background(if (scrubbing) Color.White else MOOVIE_ACCENT),
+        )
+        if (scrubbing) {
+            Text(
+                stringResource(Res.string.player_scrub_hint),
+                style = MaterialTheme.typography.labelSmall,
+                color = Color(0xFFBBBBBB),
+                modifier = Modifier.align(Alignment.BottomCenter),
+            )
+        } else if (focused) {
+            // Libellé d'accessibilité, gardé transparent : il décrit la barre
+            // sans ajouter de texte visible sous la progression.
+            Text(
+                stringResource(Res.string.player_progress),
+                style = MaterialTheme.typography.labelSmall,
+                color = Color(0x00000000),
+                modifier = Modifier.align(Alignment.BottomCenter),
+            )
+        }
+    }
+}
+
+// ── Overlays ────────────────────────────────────────────────────────────────
+
+/** Titre et sous-titre du média, en haut à gauche, avec le dégradé de lisibilité. */
+@Composable
+fun PlayerTitleOverlay(title: String, subtitle: String, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(Brush.verticalGradient(listOf(Color(0xCC000000), Color.Transparent)))
+            .padding(horizontal = 48.dp, vertical = 32.dp),
+    ) {
+        if (title.isNotBlank()) {
+            Text(
+                title,
+                style = MaterialTheme.typography.headlineMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        if (subtitle.isNotBlank()) {
+            Spacer(Modifier.height(4.dp))
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.titleMedium,
+                color = Color(0xFFBBBBBB),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+/** Bouton « Passer l'intro / le générique ». */
+@Composable
+fun PlayerSkipButton(kind: SkipKind, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    MoovieButton(onClick = onClick, modifier = modifier) {
+        Text(
+            if (kind == SkipKind.INTRO) {
+                stringResource(Res.string.player_skip_intro)
+            } else {
+                stringResource(Res.string.player_skip_outro)
+            },
+        )
+    }
+}
+
+/**
+ * Pastille de mise à jour. Le clic met en pause et laisse la bannière habituelle
+ * demander confirmation : rien ne s'installe sur une simple erreur de visée.
+ */
+@Composable
+fun PlayerUpdateChip(version: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    MoovieButton(onClick = onClick, modifier = modifier) {
+        Icon(
+            Icons.Default.SystemUpdateAlt,
+            contentDescription = null,
+            modifier = Modifier.size(18.dp),
+        )
+        Spacer(Modifier.width(10.dp))
+        Text(stringResource(Res.string.player_update_chip, version))
+    }
+}
+
+/** Décompte avant l'épisode suivant, avec son bouton d'annulation. */
+@Composable
+fun PlayerAutoNextCountdown(
+    seconds: Int,
+    cancelFocus: FocusRequester,
+    onCancel: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(Color(0xF21E1E1E))
+            .padding(horizontal = 20.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Text(
+            stringResource(Res.string.player_next_in, seconds),
+            style = MaterialTheme.typography.titleMedium,
+        )
+        MoovieButton(onClick = onCancel, modifier = Modifier.focusRequester(cancelFocus)) {
+            Text(stringResource(Res.string.common_cancel))
+        }
+    }
+}
+
+// ── Menus ───────────────────────────────────────────────────────────────────
+
+data class PlayerOption(val label: String, val selected: Boolean, val onSelect: () -> Unit)
+
+data class PlayerOptionSection(val title: String, val options: List<PlayerOption>)
+
+/** Section « Sous-titres », avec l'entrée « Désactivés » en tête. */
+@Composable
+fun subtitleSection(tracks: PlayerTracks, onSelect: (String?) -> Unit): PlayerOptionSection {
+    val options = buildList {
+        add(
+            PlayerOption(
+                stringResource(Res.string.player_subtitles_off),
+                tracks.subtitlesOff,
+            ) { onSelect(null) },
+        )
+        tracks.subtitles.forEach { track ->
+            add(PlayerOption(track.label, track.selected) { onSelect(track.id) })
+        }
+    }
+    return PlayerOptionSection(stringResource(Res.string.player_subtitles), options)
+}
+
+/** Section « Piste audio ». Une seule piste = rien à choisir, section vide. */
+@Composable
+fun audioSection(tracks: PlayerTracks, onSelect: (String) -> Unit): PlayerOptionSection {
+    val options = tracks.audio.map { track ->
+        PlayerOption(track.label, track.selected) { onSelect(track.id) }
+    }
+    return PlayerOptionSection(
+        stringResource(Res.string.player_audio),
+        if (options.size > 1) options else emptyList(),
+    )
+}
+
+/** Section « Vitesse de lecture ». */
+@Composable
+fun speedSection(current: Float, onSelect: (Float) -> Unit): PlayerOptionSection =
+    PlayerOptionSection(
+        stringResource(Res.string.player_speed),
+        PLAYER_SPEEDS.map { value ->
+            val label = "×%.2f".format(value).trimEnd('0').trimEnd('.', ',')
+            PlayerOption(label, value == current) { onSelect(value) }
+        },
+    )
+
+/** Une ligne du menu : intitulé de section ou choix sélectionnable. */
+private sealed interface DialogRow {
+    data class Header(val title: String) : DialogRow
+    data class Item(val option: PlayerOption) : DialogRow
+}
+
+/** Menu du lecteur (sous-titres, vitesse, piste audio) pilotable au D-pad. */
+@Composable
+fun PlayerOptionsDialog(sections: List<PlayerOptionSection>, onDismiss: () -> Unit) {
+    val firstOption = remember { FocusRequester() }
+    val rows = buildList {
+        sections.forEach { section ->
+            add(DialogRow.Header(section.title))
+            section.options.forEach { add(DialogRow.Item(it)) }
+        }
+    }
+    val firstItemIndex = rows.indexOfFirst { it is DialogRow.Item }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .width(380.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .background(Color(0xF5161616))
+                .padding(24.dp),
+        ) {
+            LazyColumn(
+                modifier = Modifier.heightIn(max = 420.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                contentPadding = PaddingValues(vertical = 4.dp),
+            ) {
+                itemsIndexed(rows) { index, row ->
+                    when (row) {
+                        is DialogRow.Header -> Text(
+                            row.title,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MOOVIE_ACCENT,
+                        )
+                        is DialogRow.Item -> MoovieButton(
+                            onClick = row.option.onSelect,
+                            selected = row.option.selected,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .then(
+                                    if (index == firstItemIndex) {
+                                        Modifier.focusRequester(firstOption)
+                                    } else {
+                                        Modifier
+                                    },
+                                ),
+                        ) {
+                            Text(row.option.label)
+                        }
+                    }
+                }
+            }
+        }
+    }
+    LaunchedEffect(Unit) { runCatching { firstOption.requestFocus() } }
+}

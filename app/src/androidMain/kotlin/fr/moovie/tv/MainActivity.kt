@@ -66,7 +66,24 @@ class MainActivity : ComponentActivity() {
                     Column(modifier = Modifier.fillMaxSize().background(Color(0xFF0A0A0A))) {
                         val updateViewModel: UpdateViewModel = viewModel()
                         val updateState by updateViewModel.state.collectAsStateWithLifecycle()
-                        var screen: Screen by remember { mutableStateOf(Screen.Home) }
+                        // Miroir du MOOVIE_TEST_STREAM desktop : ouvre le lecteur
+                        // directement sur une URL donnée, pour valider la chrome
+                        // sans dépendre de l'extraction d'une source réelle.
+                        // adb shell am start -n fr.moovie.tv/.MainActivity --es test_stream <url>
+                        val testStream = remember { intent?.getStringExtra("test_stream") }
+                        var screen: Screen by remember {
+                            mutableStateOf(
+                                if (testStream.isNullOrBlank()) {
+                                    Screen.Home
+                                } else {
+                                    Screen.Player(
+                                        streamUrl = testStream,
+                                        title = "Flux de test",
+                                        subtitle = "S1 · E1 — chrome partagée",
+                                    )
+                                },
+                            )
+                        }
                         // Pendant la lecture, la bannière rétrécirait la vidéo :
                         // le lecteur affiche une pastille discrète à la place, et
                         // la bannière n'apparaît qu'une fois celle-ci activée.

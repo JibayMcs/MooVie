@@ -64,8 +64,26 @@ import fr.moovie.tv.data.settings.SettingsRepository
 import fr.moovie.tv.data.watch.WatchProgressRepository
 import fr.moovie.tv.resources.Res
 import fr.moovie.tv.resources.common_cancel
+import fr.moovie.tv.resources.player_error
+import fr.moovie.tv.resources.player_fullscreen
+import fr.moovie.tv.resources.player_fullscreen_exit
+import fr.moovie.tv.resources.player_mute
 import fr.moovie.tv.resources.player_next_in
+import fr.moovie.tv.resources.player_unmute
 import fr.moovie.tv.resources.player_update_chip
+import fr.moovie.tv.ui.player.PLAYER_AUTO_NEXT_SECONDS
+import fr.moovie.tv.ui.player.PLAYER_SEEK_STEP_MS
+import fr.moovie.tv.ui.player.PLAYER_UPDATE_CHIP_MS
+import fr.moovie.tv.ui.player.PlayerAutoNextCountdown
+import fr.moovie.tv.ui.player.PlayerControlBar
+import fr.moovie.tv.ui.player.PlayerDialogKind
+import fr.moovie.tv.ui.player.PlayerOptionsDialog
+import fr.moovie.tv.ui.player.PlayerTitleOverlay
+import fr.moovie.tv.ui.player.PlayerTracks
+import fr.moovie.tv.ui.player.PlayerUpdateChip
+import fr.moovie.tv.ui.player.audioSection
+import fr.moovie.tv.ui.player.speedSection
+import fr.moovie.tv.ui.player.subtitleSection
 import fr.moovie.tv.ui.components.MOOVIE_ACCENT
 import fr.moovie.tv.ui.components.MoovieButton
 import fr.moovie.tv.ui.components.MoovieIconButton
@@ -199,6 +217,15 @@ internal fun DesktopPlayerScreen(
         }
     }
 
+    /** Vue du lecteur exposée à la chrome partagée. */
+    val controller = remember { VlcjPlayerController(player) }
+
+    var tracks by remember { mutableStateOf(PlayerTracks()) }
+    var speed by remember { mutableStateOf(1f) }
+    var dialog by remember { mutableStateOf<PlayerDialogKind?>(null) }
+    val playFocus = remember { FocusRequester() }
+    val autoNextFocus = remember { FocusRequester() }
+
     var isPlaying by remember { mutableStateOf(true) }
     var timeMs by remember { mutableStateOf(0L) }
     var lengthMs by remember { mutableStateOf(0L) }
@@ -325,7 +352,7 @@ internal fun DesktopPlayerScreen(
             return@LaunchedEffect
         }
         showControls()
-        var remaining = AUTO_NEXT_SECONDS
+        var remaining = PLAYER_AUTO_NEXT_SECONDS
         while (remaining > 0) {
             autoNextSeconds = remaining
             delay(1000)
@@ -351,7 +378,7 @@ internal fun DesktopPlayerScreen(
     LaunchedEffect(updateVersion) {
         if (updateVersion == null) return@LaunchedEffect
         updateChipFresh = true
-        delay(UPDATE_CHIP_MS)
+        delay(PLAYER_UPDATE_CHIP_MS)
         updateChipFresh = false
     }
     val showUpdateChip = updateVersion != null && (updateChipFresh || controlsVisible)
@@ -420,155 +447,147 @@ internal fun DesktopPlayerScreen(
             }
         }
 
-        // Titre du média, affiché avec les contrôles (miroir du lecteur TV).
+        // Titre du média : même overlay que sur Android TV.
         AnimatedVisibility(
             visible = controlsVisible,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier.align(Alignment.TopCenter),
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Brush.verticalGradient(listOf(Color(0xCC000000), Color.Transparent)))
-                    .padding(horizontal = 24.dp, vertical = 20.dp),
-            ) {
-                if (title.isNotBlank()) {
-                    Text(
-                        title,
-                        style = MaterialTheme.typography.headlineSmall,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                if (subtitle.isNotBlank()) {
-                    Text(
-                        subtitle,
-                        style = MaterialTheme.typography.titleSmall,
-                        color = Color(0xFFBBBBBB),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
+            PlayerTitleOverlay(title = title, subtitle = subtitle)
         }
 
-        // Pastille de mise à jour : quelques secondes à la détection, puis avec
-        // les contrôles. Cliquer met en pause et laisse la bannière habituelle
-        // demander confirmation.
         if (showUpdateChip && updateVersion != null) {
-            MoovieButton(
+            PlayerUpdateChip(
+                version = updateVersion,
                 onClick = {
-                    player.controls().setPause(true)
+                    controller.pause()
                     onUpdateSelected()
                 },
-                modifier = Modifier.align(Alignment.TopEnd).padding(24.dp),
-            ) {
-                Text(stringResource(Res.string.player_update_chip, updateVersion))
-            }
+                modifier = Modifier.align(Alignment.TopEnd).padding(end = 48.dp, top = 32.dp),
+            )
         }
 
-        // Décompte d'enchaînement, au-dessus de la barre de contrôles.
         autoNextSeconds?.let { seconds ->
-            Row(
+            PlayerAutoNextCountdown(
+                seconds = seconds,
+                cancelFocus = autoNextFocus,
+                onCancel = { cancelAutoNext() },
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(end = 24.dp, bottom = 96.dp)
-                    .background(Color(0xF21E1E1E))
-                    .padding(horizontal = 20.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                Text(
-                    stringResource(Res.string.player_next_in, seconds),
-                    style = MaterialTheme.typography.titleMedium,
-                )
-                MoovieButton(onClick = { cancelAutoNext() }) {
-                    Text(stringResource(Res.string.common_cancel))
-                }
-            }
+                    .padding(end = 48.dp, bottom = 128.dp),
+            )
         }
 
-        // Overlay de contrôles en bas, auto-masqué — la vidéo ne bouge pas.
+        // Barre de contrôles : la même que sur TV, avec en plus le volume et le
+        // plein écran, qui n'ont pas d'équivalent à la télécommande.
         AnimatedVisibility(
             visible = controlsVisible,
             enter = fadeIn() + slideInVertically(initialOffsetY = { it }),
             exit = fadeOut() + slideOutVertically(targetOffsetY = { it }),
             modifier = Modifier.align(Alignment.BottomCenter),
         ) {
-            Column(modifier = Modifier.fillMaxWidth().background(Color(0xCC101010))) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(64.dp)
-                        .padding(horizontal = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    MoovieIconButton(
-                        onClick = onBack,
-                        icon = Icons.Default.ArrowBack,
-                        contentDescription = "Retour",
-                    )
-                    MoovieIconButton(
-                        onClick = { togglePause() },
-                        icon = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = if (isPlaying) "Pause" else "Lecture",
-                    )
-                    Text(
-                        formatTime(timeMs),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = Color(0xFFCCCCCC),
-                    )
-                    Slider(
-                        value = scrubbing ?: if (lengthMs > 0) timeMs.toFloat() / lengthMs else 0f,
-                        onValueChange = { scrubbing = it },
-                        onValueChangeFinished = {
-                            scrubbing?.let { player.controls().setTime((it * lengthMs).toLong()) }
-                            scrubbing = null
-                        },
-                        colors = SliderDefaults.colors(
-                            thumbColor = MOOVIE_ACCENT,
-                            activeTrackColor = MOOVIE_ACCENT,
-                            inactiveTrackColor = Color(0xFF333333),
-                        ),
-                        modifier = Modifier.weight(1f),
-                    )
-                    Text(
-                        formatTime(lengthMs),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = Color(0xFFCCCCCC),
-                    )
-                    // Volume : muet + glissière (↑/↓ = ±5, M = muet au clavier).
-                    MoovieIconButton(
-                        onClick = { toggleMute() },
-                        icon = if (muted || volume == 0) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
-                        contentDescription = if (muted) "Rétablir le son" else "Couper le son",
-                    )
-                    Slider(
-                        value = if (muted) 0f else volume / 100f,
-                        onValueChange = { setVolume((it * 100).toInt()) },
-                        colors = SliderDefaults.colors(
-                            thumbColor = Color(0xFFCCCCCC),
-                            activeTrackColor = Color(0xFFCCCCCC),
-                            inactiveTrackColor = Color(0xFF333333),
-                        ),
-                        modifier = Modifier.width(120.dp),
-                    )
-                    MoovieIconButton(
-                        onClick = onToggleFullscreen,
-                        icon = if (isFullscreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
-                        contentDescription = if (isFullscreen) "Quitter le plein écran" else "Plein écran",
-                    )
-                }
-                if (playError) {
-                    Text(
-                        "Lecture impossible — essaie un autre lecteur depuis le panneau Sources.",
-                        color = Color(0xFFE0A0A0),
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                    )
-                }
+            PlayerControlBar(
+                isPlaying = isPlaying,
+                positionMs = timeMs,
+                durationMs = lengthMs,
+                // Pas de mode scrub au pointeur : le clic repositionne directement.
+                scrubbing = false,
+                showEpisodeButtons = nextSeason > 0 || nextEpisode > 0,
+                canGoPrevious = nextEpisode > 1,
+                playFocus = playFocus,
+                onBack = onBack,
+                onTogglePause = { controller.togglePause() },
+                onSeekBack = { controller.seekBy(-PLAYER_SEEK_STEP_MS) },
+                onSeekForward = { controller.seekBy(PLAYER_SEEK_STEP_MS) },
+                onToggleScrub = {},
+                onNudgeScrub = {},
+                onCancelScrub = {},
+                onPreviousEpisode = {
+                    if (nextEpisode > 1) onNextEpisode(nextSeason, nextEpisode - 2)
+                },
+                onNextEpisode = {
+                    if (nextSeason > 0 && nextEpisode > 0) onNextEpisode(nextSeason, nextEpisode)
+                },
+                onOpenSubtitles = {
+                    tracks = controller.tracks()
+                    dialog = PlayerDialogKind.SUBTITLES
+                },
+                onOpenSettings = {
+                    tracks = controller.tracks()
+                    dialog = PlayerDialogKind.SETTINGS
+                },
+                onActivity = { showControls() },
+                onSeekToFraction = { fraction ->
+                    if (lengthMs > 0) controller.seekTo((fraction * lengthMs).toLong())
+                },
+            ) {
+                MoovieIconButton(
+                    onClick = { toggleMute() },
+                    icon = if (muted || volume == 0) {
+                        Icons.AutoMirrored.Filled.VolumeOff
+                    } else {
+                        Icons.AutoMirrored.Filled.VolumeUp
+                    },
+                    contentDescription = if (muted) {
+                        stringResource(Res.string.player_unmute)
+                    } else {
+                        stringResource(Res.string.player_mute)
+                    },
+                )
+                MoovieIconButton(
+                    onClick = onToggleFullscreen,
+                    icon = if (isFullscreen) {
+                        Icons.Default.FullscreenExit
+                    } else {
+                        Icons.Default.Fullscreen
+                    },
+                    contentDescription = if (isFullscreen) {
+                        stringResource(Res.string.player_fullscreen_exit)
+                    } else {
+                        stringResource(Res.string.player_fullscreen)
+                    },
+                )
             }
+        }
+
+        if (playError) {
+            Text(
+                stringResource(Res.string.player_error),
+                color = Color(0xFFE0A0A0),
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 140.dp, start = 32.dp, end = 32.dp),
+            )
+        }
+
+        when (dialog) {
+            PlayerDialogKind.SUBTITLES -> PlayerOptionsDialog(
+                sections = listOf(
+                    subtitleSection(tracks) { trackId ->
+                        controller.selectSubtitle(trackId)
+                        tracks = controller.tracks()
+                        dialog = null
+                    },
+                ),
+                onDismiss = { dialog = null },
+            )
+            PlayerDialogKind.SETTINGS -> PlayerOptionsDialog(
+                sections = listOf(
+                    speedSection(speed) {
+                        speed = it
+                        controller.setSpeed(it)
+                        dialog = null
+                    },
+                    audioSection(tracks) { trackId ->
+                        controller.selectAudio(trackId)
+                        tracks = controller.tracks()
+                        dialog = null
+                    },
+                ).filter { it.options.isNotEmpty() },
+                onDismiss = { dialog = null },
+            )
+            null -> Unit
         }
 
         // Écran de veille : recouvre tout, y compris la barre de contrôles qui
@@ -601,18 +620,4 @@ private fun MissingVlc(onBack: () -> Unit) {
         )
         MoovieButton(onClick = onBack) { Text("Retour") }
     }
-}
-
-/** Durée du décompte avant l'enchaînement de l'épisode suivant. */
-private const val AUTO_NEXT_SECONDS = 10
-
-/** Durée d'affichage spontané de la pastille de mise à jour. */
-private const val UPDATE_CHIP_MS = 10_000L
-
-private fun formatTime(ms: Long): String {
-    val totalSec = ms / 1000
-    val h = totalSec / 3600
-    val m = (totalSec % 3600) / 60
-    val s = totalSec % 60
-    return if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%d:%02d".format(m, s)
 }
