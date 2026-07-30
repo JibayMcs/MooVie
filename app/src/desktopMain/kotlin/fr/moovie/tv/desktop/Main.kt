@@ -63,10 +63,17 @@ fun main() {
 
     application {
         // Crochet de dev : MOOVIE_TEST_STREAM=<url> ouvre directement le lecteur
-        // (test du pipeline VLCJ sans dépendre des hébergeurs).
+        // (test du pipeline VLCJ sans dépendre des hébergeurs). MOOVIE_TEST_KEY
+        // (ex. tv:1396:s1e1) branche en plus la reprise et TheIntroDB : sans clé
+        // média, le lecteur n'a aucun titre à interroger.
         val testStream = remember { System.getenv("MOOVIE_TEST_STREAM") }
+        val testKey = remember { System.getenv("MOOVIE_TEST_KEY").orEmpty() }
         val nav = rememberNavStack(
-            if (testStream.isNullOrBlank()) Screen.Home else Screen.Player(testStream),
+            if (testStream.isNullOrBlank()) {
+                Screen.Home
+            } else {
+                Screen.Player(testStream, mediaKey = testKey)
+            },
         )
         // Retour *interne* à un écran uniquement (panneau des sources, fiche
         // d'épisode). Null quand l'écran n'a rien à fermer : Échap dépile alors.

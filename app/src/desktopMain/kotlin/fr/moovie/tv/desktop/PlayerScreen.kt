@@ -59,6 +59,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import fr.moovie.tv.data.intro.IntroDbRepository
+import fr.moovie.tv.data.intro.IntroMedia
 import fr.moovie.tv.data.settings.ScreensaverDelay
 import fr.moovie.tv.data.settings.SettingsRepository
 import fr.moovie.tv.data.watch.WatchProgressRepository
@@ -78,9 +80,13 @@ import fr.moovie.tv.ui.player.PlayerAutoNextCountdown
 import fr.moovie.tv.ui.player.PlayerControlBar
 import fr.moovie.tv.ui.player.PlayerDialogKind
 import fr.moovie.tv.ui.player.PlayerOptionsDialog
+import fr.moovie.tv.ui.player.PlayerSkipButton
+import fr.moovie.tv.ui.player.SkipKind
 import fr.moovie.tv.ui.player.PlayerTitleOverlay
 import fr.moovie.tv.ui.player.PlayerTracks
 import fr.moovie.tv.ui.player.PlayerUpdateChip
+import fr.moovie.tv.ui.player.parseMediaKey
+import fr.moovie.tv.ui.player.toPlayerSegments
 import fr.moovie.tv.ui.player.audioSection
 import fr.moovie.tv.ui.player.speedSection
 import fr.moovie.tv.ui.player.subtitleSection
@@ -194,6 +200,8 @@ internal fun DesktopPlayerScreen(
     val progress = remember { WatchProgressRepository() }
     val settings = remember { SettingsRepository() }
     val autoPlayNext by settings.autoPlayNext.collectAsState(initial = true)
+    val skipEnabled by settings.skipIntroOutro.collectAsState(initial = true)
+    val introRepo = remember { IntroDbRepository() }
     val screensaverDelay by settings.screensaverDelay.collectAsState(initial = ScreensaverDelay.M15)
     val saveScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.IO) }
     val surface = remember { ComposeVideoSurface() }
@@ -366,6 +374,62 @@ internal fun DesktopPlayerScreen(
         }
     }
 
+    // ── Intro / générique (TheIntroDB) ───────────────────────────────────────
+    // Mêmes segments que sur Android TV, pour les faire apparaître sur la barre
+    // de progression. Le desktop n'a pas (encore) les boutons « Passer » : ici
+    // l'information est purement visuelle.
+    val pid = remember(mediaKey) { parseMediaKey(mediaKey) }
+    var media by remember(streamUrl) { mutableStateOf<IntroMedia?>(null) }
+
+    // La durée n'est connue qu'une fois le flux ouvert, et elle sert à l'API à
+    // choisir la bonne version du titre : on attend qu'elle arrive.
+    LaunchedEffect(streamUrl, skipEnabled, pid) {
+        if (!skipEnabled || pid == null) return@LaunchedEffect
+        repeat(20) {
+            if (player.status().length() > 0) return@repeat
+            delay(500)
+        }
+        media = introRepo.fetch(
+            pid.tmdbId,
+            pid.isTv,
+            pid.season,
+            pid.episode,
+            player.status().length().coerceAtLeast(0),
+        )
+    }
+
+    // Segment actif sous la tête de lecture. Dérivé de `timeMs`, déjà rafraîchi
+    // toutes les 500 ms par la boucle d'état : inutile d'en ajouter une seconde.
+    val activeSkip = remember(media, timeMs) {
+        val intro = media?.intro?.firstOrNull()
+        val credits = media?.credits?.firstOrNull()
+        when {
+            intro?.endMs != null && timeMs >= (intro.startMs ?: 0L) && timeMs <= intro.endMs ->
+                SkipKind.INTRO
+            // Générique sans borne de fin : actif jusqu'au bout du média.
+            credits?.startMs != null && timeMs >= credits.startMs &&
+                (credits.endMs == null || timeMs <= credits.endMs) -> SkipKind.CREDITS
+            else -> null
+        }
+    }
+
+    /**
+     * Saute le segment actif. Passer le générique enchaîne l'épisode suivant
+     * quand il y en a un — sinon (film, fin de série) on rend la main à la
+     * fiche, exactement comme sur Android TV.
+     */
+    fun doSkip() {
+        when (activeSkip) {
+            SkipKind.INTRO -> media?.intro?.firstOrNull()?.endMs?.let { controller.seekTo(it) }
+            SkipKind.CREDITS -> if (nextSeason > 0 && nextEpisode > 0) {
+                onNextEpisode(nextSeason, nextEpisode)
+            } else {
+                onBack()
+            }
+            null -> Unit
+        }
+    }
+
     // Minuterie d'auto-masquage : relancée à chaque activité ; en pause les
     // contrôles restent affichés.
     LaunchedEffect(activityTick, isPlaying) {
@@ -533,6 +597,23 @@ internal fun DesktopPlayerScreen(
             )
         }
 
+        // Bouton « Passer l'intro / le générique ». Masqué pendant le décompte
+        // d'enchaînement, qui occupe le même coin — et à ce moment-là le
+        // générique est justement le segment actif.
+        val skip = activeSkip
+        if (skip != null && autoNextSeconds == null) {
+            PlayerSkipButton(
+                kind = skip,
+                onClick = {
+                    showControls()
+                    doSkip()
+                },
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 48.dp, bottom = if (controlsVisible) 128.dp else 48.dp),
+            )
+        }
+
         autoNextSeconds?.let { seconds ->
             PlayerAutoNextCountdown(
                 seconds = seconds,
@@ -558,6 +639,8 @@ internal fun DesktopPlayerScreen(
                 durationMs = lengthMs,
                 // Pas de mode scrub au pointeur : le clic repositionne directement.
                 scrubbing = false,
+                // Intro / générique repérés sur la barre, comme sur Android TV.
+                segments = remember(media) { media?.toPlayerSegments().orEmpty() },
                 showEpisodeButtons = nextSeason > 0 || nextEpisode > 0,
                 canGoPrevious = nextEpisode > 1,
                 playFocus = playFocus,
