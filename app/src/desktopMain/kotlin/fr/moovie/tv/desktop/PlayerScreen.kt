@@ -131,37 +131,23 @@ private class ComposeVideoSurface {
         private set
 
     val bufferFormatCallback = object : BufferFormatCallback {
-        override fun getBufferFormat(sourceWidth: Int, sourceHeight: Int): BufferFormat =
-            RV32BufferFormat(sourceWidth, sourceHeight)
+        override fun getBufferFormat(sourceWidth: Int, sourceHeight: Int): BufferFormat {
+            info = ImageInfo(sourceWidth, sourceHeight, ColorType.BGRA_8888, ColorAlphaType.OPAQUE)
+            pixels = ByteArray(sourceWidth * sourceHeight * 4)
+            bitmap = Bitmap()
+            return RV32BufferFormat(sourceWidth, sourceHeight)
+        }
 
         override fun allocatedBuffers(buffers: Array<ByteBuffer>) = Unit
     }
 
     val renderCallback = RenderCallback { _, nativeBuffers, bufferFormat ->
-        val src = nativeBuffers[0]
-        val rowBytes = bufferFormat.width * 4
-        if (rowBytes <= 0) return@RenderCallback
-        src.rewind()
-        // On se dimensionne sur le buffer réellement livré, jamais sur la taille
-        // demandée : libVLC pade la hauteur (720x368 pour 720x360 visibles) et
-        // peut changer de chemin de décodage en cours de lecture (VAAPI → VDPAU
-        // → logiciel), auquel cas la hauteur du buffer change encore. Se fier à
-        // la taille demandée donnait une image jamais affichée.
-        val rows = src.remaining() / rowBytes
-        if (rows <= 0) return@RenderCallback
-        if (pixels.size != rows * rowBytes || info?.height != rows) {
-            pixels = ByteArray(rows * rowBytes)
-            info = ImageInfo(bufferFormat.width, rows, ColorType.BGRA_8888, ColorAlphaType.OPAQUE)
-            bitmap = Bitmap()
-        }
         val bmp = bitmap ?: return@RenderCallback
         val fmt = info ?: return@RenderCallback
-        src.get(pixels, 0, pixels.size)
-        if (!bmp.installPixels(fmt, pixels, rowBytes)) {
-            // Silencieux, l'image resterait simplement noire : on veut le savoir.
-            println("MOOVIE: installPixels a échoué (${fmt.width}x${fmt.height}, rowBytes=$rowBytes)")
-            return@RenderCallback
-        }
+        val src = nativeBuffers[0]
+        src.rewind()
+        src.get(pixels, 0, minOf(src.remaining(), pixels.size))
+        bmp.installPixels(fmt, pixels, bufferFormat.width * 4)
         image = bmp.asComposeImageBitmap()
         frameTick++
     }
@@ -206,14 +192,7 @@ internal fun DesktopPlayerScreen(
     val factory = remember {
         runCatching {
             NativeDiscovery().discover()
-            // Décodage matériel désactivé : on rend dans un CallbackVideoSurface,
-            // qui exige du RV32 en mémoire système. Avec VA-API/VDPAU les images
-            // vivent dans des surfaces GPU qu'il faut redescendre et convertir
-            // (VAOP -> I420 -> RV32), chemin sur lequel certains flux ne
-            // rendaient qu'un écran noir — alors que VLC seul, dont la sortie
-            // vidéo consomme ces surfaces directement, les affichait très bien.
-            // On ne perd rien : ce transfert annulait de toute façon le gain.
-            MediaPlayerFactory("--avcodec-hw=none")
+            MediaPlayerFactory()
         }.onFailure {
             // Trace en console : indispensable pour diagnostiquer une libVLC
             // absente/incompatible (snap, version, JNA…).
