@@ -4,6 +4,7 @@ import fr.moovie.tv.ui.player.MooviePlayerController
 import fr.moovie.tv.ui.player.PlayerTrack
 import fr.moovie.tv.ui.player.PlayerTracks
 import uk.co.caprica.vlcj.player.base.MediaPlayer
+import java.util.concurrent.Executors
 
 /**
  * [MooviePlayerController] adossé à libVLC via VLCJ.
@@ -18,6 +19,27 @@ import uk.co.caprica.vlcj.player.base.MediaPlayer
  */
 internal class VlcjPlayerController(private val player: MediaPlayer) : MooviePlayerController {
 
+    /**
+     * Toutes les commandes partent d'ici, jamais du thread UI.
+     *
+     * `libvlc_media_player_set_time` & consorts prennent un verrou natif et
+     * peuvent bloquer indéfiniment ; appelées depuis une lambda Compose, elles
+     * gèlent la fenêtre entière. Un seul thread, pour préserver l'ordre des
+     * commandes (une bascule pause/lecture ne doit pas s'inverser).
+     */
+    private val commands = Executors.newSingleThreadExecutor { runnable ->
+        Thread(runnable, "moovie-vlc-commands").apply { isDaemon = true }
+    }
+
+    private fun command(block: () -> Unit) {
+        runCatching { commands.execute { runCatching(block) } }
+    }
+
+    /** À appeler quand le lecteur est libéré : sinon le thread survit. */
+    fun shutdown() {
+        runCatching { commands.shutdownNow() }
+    }
+
     override val isPlaying: Boolean
         get() = runCatching { player.status().isPlaying }.getOrDefault(false)
 
@@ -28,19 +50,19 @@ internal class VlcjPlayerController(private val player: MediaPlayer) : MooviePla
         runCatching { player.status().length().coerceAtLeast(0) }.getOrDefault(0L)
 
     override fun togglePause() {
-        runCatching { player.controls().setPause(player.status().isPlaying) }
+        command { player.controls().setPause(player.status().isPlaying) }
     }
 
     override fun pause() {
-        runCatching { player.controls().setPause(true) }
+        command { player.controls().setPause(true) }
     }
 
     override fun seekTo(positionMs: Long) {
-        runCatching { player.controls().setTime(positionMs.coerceAtLeast(0)) }
+        command { player.controls().setTime(positionMs.coerceAtLeast(0)) }
     }
 
     override fun seekBy(deltaMs: Long) {
-        runCatching {
+        command {
             val length = player.status().length()
             val max = if (length > 0) length else Long.MAX_VALUE
             val target = (player.status().time() + deltaMs).coerceIn(0L, max)
@@ -52,7 +74,7 @@ internal class VlcjPlayerController(private val player: MediaPlayer) : MooviePla
         get() = runCatching { player.status().rate() }.getOrDefault(1f)
 
     override fun setSpeed(value: Float) {
-        runCatching { player.controls().setRate(value) }
+        command { player.controls().setRate(value) }
     }
 
     override fun tracks(): PlayerTracks = runCatching {
@@ -75,11 +97,11 @@ internal class VlcjPlayerController(private val player: MediaPlayer) : MooviePla
     override fun selectSubtitle(trackId: String?) {
         // -1 : libVLC coupe l'affichage des sous-titres.
         val id = trackId?.toIntOrNull() ?: -1
-        runCatching { player.subpictures().setTrack(id) }
+        command { player.subpictures().setTrack(id) }
     }
 
     override fun selectAudio(trackId: String) {
         val id = trackId.toIntOrNull() ?: return
-        runCatching { player.audio().setTrack(id) }
+        command { player.audio().setTrack(id) }
     }
 }

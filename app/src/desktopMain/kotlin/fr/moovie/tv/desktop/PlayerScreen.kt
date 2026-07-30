@@ -285,13 +285,25 @@ internal fun DesktopPlayerScreen(
         val resumeAt = if (mediaKey.isNotBlank()) progress.position(mediaKey) else 0L
         player.events().addMediaPlayerEventListener(object : MediaPlayerEventAdapter() {
             override fun mediaPlayerReady(mediaPlayer: MediaPlayer) {
-                if (resumeAt > 0) mediaPlayer.controls().setTime(resumeAt)
-                // Aligne libVLC sur l'état du slider (volume plein, non muet).
-                mediaPlayer.audio().isMute = false
-                mediaPlayer.audio().setVolume(100)
-                subtitles.forEach { (_, url) ->
-                    if (url.isNotBlank()) {
-                        mediaPlayer.media().addSlave(MediaSlaveType.SUBTITLE, url, false)
+                // Ne JAMAIS rappeler libVLC depuis son propre thread
+                // d'événements : il détient un verrou natif pendant le callback,
+                // et toute commande émise ici l'interbloque. Symptôme observé :
+                // écran noir, aucun son, horloge figée sur la position de
+                // reprise, puis gel complet de la fenêtre au premier seek (le
+                // thread UI venant s'échouer sur le même verrou). Seuls les
+                // titres repris en cours étaient touchés, `setTime` n'étant
+                // appelé que si resumeAt > 0.
+                saveScope.launch {
+                    runCatching {
+                        if (resumeAt > 0) mediaPlayer.controls().setTime(resumeAt)
+                        // Aligne libVLC sur l'état du slider (volume plein, non muet).
+                        mediaPlayer.audio().isMute = false
+                        mediaPlayer.audio().setVolume(100)
+                        subtitles.forEach { (_, url) ->
+                            if (url.isNotBlank()) {
+                                mediaPlayer.media().addSlave(MediaSlaveType.SUBTITLE, url, false)
+                            }
+                        }
                     }
                 }
             }
@@ -380,6 +392,7 @@ internal fun DesktopPlayerScreen(
                 runCatching { player.controls().stop() }
                 runCatching { player.release() }
                 runCatching { factory.release() }
+                controller.shutdown()
             }
         }
     }
