@@ -79,6 +79,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.window.Dialog
 import fr.moovie.tv.resources.watchlist_add
 import fr.moovie.tv.resources.watchlist_remove
+import androidx.compose.foundation.shape.CircleShape
+import fr.moovie.tv.resources.watchlist_added
 
 /**
  * Écran de recherche partagé TV + desktop : état hoisté (le ViewModel reste
@@ -317,12 +319,35 @@ private fun ResultCard(
 ) {
     MoovieCard(onClick = onClick, onLongClick = onLongClick, modifier = modifier.fillMaxWidth()) {
         Column {
-            AsyncImage(
-                model = item.posterUrl(),
-                contentDescription = item.displayTitle,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxWidth().aspectRatio(2f / 3f).background(Color(0xFF222222)),
-            )
+            Box {
+                AsyncImage(
+                    model = item.posterUrl(),
+                    contentDescription = item.displayTitle,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxWidth().aspectRatio(2f / 3f).background(Color(0xFF222222)),
+                )
+                // Sans ce repère, rien ne distingue un titre déjà mis de côté :
+                // on le rajoutait sans le savoir, autant de fois qu'on retombait
+                // dessus dans les résultats.
+                if (inWatchlist) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(6.dp)
+                            .size(24.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xCC0A0A0A)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            Icons.Default.Bookmark,
+                            contentDescription = stringResource(Res.string.watchlist_added),
+                            tint = MOOVIE_ACCENT,
+                            modifier = Modifier.size(14.dp),
+                        )
+                    }
+                }
+            }
             MoovieMarqueeText(
                 text = item.displayTitle,
                 modifier = Modifier.padding(8.dp),
