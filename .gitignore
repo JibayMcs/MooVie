@@ -13,3 +13,8 @@
 keystore.properties
 /.env
 /graphify-out/
+/.kotlin/
+
+# Outils de dev locaux, non versionnés (consignes projet)
+/CLAUDE.md
+/.claude/
