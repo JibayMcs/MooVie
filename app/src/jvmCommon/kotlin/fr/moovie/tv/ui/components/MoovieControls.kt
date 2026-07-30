@@ -153,22 +153,25 @@ private val CONFIRM_KEYS = setOf(Key.DirectionCenter, Key.Enter, Key.NumPadEnter
 
 /**
  * Suivi d'un appui OK au D-pad (mutable hors composition : ces champs ne
- * pilotent aucun rendu). [watchdog] relâche l'état si le KeyUp n'arrive jamais
- * — c'est le cas quand l'appui long ouvre une popup, qui capte la fin de
- * l'événement : sans lui la carte resterait bloquée et ne répondrait plus.
+ * pilotent aucun rendu). [watchdog] relâche l'état si le KeyUp n'arrive jamais,
+ * sans quoi la carte resterait bloquée et ne répondrait plus.
  */
 private class ConfirmKeyPress {
     var downs = 0
-    var fired = false
     var watchdog: Job? = null
 
     fun reset() {
         watchdog?.cancel()
         watchdog = null
         downs = 0
-        fired = false
     }
 }
+
+/**
+ * Nombre de KeyDown (Android répète tant que la touche est tenue) à partir
+ * duquel l'appui est considéré long. Deux = une répétition, soit ~400 ms.
+ */
+private const val LONG_PRESS_DOWNS = 2
 
 /**
  * Silence au-delà duquel la touche est considérée relâchée. Doit rester
@@ -202,6 +205,11 @@ fun MoovieCard(
     // télécommande, maintenir OK ne produisait rien. Android répète les KeyDown
     // tant que la touche est tenue — on les compte, et on avale le KeyUp final
     // pour que le clic simple ne parte pas en plus de l'appui long.
+    //
+    // L'appui long ne se déclenche qu'au **relâchement**, jamais pendant que la
+    // touche est tenue : la popup ouverte sous une touche encore enfoncée
+    // recevait aussitôt la fin de l'appui et validait sa première action, sans
+    // laisser le temps de choisir.
     val confirm = remember { ConfirmKeyPress() }
     val scope = rememberCoroutineScope()
     DisposableEffect(confirm) { onDispose { confirm.reset() } }
@@ -213,25 +221,21 @@ fun MoovieCard(
             when (event.type) {
                 KeyEventType.KeyDown -> {
                     confirm.downs++
-                    if (!confirm.fired && confirm.downs >= 2) {
-                        confirm.fired = true
-                        onLongClick()
-                    }
                     // Chaque répétition repousse le relâchement présumé.
                     confirm.watchdog?.cancel()
                     confirm.watchdog = scope.launch {
                         delay(CONFIRM_RELEASE_MS)
                         confirm.downs = 0
-                        confirm.fired = false
                     }
-                    // Une fois l'appui long parti, on avale les répétitions puis
-                    // le KeyUp pour que le clic simple ne se déclenche pas aussi.
-                    confirm.fired
+                    // Les répétitions au-delà du seuil sont avalées : le clic
+                    // simple ne doit pas partir en plus de l'appui long.
+                    confirm.downs >= LONG_PRESS_DOWNS
                 }
                 KeyEventType.KeyUp -> {
-                    val consumed = confirm.fired
+                    val long = confirm.downs >= LONG_PRESS_DOWNS
                     confirm.reset()
-                    consumed
+                    if (long) onLongClick()
+                    long
                 }
                 else -> false
             }

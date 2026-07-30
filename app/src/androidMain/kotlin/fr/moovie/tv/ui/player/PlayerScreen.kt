@@ -73,6 +73,19 @@ private fun parseMediaKey(key: String): PlaybackId? {
 }
 
 /**
+ * Touches qui, en sortant de l'écran de veille, relancent aussi la lecture.
+ * Les flèches ne font que réveiller : on regarde où on en est avant de reprendre.
+ */
+private val RESUME_KEYS = setOf(
+    Key.DirectionCenter,
+    Key.Enter,
+    Key.NumPadEnter,
+    Key.MediaPlayPause,
+    Key.MediaPlay,
+    Key.Spacebar,
+)
+
+/**
  * Lecteur natif Media3/ExoPlayer.
  *
  * Les contrôles sont un **overlay Compose** et non le contrôleur intégré de
@@ -173,6 +186,8 @@ fun PlayerScreen(
     var updateChipFresh by remember(updateVersion) { mutableStateOf(updateVersion != null) }
     // Écran de veille affiché (lecture en pause depuis le délai choisi).
     var screensaverOn by remember { mutableStateOf(false) }
+    // Appui en cours qui a servi à sortir de la veille : sa fin doit être avalée.
+    var swallowUntilRelease by remember { mutableStateOf(false) }
 
     fun wake() {
         controlsVisible = true
@@ -353,7 +368,16 @@ fun PlayerScreen(
     // même qu'elle apparaisse. Borné : une pause oubliée ne doit pas laisser la
     // dalle allumée toute la nuit.
     LaunchedEffect(screensaverOn) {
-        if (!screensaverOn) return@LaunchedEffect
+        if (!screensaverOn) {
+            // Sortie de veille : la couche disparaît et le focus retombe sur le
+            // premier bouton de la barre, c'est-à-dire Retour. On le ramène sur
+            // Lecture, sinon l'appui suivant quitte le film.
+            if (controlsVisible) {
+                delay(60)
+                runCatching { playFocus.requestFocus() }
+            }
+            return@LaunchedEffect
+        }
         playerView.keepScreenOn = true
         delay(PLAYER_SCREENSAVER_AWAKE_MS)
         playerView.keepScreenOn = false
@@ -423,6 +447,30 @@ fun PlayerScreen(
             .fillMaxSize()
             .background(Color.Black)
             .onPreviewKeyEvent { event ->
+                // Écran de veille : la touche ne sert qu'à en sortir. OK et les
+                // touches de lecture relancent en plus le film — revenir devant
+                // sa TV et appuyer sur OK veut dire « reprends », pas « quitte ».
+                //
+                // Le KeyUp est avalé lui aussi (swallowUntilRelease) : la barre
+                // de contrôles est déjà affichée sous la veille, et la fin de
+                // l'appui atteignait son bouton focalisé — d'où le retour à la
+                // fiche au lieu de la reprise.
+                if (screensaverOn || swallowUntilRelease) {
+                    when (event.type) {
+                        KeyEventType.KeyDown -> {
+                            if (screensaverOn) {
+                                screensaverOn = false
+                                activityTick++
+                                if (event.key in RESUME_KEYS && !controller.isPlaying) {
+                                    controller.togglePause()
+                                }
+                            }
+                            swallowUntilRelease = true
+                        }
+                        else -> swallowUntilRelease = false
+                    }
+                    return@onPreviewKeyEvent true
+                }
                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                 // Décompte en cours : la 1re touche l'interrompt, quelle qu'elle
                 // soit — on ne subit pas l'enchaînement en réveillant les contrôles.

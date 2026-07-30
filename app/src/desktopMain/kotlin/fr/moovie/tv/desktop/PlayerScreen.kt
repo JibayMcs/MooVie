@@ -156,6 +156,12 @@ private class ComposeVideoSurface {
 }
 
 /**
+ * Touches qui, en sortant de l'écran de veille, relancent aussi la lecture.
+ * Les flèches ne font que réveiller : on regarde où on en est avant de reprendre.
+ */
+private val RESUME_KEYS = setOf(Key.Spacebar, Key.Enter, Key.NumPadEnter, Key.DirectionCenter)
+
+/**
  * Lecteur desktop via libVLC (VLC doit être installé sur la machine).
  * Frames rendues dans Compose (callbacks vlcj) → overlay de contrôles
  * auto-masqué sans clignotement. Clavier : Espace = pause, ←/→ = ±10 s,
@@ -262,6 +268,8 @@ internal fun DesktopPlayerScreen(
     var updateChipFresh by remember(updateVersion) { mutableStateOf(updateVersion != null) }
     // Écran de veille affiché (lecture en pause depuis le délai choisi).
     var screensaverOn by remember { mutableStateOf(false) }
+    // Appui en cours qui a servi à sortir de la veille : sa fin doit être avalée.
+    var swallowUntilRelease by remember { mutableStateOf(false) }
 
     fun showControls() {
         controlsVisible = true
@@ -454,6 +462,24 @@ internal fun DesktopPlayerScreen(
             .focusRequester(keyFocus)
             .focusable()
             .onPreviewKeyEvent { event ->
+                // Écran de veille : la touche en sort, et Espace / Entrée
+                // relancent la lecture — même contrat que sur Android TV. Le
+                // relâchement est avalé pour qu'il n'atteigne pas la barre de
+                // contrôles restée ouverte sous la veille.
+                if (screensaverOn || swallowUntilRelease) {
+                    when (event.type) {
+                        KeyEventType.KeyDown -> {
+                            if (screensaverOn) {
+                                screensaverOn = false
+                                activityTick++
+                                if (event.key in RESUME_KEYS && !isPlaying) togglePause()
+                            }
+                            swallowUntilRelease = true
+                        }
+                        else -> swallowUntilRelease = false
+                    }
+                    return@onPreviewKeyEvent true
+                }
                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                 // Décompte en cours : la 1re touche l'interrompt, quelle qu'elle soit.
                 if (autoNextSeconds != null) {
