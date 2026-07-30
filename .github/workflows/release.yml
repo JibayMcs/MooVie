@@ -65,6 +65,19 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      # Le runtime que jpackage embarque dans le paquet ne peut pas être Temurin
+      # sous Linux : libVLC part en SIGSEGV dans son démuxeur adaptive dès le
+      # démarrage d'une lecture (reproduit 7/7 sur Ubuntu 24.04, absent avec
+      # l'OpenJDK de la distribution — bisection A/B sur le même binaire, même
+      # VLC 3.0.20, même Java 17.0.19). Gradle continue de tourner sur Temurin,
+      # seul le runtime jlinké change.
+      - name: Runtime embarqué (OpenJDK de la distribution)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y openjdk-17-jdk
+          echo "MOOVIE_JPACKAGE_JDK=/usr/lib/jvm/java-17-openjdk-amd64" >> "$GITHUB_ENV"
+
       - name: Build paquet desktop (${{ matrix.ext }})
         run: ./gradlew packageDistributionForCurrentOS --no-daemon
 
@@ -74,8 +87,93 @@ jobs:
           src=$(find app/build/compose/binaries -name "*.${{ matrix.ext }}" | head -1)
           cp "$src" "moovie-${{ github.ref_name }}.${{ matrix.ext }}"
 
+      # Le .deb ne part pas directement en release : il doit d'abord prouver
+      # qu'il s'installe (job verify-deb). msi et dmg publient tout de suite,
+      # faute d'équivalent conteneurisé pour les tester.
       - name: Publier sur la release GitHub
+        if: runner.os != 'Linux'
         uses: softprops/action-gh-release@v2
         with:
           files: moovie-*.${{ matrix.ext }}
+          generate_release_notes: true
+
+      - name: Conserver le .deb pour vérification
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: moovie-deb
+          path: moovie-*.deb
+          retention-days: 1
+
+  # Le paquet a déjà été livré une fois avec une dépendance (libpcre3) absente de
+  # la distribution cible : `dpkg -i` échouait et l'app restait non configurée.
+  # jpackage dérive ces dépendances de la machine de build, donc rien ne garantit
+  # a priori qu'elles soient satisfaisables ailleurs. On installe donc le paquet
+  # pour de vrai, sur plusieurs bases, avant de le publier.
+  verify-deb:
+    needs: desktop
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Ubuntu et dérivées uniquement. Debian est volontairement absent : son
+        # libjpeg fournit l'ABI .so.62 quand le runtime attend .so.8, ce que
+        # seule une image embarquant sa propre libjpeg règlerait.
+        image: ['ubuntu:22.04', 'ubuntu:24.04']
+    container:
+      image: ${{ matrix.image }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: moovie-deb
+
+      # Un conteneur nu n'a ni /usr/share/applications ni desktop-directories, et
+      # le postinst du paquet (xdg-desktop-menu) échoue alors pour une raison qui
+      # n'existe sur aucune machine de bureau. On rend l'environnement
+      # représentatif plutôt que d'assouplir la vérification.
+      - name: Préparer un environnement de bureau minimal
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          apt-get update
+          apt-get install -y desktop-file-utils
+          mkdir -p /usr/share/desktop-directories
+
+      - name: Installer le paquet
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          # `apt-get install ./fichier.deb` résout les dépendances, contrairement
+          # à `dpkg -i` — c'est aussi ce qu'on documente pour l'utilisateur.
+          apt-get install -y ./moovie-*.deb
+          # `ii` = installé et configuré. Sans ce contrôle, un postinst en échec
+          # passerait inaperçu : le paquet resterait en état iU/iF.
+          test "$(dpkg-query -W -f='${db:Status-Abbrev}' moo-vie)" = "ii " \
+            || { dpkg -l moo-vie; echo "Paquet non configuré."; exit 1; }
+
+      - name: Vérifier que rien ne manque à l'exécution
+        run: |
+          R=/opt/moo-vie/lib/runtime/lib
+          export LD_LIBRARY_PATH="$R:$R/server:/opt/moo-vie/lib:/opt/moo-vie/lib/app"
+          missing=$(find /opt/moo-vie -name '*.so' -type f -exec ldd {} \; 2>/dev/null \
+            | grep 'not found' | sort -u)
+          if [ -n "$missing" ]; then
+            echo "Bibliothèques non résolues sur ${{ matrix.image }} :"
+            echo "$missing"
+            exit 1
+          fi
+          echo "Fermeture des dépendances complète sur ${{ matrix.image }}."
+
+  publish-deb:
+    needs: verify-deb
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: moovie-deb
+
+      - name: Publier sur la release GitHub
+        uses: softprops/action-gh-release@v2
+        with:
+          files: moovie-*.deb
           generate_release_notes: true
