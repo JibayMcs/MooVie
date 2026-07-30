@@ -75,6 +75,19 @@ class DetailsViewModel : ViewModel() {
 
     private var quickPlayJob: Job? = null
 
+    /**
+     * Liens écartés pour le contenu en cours : sonde négative, ou lecture qui a
+     * cassé une fois le lecteur ouvert. La cascade les saute au lieu de
+     * reproposer un hébergeur dont on sait déjà qu'il ne passe pas.
+     */
+    private val rejectedLinks = mutableSetOf<String>()
+
+    /** Lien à l'origine du flux en cours de lecture, pour pouvoir l'écarter. */
+    private var playingLink: EmbedLink? = null
+
+    /** Libellé de la lecture rapide en cours, réutilisé si la cascade reprend. */
+    private var quickPlayLabel = ""
+
     /** Langue de stream préférée de l'utilisateur (pour trier/prioriser les sources). */
     val streamLanguage: StateFlow<StreamLanguage> = settings.streamLanguage
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), StreamLanguage.VF)
@@ -121,6 +134,8 @@ class DetailsViewModel : ViewModel() {
         _resolved.value = null
         _selectedEpisode.value = null
         pendingMeta = null
+        rejectedLinks.clear()
+        playingLink = null
         this.tmdbId = tmdbId
         this.isTv = isTv
         viewModelScope.launch {
@@ -390,6 +405,45 @@ class DetailsViewModel : ViewModel() {
         _panelVisible.value = false
     }
 
+    /**
+     * Le lecteur a renoncé sur le flux en cours : écarte sa source et relance la
+     * cascade sur la suivante.
+     *
+     * La sonde ne valide qu'un accès au premier octet : un lien peut répondre
+     * correctement puis casser à l'ouverture (manifeste HLS vide, segments en
+     * 403, codec refusé). Sans cette reprise, l'utilisateur retombait sur un
+     * écran d'erreur alors que d'autres hébergeurs restaient à essayer.
+     *
+     * Renvoie false si plus rien n'est à tenter — à l'appelant de traiter
+     * l'échec (retour à la fiche).
+     */
+    fun retryAfterPlaybackFailure(): Boolean {
+        val failed = playingLink ?: return false
+        rejectedLinks += failed.url
+        playingLink = null
+        _resolved.value = null
+        val active = _sources.value as? SourcesState.Active ?: return false
+        // Même filtre que la cascade : seule la langue préférée est enchaînée,
+        // sinon on relancerait pour ne rien trouver.
+        val lang = streamLanguage.value.name
+        val hasAlternative = active.anyLoading ||
+            active.links.any { it.language == lang && it.url !in rejectedLinks }
+        if (!hasAlternative) {
+            // Plus rien à tenter : sans ce retour, l'utilisateur revenait à la
+            // fiche sans la moindre explication. On ouvre le panneau, qui liste
+            // les autres langues et hébergeurs restants.
+            viewModelScope.launch {
+                _resolveError.value = getString(Res.string.details_no_player, lang)
+                _panelVisible.value = true
+            }
+            return false
+        }
+        // La cascade repart de zéro : le job précédent est terminé (il rend la
+        // main dès qu'il a émis un flux), rejectedLinks fait le reste.
+        startQuickPlay(quickPlayLabel)
+        return true
+    }
+
     /** Efface la bannière « indisponible » de la lecture rapide. */
     fun dismissQuickPlay() {
         if (_quickPlay.value is QuickPlayState.Unavailable) _quickPlay.value = QuickPlayState.Idle
@@ -417,11 +471,14 @@ class DetailsViewModel : ViewModel() {
     private fun startQuickPlay(label: String) {
         if (quickPlayJob?.isActive == true) return
         val gen = ++resolveGen
+        quickPlayLabel = label
         quickPlayJob = viewModelScope.launch {
             val lang = settings.streamLanguage.first().name
             _quickPlay.value = QuickPlayState.Searching(if (label.isBlank()) lang else "$label · $lang")
             _resolveError.value = null
-            val tried = mutableSetOf<String>()
+            // Repart des liens déjà écartés : une reprise après échec de lecture
+            // ne doit pas reproposer l'hébergeur qui vient de casser.
+            val tried = rejectedLinks.toMutableSet()
             // Tours passés à attendre que la liste des providers soit publiée.
             var startupWaits = 0
             // Une seule reprise autorisée après purge d'un cache périmé.
@@ -448,10 +505,14 @@ class DetailsViewModel : ViewModel() {
                     if (stream != null && stream.url.isNotBlank() && isStreamPlayable(stream)) {
                         if (gen != resolveGen) return@launch
                         pendingMeta?.let { watchRepo.register(it) }
+                        playingLink = next
                         _quickPlay.value = QuickPlayState.Idle
                         _resolved.value = stream
                         return@launch
                     }
+                    // Écarté durablement : la sonde vient de le refuser, inutile
+                    // d'y revenir si la cascade reprend plus tard.
+                    rejectedLinks += next.url
                     continue
                 }
                 if (!active.anyLoading) {

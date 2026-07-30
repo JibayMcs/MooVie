@@ -191,6 +191,13 @@ private fun DesktopApp(
                     isFullscreen = isFullscreen,
                     onToggleFullscreen = onToggleFullscreen,
                     onBack = { nav.pop() },
+                    // Le flux a cassé une fois ouvert : retour à la fiche, qui
+                    // reprend la cascade sur l'hébergeur suivant. Si plus rien
+                    // n'est à tenter, elle affiche son erreur habituelle.
+                    onPlaybackFailed = {
+                        nav.pop()
+                        Vm.details.retryAfterPlaybackFailure()
+                    },
                     // Enchaînement : repasse par la fiche, qui résout la source
                     // du nouvel épisode puis relance le lecteur.
                     // Enchaînement : remplace l'entrée du lecteur par la fiche

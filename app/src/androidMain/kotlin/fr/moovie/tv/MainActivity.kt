@@ -26,6 +26,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.tv.material3.LocalContentColor
 import fr.moovie.tv.data.settings.LocaleManager
 import fr.moovie.tv.data.settings.SettingsRepository
+import fr.moovie.tv.ui.details.DetailsViewModel
 import fr.moovie.tv.ui.navigation.Screen
 import fr.moovie.tv.ui.navigation.rememberNavStack
 import fr.moovie.tv.ui.details.DetailsScreen
@@ -66,6 +67,10 @@ class MainActivity : ComponentActivity() {
                 CompositionLocalProvider(LocalContentColor provides Color.White) {
                     Column(modifier = Modifier.fillMaxSize().background(Color(0xFF0A0A0A))) {
                         val updateViewModel: UpdateViewModel = viewModel()
+                        // Même instance que celle de DetailsScreen (scope
+                        // Activity) : le lecteur peut donc lui rendre la main
+                        // quand un flux casse.
+                        val detailsViewModel: DetailsViewModel = viewModel()
                         val updateState by updateViewModel.state.collectAsStateWithLifecycle()
                         // Miroir du MOOVIE_TEST_STREAM desktop : ouvre le lecteur
                         // directement sur une URL donnée, pour valider la chrome
@@ -160,6 +165,14 @@ class MainActivity : ComponentActivity() {
                                 onUpdateSelected = { bannerOnPlayer = true },
                                 posterUrl = s.posterUrl,
                                 onBack = { nav.pop() },
+                                // Le flux a cassé une fois ouvert : retour à la
+                                // fiche, qui reprend la cascade sur l'hébergeur
+                                // suivant. Si plus rien n'est à tenter, elle
+                                // affiche son erreur habituelle.
+                                onPlaybackFailed = {
+                                    nav.pop()
+                                    detailsViewModel.retryAfterPlaybackFailure()
+                                },
                                 // Passer le générique d'un épisode → enchaîne le
                                 // suivant via la fiche (résolution + lecture auto).
                                 onNextEpisode = { tmdbId, season, episode ->

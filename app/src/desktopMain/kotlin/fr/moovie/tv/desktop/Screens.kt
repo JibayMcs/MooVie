@@ -25,7 +25,7 @@ import fr.moovie.tv.ui.settings.SettingsViewModel
  * ViewModels à l'échelle de la fenêtre (équivalent du scope Activity sur
  * Android) : survivent à la navigation, le process les emporte en quittant.
  */
-private object Vm {
+internal object Vm {
     val home by lazy { HomeViewModel() }
     val search by lazy { SearchViewModel() }
     val settings by lazy { SettingsViewModel() }

@@ -180,6 +180,8 @@ internal fun DesktopPlayerScreen(
     onToggleFullscreen: () -> Unit,
     onBack: () -> Unit,
     onNextEpisode: (season: Int, episode: Int) -> Unit,
+    /** Le flux a cassé en lecture : rend la main à la cascade de sources. */
+    onPlaybackFailed: () -> Unit = onBack,
 ) {
     val progress = remember { WatchProgressRepository() }
     val settings = remember { SettingsRepository() }
@@ -571,6 +573,13 @@ internal fun DesktopPlayerScreen(
                     },
                 )
             }
+        }
+
+        // Rendu à la cascade depuis un effet Compose et non depuis error() :
+        // ce callback vient du thread d'événements de libVLC, d'où l'on ne
+        // touche à rien (deadlock natif déjà rencontré).
+        LaunchedEffect(playError) {
+            if (playError) onPlaybackFailed()
         }
 
         if (playError) {

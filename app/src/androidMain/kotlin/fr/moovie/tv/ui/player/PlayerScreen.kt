@@ -38,6 +38,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
@@ -104,6 +105,8 @@ fun PlayerScreen(
     posterUrl: String = "",
     onBack: () -> Unit,
     onNextEpisode: (tmdbId: Int, season: Int, episode: Int) -> Unit = { _, _, _ -> },
+    /** Le flux a cassé en lecture : rend la main à la cascade de sources. */
+    onPlaybackFailed: () -> Unit = onBack,
 ) {
     val context = LocalContext.current
     val progress = remember { WatchProgressRepository() }
@@ -284,6 +287,13 @@ fun PlayerScreen(
 
             override fun onPlaybackStateChanged(playbackState: Int) {
                 if (playbackState == Player.STATE_ENDED) ended = true
+            }
+
+            // Le flux a cassé une fois ouvert (manifeste vide, segments en 403,
+            // codec refusé) : la sonde ne valide qu'un accès au premier octet.
+            // On rend la main à la cascade plutôt que de laisser un écran noir.
+            override fun onPlayerError(error: PlaybackException) {
+                onPlaybackFailed()
             }
         }
         isPlaying = player.isPlaying
