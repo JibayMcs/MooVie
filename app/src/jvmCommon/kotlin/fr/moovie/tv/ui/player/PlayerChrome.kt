@@ -1,5 +1,6 @@
 package fr.moovie.tv.ui.player
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -46,6 +48,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
@@ -60,6 +65,8 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import fr.moovie.tv.data.intro.IntroMedia
+import fr.moovie.tv.data.intro.Segment
 import fr.moovie.tv.resources.Res
 import fr.moovie.tv.resources.common_back
 import fr.moovie.tv.resources.common_cancel
@@ -129,6 +136,8 @@ fun PlayerControlBar(
      * réglage se fait au D-pad via le mode scrub.
      */
     onSeekToFraction: ((Float) -> Unit)? = null,
+    /** Intro / générique repérés sur la barre. Vide = titre inconnu de l'API. */
+    segments: List<PlayerSegment> = emptyList(),
     /** Commandes propres à la plateforme, ajoutées à droite (volume, plein écran). */
     trailing: @Composable RowScope.() -> Unit = {},
 ) {
@@ -210,6 +219,8 @@ fun PlayerControlBar(
                 } else {
                     0f
                 },
+                durationMs = durationMs,
+                segments = segments,
                 scrubbing = scrubbing,
                 onToggleScrub = onToggleScrub,
                 onNudgeScrub = onNudgeScrub,
@@ -228,6 +239,38 @@ fun PlayerControlBar(
 }
 
 /**
+ * Segment repéré sur la barre de progression (intro ou générique TheIntroDB).
+ * [endMs] nul = borne inconnue : le segment court jusqu'à la fin du média.
+ */
+data class PlayerSegment(val startMs: Long, val endMs: Long?, val kind: SkipKind)
+
+/**
+ * Segments d'un média TheIntroDB, prêts à être dessinés. Un segment sans début
+ * connu commence à zéro ; sans aucune borne, il est ignoré — on ne colorie pas
+ * la barre entière sur une donnée vide.
+ */
+fun IntroMedia.toPlayerSegments(): List<PlayerSegment> =
+    intro.mapNotNull { it.toPlayerSegment(SkipKind.INTRO) } +
+        credits.mapNotNull { it.toPlayerSegment(SkipKind.CREDITS) }
+
+private fun Segment.toPlayerSegment(kind: SkipKind): PlayerSegment? {
+    if (startMs == null && endMs == null) return null
+    return PlayerSegment(startMs = startMs ?: 0L, endMs = endMs, kind = kind)
+}
+
+/** Hauteur des bandes de segments, sous la piste de progression. */
+private val SEGMENT_BAND_HEIGHT = 5.dp
+
+/**
+ * Teinte d'un segment. Franchement différentes de l'accent rouge de la portion
+ * déjà lue : une bande ne doit jamais se lire comme de la progression.
+ */
+private fun SkipKind.bandColor(): Color = when (this) {
+    SkipKind.INTRO -> Color(0xFF3DA9FC)
+    SkipKind.CREDITS -> Color(0xFFF5A623)
+}
+
+/**
  * Barre de progression pilotable au D-pad. OK entre/sort du « mode réglage » :
  * hors de ce mode, ←/→ ne sont pas consommées et servent à passer d'un bouton à
  * l'autre — sinon le focus resterait piégé sur la barre, sans issue possible à
@@ -236,6 +279,8 @@ fun PlayerControlBar(
 @Composable
 private fun PlayerSeekBar(
     fraction: Float,
+    durationMs: Long,
+    segments: List<PlayerSegment>,
     scrubbing: Boolean,
     onToggleScrub: () -> Unit,
     onNudgeScrub: (Long) -> Unit,
@@ -318,6 +363,38 @@ private fun PlayerSeekBar(
                 .clip(CircleShape)
                 .background(if (scrubbing) Color.White else MOOVIE_ACCENT),
         )
+        // Segments TheIntroDB, sous la piste. La durée n'est connue qu'une fois
+        // le flux ouvert : avant, rien à placer. Et quand l'API ne connaît pas
+        // le titre, aucune bande n'apparaît — l'absence est l'information.
+        if (segments.isNotEmpty() && durationMs > 0) {
+            Canvas(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(SEGMENT_BAND_HEIGHT)
+                    .align(Alignment.Center)
+                    .offset(y = barHeight / 2 + 4.dp),
+            ) {
+                segments.forEach { segment ->
+                    val start = (segment.startMs.toFloat() / durationMs).coerceIn(0f, 1f)
+                    // Générique sans borne de fin : il file jusqu'au bout de la
+                    // barre plutôt que de disparaître.
+                    val end = segment.endMs
+                        ?.let { (it.toFloat() / durationMs).coerceIn(0f, 1f) }
+                        ?: 1f
+                    if (end <= start) return@forEach
+                    drawRoundRect(
+                        color = segment.kind.bandColor(),
+                        topLeft = Offset(size.width * start, 0f),
+                        // Un segment très court reste visible : au minimum un rond.
+                        size = Size(
+                            width = (size.width * (end - start)).coerceAtLeast(size.height),
+                            height = size.height,
+                        ),
+                        cornerRadius = CornerRadius(size.height / 2f),
+                    )
+                }
+            }
+        }
         if (scrubbing) {
             Text(
                 stringResource(Res.string.player_scrub_hint),

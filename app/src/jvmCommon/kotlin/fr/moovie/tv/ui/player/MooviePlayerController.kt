@@ -92,6 +92,28 @@ const val PLAYER_SCREENSAVER_AWAKE_MS = 2 * 60 * 60 * 1000L
 /** Segment que le bouton « Passer » propose de sauter. */
 enum class SkipKind { INTRO, CREDITS }
 
+/** Contenu déduit de la mediaKey ("movie:<id>" ou "tv:<id>:s<S>e<E>"). */
+data class PlaybackId(val tmdbId: Int, val isTv: Boolean, val season: Int, val episode: Int)
+
+/**
+ * Décompose la clé de lecture. Null quand elle est vide ou hors format : le
+ * titre est alors inconnu, et sans lui il n'y a ni intro ni générique à
+ * demander à TheIntroDB. Partagé par les deux lecteurs.
+ */
+fun parseMediaKey(key: String): PlaybackId? {
+    val parts = key.split(":")
+    return when {
+        parts.size >= 2 && parts[0] == "movie" ->
+            parts[1].toIntOrNull()?.let { PlaybackId(it, false, 0, 0) }
+        parts.size >= 3 && parts[0] == "tv" -> {
+            val tmdb = parts[1].toIntOrNull() ?: return null
+            val m = Regex("s(\\d+)e(\\d+)").find(parts[2]) ?: return null
+            PlaybackId(tmdb, true, m.groupValues[1].toInt(), m.groupValues[2].toInt())
+        }
+        else -> null
+    }
+}
+
 /** Menu ouvert par la barre de contrôles. */
 enum class PlayerDialogKind { SUBTITLES, SETTINGS }
 

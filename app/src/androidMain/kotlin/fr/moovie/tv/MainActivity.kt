@@ -77,13 +77,18 @@ class MainActivity : ComponentActivity() {
                         // directement sur une URL donnée, pour valider la chrome
                         // sans dépendre de l'extraction d'une source réelle.
                         // adb shell am start -n fr.moovie.tv/.MainActivity --es test_stream <url>
+                        // `test_key` (ex. tv:1396:s1e1) branche en plus la reprise
+                        // et TheIntroDB : sans clé média, le lecteur n'a aucun
+                        // titre à interroger et n'affiche ni segments ni boutons.
                         val testStream = remember { intent?.getStringExtra("test_stream") }
+                        val testKey = remember { intent?.getStringExtra("test_key").orEmpty() }
                         val nav = rememberNavStack(
                             if (testStream.isNullOrBlank()) {
                                 Screen.Home
                             } else {
                                 Screen.Player(
                                     streamUrl = testStream,
+                                    mediaKey = testKey,
                                     title = "Flux de test",
                                     subtitle = "S1 · E1 — chrome partagée",
                                 )

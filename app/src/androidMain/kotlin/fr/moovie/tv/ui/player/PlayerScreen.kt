@@ -55,23 +55,6 @@ import fr.moovie.tv.data.watch.WatchProgressRepository
 import fr.moovie.tv.ui.components.MoovieScreensaver
 import kotlinx.coroutines.delay
 
-/** Contenu déduit de la mediaKey ("movie:<id>" ou "tv:<id>:s<S>e<E>"). */
-private data class PlaybackId(val tmdbId: Int, val isTv: Boolean, val season: Int, val episode: Int)
-
-private fun parseMediaKey(key: String): PlaybackId? {
-    val parts = key.split(":")
-    return when {
-        parts.size >= 2 && parts[0] == "movie" ->
-            parts[1].toIntOrNull()?.let { PlaybackId(it, false, 0, 0) }
-        parts.size >= 3 && parts[0] == "tv" -> {
-            val tmdb = parts[1].toIntOrNull() ?: return null
-            val m = Regex("s(\\d+)e(\\d+)").find(parts[2]) ?: return null
-            PlaybackId(tmdb, true, m.groupValues[1].toInt(), m.groupValues[2].toInt())
-        }
-        else -> null
-    }
-}
-
 /**
  * Touches qui, en sortant de l'écran de veille, relancent aussi la lecture.
  * Les flèches ne font que réveiller : on regarde où on en est avant de reprendre.
@@ -570,6 +553,10 @@ fun PlayerScreen(
                 positionMs = scrubTarget ?: positionMs,
                 durationMs = durationMs,
                 scrubbing = scrubTarget != null,
+                // Intro / générique repérés sur la barre, à la SponsorBlock.
+                // Les mêmes bornes que les boutons « Passer » : rien de plus à
+                // aller chercher, on cesse juste de les réserver aux boutons.
+                segments = remember(media) { media?.toPlayerSegments().orEmpty() },
                 showEpisodeButtons = pid?.isTv == true,
                 canGoPrevious = pid != null && pid.isTv && pid.episode > 1,
                 playFocus = playFocus,
