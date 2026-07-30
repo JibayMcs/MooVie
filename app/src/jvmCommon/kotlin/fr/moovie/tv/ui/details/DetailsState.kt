@@ -48,7 +48,8 @@ data class EpisodeSelection(val season: Int, val episode: Episode)
 sealed interface QuickPlayState {
     data object Idle : QuickPlayState
     /** [label] = descripteur technique ("VF" ou "S1E3 · VF"), formaté par l'UI. */
-    data class Searching(val label: String) : QuickPlayState
+    /** [hoster] non nul pendant l'essai d'un hébergeur précis (cascade visible). */
+    data class Searching(val label: String, val hoster: String? = null) : QuickPlayState
     /** [lang] = langue manquante ("VF"…), formatée par l'UI. */
     data class Unavailable(val lang: String) : QuickPlayState
 }

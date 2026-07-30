@@ -8,6 +8,7 @@ import fr.moovie.tv.data.settings.currentTmdbLanguage
 import fr.moovie.tv.data.sources.EmbedLink
 import fr.moovie.tv.data.sources.ExtractorRegistry
 import fr.moovie.tv.data.sources.PlayableStream
+import fr.moovie.tv.data.sources.isStreamPlayable
 import fr.moovie.tv.data.sources.ProviderRegistry
 import fr.moovie.tv.data.sources.SourceCacheRepository
 import fr.moovie.tv.data.tmdb.Episode
@@ -434,9 +435,18 @@ class DetailsViewModel : ViewModel() {
                 val next = active.links.firstOrNull { it.language == lang && it.url !in tried }
                 if (next != null) {
                     tried += next.url
+                    // Affiche l'hébergeur en cours d'essai : la cascade devient
+                    // visible au lieu de laisser l'utilisateur devant un écran
+                    // d'attente muet.
+                    _quickPlay.value = QuickPlayState.Searching(next.hoster, hoster = next.hoster)
                     val stream = runCatching { ExtractorRegistry.resolve(next) }.getOrNull()
                     if (gen != resolveGen) return@launch // titre changé entre-temps
-                    if (stream != null && stream.url.isNotBlank()) {
+                    // Une URL extraite ne suffit pas : ces hébergeurs signent des
+                    // liens à durée de vie courte et répondent 403 derrière. Sans
+                    // cette sonde, la cascade s'arrêtait sur un lien mort et le
+                    // lecteur s'ouvrait sur « lecture impossible ».
+                    if (stream != null && stream.url.isNotBlank() && isStreamPlayable(stream)) {
+                        if (gen != resolveGen) return@launch
                         pendingMeta?.let { watchRepo.register(it) }
                         _quickPlay.value = QuickPlayState.Idle
                         _resolved.value = stream

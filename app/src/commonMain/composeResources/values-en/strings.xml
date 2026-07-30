@@ -53,6 +53,7 @@
     <string name="details_no_player">No %1$s player worked.</string>
     <string name="details_lang_missing">No %1$s source — other languages available.</string>
     <string name="details_no_sources">No source available for this title.</string>
+    <string name="details_trying_source">Playing from %1$s…</string>
     <string name="details_searching_source">Searching for a source… %1$s</string>
     <string name="details_resolve_error">Can’t play “%1$s”. Try another player.</string>
     <string name="details_needs_key">Missing TMDB key (Settings).</string>

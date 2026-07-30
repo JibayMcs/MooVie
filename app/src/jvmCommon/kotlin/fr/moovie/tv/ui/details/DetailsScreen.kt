@@ -85,6 +85,7 @@ import fr.moovie.tv.resources.details_resume
 import fr.moovie.tv.resources.details_runtime
 import fr.moovie.tv.resources.details_searching
 import fr.moovie.tv.resources.details_searching_source
+import fr.moovie.tv.resources.details_trying_source
 import fr.moovie.tv.resources.details_seasons
 import fr.moovie.tv.resources.details_sources
 import fr.moovie.tv.resources.mark_season_unwatched
@@ -387,7 +388,19 @@ fun DetailsScreenContent(
                             strokeWidth = 2.dp,
                             modifier = Modifier.size(16.dp),
                         )
-                        Text(stringResource(Res.string.details_searching_source, q.label), style = MaterialTheme.typography.bodyMedium)
+                        val hoster = q.hoster
+                        Text(
+                            if (hoster != null) {
+                                // Même capitalisation que dans le panneau des sources.
+                                stringResource(
+                                    Res.string.details_trying_source,
+                                    hoster.replaceFirstChar { it.uppercase() },
+                                )
+                            } else {
+                                stringResource(Res.string.details_searching_source, q.label)
+                            },
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
                     }
                     is QuickPlayState.Unavailable -> Text(
                         stringResource(Res.string.details_lang_unavailable, q.lang),

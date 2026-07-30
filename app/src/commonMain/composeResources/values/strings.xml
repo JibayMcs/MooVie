@@ -55,6 +55,7 @@
     <string name="details_no_player">Aucun lecteur %1$s n'a fonctionné.</string>
     <string name="details_lang_missing">Aucune source en %1$s — autres langues disponibles.</string>
     <string name="details_no_sources">Aucune source disponible pour ce titre.</string>
+    <string name="details_trying_source">Lecture depuis %1$s…</string>
     <string name="details_searching_source">Recherche d'une source… %1$s</string>
     <string name="details_resolve_error">Impossible de lire « %1$s ». Essaie un autre lecteur.</string>
     <string name="details_needs_key">Clé TMDB manquante (Réglages).</string>
