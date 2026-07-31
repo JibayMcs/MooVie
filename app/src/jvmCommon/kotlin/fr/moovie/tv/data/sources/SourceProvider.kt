@@ -9,9 +9,23 @@ package fr.moovie.tv.data.sources
 interface SourceProvider {
     val name: String
 
-    /** Liens d'embed pour un film. */
-    suspend fun movieSources(title: String, year: String?): List<EmbedLink>
+    /**
+     * Liens d'embed pour un film.
+     *
+     * `tmdbId` est l'identifiant TMDB du titre. Les providers qui scrapent un
+     * site par son moteur de recherche l'ignorent et travaillent sur le titre ;
+     * ceux qui indexent par TMDB (cinestream, frembed, j1f, cpasmal…) le
+     * prennent, ce qui supprime le rapprochement par titre — et avec lui la
+     * confusion « Dune » / « Dune Dreams ».
+     */
+    suspend fun movieSources(tmdbId: Int, title: String, year: String?): List<EmbedLink>
 
     /** Liens d'embed pour un épisode précis d'une série. */
-    suspend fun tvSources(title: String, year: String?, season: Int, episode: Int): List<EmbedLink>
+    suspend fun tvSources(
+        tmdbId: Int,
+        title: String,
+        year: String?,
+        season: Int,
+        episode: Int,
+    ): List<EmbedLink>
 }

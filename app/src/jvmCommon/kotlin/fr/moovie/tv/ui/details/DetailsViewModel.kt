@@ -281,7 +281,7 @@ class DetailsViewModel : ViewModel() {
             title = movie.details.title,
             imageUrl = movie.details.backdropUrl() ?: movie.details.posterUrl(),
         )
-        startSourceLoad { it.movieSources(movie.details.title, movie.details.year) }
+        startSourceLoad { it.movieSources(tmdbId, movie.details.title, movie.details.year) }
     }
 
     /** Charge les sources d'un épisode de la saison affichée. */
@@ -313,7 +313,7 @@ class DetailsViewModel : ViewModel() {
             title = tv.details.name,
             imageUrl = still ?: tv.details.backdropUrl() ?: tv.details.posterUrl(),
         )
-        startSourceLoad { it.tvSources(tv.details.name, tv.details.year, season, episode) }
+        startSourceLoad { it.tvSources(tmdbId, tv.details.name, tv.details.year, season, episode) }
     }
 
     /** Bascule vu/non vu pour une clé (épisode ou film). */

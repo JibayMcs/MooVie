@@ -28,7 +28,8 @@ class FstreamProvider(private val http: OkHttpClient) : SourceProvider {
 
     private val json = Json { ignoreUnknownKeys = true }
 
-    override suspend fun movieSources(title: String, year: String?): List<EmbedLink> =
+    // fstream ne connaît que son moteur de recherche interne : tmdbId est ignoré.
+    override suspend fun movieSources(tmdbId: Int, title: String, year: String?): List<EmbedLink> =
         withContext(Dispatchers.IO) {
             val page = searchBestMatch(title, year, season = null) ?: return@withContext emptyList()
             val pageId = extractPageId(page.link) ?: return@withContext emptyList()
@@ -36,6 +37,7 @@ class FstreamProvider(private val http: OkHttpClient) : SourceProvider {
         }
 
     override suspend fun tvSources(
+        tmdbId: Int,
         title: String,
         year: String?,
         season: Int,

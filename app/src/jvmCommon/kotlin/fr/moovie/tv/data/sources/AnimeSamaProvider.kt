@@ -16,10 +16,17 @@ class AnimeSamaProvider(private val http: OkHttpClient) : SourceProvider {
 
     override val name = "animesama"
 
-    override suspend fun movieSources(title: String, year: String?): List<EmbedLink> =
+    // anime-sama s'indexe par slug de catalogue, pas par TMDB : tmdbId est ignoré.
+    override suspend fun movieSources(tmdbId: Int, title: String, year: String?): List<EmbedLink> =
         withContext(Dispatchers.IO) { sourcesFor(title, seasonPrefix = "film", episode = 1) }
 
-    override suspend fun tvSources(title: String, year: String?, season: Int, episode: Int): List<EmbedLink> =
+    override suspend fun tvSources(
+        tmdbId: Int,
+        title: String,
+        year: String?,
+        season: Int,
+        episode: Int,
+    ): List<EmbedLink> =
         withContext(Dispatchers.IO) { sourcesFor(title, seasonPrefix = "saison$season", episode = episode) }
 
     private fun sourcesFor(title: String, seasonPrefix: String, episode: Int): List<EmbedLink> {
