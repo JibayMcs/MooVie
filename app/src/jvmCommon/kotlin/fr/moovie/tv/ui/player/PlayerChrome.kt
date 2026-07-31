@@ -60,9 +60,12 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import fr.moovie.tv.data.intro.IntroMedia
@@ -91,6 +94,7 @@ import fr.moovie.tv.ui.components.MOOVIE_ACCENT
 import fr.moovie.tv.ui.components.MoovieButton
 import fr.moovie.tv.ui.components.MoovieIconButton
 import org.jetbrains.compose.resources.stringResource
+import kotlin.math.roundToInt
 
 // Chrome du lecteur partagée entre Android TV et desktop : barre de contrôles,
 // barre de progression, menus, overlay de titre, boutons « Passer », pastille de
@@ -261,6 +265,9 @@ private fun Segment.toPlayerSegment(kind: SkipKind): PlayerSegment? {
 /** Hauteur des bandes de segments, sous la piste de progression. */
 private val SEGMENT_BAND_HEIGHT = 5.dp
 
+/** Élévation de l'infobulle de temps au-dessus de la barre de progression. */
+private val SEEK_TOOLTIP_GAP = 26.dp
+
 /**
  * Teinte d'un segment. Franchement différentes de l'accent rouge de la portion
  * déjà lue : une bande ne doit jamais se lire comme de la progression.
@@ -297,6 +304,9 @@ private fun PlayerSeekBar(
 
     val barHeight = if (focused || scrubbing) 10.dp else 6.dp
     var widthPx by remember { mutableStateOf(1) }
+    // Position survolée à la souris, en fraction de la barre (null = pas de
+    // survol). Sert uniquement à l'infobulle : le survol ne déplace rien.
+    var hoverFraction by remember { mutableStateOf<Float?>(null) }
     Box(
         modifier = modifier
             .height(32.dp)
@@ -308,7 +318,28 @@ private fun PlayerSeekBar(
                 if (onSeekToFraction == null) {
                     Modifier
                 } else {
+                    // Survol suivi en passe Initial : les mouvements sont
+                    // consommés par le détecteur de glisser ci-dessous, et
+                    // l'infobulle doit continuer à suivre le curseur pendant le
+                    // glisser, pas seulement avant.
                     Modifier.pointerInput(Unit) {
+                        awaitPointerEventScope {
+                            while (true) {
+                                val event = awaitPointerEvent(PointerEventPass.Initial)
+                                when (event.type) {
+                                    PointerEventType.Exit -> hoverFraction = null
+                                    PointerEventType.Enter,
+                                    PointerEventType.Move,
+                                    PointerEventType.Press,
+                                    -> {
+                                        val x = event.changes.first().position.x
+                                        hoverFraction = (x / widthPx).coerceIn(0f, 1f)
+                                    }
+                                    else -> Unit
+                                }
+                            }
+                        }
+                    }.pointerInput(Unit) {
                         detectHorizontalDragGestures(
                             onDragEnd = { onActivity() },
                         ) { change, _ ->
@@ -394,6 +425,34 @@ private fun PlayerSeekBar(
                     )
                 }
             }
+        }
+        // Infobulle de temps, calée sur l'abscisse visée : le curseur au
+        // pointeur, la tête de lecture en mode réglage à la télécommande. Même
+        // service dans les deux cas — savoir où l'on tombe avant de valider.
+        val tipFraction = hoverFraction ?: fraction.takeIf { scrubbing }
+        if (tipFraction != null && durationMs > 0) {
+            var tipWidth by remember { mutableStateOf(0) }
+            Text(
+                formatPlayerTime((tipFraction * durationMs).toLong()),
+                style = MaterialTheme.typography.labelLarge,
+                color = Color.White,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    // Centrée sur le point visé, mais jamais débordante : aux
+                    // deux extrémités elle se cale contre le bord de la barre.
+                    .offset {
+                        IntOffset(
+                            x = (tipFraction * widthPx - tipWidth / 2f)
+                                .roundToInt()
+                                .coerceIn(0, (widthPx - tipWidth).coerceAtLeast(0)),
+                            y = -SEEK_TOOLTIP_GAP.roundToPx(),
+                        )
+                    }
+                    .onSizeChanged { tipWidth = it.width }
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(Color(0xF21E1E1E))
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+            )
         }
         if (scrubbing) {
             Text(
