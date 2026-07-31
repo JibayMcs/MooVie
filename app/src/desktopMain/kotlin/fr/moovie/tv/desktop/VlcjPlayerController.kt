@@ -49,6 +49,14 @@ internal class VlcjPlayerController(private val player: MediaPlayer) : MooviePla
     override fun durationMs(): Long =
         runCatching { player.status().length().coerceAtLeast(0) }.getOrDefault(0L)
 
+    /**
+     * Inconnue côté libVLC 3 : l'API n'expose aucune plage tamponnée, seulement
+     * un pourcentage de remplissage du cache réseau (événement `buffering`), qui
+     * ne se traduit pas en position. L'écran desktop affiche donc ce pourcentage
+     * en clair plutôt qu'une piste de chargement mensongère sur la barre.
+     */
+    override fun bufferedMs(): Long = 0L
+
     override fun togglePause() {
         command { player.controls().setPause(player.status().isPlaying) }
     }

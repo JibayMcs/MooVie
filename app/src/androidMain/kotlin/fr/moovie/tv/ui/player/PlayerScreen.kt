@@ -154,6 +154,8 @@ fun PlayerScreen(
     var isPlaying by remember { mutableStateOf(false) }
     var positionMs by remember { mutableLongStateOf(0L) }
     var durationMs by remember { mutableLongStateOf(0L) }
+    // Fin du tampon Media3, pour la piste de chargement de la barre.
+    var bufferedMs by remember { mutableLongStateOf(0L) }
     var tracks by remember { mutableStateOf(PlayerTracks()) }
     var speed by remember { mutableStateOf(1f) }
     var controlsVisible by remember { mutableStateOf(true) }
@@ -212,6 +214,7 @@ fun PlayerScreen(
         while (true) {
             positionMs = controller.positionMs()
             durationMs = controller.durationMs()
+            bufferedMs = controller.bufferedMs()
             delay(500)
         }
     }
@@ -553,6 +556,7 @@ fun PlayerScreen(
                 positionMs = scrubTarget ?: positionMs,
                 durationMs = durationMs,
                 scrubbing = scrubTarget != null,
+                bufferedMs = bufferedMs,
                 // Intro / générique repérés sur la barre, à la SponsorBlock.
                 // Les mêmes bornes que les boutons « Passer » : rien de plus à
                 // aller chercher, on cesse juste de les réserver aux boutons.

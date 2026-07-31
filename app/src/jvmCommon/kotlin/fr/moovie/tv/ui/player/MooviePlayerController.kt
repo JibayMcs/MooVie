@@ -46,6 +46,18 @@ interface MooviePlayerController {
     /** Durée totale en millisecondes, 0 si inconnue (flux live, média non prêt). */
     fun durationMs(): Long
 
+    /**
+     * Fin de la portion déjà mise en mémoire tampon, en millisecondes.
+     *
+     * C'est la limite au-delà de laquelle un saut oblige à retélécharger : sur un
+     * hôte qui ne gère pas les requêtes `Range`, reprendre à 1 h d'un film de 2 h
+     * cale tant que le flux n'est pas chargé jusque-là. La barre de progression
+     * en dessine une seconde piste pour rendre cette limite visible.
+     *
+     * 0 = inconnue ; la piste de chargement n'est alors pas dessinée.
+     */
+    fun bufferedMs(): Long
+
     /** Bascule lecture / pause. */
     fun togglePause()
 

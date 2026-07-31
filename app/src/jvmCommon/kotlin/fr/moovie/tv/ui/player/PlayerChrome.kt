@@ -119,6 +119,11 @@ fun PlayerControlBar(
     positionMs: Long,
     durationMs: Long,
     scrubbing: Boolean,
+    /**
+     * Fin du tampon, dessinée en piste secondaire. 0 = inconnue (desktop) : la
+     * piste n'apparaît pas.
+     */
+    bufferedMs: Long = 0L,
     showEpisodeButtons: Boolean,
     canGoPrevious: Boolean,
     playFocus: FocusRequester,
@@ -223,6 +228,11 @@ fun PlayerControlBar(
                 } else {
                     0f
                 },
+                bufferedFraction = if (durationMs > 0) {
+                    (bufferedMs.toFloat() / durationMs).coerceIn(0f, 1f)
+                } else {
+                    0f
+                },
                 durationMs = durationMs,
                 segments = segments,
                 scrubbing = scrubbing,
@@ -286,6 +296,7 @@ private fun SkipKind.bandColor(): Color = when (this) {
 @Composable
 private fun PlayerSeekBar(
     fraction: Float,
+    bufferedFraction: Float,
     durationMs: Long,
     segments: List<PlayerSegment>,
     scrubbing: Boolean,
@@ -387,6 +398,18 @@ private fun PlayerSeekBar(
                 .clip(CircleShape)
                 .background(if (focused) Color(0x66FFFFFF) else Color(0x40FFFFFF)),
         )
+        // Piste de chargement : jusqu'où le flux est en mémoire tampon. Un saut
+        // au-delà de cette limite oblige à retélécharger, et cale sur un hôte
+        // qui ignore les requêtes `Range` — d'où l'intérêt de la voir.
+        if (bufferedFraction > fraction) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(bufferedFraction)
+                    .height(barHeight)
+                    .clip(CircleShape)
+                    .background(Color(0x8AFFFFFF)),
+            )
+        }
         Box(
             modifier = Modifier
                 .fillMaxWidth(fraction)

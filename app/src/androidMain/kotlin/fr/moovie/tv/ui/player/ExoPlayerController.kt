@@ -21,6 +21,10 @@ internal class ExoPlayerController(private val player: Player) : MooviePlayerCon
     override fun durationMs(): Long =
         player.duration.let { if (it == C.TIME_UNSET) 0L else it }
 
+    // Media3 tient à jour la fin réelle du tampon : c'est exactement la limite
+    // jusqu'à laquelle un saut est instantané.
+    override fun bufferedMs(): Long = player.bufferedPosition.coerceAtLeast(0)
+
     override fun togglePause() {
         player.playWhenReady = !player.playWhenReady
     }

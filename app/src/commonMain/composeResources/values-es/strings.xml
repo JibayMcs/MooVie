@@ -71,6 +71,7 @@
     <string name="player_prev_episode">Episodio anterior</string>
     <string name="player_progress">Barra de progreso</string>
     <string name="player_scrub_hint">OK para confirmar</string>
+    <string name="player_buffering">Almacenando en búfer…  %1$d %</string>
     <string name="player_subtitles">Subtítulos</string>
     <string name="player_subtitles_off">Desactivados</string>
     <string name="player_audio">Pista de audio</string>

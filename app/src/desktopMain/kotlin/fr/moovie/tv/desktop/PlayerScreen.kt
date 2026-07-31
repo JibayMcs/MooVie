@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
@@ -42,6 +43,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
@@ -66,6 +68,7 @@ import fr.moovie.tv.data.settings.SettingsRepository
 import fr.moovie.tv.data.watch.WatchProgressRepository
 import fr.moovie.tv.resources.Res
 import fr.moovie.tv.resources.common_cancel
+import fr.moovie.tv.resources.player_buffering
 import fr.moovie.tv.resources.player_error
 import fr.moovie.tv.resources.player_fullscreen
 import fr.moovie.tv.resources.player_fullscreen_exit
@@ -262,6 +265,10 @@ internal fun DesktopPlayerScreen(
     var lengthMs by remember { mutableStateOf(0L) }
     var finished by remember { mutableStateOf(false) }
     var playError by remember { mutableStateOf(false) }
+    // Remplissage du cache réseau (0-100). libVLC 3 n'expose pas de plage
+    // tamponnée exploitable sur la barre : on affiche donc l'état de chargement
+    // en clair, là où Android TV peut dessiner une vraie piste de tampon.
+    var bufferingPercent by remember(streamUrl) { mutableStateOf(100f) }
     // Position en cours de drag sur la barre (null = pas de drag).
     var scrubbing by remember { mutableStateOf<Float?>(null) }
     var volume by remember { mutableStateOf(100) }
@@ -341,6 +348,12 @@ internal fun DesktopPlayerScreen(
                 }
             }
 
+            // Simple écriture d'état Compose : aucun appel natif, donc rien à
+            // renvoyer sur le thread de commandes depuis ce callback.
+            override fun buffering(mediaPlayer: MediaPlayer, newCache: Float) {
+                bufferingPercent = newCache
+            }
+
             override fun finished(mediaPlayer: MediaPlayer) {
                 finished = true
             }
@@ -365,7 +378,12 @@ internal fun DesktopPlayerScreen(
         while (true) {
             delay(500)
             isPlaying = player.status().isPlaying
-            timeMs = player.status().time().coerceAtLeast(0)
+            val time = player.status().time().coerceAtLeast(0)
+            // Une horloge qui avance prouve que le flux coule : libVLC n'émet
+            // pas toujours son « 100 % » final, et l'indicateur resterait
+            // affiché en pleine lecture.
+            if (time > timeMs) bufferingPercent = 100f
+            timeMs = time
             lengthMs = player.status().length().coerceAtLeast(0)
             ticks++
             if (ticks % 10 == 0 && mediaKey.isNotBlank() && isPlaying) {
@@ -584,6 +602,23 @@ internal fun DesktopPlayerScreen(
             modifier = Modifier.align(Alignment.TopCenter),
         ) {
             PlayerTitleOverlay(title = title, subtitle = subtitle)
+        }
+
+        // Mise en mémoire tampon : seul repère de chargement disponible ici,
+        // libVLC 3 ne donnant aucune plage tamponnée (voir
+        // VlcjPlayerController.bufferedMs). Sur Android TV, c'est une vraie
+        // piste dessinée sur la barre de progression.
+        if (bufferingPercent < 100f && !playError) {
+            Text(
+                stringResource(Res.string.player_buffering, bufferingPercent.toInt()),
+                style = MaterialTheme.typography.titleMedium,
+                color = Color(0xFFDDDDDD),
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color(0xB3000000))
+                    .padding(horizontal = 18.dp, vertical = 12.dp),
+            )
         }
 
         if (showUpdateChip && updateVersion != null) {
