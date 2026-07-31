@@ -39,14 +39,26 @@ class CinestreamEndToEndProbeTest {
 
             var resolved = 0
             for (link in vf) {
-                val handled = ExtractorRegistry.canResolve(link.url)
-                val stream = if (handled) ExtractorRegistry.resolve(link) else null
-                if (stream != null) resolved++
+                // Toujours passer par resolve() : un domaine que personne ne
+                // revendique reste résoluble par reniflage (VOE et ses alias
+                // tournants). Conditionner l'appel à canResolve() masquerait
+                // précisément ce que le reniflage est censé rattraper.
+                val claimed = ExtractorRegistry.canResolve(link.url)
+                val stream = ExtractorRegistry.resolve(link)
 
+                // « Résolu » ne veut pas dire « jouable » : un extracteur trop
+                // permissif peut rendre une URL de gabarit périmée, laissée dans
+                // la page par l'hébergeur. On sonde donc réellement le flux —
+                // c'est ce que fait la cascade avant d'ouvrir le lecteur.
+                val playable = stream != null && isStreamPlayable(stream)
+                if (playable) resolved++
+
+                val how = if (claimed) "" else " (reniflé)"
                 val state = when {
-                    stream != null -> "✅ ${stream.format}"
-                    handled -> "⚠ extracteur présent mais échec"
-                    else -> "❌ aucun extracteur"
+                    playable -> "✅ ${stream!!.format}$how"
+                    stream != null -> "⚠ résolu mais injouable$how"
+                    claimed -> "⚠ extracteur présent mais échec"
+                    else -> "❌ non résolu"
                 }
                 println("   %-16s %-30s %s".format(link.hoster, state, link.url.take(48)))
             }
