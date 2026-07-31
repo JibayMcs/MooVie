@@ -11,7 +11,26 @@ permissions:
   contents: write
 
 jobs:
+  # Notes de release construites depuis les commits conventionnels du tag.
+  # `generate_release_notes` seul ne produisait qu'un « Full Changelog » : les
+  # notes automatiques de GitHub listent les *pull requests* fusionnées, or on
+  # pousse directement sur main. Le contenu doit donc venir des commits.
+  changelog:
+    runs-on: ubuntu-latest
+    outputs:
+      notes: ${{ steps.build.outputs.notes }}
+    steps:
+      # Historique complet : sans lui, impossible de retrouver le tag précédent.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Construire les notes
+        id: build
+        run: bash .github/scripts/changelog.sh >> "$GITHUB_OUTPUT"
+
   apk:
+    needs: changelog
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -40,9 +59,11 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: moovie-*.apk
+          body: ${{ needs.changelog.outputs.notes }}
           generate_release_notes: true
 
   desktop:
+    needs: changelog
     strategy:
       # Un OS en échec ne bloque pas les autres paquets.
       fail-fast: false
@@ -76,6 +97,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: moovie-*.${{ matrix.ext }}
+          body: ${{ needs.changelog.outputs.notes }}
           generate_release_notes: true
 
   # Linux passe par un AppImage : il embarque ses bibliothèques, tourne sur
@@ -217,7 +239,7 @@ jobs:
           echo "Démarrage confirmé sur ${{ matrix.image }}."
 
   publish-appimage:
-    needs: verify-appimage
+    needs: [verify-appimage, changelog]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
@@ -228,4 +250,5 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: moovie-*.AppImage
+          body: ${{ needs.changelog.outputs.notes }}
           generate_release_notes: true
