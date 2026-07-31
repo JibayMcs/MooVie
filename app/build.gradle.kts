@@ -163,9 +163,14 @@ compose.resources {
     packageOfResClass = "fr.moovie.tv.resources"
 }
 
+// Classe principale du desktop. Extraite en constante parce que l'AppImage en
+// dérive aussi son StartupWMClass : AWT nomme la WM_CLASS X11 d'après elle, en
+// remplaçant les points par des tirets.
+val desktopMainClass = "fr.moovie.tv.desktop.MainKt"
+
 compose.desktop {
     application {
-        mainClass = "fr.moovie.tv.desktop.MainKt"
+        mainClass = desktopMainClass
         // Version lue au runtime par l'updater desktop (bannière de mise à jour).
         jvmArgs += "-Dmoovie.version=$appVersion"
 
@@ -383,6 +388,7 @@ val packageAppImage by tasks.registering {
             Icon=moovie
             Categories=AudioVideo;Video;Player;
             Terminal=false
+            StartupWMClass=${desktopMainClass.replace('.', '-')}
             """.trimIndent() + "\n",
         )
         // $APPDIR n'est pas fiable selon le mode de montage : on résout le
