@@ -27,11 +27,17 @@ import kotlin.system.exitProcess
  * Vérifie la dernière release GitHub au démarrage puis à l'intervalle choisi
  * dans les réglages.
  *
- * Lancée depuis une AppImage, l'app se met à jour elle-même : le paquet est un
- * fichier unique appartenant à l'utilisateur, donc remplaçable sans droits
- * particuliers. Partout ailleurs (`.msi` Windows, lancement depuis les sources)
- * on retombe sur l'ouverture de la page de release : ces paquets s'installent
- * hors de l'app et exigent une élévation de privilèges.
+ * Deux chemins de mise à jour en place :
+ *  - AppImage (Linux) : le paquet est un fichier unique appartenant à
+ *    l'utilisateur, on le télécharge, on se remplace et on relance.
+ *  - MSI (Windows) : depuis la 1.6.x le paquet s'installe par utilisateur
+ *    (`perUserInstall`), donc msiexec peut réinstaller par-dessus sans
+ *    élévation UAC ; l'`upgradeUuid` figé fait de la nouvelle version une mise
+ *    à niveau majeure qui remplace l'ancienne. On télécharge le `.msi`, on
+ *    lance msiexec depuis un script qui attend notre fermeture puis relance.
+ *
+ * Partout ailleurs (lancement depuis les sources, format sans self-update) on
+ * retombe sur l'ouverture de la page de release dans le navigateur.
  */
 class DesktopUpdateViewModel : ViewModel() {
 
@@ -47,6 +53,12 @@ class DesktopUpdateViewModel : ViewModel() {
 
     /** Asset .AppImage de la release courante, si elle en propose un. */
     private var appImageAssetUrl: String? = null
+
+    /** Asset .msi de la release courante, si elle en propose un. */
+    private var msiAssetUrl: String? = null
+
+    private val isWindows =
+        System.getProperty("os.name").orEmpty().startsWith("Windows", ignoreCase = true)
 
     /**
      * Fichier AppImage en cours d'exécution. Le runtime AppImage exporte
@@ -83,6 +95,9 @@ class DesktopUpdateViewModel : ViewModel() {
         appImageAssetUrl = release.assets
             .firstOrNull { it.name.endsWith(".AppImage", ignoreCase = true) }
             ?.downloadUrl
+        msiAssetUrl = release.assets
+            .firstOrNull { it.name.endsWith(".msi", ignoreCase = true) }
+            ?.downloadUrl
         // apkUrl transporte ici l'URL de la page de release (repli navigateur).
         _state.value = UpdateState.Available(version, release.htmlUrl)
     }
@@ -94,20 +109,25 @@ class DesktopUpdateViewModel : ViewModel() {
     }
 
     /**
-     * Depuis une AppImage : télécharge la nouvelle version, remplace le fichier
-     * courant et relance. Sinon : ouvre la page de release.
+     * AppImage : télécharge la nouvelle version, remplace le fichier courant et
+     * relance. Windows/MSI : télécharge le `.msi` et le passe à msiexec. Sinon :
+     * ouvre la page de release dans le navigateur.
      */
     fun install() {
         val available = _state.value as? UpdateState.Available ?: return
-        val target = runningAppImage
-        val assetUrl = appImageAssetUrl
-        if (target == null || assetUrl.isNullOrBlank()) {
-            if (available.apkUrl.isNotBlank()) {
+        val appImage = runningAppImage
+        val appImageUrl = appImageAssetUrl
+        val msiUrl = msiAssetUrl
+        when {
+            appImage != null && !appImageUrl.isNullOrBlank() ->
+                viewModelScope.launch { replaceSelf(available.version, appImageUrl, appImage) }
+
+            isWindows && !msiUrl.isNullOrBlank() ->
+                viewModelScope.launch { installMsi(available.version, msiUrl) }
+
+            available.apkUrl.isNotBlank() ->
                 runCatching { Desktop.getDesktop().browse(URI(available.apkUrl)) }
-            }
-            return
         }
-        viewModelScope.launch { replaceSelf(available.version, assetUrl, target) }
     }
 
     private suspend fun replaceSelf(version: String, url: String, target: File) {
@@ -144,6 +164,76 @@ class DesktopUpdateViewModel : ViewModel() {
         }
         relaunch(target)
         exitProcess(0)
+    }
+
+    /**
+     * Windows : télécharge le `.msi` de la release et le confie à msiexec via un
+     * script qui attend la fermeture de cette instance avant de réécrire les
+     * fichiers, puis relance l'app.
+     */
+    private suspend fun installMsi(version: String, url: String) {
+        _state.value = UpdateState.Downloading(version, 0f)
+        // %TEMP% et non le dossier d'install : les fichiers de l'app sont sur le
+        // point d'être remplacés par msiexec, on n'écrit rien dedans.
+        val staged = File(System.getProperty("java.io.tmpdir"), "Moo-vie-$version.msi")
+        val downloaded = repo.downloadApk(url, staged) { progress ->
+            _state.value = UpdateState.Downloading(version, progress)
+        }
+        if (!downloaded || !isMsi(staged)) {
+            staged.delete()
+            _state.value = UpdateState.Error(getString(Res.string.update_error))
+            return
+        }
+        val launched = withContext(Dispatchers.IO) {
+            runCatching { launchMsiInstaller(staged) }.isSuccess
+        }
+        if (!launched) {
+            staged.delete()
+            _state.value = UpdateState.Error(getString(Res.string.update_error))
+            return
+        }
+        // On sort tout de suite : msiexec, détaché, ne peut pas mettre à niveau
+        // tant que l'exécutable courant tient ses fichiers ouverts.
+        exitProcess(0)
+    }
+
+    /**
+     * Écrit et démarre, détaché, un script qui : attend quelques secondes que ce
+     * processus meure, lance msiexec (`/qb` : barre de progression, aucune
+     * question ; pas d'UAC car l'install est par utilisateur), relance l'app
+     * fraîchement installée, puis se supprime.
+     *
+     * Le script est nécessaire parce qu'on ne peut ni attendre msiexec (il doit
+     * survivre à notre mort) ni relancer l'app depuis un processus qu'on tue.
+     */
+    private fun launchMsiInstaller(msi: File) {
+        // Lanceur natif jpackage (Moo-vie.exe) : même chemin après une mise à
+        // niveau majeure au même INSTALLDIR, donc relançable tel quel. Absent →
+        // on renonce à la relance, l'utilisateur rouvre via le raccourci.
+        val exe = ProcessHandle.current().info().command().orElse(null)
+        val log = File(System.getProperty("java.io.tmpdir"), "Moo-vie-update.log")
+        val script = File.createTempFile("moovie-update", ".cmd").apply {
+            writeText(
+                buildString {
+                    appendLine("@echo off")
+                    // ping plutôt que timeout : ce dernier exige un vrai console
+                    // input, absent d'un process démarré détaché.
+                    appendLine("ping 127.0.0.1 -n 3 >nul")
+                    appendLine(
+                        "msiexec /i \"${msi.absolutePath}\" /qb /norestart " +
+                            "/l*v \"${log.absolutePath}\"",
+                    )
+                    if (exe != null) appendLine("start \"\" \"$exe\"")
+                    // %~f0 : le script se supprime lui-même en dernier.
+                    appendLine("del \"%~f0\"")
+                },
+            )
+        }
+        // start "" /min : la fenêtre du script est détachée de ce process et
+        // survivra à exitProcess ; minimisée pour ne pas surgir au premier plan.
+        ProcessBuilder("cmd", "/c", "start", "", "/min", script.absolutePath)
+            .apply { scrubLauncherEnv(environment()) }
+            .start()
     }
 
     /**
@@ -219,6 +309,27 @@ class DesktopUpdateViewModel : ViewModel() {
                     header[8] == 'A'.code.toByte() &&
                     header[9] == 'I'.code.toByte() &&
                     header[10] == 0x02.toByte()
+            }
+        }.getOrDefault(false)
+    }
+
+    /**
+     * Vérifie que le fichier est bien un MSI : un `.msi` est un fichier composé
+     * OLE2, reconnaissable à sa signature `D0 CF 11 E0 A1 B1 1A E1`. Sans ce
+     * contrôle, une page d'erreur HTML servie à la place du binaire serait
+     * passée à msiexec, qui échouerait sans qu'on sache pourquoi.
+     */
+    private suspend fun isMsi(file: File): Boolean = withContext(Dispatchers.IO) {
+        runCatching {
+            file.inputStream().use { input ->
+                val header = ByteArray(8)
+                if (input.read(header) < header.size) return@use false
+                header.contentEquals(
+                    byteArrayOf(
+                        0xD0.toByte(), 0xCF.toByte(), 0x11, 0xE0.toByte(),
+                        0xA1.toByte(), 0xB1.toByte(), 0x1A, 0xE1.toByte(),
+                    ),
+                )
             }
         }.getOrDefault(false)
     }
