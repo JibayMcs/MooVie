@@ -24,6 +24,12 @@ import java.nio.file.StandardCopyOption
 import kotlin.system.exitProcess
 
 /**
+ * Nom du lanceur natif jpackage sous Windows, et du dossier d'installation sous
+ * `%LOCALAPPDATA%`. Doit rester aligné sur `packageName` de `build.gradle.kts`.
+ */
+private const val WINDOWS_LAUNCHER_NAME = "Moo-vie"
+
+/**
  * Vérifie la dernière release GitHub au démarrage puis à l'intervalle choisi
  * dans les réglages.
  *
@@ -70,6 +76,21 @@ class DesktopUpdateViewModel : ViewModel() {
             ?.takeIf { it.isNotBlank() }
             ?.let(::File)
             ?.takeIf { it.isFile }
+
+    /**
+     * Lanceur jpackage en cours d'exécution sous Windows (`Moo-vie.exe`), ou
+     * null quand on tourne depuis les sources — où le processus est `java.exe`
+     * et où il n'y a rien à mettre à jour en place.
+     *
+     * Pendant strict du test `APPIMAGE` côté Linux : sans lui, un `gradlew run`
+     * sous Windows téléchargeait le MSI, lançait msiexec et se tuait au milieu
+     * d'une session de développement.
+     */
+    private val runningWindowsLauncher: File? =
+        ProcessHandle.current().info().command()
+            .map(::File)
+            .filter { it.name.equals("$WINDOWS_LAUNCHER_NAME.exe", ignoreCase = true) && it.isFile }
+            .orElse(null)
 
     init {
         viewModelScope.launch {
@@ -118,12 +139,13 @@ class DesktopUpdateViewModel : ViewModel() {
         val appImage = runningAppImage
         val appImageUrl = appImageAssetUrl
         val msiUrl = msiAssetUrl
+        val launcher = runningWindowsLauncher
         when {
             appImage != null && !appImageUrl.isNullOrBlank() ->
                 viewModelScope.launch { replaceSelf(available.version, appImageUrl, appImage) }
 
-            isWindows && !msiUrl.isNullOrBlank() ->
-                viewModelScope.launch { installMsi(available.version, msiUrl) }
+            isWindows && launcher != null && !msiUrl.isNullOrBlank() ->
+                viewModelScope.launch { installMsi(available.version, msiUrl, launcher) }
 
             available.apkUrl.isNotBlank() ->
                 runCatching { Desktop.getDesktop().browse(URI(available.apkUrl)) }
@@ -171,11 +193,11 @@ class DesktopUpdateViewModel : ViewModel() {
      * script qui attend la fermeture de cette instance avant de réécrire les
      * fichiers, puis relance l'app.
      */
-    private suspend fun installMsi(version: String, url: String) {
+    private suspend fun installMsi(version: String, url: String, launcher: File) {
         _state.value = UpdateState.Downloading(version, 0f)
         // %TEMP% et non le dossier d'install : les fichiers de l'app sont sur le
         // point d'être remplacés par msiexec, on n'écrit rien dedans.
-        val staged = File(System.getProperty("java.io.tmpdir"), "Moo-vie-$version.msi")
+        val staged = File(System.getProperty("java.io.tmpdir"), "$WINDOWS_LAUNCHER_NAME-$version.msi")
         val downloaded = repo.downloadApk(url, staged) { progress ->
             _state.value = UpdateState.Downloading(version, progress)
         }
@@ -185,7 +207,7 @@ class DesktopUpdateViewModel : ViewModel() {
             return
         }
         val launched = withContext(Dispatchers.IO) {
-            runCatching { launchMsiInstaller(staged) }.isSuccess
+            runCatching { launchMsiInstaller(staged, launcher) }.isSuccess
         }
         if (!launched) {
             staged.delete()
@@ -198,40 +220,54 @@ class DesktopUpdateViewModel : ViewModel() {
     }
 
     /**
-     * Écrit et démarre, détaché, un script qui : attend quelques secondes que ce
-     * processus meure, lance msiexec (`/qb` : barre de progression, aucune
-     * question ; pas d'UAC car l'install est par utilisateur), relance l'app
-     * fraîchement installée, puis se supprime.
+     * Écrit et démarre, détaché, un script qui : attend que ce processus meure,
+     * lance msiexec (`/qb!` : barre de progression, aucune question et pas de
+     * bouton Annuler qui laisserait une install à moitié faite ; pas d'UAC car
+     * l'install est par utilisateur), efface le MSI téléchargé, relance l'app
+     * puis se supprime.
      *
      * Le script est nécessaire parce qu'on ne peut ni attendre msiexec (il doit
      * survivre à notre mort) ni relancer l'app depuis un processus qu'on tue.
+     *
+     * **Aucun chemin n'est écrit dans le script** : ils arrivent en arguments.
+     * `cmd.exe` lit un `.cmd` dans la page de code OEM (850 en France) alors que
+     * [writeText] écrit en UTF-8 — un nom d'utilisateur accentué
+     * (`C:\Users\Jérôme`) suffisait à corrompre les chemins et à faire échouer
+     * l'installation sans message. Les arguments, eux, transitent en UTF-16 par
+     * `CreateProcess` et ne traversent aucune page de code.
      */
-    private fun launchMsiInstaller(msi: File) {
-        // Lanceur natif jpackage (Moo-vie.exe) : même chemin après une mise à
-        // niveau majeure au même INSTALLDIR, donc relançable tel quel. Absent →
-        // on renonce à la relance, l'utilisateur rouvre via le raccourci.
-        val exe = ProcessHandle.current().info().command().orElse(null)
-        val log = File(System.getProperty("java.io.tmpdir"), "Moo-vie-update.log")
+    private fun launchMsiInstaller(msi: File, launcher: File) {
+        // Après la mise à niveau, l'app vit sous %LOCALAPPDATA% (perUserInstall).
+        // Ce n'est pas forcément là que tourne l'instance courante : une install
+        // ≤ 1.5.0 était par machine, sous Program Files, et le MSI par-utilisateur
+        // ne la remplace pas. Relancer le lanceur courant rouvrirait donc
+        // l'ancienne version, et la bannière de mise à jour reviendrait en boucle.
+        val upgraded = System.getenv("LOCALAPPDATA")
+            ?.takeIf { it.isNotBlank() }
+            ?.let { File(it, "$WINDOWS_LAUNCHER_NAME/$WINDOWS_LAUNCHER_NAME.exe") }
+            ?: launcher
         val script = File.createTempFile("moovie-update", ".cmd").apply {
             writeText(
-                buildString {
-                    appendLine("@echo off")
-                    // ping plutôt que timeout : ce dernier exige un vrai console
-                    // input, absent d'un process démarré détaché.
-                    appendLine("ping 127.0.0.1 -n 3 >nul")
-                    appendLine(
-                        "msiexec /i \"${msi.absolutePath}\" /qb /norestart " +
-                            "/l*v \"${log.absolutePath}\"",
-                    )
-                    if (exe != null) appendLine("start \"\" \"$exe\"")
-                    // %~f0 : le script se supprime lui-même en dernier.
-                    appendLine("del \"%~f0\"")
-                },
+                """
+                @echo off
+                rem %1 = MSI telecharge, %2 = app fraichement installee, %3 = instance courante.
+                rem ping plutot que timeout : ce dernier exige une vraie entree
+                rem console, absente d'un processus demarre detache.
+                ping 127.0.0.1 -n 4 >nul
+                msiexec /i "%~1" /qb! /norestart /l*v "%TEMP%\Moo-vie-update.log"
+                del "%~1" >nul 2>&1
+                if exist "%~2" (start "" "%~2") else (if exist "%~3" start "" "%~3")
+                rem %~f0 : le script se supprime lui-meme en dernier.
+                del "%~f0"
+                """.trimIndent(),
             )
         }
         // start "" /min : la fenêtre du script est détachée de ce process et
         // survivra à exitProcess ; minimisée pour ne pas surgir au premier plan.
-        ProcessBuilder("cmd", "/c", "start", "", "/min", script.absolutePath)
+        ProcessBuilder(
+            "cmd", "/c", "start", "", "/min",
+            script.absolutePath, msi.absolutePath, upgraded.absolutePath, launcher.absolutePath,
+        )
             .apply { scrubLauncherEnv(environment()) }
             .start()
     }
