@@ -1,5 +1,6 @@
 package fr.moovie.tv.data.sources
 
+import fr.moovie.tv.core.sources.model.MediaRef
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 
@@ -32,7 +33,7 @@ class CinestreamEndToEndProbeTest {
         val provider = CinestreamProvider(ExtractorRegistry.http)
 
         for ((tmdbId, title, year) in titles) {
-            val links = provider.movieSources(tmdbId, title, year)
+            val links = provider.sourcesFor(MediaRef.Movie(tmdbId, title, year))
             val vf = links.filter { it.language == "VF" }
 
             println("\n════ $title ($year) — ${links.size} embeds, dont ${vf.size} VF")

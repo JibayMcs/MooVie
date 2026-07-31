@@ -5,9 +5,11 @@ import androidx.lifecycle.viewModelScope
 import fr.moovie.tv.data.settings.SettingsRepository
 import fr.moovie.tv.data.settings.StreamLanguage
 import fr.moovie.tv.data.settings.currentTmdbLanguage
-import fr.moovie.tv.data.sources.EmbedLink
+import fr.moovie.tv.core.sources.model.EmbedLink
+import fr.moovie.tv.core.sources.model.MediaRef
+import fr.moovie.tv.core.sources.port.SourceProvider
 import fr.moovie.tv.data.sources.ExtractorRegistry
-import fr.moovie.tv.data.sources.PlayableStream
+import fr.moovie.tv.core.sources.model.PlayableStream
 import fr.moovie.tv.data.sources.isStreamPlayable
 import fr.moovie.tv.data.sources.ProviderRegistry
 import fr.moovie.tv.data.sources.SourceCacheRepository
@@ -281,7 +283,9 @@ class DetailsViewModel : ViewModel() {
             title = movie.details.title,
             imageUrl = movie.details.backdropUrl() ?: movie.details.posterUrl(),
         )
-        startSourceLoad { it.movieSources(tmdbId, movie.details.title, movie.details.year) }
+        startSourceLoad {
+            it.sourcesFor(MediaRef.Movie(tmdbId, movie.details.title, movie.details.year))
+        }
     }
 
     /** Charge les sources d'un épisode de la saison affichée. */
@@ -313,7 +317,9 @@ class DetailsViewModel : ViewModel() {
             title = tv.details.name,
             imageUrl = still ?: tv.details.backdropUrl() ?: tv.details.posterUrl(),
         )
-        startSourceLoad { it.tvSources(tmdbId, tv.details.name, tv.details.year, season, episode) }
+        startSourceLoad {
+            it.sourcesFor(MediaRef.Episode(tmdbId, tv.details.name, tv.details.year, season, episode))
+        }
     }
 
     /** Bascule vu/non vu pour une clé (épisode ou film). */
@@ -342,7 +348,7 @@ class DetailsViewModel : ViewModel() {
     private var servedFromCache = false
 
     /** Dernière requête de recherche, pour pouvoir la rejouer sans le cache. */
-    private var lastSourceQuery: (suspend (fr.moovie.tv.data.sources.SourceProvider) -> List<EmbedLink>)? = null
+    private var lastSourceQuery: (suspend (SourceProvider) -> List<EmbedLink>)? = null
 
     /**
      * Ouvre le panneau immédiatement (tous providers en LOADING) puis interroge
@@ -352,7 +358,7 @@ class DetailsViewModel : ViewModel() {
      */
     private fun startSourceLoad(
         skipCache: Boolean = false,
-        query: suspend (fr.moovie.tv.data.sources.SourceProvider) -> List<EmbedLink>,
+        query: suspend (SourceProvider) -> List<EmbedLink>,
     ) {
         val generation = ++loadGeneration
         val cacheKey = playbackKey

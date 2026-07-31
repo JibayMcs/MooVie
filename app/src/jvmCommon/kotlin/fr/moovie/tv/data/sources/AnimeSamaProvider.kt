@@ -1,5 +1,8 @@
 package fr.moovie.tv.data.sources
 
+import fr.moovie.tv.core.sources.model.EmbedLink
+import fr.moovie.tv.core.sources.model.MediaRef
+import fr.moovie.tv.core.sources.port.SourceProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.FormBody
@@ -16,20 +19,17 @@ class AnimeSamaProvider(private val http: OkHttpClient) : SourceProvider {
 
     override val name = "animesama"
 
-    // anime-sama s'indexe par slug de catalogue, pas par TMDB : tmdbId est ignoré.
-    override suspend fun movieSources(tmdbId: Int, title: String, year: String?): List<EmbedLink> =
-        withContext(Dispatchers.IO) { sourcesFor(title, seasonPrefix = "film", episode = 1) }
+    // anime-sama s'indexe par slug de catalogue, pas par TMDB : l'ID TMDB de
+    // MediaRef ne lui sert à rien.
+    override suspend fun sourcesFor(media: MediaRef): List<EmbedLink> = withContext(Dispatchers.IO) {
+        when (media) {
+            is MediaRef.Movie -> linksFor(media.title, seasonPrefix = "film", episode = 1)
+            is MediaRef.Episode ->
+                linksFor(media.title, seasonPrefix = "saison${media.season}", episode = media.episode)
+        }
+    }
 
-    override suspend fun tvSources(
-        tmdbId: Int,
-        title: String,
-        year: String?,
-        season: Int,
-        episode: Int,
-    ): List<EmbedLink> =
-        withContext(Dispatchers.IO) { sourcesFor(title, seasonPrefix = "saison$season", episode = episode) }
-
-    private fun sourcesFor(title: String, seasonPrefix: String, episode: Int): List<EmbedLink> {
+    private fun linksFor(title: String, seasonPrefix: String, episode: Int): List<EmbedLink> {
         val catalogueUrl = search(title) ?: return emptyList()
         val page = get(catalogueUrl) ?: return emptyList()
 

@@ -1,5 +1,8 @@
 package fr.moovie.tv.data.sources
 
+import fr.moovie.tv.core.sources.model.EmbedLink
+import fr.moovie.tv.core.sources.model.MediaRef
+import fr.moovie.tv.core.sources.port.SourceProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -28,24 +31,16 @@ class FstreamProvider(private val http: OkHttpClient) : SourceProvider {
 
     private val json = Json { ignoreUnknownKeys = true }
 
-    // fstream ne connaît que son moteur de recherche interne : tmdbId est ignoré.
-    override suspend fun movieSources(tmdbId: Int, title: String, year: String?): List<EmbedLink> =
-        withContext(Dispatchers.IO) {
-            val page = searchBestMatch(title, year, season = null) ?: return@withContext emptyList()
-            val pageId = extractPageId(page.link) ?: return@withContext emptyList()
-            filmPlayers(pageId, page.link)
-        }
-
-    override suspend fun tvSources(
-        tmdbId: Int,
-        title: String,
-        year: String?,
-        season: Int,
-        episode: Int,
-    ): List<EmbedLink> = withContext(Dispatchers.IO) {
-        val page = searchBestMatch(title, year, season = season) ?: return@withContext emptyList()
+    // fstream ne connaît que son moteur de recherche interne : l'ID TMDB de
+    // MediaRef ne lui sert à rien, il travaille sur le titre.
+    override suspend fun sourcesFor(media: MediaRef): List<EmbedLink> = withContext(Dispatchers.IO) {
+        val season = (media as? MediaRef.Episode)?.season
+        val page = searchBestMatch(media.title, media.year, season) ?: return@withContext emptyList()
         val pageId = extractPageId(page.link) ?: return@withContext emptyList()
-        episodePlayers(pageId, page.link, episode)
+        when (media) {
+            is MediaRef.Movie -> filmPlayers(pageId, page.link)
+            is MediaRef.Episode -> episodePlayers(pageId, page.link, media.episode)
+        }
     }
 
     // --- Recherche ------------------------------------------------------------

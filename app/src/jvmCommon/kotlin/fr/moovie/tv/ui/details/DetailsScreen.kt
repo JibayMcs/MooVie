@@ -67,7 +67,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import fr.moovie.tv.data.settings.StreamLanguage
-import fr.moovie.tv.data.sources.EmbedLink
+import fr.moovie.tv.core.sources.model.EmbedLink
 import fr.moovie.tv.data.tmdb.CastMember
 import fr.moovie.tv.data.tmdb.Episode
 import fr.moovie.tv.data.watch.ResumeEntry

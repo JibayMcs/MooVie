@@ -79,6 +79,9 @@ kotlin {
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
+                // runTest : la politique de résolution est suspend, elle se teste
+                // sans dispatcher réel ni attente.
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
             }
         }
 

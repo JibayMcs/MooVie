@@ -1,5 +1,6 @@
 package fr.moovie.tv.data.sources
 
+import fr.moovie.tv.core.sources.model.EmbedLink
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import fr.moovie.tv.data.store.preferencesStore

@@ -1,5 +1,9 @@
 package fr.moovie.tv.data.sources
 
+import fr.moovie.tv.core.sources.model.EmbedLink
+import fr.moovie.tv.core.sources.model.PlayableStream
+import fr.moovie.tv.core.sources.model.StreamFormat
+import fr.moovie.tv.core.sources.port.SourceExtractor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl

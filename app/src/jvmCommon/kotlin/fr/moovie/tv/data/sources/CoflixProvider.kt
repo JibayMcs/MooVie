@@ -1,5 +1,8 @@
 package fr.moovie.tv.data.sources
 
+import fr.moovie.tv.core.sources.model.EmbedLink
+import fr.moovie.tv.core.sources.model.MediaRef
+import fr.moovie.tv.core.sources.port.SourceProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -31,27 +34,24 @@ class CoflixProvider(private val http: OkHttpClient) : SourceProvider {
 
     private val json = Json { ignoreUnknownKeys = true }
 
-    // coflix s'indexe par slug de titre : tmdbId est ignoré.
-    override suspend fun movieSources(tmdbId: Int, title: String, year: String?): List<EmbedLink> =
-        withContext(Dispatchers.IO) {
-            val pageUrl = findPage(title, year, movie = true) ?: return@withContext emptyList()
-            playerLinks(pageUrl)
-        }
+    // coflix s'indexe par slug de titre : l'ID TMDB de MediaRef ne lui sert à rien.
+    override suspend fun sourcesFor(media: MediaRef): List<EmbedLink> = withContext(Dispatchers.IO) {
+        when (media) {
+            is MediaRef.Movie -> {
+                val pageUrl = findPage(media.title, media.year, movie = true)
+                    ?: return@withContext emptyList()
+                playerLinks(pageUrl)
+            }
 
-    override suspend fun tvSources(
-        tmdbId: Int,
-        title: String,
-        year: String?,
-        season: Int,
-        episode: Int,
-    ): List<EmbedLink> =
-        withContext(Dispatchers.IO) {
-            // Coflix séries : page épisode construite depuis le slug (best-effort).
-            val seriesUrl = findPage(title, year, movie = false) ?: return@withContext emptyList()
-            val slug = SLUG.find(seriesUrl)?.groupValues?.get(1) ?: return@withContext emptyList()
-            val epUrl = "$BASE/episode/$slug-${season}x$episode/"
-            playerLinks(epUrl)
+            is MediaRef.Episode -> {
+                // Coflix séries : page épisode construite depuis le slug (best-effort).
+                val seriesUrl = findPage(media.title, media.year, movie = false)
+                    ?: return@withContext emptyList()
+                val slug = SLUG.find(seriesUrl)?.groupValues?.get(1) ?: return@withContext emptyList()
+                playerLinks("$BASE/episode/$slug-${media.season}x${media.episode}/")
+            }
         }
+    }
 
     // --- Recherche ------------------------------------------------------------
 

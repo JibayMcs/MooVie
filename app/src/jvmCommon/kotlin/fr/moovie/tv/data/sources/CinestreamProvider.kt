@@ -1,5 +1,8 @@
 package fr.moovie.tv.data.sources
 
+import fr.moovie.tv.core.sources.model.EmbedLink
+import fr.moovie.tv.core.sources.model.MediaRef
+import fr.moovie.tv.core.sources.port.SourceProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -33,20 +36,14 @@ class CinestreamProvider(private val http: OkHttpClient) : SourceProvider {
 
     override val name = "cinestream"
 
-    override suspend fun movieSources(tmdbId: Int, title: String, year: String?): List<EmbedLink> =
-        withContext(Dispatchers.IO) {
-            val film = findFilm(tmdbId, title, year) ?: return@withContext emptyList()
-            embeds(tmdbId, film.players)
+    /** cinestream est un catalogue de films uniquement : les séries rendent vide. */
+    override suspend fun sourcesFor(media: MediaRef): List<EmbedLink> {
+        if (media !is MediaRef.Movie) return emptyList()
+        return withContext(Dispatchers.IO) {
+            val film = findFilm(media.tmdbId, media.title, media.year) ?: return@withContext emptyList()
+            embeds(media.tmdbId, film.players)
         }
-
-    /** cinestream est un catalogue de films uniquement. */
-    override suspend fun tvSources(
-        tmdbId: Int,
-        title: String,
-        year: String?,
-        season: Int,
-        episode: Int,
-    ): List<EmbedLink> = emptyList()
+    }
 
     // --- Étapes 1 et 2 : candidats puis confirmation par ID TMDB --------------
 

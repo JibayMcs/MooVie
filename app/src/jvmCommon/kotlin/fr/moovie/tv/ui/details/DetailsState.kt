@@ -1,6 +1,6 @@
 package fr.moovie.tv.ui.details
 
-import fr.moovie.tv.data.sources.EmbedLink
+import fr.moovie.tv.core.sources.model.EmbedLink
 import fr.moovie.tv.data.tmdb.Episode
 import fr.moovie.tv.data.tmdb.MovieDetails
 import fr.moovie.tv.data.tmdb.TvDetails

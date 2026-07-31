@@ -1,5 +1,6 @@
 package fr.moovie.tv.data.sources
 
+import fr.moovie.tv.core.sources.model.PlayableStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
