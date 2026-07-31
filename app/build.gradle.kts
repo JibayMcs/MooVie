@@ -76,6 +76,18 @@ kotlin {
             }
         }
 
+        val commonTest by getting {
+            dependencies {
+                implementation(kotlin("test"))
+            }
+        }
+
+        // Miroir de jvmCommon côté tests : le domaine des sources et ses adapters
+        // se testent une seule fois pour les deux cibles.
+        val jvmCommonTest by creating {
+            dependsOn(commonTest)
+        }
+
         val androidMain by getting {
             dependsOn(jvmCommon)
             dependencies {
@@ -110,6 +122,9 @@ kotlin {
                 implementation("uk.co.caprica:vlcj:4.8.3")
             }
         }
+
+        val desktopTest by getting { dependsOn(jvmCommonTest) }
+        val androidUnitTest by getting { dependsOn(jvmCommonTest) }
     }
 }
 
@@ -156,6 +171,15 @@ android {
         compose = true
         buildConfig = true
     }
+}
+
+tasks.withType<Test>().configureEach {
+    // Les sondes de diagnostic (empreinte TLS…) écrivent sur stdout : sans ça
+    // Gradle l'avale et le test « passe » sans rien montrer.
+    testLogging { showStandardStreams = true }
+    // -Dmoovie.probe=1 est passé à la JVM Gradle, pas à celle des tests : on le
+    // relaie explicitement, sinon la sonde se croit non demandée.
+    System.getProperty("moovie.probe")?.let { systemProperty("moovie.probe", it) }
 }
 
 compose.resources {
