@@ -1,0 +1,142 @@
+package fr.moovie.tv.data.sources
+
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
+
+/**
+ * Provider CineStream (cinestream.info) — port de API/Mainapi/routes/cinestream.js.
+ *
+ * Le premier provider indexé par **ID TMDB** : cinestream réutilise les ID de
+ * TMDB, on confirme donc le bon film sur l'identifiant et non sur une
+ * ressemblance de titre. La confusion « Dune » / « Dune Dreams » devient
+ * impossible — la recherche ne sert plus qu'à proposer des candidats.
+ *
+ * Flux (tout en GET, HTML public, aucun échange de cookie) :
+ *   1. `/search?q={titre}`      → slugs `/film/{slug}` candidats
+ *   2. `/film/{slug}`           → charge RSC échappée : `tmdbid` (fait autorité)
+ *                                 et `players:[{name}]` dans l'ordre
+ *   3. `/player/{tmdbid}/{i}`   → `<iframe src>` de l'hébergeur, index = position
+ *                                 dans le tableau players
+ *
+ * ⚠️ L'en-tête `Accept` navigateur est **obligatoire** à l'étape 3 : sans lui la
+ * page revient sans son iframe (rendue côté client). C'est ce détail qui faisait
+ * croire que le lien d'embed n'était pas récupérable sans exécuter du JS.
+ *
+ * Séries non couvertes : cinestream ne sert que des films (chez Movix les séries
+ * passent par wiflix).
+ */
+class CinestreamProvider(private val http: OkHttpClient) : SourceProvider {
+
+    override val name = "cinestream"
+
+    override suspend fun movieSources(tmdbId: Int, title: String, year: String?): List<EmbedLink> =
+        withContext(Dispatchers.IO) {
+            val film = findFilm(tmdbId, title, year) ?: return@withContext emptyList()
+            embeds(tmdbId, film.players)
+        }
+
+    /** cinestream est un catalogue de films uniquement. */
+    override suspend fun tvSources(
+        tmdbId: Int,
+        title: String,
+        year: String?,
+        season: Int,
+        episode: Int,
+    ): List<EmbedLink> = emptyList()
+
+    // --- Étapes 1 et 2 : candidats puis confirmation par ID TMDB --------------
+
+    private data class Film(val players: List<String>)
+
+    private fun findFilm(tmdbId: Int, title: String, year: String?): Film? {
+        val q = java.net.URLEncoder.encode(title, "UTF-8")
+        val html = get("$BASE/search?q=$q") ?: return null
+
+        val slugs = SLUG.findAll(html).map { it.groupValues[1] }.distinct().toList()
+        if (slugs.isEmpty()) return null
+
+        // Les slugs finissent par leur année (« dune-premiere-partie-2021 ») :
+        // on remonte les candidats de la bonne année pour éviter des pages
+        // inutiles sur les titres courants. Le verdict reste l'ID TMDB.
+        val ranked = if (year == null) slugs else
+            slugs.sortedByDescending { YEAR.find(it)?.groupValues?.get(1) == year }
+
+        for (slug in ranked.take(MAX_FILM_PAGES)) {
+            val page = get("$BASE/film/$slug") ?: continue
+            val id = TMDB_ID.find(page)?.groupValues?.get(1)?.toIntOrNull() ?: continue
+            if (id != tmdbId) continue
+
+            val players = PLAYER_NAME.findAll(
+                PLAYERS.find(page)?.groupValues?.get(1) ?: continue,
+            ).map { it.groupValues[1] }.toList()
+
+            return if (players.isEmpty()) null else Film(players)
+        }
+        return null
+    }
+
+    // --- Étape 3 : un embed par index de player -------------------------------
+
+    private suspend fun embeds(tmdbId: Int, players: List<String>): List<EmbedLink> = coroutineScope {
+        players.mapIndexed { index, name ->
+            async {
+                val page = get("$BASE/player/$tmdbId/$index") ?: return@async null
+                val url = IFRAME_SRC.find(page)?.groupValues?.get(1)
+                    ?.replace("&amp;", "&")
+                    ?.takeIf { it.startsWith("http") } ?: return@async null
+
+                EmbedLink(
+                    url = url,
+                    // L'hébergeur se déduit de l'URL, JAMAIS du libellé affiché :
+                    // « DdStream » est servi par playmogo, « Filelions » par
+                    // minochinos, « netu » par waaw.to. Seul le domaine dit vrai.
+                    hoster = hosterOf(url),
+                    language = languageOf(name),
+                )
+            }
+        }.mapNotNull { it.await() }.distinctBy { it.url }
+    }
+
+    private fun get(url: String): String? {
+        val req = Request.Builder()
+            .url(url)
+            .header("User-Agent", Ua.BROWSER)
+            // Sans cet Accept, /player/ renvoie la page sans son iframe.
+            .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+            .header("Accept-Language", "fr-FR,fr;q=0.9,en;q=0.8")
+            .header("Referer", "$BASE/")
+            .build()
+        return runCatching {
+            http.newCall(req).execute().use { if (it.isSuccessful) it.body?.string() else null }
+        }.getOrNull()
+    }
+
+    companion object {
+        const val BASE = "https://cinestream.info"
+
+        /** Nombre de fiches film ouvertes avant d'abandonner la confirmation TMDB. */
+        private const val MAX_FILM_PAGES = 5
+
+        private val SLUG = Regex("""href="/film/([^"]+)"""")
+        private val YEAR = Regex("""-(\d{4})$""")
+        // La charge RSC est incluse échappée dans le HTML : \"tmdbid\":438631
+        private val TMDB_ID = Regex("""tmdbid\\?":(\d+)""")
+        // Le `]` fermant est échappé : le moteur regex ICU d'Android rejette un
+        // `]` isolé (PatternSyntaxException), là où le JVM desktop l'accepte.
+        // Même piège que dans PackedJs — invisible en test desktop.
+        private val PLAYERS = Regex("""players\\?":(\[.*?\])""")
+        private val PLAYER_NAME = Regex("""name\\?":\\?"([^"\\]+)""")
+        private val IFRAME_SRC = Regex("""<iframe[^>]+src="([^"]+)"""", RegexOption.IGNORE_CASE)
+
+        /**
+         * Un player dont le libellé commence par « vostfr » est VOSTFR, tout le
+         * reste est VF. Règle de cinestream, reprise telle quelle de Movix.
+         */
+        fun languageOf(playerName: String): String =
+            if (playerName.trim().startsWith("vostfr", ignoreCase = true)) "VOSTFR" else "VF"
+    }
+}

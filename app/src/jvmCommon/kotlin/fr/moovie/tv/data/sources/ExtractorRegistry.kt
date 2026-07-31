@@ -28,6 +28,7 @@ object ExtractorRegistry {
         SeekStreamingExtractor(http),
         AnsembedExtractor(http),
         VoeExtractor(http),
+        LuluExtractor(http),
     )
 
     fun extractorFor(url: String): SourceExtractor? =
@@ -54,5 +55,6 @@ object ProviderRegistry {
         FstreamProvider(ExtractorRegistry.http),
         AnimeSamaProvider(ExtractorRegistry.http),
         CoflixProvider(ExtractorRegistry.http),
+        CinestreamProvider(ExtractorRegistry.http),
     )
 }
