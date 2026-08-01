@@ -97,6 +97,16 @@ class SettingsRepository {
     suspend fun setAutoPlayNext(value: Boolean) =
         store.edit { it[AUTO_PLAY_NEXT] = value }
 
+    /**
+     * Date et heure en haut du lecteur. Activées par défaut : devant un film,
+     * savoir l'heure sans sortir de l'app est précisément ce qu'on cherche.
+     */
+    val playerClock: Flow<Boolean> =
+        store.data.map { it[PLAYER_CLOCK] ?: true }
+
+    suspend fun setPlayerClock(value: Boolean) =
+        store.edit { it[PLAYER_CLOCK] = value }
+
     suspend fun setDohEnabled(value: Boolean) =
         store.edit { it[DOH_ENABLED] = value }
 
@@ -130,6 +140,7 @@ class SettingsRepository {
         val SKIP_INTRO_OUTRO = booleanPreferencesKey("skip_intro_outro")
         val HIDE_HISTORY_WIDGETS = booleanPreferencesKey("hide_history_widgets")
         val AUTO_PLAY_NEXT = booleanPreferencesKey("auto_play_next")
+        val PLAYER_CLOCK = booleanPreferencesKey("player_clock")
         val UPDATE_INTERVAL = stringPreferencesKey("update_interval")
         val SCREENSAVER_DELAY = stringPreferencesKey("screensaver_delay")
     }

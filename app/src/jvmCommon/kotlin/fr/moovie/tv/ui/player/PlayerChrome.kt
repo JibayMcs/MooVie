@@ -499,15 +499,26 @@ private fun PlayerSeekBar(
 
 // ── Overlays ────────────────────────────────────────────────────────────────
 
-/** Titre et sous-titre du média, en haut à gauche, avec le dégradé de lisibilité. */
+/**
+ * Titre et sous-titre du média, en haut à gauche, avec le dégradé de lisibilité.
+ *
+ * [clock] occupe le coin opposé : le bandeau existe déjà et porte son propre
+ * dégradé, y poser l'heure évite d'empiler une seconde surface sur l'image.
+ */
 @Composable
-fun PlayerTitleOverlay(title: String, subtitle: String, modifier: Modifier = Modifier) {
-    Column(
+fun PlayerTitleOverlay(
+    title: String,
+    subtitle: String,
+    modifier: Modifier = Modifier,
+    clock: String? = null,
+) {
+    Box(
         modifier = modifier
             .fillMaxWidth()
             .background(Brush.verticalGradient(listOf(Color(0xCC000000), Color.Transparent)))
             .padding(horizontal = 48.dp, vertical = 32.dp),
     ) {
+    Column {
         if (title.isNotBlank()) {
             Text(
                 title,
@@ -524,6 +535,16 @@ fun PlayerTitleOverlay(title: String, subtitle: String, modifier: Modifier = Mod
                 color = Color(0xFFBBBBBB),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+        clock?.let {
+            Text(
+                it,
+                style = MaterialTheme.typography.titleMedium,
+                color = Color(0xFFDDDDDD),
+                maxLines = 1,
+                modifier = Modifier.align(Alignment.TopEnd),
             )
         }
     }

@@ -128,6 +128,7 @@ internal fun DesktopSettingsScreen(onBack: () -> Unit) {
     val dohProvider by vm.dohProvider.collectAsState()
     val skipIntroOutro by vm.skipIntroOutro.collectAsState()
     val autoPlayNext by vm.autoPlayNext.collectAsState()
+    val playerClock by vm.playerClock.collectAsState()
     val hideHistoryWidgets by vm.hideHistoryWidgets.collectAsState()
     val updateInterval by vm.updateInterval.collectAsState()
     val screensaverDelay by vm.screensaverDelay.collectAsState()
@@ -137,6 +138,7 @@ internal fun DesktopSettingsScreen(onBack: () -> Unit) {
         streamLang = streamLang,
         skipIntroOutro = skipIntroOutro,
         autoPlayNext = autoPlayNext,
+        playerClock = playerClock,
         hideHistoryWidgets = hideHistoryWidgets,
         updateInterval = updateInterval,
         screensaverDelay = screensaverDelay,
@@ -147,6 +149,7 @@ internal fun DesktopSettingsScreen(onBack: () -> Unit) {
         onSetStreamLanguage = vm::setStreamLanguage,
         onSetSkipIntroOutro = vm::setSkipIntroOutro,
         onSetAutoPlayNext = vm::setAutoPlayNext,
+        onSetPlayerClock = vm::setPlayerClock,
         onSetHideHistoryWidgets = vm::setHideHistoryWidgets,
         onSetUpdateInterval = vm::setUpdateInterval,
         onSetScreensaverDelay = vm::setScreensaverDelay,

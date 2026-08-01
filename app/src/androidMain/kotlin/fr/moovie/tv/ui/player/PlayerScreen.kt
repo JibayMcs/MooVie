@@ -47,6 +47,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.MediaSession
 import androidx.media3.ui.PlayerView
+import fr.moovie.tv.ui.format.formatNowDateTime
 import fr.moovie.tv.data.intro.IntroDbRepository
 import fr.moovie.tv.data.intro.IntroMedia
 import fr.moovie.tv.data.settings.ScreensaverDelay
@@ -118,6 +119,8 @@ fun PlayerScreen(
     val introRepo = remember { IntroDbRepository() }
     val settings = remember { SettingsRepository() }
     val skipEnabled by settings.skipIntroOutro.collectAsStateWithLifecycle(initialValue = true)
+    val clockEnabled by settings.playerClock.collectAsStateWithLifecycle(initialValue = true)
+
     val autoPlayNext by settings.autoPlayNext.collectAsStateWithLifecycle(initialValue = true)
     val screensaverDelay by settings.screensaverDelay.collectAsStateWithLifecycle(
         initialValue = ScreensaverDelay.M15,
@@ -168,6 +171,23 @@ fun PlayerScreen(
     var tracks by remember { mutableStateOf(PlayerTracks()) }
     var speed by remember { mutableStateOf(1f) }
     var controlsVisible by remember { mutableStateOf(true) }
+    // Horloge du bandeau. Rafraîchie à la minute, et seulement quand les
+    // contrôles sont visibles : un film dure deux heures, réveiller la
+    // composition pour une horloge cachée ne servirait qu'à chauffer la box.
+    var clock by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(clockEnabled, controlsVisible) {
+        if (!clockEnabled || !controlsVisible) {
+            clock = null
+            return@LaunchedEffect
+        }
+        while (true) {
+            val now = System.currentTimeMillis()
+            clock = formatNowDateTime(now)
+            // Se cale sur le changement de minute plutôt que d'attendre 60 s
+            // en aveugle, sinon l'heure affichée traîne jusqu'à une minute.
+            delay(60_000 - now % 60_000)
+        }
+    }
     var activityTick by remember { mutableIntStateOf(0) }
     var dialog by remember { mutableStateOf<PlayerDialogKind?>(null) }
     // Position en cours de réglage à la télécommande (null = pas en mode réglage).
@@ -557,7 +577,7 @@ fun PlayerScreen(
             exit = fadeOut(),
             modifier = Modifier.align(Alignment.TopCenter),
         ) {
-            PlayerTitleOverlay(title = title, subtitle = subtitle)
+            PlayerTitleOverlay(title = title, subtitle = subtitle, clock = clock)
         }
 
         // Bouton « Passer l'intro / le générique », au-dessus de la barre pour

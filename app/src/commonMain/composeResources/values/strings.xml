@@ -191,4 +191,6 @@
     <string name="catalog_open">Catalogue</string>
     <string name="media_movie">Film</string>
     <string name="media_series">Série</string>
+    <string name="settings_player_clock">Date et heure dans le lecteur</string>
+    <string name="settings_player_clock_help">Affiche la date et l'heure en haut du lecteur quand les contrôles sont visibles.</string>
 </resources>

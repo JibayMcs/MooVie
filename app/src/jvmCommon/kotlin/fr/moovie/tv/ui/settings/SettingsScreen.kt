@@ -79,6 +79,8 @@ import fr.moovie.tv.resources.settings_intro_help
 import fr.moovie.tv.resources.settings_language
 import fr.moovie.tv.resources.settings_move_down
 import fr.moovie.tv.resources.settings_move_up
+import fr.moovie.tv.resources.settings_player_clock
+import fr.moovie.tv.resources.settings_player_clock_help
 import fr.moovie.tv.resources.settings_screensaver_delay
 import fr.moovie.tv.resources.settings_screensaver_help
 import fr.moovie.tv.resources.settings_skip_intro
@@ -139,6 +141,7 @@ fun SettingsScreenContent(
     streamLang: StreamLanguage,
     skipIntroOutro: Boolean,
     autoPlayNext: Boolean,
+    playerClock: Boolean,
     hideHistoryWidgets: Boolean,
     updateInterval: UpdateInterval,
     screensaverDelay: ScreensaverDelay,
@@ -149,6 +152,7 @@ fun SettingsScreenContent(
     onSetStreamLanguage: (StreamLanguage) -> Unit,
     onSetSkipIntroOutro: (Boolean) -> Unit,
     onSetAutoPlayNext: (Boolean) -> Unit,
+    onSetPlayerClock: (Boolean) -> Unit,
     onSetHideHistoryWidgets: (Boolean) -> Unit,
     onSetUpdateInterval: (UpdateInterval) -> Unit,
     onSetScreensaverDelay: (ScreensaverDelay) -> Unit,
@@ -255,6 +259,12 @@ fun SettingsScreenContent(
                         help = stringResource(Res.string.settings_autoplay_help),
                     ) {
                         OnOff(value = autoPlayNext, onChange = onSetAutoPlayNext)
+                    }
+                    SettingRow(
+                        label = stringResource(Res.string.settings_player_clock),
+                        help = stringResource(Res.string.settings_player_clock_help),
+                    ) {
+                        OnOff(value = playerClock, onChange = onSetPlayerClock)
                     }
                 }
 

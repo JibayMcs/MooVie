@@ -40,6 +40,13 @@ class SettingsViewModel : ViewModel() {
     val autoPlayNext: StateFlow<Boolean> =
         repo.autoPlayNext.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
 
+    val playerClock: StateFlow<Boolean> =
+        repo.playerClock.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+
+    fun setPlayerClock(value: Boolean) {
+        viewModelScope.launch { repo.setPlayerClock(value) }
+    }
+
     fun setAutoPlayNext(value: Boolean) {
         viewModelScope.launch { repo.setAutoPlayNext(value) }
     }

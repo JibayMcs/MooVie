@@ -57,3 +57,22 @@ private fun formatterFor(locale: Locale): DateTimeFormatter = formatters.getOrPu
         .replace(Regex("y+"), "yyyy")
     DateTimeFormatter.ofPattern(pattern, locale)
 }
+
+/**
+ * Date et heure courantes, dans la langue de l'app : « sam. 1 août · 21:42 ».
+ *
+ * Format long-mais-abrégé pour la date (jour de semaine + jour + mois) et
+ * numérique pour l'heure : sur un bandeau de lecteur, la date sert de repère et
+ * l'heure de mesure. La minute suffit — afficher les secondes obligerait à
+ * recomposer le lecteur une fois par seconde pendant tout un film.
+ */
+fun formatNowDateTime(nowMs: Long): String {
+    val locale = Locale.getDefault()
+    val moment = java.time.Instant.ofEpochMilli(nowMs)
+        .atZone(java.time.ZoneId.systemDefault())
+    val date = DateTimeFormatter.ofPattern("EEE d MMM", locale).format(moment)
+    val time = DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT)
+        .withLocale(locale)
+        .format(moment)
+    return "$date · $time"
+}
