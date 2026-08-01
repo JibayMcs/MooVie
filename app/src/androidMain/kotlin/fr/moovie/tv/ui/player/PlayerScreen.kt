@@ -138,6 +138,15 @@ fun PlayerScreen(
             // de flux quand le réseau se met en veille).
             .setWakeMode(C.WAKE_MODE_NETWORK)
             .build()
+            .apply {
+                // Aucun sous-titre au démarrage : ExoPlayer active sinon de
+                // lui-même une piste dont la langue lui paraît pertinente, et on
+                // se retrouve avec des sous-titres sur tous les dialogues sans
+                // les avoir demandés. Les afficher reste un choix explicite.
+                trackSelectionParameters = trackSelectionParameters.buildUpon()
+                    .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+                    .build()
+            }
     }
 
     /** Vue du lecteur exposée à la chrome partagée. */

@@ -397,6 +397,13 @@ internal fun DesktopPlayerScreen(
                                 mediaPlayer.media().addSlave(MediaSlaveType.SUBTITLE, url, false)
                             }
                         }
+                        // Aucun sous-titre au démarrage : libVLC en choisit
+                        // sinon un tout seul dès qu'une piste existe, et on se
+                        // retrouve avec des sous-titres sur tous les dialogues
+                        // sans les avoir demandés. Les afficher reste un choix
+                        // explicite. -1 coupe l'affichage sans retirer les
+                        // pistes, qui restent proposées dans la popup.
+                        mediaPlayer.subpictures().setTrack(-1)
                     }
                 }
             }
