@@ -5,10 +5,16 @@
         <item name="android:windowBackground">@color/app_background</item>
     </style>
 
-    <!-- Splash au lancement : fond violet branding + logo, puis bascule sur Theme.MooVie. -->
+    <!--
+      Splash système réduit à un aplat : l'animation de lancement est rendue par
+      l'app (MoovieSplash), pas ici. Android 12+ masque `windowSplashScreenAnimatedIcon`
+      dans un cercle dont seul le centre est visible — c'est ce qui rognait le logo.
+      Le masque n'étant pas désactivable, on passe une icône transparente : reste
+      un fond uni, exactement de la couleur de la 1re image de l'animation.
+    -->
     <style name="Theme.MooVie.Splash" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">@color/splash_background</item>
-        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_icon_none</item>
         <item name="postSplashScreenTheme">@style/Theme.MooVie</item>
     </style>
 </resources>

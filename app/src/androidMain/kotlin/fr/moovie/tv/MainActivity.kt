@@ -28,6 +28,8 @@ import fr.moovie.tv.data.settings.LocaleManager
 import fr.moovie.tv.data.settings.SettingsRepository
 import fr.moovie.tv.ui.details.DetailsViewModel
 import fr.moovie.tv.ui.catalog.CatalogScreen
+import androidx.compose.runtime.saveable.rememberSaveable
+import fr.moovie.tv.ui.splash.MoovieSplash
 import fr.moovie.tv.ui.navigation.Screen
 import fr.moovie.tv.ui.navigation.rememberNavStack
 import fr.moovie.tv.ui.details.DetailsScreen
@@ -61,6 +63,11 @@ class MainActivity : ComponentActivity() {
         handleTmdbKey(intent)
 
         setContent {
+            // L'animation de lancement se pose *au-dessus* de l'app plutôt que
+            // devant : l'accueil charge TMDB derrière, et le temps d'animation
+            // devient du temps de chargement gagné.
+            var splashDone by rememberSaveable { mutableStateOf(false) }
+
             // Thème tv-material (PlayerScreen) autour du thème material3 partagé.
             MooVieTvMaterialTheme {
             MooVieTheme {
@@ -205,6 +212,9 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         }
+                    }
+                    if (!splashDone) {
+                        MoovieSplash(onFinished = { splashDone = true })
                     }
                 }
             }
