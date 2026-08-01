@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -30,12 +31,14 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
@@ -68,6 +71,7 @@ import fr.moovie.tv.ui.components.MoovieIconButton
 import fr.moovie.tv.ui.components.MoovieMarqueeText
 import java.text.SimpleDateFormat
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.util.Date
 import java.util.Locale
 import org.jetbrains.compose.resources.pluralStringResource
@@ -106,6 +110,8 @@ fun HistoryScreenContent(
     // première composition (flux DataStore) : on retente tant que la grille
     // n'est pas encore posée, sinon la demande tombe dans le vide.
     val firstCard = remember { FocusRequester() }
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
     LaunchedEffect(days.isNotEmpty()) {
         if (days.isEmpty()) return@LaunchedEffect
         repeat(10) {
@@ -133,7 +139,7 @@ fun HistoryScreenContent(
                     style = MaterialTheme.typography.headlineMedium,
                 )
             }
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(24.dp))
 
             if (days.isEmpty()) {
                 Text(
@@ -148,6 +154,7 @@ fun HistoryScreenContent(
             // Marges horizontales dans le contentPadding : sinon le zoom au
             // focus des vignettes de bord est rogné par le conteneur.
             LazyColumn(
+                state = listState,
                 contentPadding = PaddingValues(horizontal = 32.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
@@ -160,13 +167,32 @@ fun HistoryScreenContent(
                         items = day.entries.chunked(COLUMNS),
                         key = { _, row -> row.first().key },
                     ) { rowIndex, row ->
-                        HistoryGridRow(
-                            entries = row,
-                            onOpen = { onOpenTitle(it.tmdbId, it.isTv) },
-                            onMenu = { menuFor = it },
-                            // Toute première vignette de la page.
-                            firstFocus = if (dayIndex == 0 && rowIndex == 0) firstCard else null,
-                        )
+                        val isFirstRow = dayIndex == 0 && rowIndex == 0
+                        // Les cartes de statistiques ne sont pas focalisables (ce
+                        // sont des tuiles décoratives, les traverser au D-pad
+                        // n'aurait aucun sens). En remontant, le focus s'arrêtait
+                        // donc sur cette rangée-ci et la liste ne défilait jamais
+                        // jusqu'en haut : les widgets restaient hors écran, leur
+                        // place prise par l'en-tête de jour collant. On ramène
+                        // explicitement la liste à zéro quand on atteint la
+                        // première rangée.
+                        Box(
+                            modifier = if (isFirstRow) {
+                                Modifier.onFocusChanged {
+                                    if (it.hasFocus) scope.launch { listState.animateScrollToItem(0) }
+                                }
+                            } else {
+                                Modifier
+                            },
+                        ) {
+                            HistoryGridRow(
+                                entries = row,
+                                onOpen = { onOpenTitle(it.tmdbId, it.isTv) },
+                                onMenu = { menuFor = it },
+                                // Toute première vignette de la page.
+                                firstFocus = if (isFirstRow) firstCard else null,
+                            )
+                        }
                     }
                 }
             }
