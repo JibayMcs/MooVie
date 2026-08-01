@@ -30,7 +30,51 @@ import androidx.compose.ui.input.pointer.isShiftPressed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import fr.moovie.tv.shared.isPointerUi
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.relocation.BringIntoViewResponder
+import androidx.compose.foundation.relocation.bringIntoViewResponder
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.IntSize
 import kotlinx.coroutines.launch
+
+/**
+ * Empêche le déplacement du focus **dans** une rangée de faire défiler la page
+ * qui la contient.
+ *
+ * Quand une carte prend le focus, Compose demande à tous les conteneurs
+ * défilants au-dessus d'elle de la rendre visible. La `LazyRow` fait son travail
+ * en défilant horizontalement — mais la demande continuait de remonter jusqu'à
+ * la `LazyColumn` de la page, qui ajustait aussi la position verticale. Mesuré
+ * sur l'accueil : **11 px de dérive après quatre appuis vers la droite**, d'où
+ * l'impression que les rangées du dessus « sautent » pendant qu'on parcourt
+ * celle du dessous.
+ *
+ * On intercepte donc la demande à hauteur de la rangée et on ne transmet plus le
+ * rectangle de la carte, mais **celui de la rangée entière**. Rangée déjà
+ * visible → le parent n'a rien à faire, donc plus aucun mouvement vertical.
+ * Rangée partiellement hors écran (on descend d'une rangée à l'autre) → le
+ * parent défile pour la montrer, ce qui est exactement le comportement voulu.
+ * C'est pour ça qu'on ne se contente pas d'ignorer la demande.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun Modifier.keepVerticalStill(): Modifier {
+    var size by remember { mutableStateOf(IntSize.Zero) }
+    val responder = remember {
+        object : BringIntoViewResponder {
+            override fun calculateRectForParent(localRect: Rect): Rect =
+                Rect(0f, 0f, size.width.toFloat(), size.height.toFloat())
+
+            // La rangée n'est pas elle-même défilante : la `LazyRow` qu'elle
+            // contient a déjà fait le nécessaire avant que la demande n'arrive ici.
+            override suspend fun bringChildIntoView(localRect: () -> Rect?) = Unit
+        }
+    }
+    return onSizeChanged { size = it }.bringIntoViewResponder(responder)
+}
 
 /** Fraction de la largeur visible parcourue par un « coup » de défilement. */
 private const val PAGE_FRACTION = 0.8f
@@ -57,7 +101,7 @@ fun MoovieRail(
     row: @Composable () -> Unit,
 ) {
     if (!isPointerUi) {
-        Box(modifier = modifier) { row() }
+        Box(modifier = modifier.keepVerticalStill()) { row() }
         return
     }
 
@@ -76,6 +120,7 @@ fun MoovieRail(
 
     Box(
         modifier = modifier
+            .keepVerticalStill()
             .hoverable(hoverSource)
             .onPreviewKeyEvent { event ->
                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
