@@ -13,6 +13,8 @@ import fr.moovie.tv.data.watch.ResumeEntry
 import fr.moovie.tv.ui.details.DetailsScreenContent
 import fr.moovie.tv.ui.details.DetailsState
 import fr.moovie.tv.ui.details.DetailsViewModel
+import fr.moovie.tv.ui.catalog.CatalogScreenContent
+import fr.moovie.tv.ui.catalog.CatalogViewModel
 import fr.moovie.tv.ui.history.HistoryScreenContent
 import fr.moovie.tv.ui.history.HistoryViewModel
 import fr.moovie.tv.ui.home.HomeScreenContent
@@ -33,6 +35,7 @@ internal object Vm {
     val history by lazy { HistoryViewModel() }
     val settings by lazy { SettingsViewModel() }
     val details by lazy { DetailsViewModel() }
+    val catalog by lazy { CatalogViewModel() }
 }
 
 @Composable
@@ -42,6 +45,7 @@ internal fun DesktopHomeScreen(
     onOpenSettings: () -> Unit,
     onOpenSearch: () -> Unit,
     onOpenHistory: () -> Unit,
+    onOpenCatalog: () -> Unit,
 ) {
     val vm = Vm.home
     val state by vm.state.collectAsState()
@@ -58,6 +62,7 @@ internal fun DesktopHomeScreen(
         onOpenSettings = onOpenSettings,
         onOpenSearch = onOpenSearch,
         onOpenHistory = onOpenHistory,
+        onOpenCatalog = onOpenCatalog,
         onRemoveResume = vm::removeResume,
         onMarkResumeWatched = vm::markResumeWatched,
         watchlist = watchlist,
@@ -75,10 +80,6 @@ internal fun DesktopSearchScreen(
     val results by vm.results.collectAsState()
     val history by vm.history.collectAsState()
     val watchlistKeys by vm.watchlistKeys.collectAsState()
-    val exploreIsTv by vm.exploreIsTv.collectAsState()
-    val genres by vm.genres.collectAsState()
-    val selectedGenre by vm.selectedGenre.collectAsState()
-    val discover by vm.discover.collectAsState()
 
     SearchScreenContent(
         query = query,
@@ -94,12 +95,6 @@ internal fun DesktopSearchScreen(
         onRemoveFromWatchlist = vm::removeFromWatchlist,
         onRemoveHistory = vm::removeHistory,
         onClearHistory = vm::clearHistory,
-        exploreIsTv = exploreIsTv,
-        genres = genres,
-        selectedGenre = selectedGenre,
-        discover = discover,
-        onSetExploreType = vm::setExploreType,
-        onSelectGenre = vm::selectGenre,
     )
 }
 
@@ -274,6 +269,34 @@ internal fun DesktopDetailsScreen(
         sourceQualities = sourceQualities,
         onRequestQuality = vm::requestQuality,
         onDismissQuickPlay = vm::dismissQuickPlay,
+        onBack = onBack,
+        showBackButton = true,
+    )
+}
+
+@Composable
+internal fun DesktopCatalogScreen(
+    onOpenTitle: (tmdbId: Int, isTv: Boolean) -> Unit,
+    onBack: () -> Unit,
+) {
+    val vm = Vm.catalog
+    val entries by vm.entries.collectAsState()
+    val selection by vm.selection.collectAsState()
+    val state by vm.state.collectAsState()
+    val items by vm.items.collectAsState()
+    val watched by vm.watched.collectAsState()
+    val watchlistKeys by vm.watchlistKeys.collectAsState()
+
+    CatalogScreenContent(
+        entries = entries,
+        selection = selection,
+        state = state,
+        items = items,
+        watched = watched,
+        watchlistKeys = watchlistKeys,
+        onSelectGenre = vm::select,
+        onLoadMore = vm::loadMore,
+        onOpenTitle = onOpenTitle,
         onBack = onBack,
         showBackButton = true,
     )

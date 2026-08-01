@@ -17,6 +17,7 @@ fun HomeScreen(
     onOpenSettings: () -> Unit,
     onOpenSearch: () -> Unit,
     onOpenHistory: () -> Unit,
+    onOpenCatalog: () -> Unit,
     viewModel: HomeViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -33,6 +34,7 @@ fun HomeScreen(
         onOpenSettings = onOpenSettings,
         onOpenSearch = onOpenSearch,
         onOpenHistory = onOpenHistory,
+        onOpenCatalog = onOpenCatalog,
         onRemoveResume = viewModel::removeResume,
         onMarkResumeWatched = viewModel::markResumeWatched,
         watchlist = watchlist,

@@ -53,12 +53,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
-import fr.moovie.tv.data.tmdb.Genre
 import fr.moovie.tv.data.tmdb.TmdbItem
 import fr.moovie.tv.resources.Res
-import fr.moovie.tv.resources.explore_movies
-import fr.moovie.tv.resources.explore_no_results
-import fr.moovie.tv.resources.explore_series
 import fr.moovie.tv.resources.search_clear_history
 import fr.moovie.tv.resources.search_empty_hint
 import fr.moovie.tv.resources.search_hint
@@ -107,13 +103,6 @@ fun SearchScreenContent(
     watchlistKeys: Set<String> = emptySet(),
     onAddToWatchlist: (TmdbItem) -> Unit = {},
     onRemoveFromWatchlist: (String) -> Unit = {},
-    /** Page « explorer » (champ vide) : genres du type choisi et grille TMDB. */
-    exploreIsTv: Boolean = false,
-    genres: List<Genre> = emptyList(),
-    selectedGenre: Int? = null,
-    discover: SearchState = SearchState.Idle,
-    onSetExploreType: (Boolean) -> Unit = {},
-    onSelectGenre: (Int) -> Unit = {},
 ) {
     var menuFor by remember { mutableStateOf<TmdbItem?>(null) }
     val fieldFocus = remember { FocusRequester() }
@@ -181,23 +170,16 @@ fun SearchScreenContent(
         Spacer(Modifier.height(24.dp))
 
         when {
-            // Champ vide = page « explorer ». L'historique de recherche reste
-            // là, sous les chips, tant qu'aucun genre n'est choisi.
-            query.isBlank() -> ExploreSection(
-                isTv = exploreIsTv,
-                genres = genres,
-                selectedGenre = selectedGenre,
-                discover = discover,
+            // Champ vide : l'historique de recherche. Parcourir par genre a
+            // désormais sa propre page (Catalogue) — les deux gestes cohabitaient
+            // mal ici, il fallait traverser le champ de saisie, donc le clavier
+            // virtuel, pour atteindre les genres.
+            query.isBlank() -> HistorySection(
                 history = history,
-                onSetType = onSetExploreType,
-                onSelectGenre = onSelectGenre,
-                onPickHistory = onQueryChange,
-                onRemoveHistory = onRemoveHistory,
-                onClearHistory = onClearHistory,
-                onOpen = onOpen,
-                onMenu = { menuFor = it },
-                watchlistKeys = watchlistKeys,
-                firstResultFocus = firstResultFocus,
+                onPick = onQueryChange,
+                onRemove = onRemoveHistory,
+                onClear = onClearHistory,
+                modifier = Modifier.padding(horizontal = 40.dp),
             )
             results is SearchState.Loading -> Text(stringResource(Res.string.search_loading), color = Color(0xFFBBBBBB), modifier = Modifier.padding(horizontal = 40.dp))
             results is SearchState.NeedsKey -> Text(
@@ -256,102 +238,6 @@ private fun SearchField(
                     }
                 },
         )
-    }
-}
-
-/**
- * Page « explorer » : sélecteur films / séries, chips de genres, puis la grille
- * du genre choisi. Tant qu'aucun genre n'est sélectionné, la place revient à
- * l'historique de recherche — l'écran ne perd rien de ce qu'il faisait avant.
- */
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun ExploreSection(
-    isTv: Boolean,
-    genres: List<Genre>,
-    selectedGenre: Int?,
-    discover: SearchState,
-    history: List<String>,
-    onSetType: (Boolean) -> Unit,
-    onSelectGenre: (Int) -> Unit,
-    onPickHistory: (String) -> Unit,
-    onRemoveHistory: (String) -> Unit,
-    onClearHistory: () -> Unit,
-    onOpen: (TmdbItem) -> Unit,
-    onMenu: (TmdbItem) -> Unit,
-    watchlistKeys: Set<String>,
-    firstResultFocus: FocusRequester,
-) {
-    Column {
-        Row(
-            modifier = Modifier.padding(horizontal = 40.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            MoovieButton(onClick = { onSetType(false) }, selected = !isTv) {
-                Text(stringResource(Res.string.explore_movies))
-            }
-            MoovieButton(onClick = { onSetType(true) }, selected = isTv) {
-                Text(stringResource(Res.string.explore_series))
-            }
-        }
-        if (genres.isNotEmpty()) {
-            Spacer(Modifier.height(16.dp))
-            // Rangée unique défilante plutôt qu'un FlowRow : vingt genres sur
-            // trois lignes mangeaient la moitié de la hauteur d'un écran TV et
-            // ne laissaient qu'une demi-rangée d'affiches sous les chips.
-            val genreRow = rememberLazyListState()
-            MoovieRail(genreRow) {
-                LazyRow(
-                    state = genreRow,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    // Marges dans le contentPadding : le zoom au focus du 1er et
-                    // du dernier chip serait rogné par les bords de la rangée.
-                    contentPadding = PaddingValues(horizontal = 40.dp, vertical = 6.dp),
-                ) {
-                    items(genres, key = { it.id }) { genre ->
-                        MoovieButton(
-                            onClick = { onSelectGenre(genre.id) },
-                            selected = genre.id == selectedGenre,
-                        ) {
-                            Text(genre.name)
-                        }
-                    }
-                }
-            }
-        }
-        Spacer(Modifier.height(16.dp))
-
-        when {
-            selectedGenre == null -> HistorySection(
-                history = history,
-                onPick = onPickHistory,
-                onRemove = onRemoveHistory,
-                onClear = onClearHistory,
-                modifier = Modifier.padding(horizontal = 40.dp),
-            )
-            discover is SearchState.Loading -> Text(
-                stringResource(Res.string.search_loading),
-                color = Color(0xFFBBBBBB),
-                modifier = Modifier.padding(horizontal = 40.dp),
-            )
-            discover is SearchState.NeedsKey -> Text(
-                stringResource(Res.string.search_needs_key),
-                color = Color(0xFFE0A0A0),
-                modifier = Modifier.padding(horizontal = 40.dp),
-            )
-            discover is SearchState.Empty -> Text(
-                stringResource(Res.string.explore_no_results),
-                color = Color(0xFFBBBBBB),
-                modifier = Modifier.padding(horizontal = 40.dp),
-            )
-            discover is SearchState.Results -> ResultsGrid(
-                items = discover.items,
-                firstFocus = firstResultFocus,
-                onOpen = onOpen,
-                watchlistKeys = watchlistKeys,
-                onMenu = onMenu,
-            )
-        }
     }
 }
 

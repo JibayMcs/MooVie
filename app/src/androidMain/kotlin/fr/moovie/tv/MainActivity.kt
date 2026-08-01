@@ -27,6 +27,7 @@ import androidx.tv.material3.LocalContentColor
 import fr.moovie.tv.data.settings.LocaleManager
 import fr.moovie.tv.data.settings.SettingsRepository
 import fr.moovie.tv.ui.details.DetailsViewModel
+import fr.moovie.tv.ui.catalog.CatalogScreen
 import fr.moovie.tv.ui.navigation.Screen
 import fr.moovie.tv.ui.navigation.rememberNavStack
 import fr.moovie.tv.ui.details.DetailsScreen
@@ -134,9 +135,13 @@ class MainActivity : ComponentActivity() {
                                 onOpenSettings = { nav.push(Screen.Settings) },
                                 onOpenSearch = { nav.push(Screen.Search) },
                                 onOpenHistory = { nav.push(Screen.History) },
+                                onOpenCatalog = { nav.push(Screen.Catalog) },
                             )
                             Screen.Settings -> SettingsScreen(
                                 onBack = { nav.pop() },
+                            )
+                            Screen.Catalog -> CatalogScreen(
+                                onOpenTitle = { id, isTv -> nav.push(Screen.Details(id, isTv)) },
                             )
                             Screen.History -> HistoryScreen(
                                 onOpenTitle = { id, isTv -> nav.push(Screen.Details(id, isTv)) },

@@ -7,6 +7,9 @@ sealed interface Screen {
     data object Search : Screen
     data object History : Screen
 
+    /** Parcours du catalogue TMDB par genre (distinct de la recherche par texte). */
+    data object Catalog : Screen
+
     /**
      * Fiche d'un titre. Si [autoSources] est vrai (reprise depuis l'accueil),
      * le panneau des sources s'ouvre directement — sur [resumeSeason]/[resumeEpisode]

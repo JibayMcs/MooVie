@@ -25,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
@@ -64,6 +65,7 @@ import fr.moovie.tv.data.tmdb.TmdbItem
 import fr.moovie.tv.data.watch.ResumeEntry
 import fr.moovie.tv.data.watch.WatchlistEntry
 import fr.moovie.tv.resources.Res
+import fr.moovie.tv.resources.catalog_open
 import fr.moovie.tv.resources.common_loading
 import fr.moovie.tv.resources.history_title
 import fr.moovie.tv.resources.home_continue_watching
@@ -103,6 +105,7 @@ fun HomeScreenContent(
     onOpenSettings: () -> Unit,
     onOpenSearch: () -> Unit,
     onOpenHistory: () -> Unit,
+    onOpenCatalog: () -> Unit,
     onRemoveResume: (String) -> Unit,
     onMarkResumeWatched: (String) -> Unit,
     watchlist: List<WatchlistEntry> = emptyList(),
@@ -196,6 +199,15 @@ fun HomeScreenContent(
                         onClick = onOpenSearch,
                         icon = Icons.Default.Search,
                         contentDescription = stringResource(Res.string.home_search),
+                        modifier = headerDown,
+                    )
+                    // Parcourir par genre : geste distinct de la recherche par
+                    // titre, d'où un bouton à part plutôt qu'un onglet caché
+                    // derrière le champ de saisie.
+                    MoovieIconButton(
+                        onClick = onOpenCatalog,
+                        icon = Icons.Default.GridView,
+                        contentDescription = stringResource(Res.string.catalog_open),
                         modifier = headerDown,
                     )
                     // Entre la loupe et l'engrenage : le focus par défaut de la

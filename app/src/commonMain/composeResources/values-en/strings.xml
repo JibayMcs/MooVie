@@ -184,4 +184,7 @@
         <item quantity="one">%1$d catalogue</item>
         <item quantity="other">%1$d catalogues</item>
     </plurals>
+    <string name="catalog_title">Catalogue</string>
+    <string name="catalog_pick_genre">Pick a genre on the left to browse the catalogue.</string>
+    <string name="catalog_open">Catalogue</string>
 </resources>
