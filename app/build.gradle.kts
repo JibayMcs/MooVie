@@ -13,7 +13,7 @@ plugins {
 
 // Version unique Android + desktop (l'updater compare les tags GitHub à cette
 // valeur ; côté desktop elle est injectée en propriété système moovie.version).
-val appVersion = "1.8.0"
+val appVersion = "1.9.0"
 
 // Signature release : keystore.properties en local (gitignoré), variables
 // d'environnement en CI (KEYSTORE_FILE / KEYSTORE_PASSWORD / KEY_ALIAS).
@@ -141,7 +141,7 @@ android {
         applicationId = "fr.moovie.tv"
         minSdk = 23
         targetSdk = 34
-        versionCode = 19
+        versionCode = 20
         versionName = appVersion
     }
 
