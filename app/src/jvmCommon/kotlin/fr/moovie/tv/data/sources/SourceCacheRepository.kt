@@ -3,6 +3,7 @@ package fr.moovie.tv.data.sources
 import fr.moovie.tv.core.sources.model.EmbedLink
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
+import fr.moovie.tv.core.sources.usecase.isCacheComplete
 import fr.moovie.tv.data.store.preferencesStore
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.Serializable
@@ -24,7 +25,19 @@ private const val TTL_MS = 6L * 60 * 60 * 1000
 private const val MAX_ENTRIES = 80
 
 @Serializable
-private data class CachedSources(val links: List<EmbedLink>, val savedAt: Long)
+private data class CachedSources(
+    val links: List<EmbedLink>,
+    val savedAt: Long,
+    /**
+     * Catalogues **interrogés** pour produire cette entrée — pas seulement ceux
+     * qui ont rendu quelque chose. Sans ça, une entrée écrite avant l'ajout d'un
+     * provider (ou pendant qu'il était désactivé) resservait indéfiniment sa
+     * liste amputée : le catalogue neuf n'était jamais consulté sur les fiches
+     * déjà visitées, et l'utilisateur gardait la redondance de l'ancienne
+     * version. Vide = entrée d'une version antérieure, à refaire.
+     */
+    val providers: List<String> = emptyList(),
+)
 
 /**
  * Cache disque des liens d'embed trouvés par les providers, indexé par clé de
@@ -39,21 +52,36 @@ class SourceCacheRepository {
     private val store = preferencesStore("moovie_sources_cache")
     private val json = Json { ignoreUnknownKeys = true }
 
-    /** Liens en cache pour cette clé, ou null si absent / périmé. */
-    suspend fun get(key: String): List<EmbedLink>? {
+    /**
+     * Liens en cache pour cette clé, ou null si absent, périmé, ou **incomplet**.
+     *
+     * Incomplet = [expectedProviders] contient un catalogue que l'entrée n'a pas
+     * interrogé. C'est le cas juste après une mise à jour qui ajoute un provider,
+     * ou quand l'utilisateur en réactive un : resservir l'entrée telle quelle
+     * masquerait le nouveau catalogue pendant toute la durée de vie du cache.
+     */
+    suspend fun get(key: String, expectedProviders: Set<String> = emptySet()): List<EmbedLink>? {
         if (key.isBlank()) return null
         val raw = store.data.first()[stringPreferencesKey(ENTRY_PREFIX + key)] ?: return null
         val entry = runCatching { json.decodeFromString<CachedSources>(raw) }.getOrNull() ?: return null
         if (System.currentTimeMillis() - entry.savedAt > TTL_MS) return null
+        if (!isCacheComplete(entry.providers, expectedProviders)) return null
         return entry.links.ifEmpty { null }
     }
 
-    /** Mémorise les liens d'une fiche (ignoré si la recherche n'a rien donné). */
-    suspend fun put(key: String, links: List<EmbedLink>) {
+    /**
+     * Mémorise les liens d'une fiche (ignoré si la recherche n'a rien donné).
+     *
+     * [providers] est l'ensemble **interrogé**, catalogues muets compris : un
+     * provider qui n'a rien pour ce titre a quand même fait son travail, et
+     * l'exclure ferait rejeter l'entrée à chaque relecture.
+     */
+    suspend fun put(key: String, links: List<EmbedLink>, providers: Set<String> = emptySet()) {
         if (key.isBlank() || links.isEmpty()) return
         store.edit { prefs ->
-            prefs[stringPreferencesKey(ENTRY_PREFIX + key)] =
-                json.encodeToString(CachedSources(links, System.currentTimeMillis()))
+            prefs[stringPreferencesKey(ENTRY_PREFIX + key)] = json.encodeToString(
+                CachedSources(links, System.currentTimeMillis(), providers.sorted()),
+            )
             prune(prefs)
         }
     }

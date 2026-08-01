@@ -428,11 +428,25 @@ class DetailsViewModel : ViewModel() {
         // l'obligation d'appuyer deux fois sur OK pour lancer un épisode.
         _sources.value = SourcesState.Active(links = emptyList(), providers = emptyList())
         viewModelScope.launch {
+            // Réglages utilisateur : providers désactivés + ordre de priorité.
+            // Lus AVANT le cache : une entrée n'est resservie que si elle a
+            // interrogé tous les catalogues actifs aujourd'hui, sinon une mise à
+            // jour qui en ajoute un resterait invisible sur les fiches déjà vues.
+            val disabled = settings.disabledProviders.first()
+            val order = settings.providerOrder.first()
+            val providers = ProviderRegistry.all
+                .filter { it.name !in disabled }
+                .sortedBy { p ->
+                    order.indexOf(p.name).let { if (it == -1) order.size + ProviderRegistry.all.indexOf(p) else it }
+                }
+            val rank = providers.mapIndexed { i, p -> p.name to i }.toMap()
+            val expected = providers.map { it.name }.toSet()
+
             // Fiche déjà consultée : on ressert les liens connus au lieu de
             // réinterroger les providers (plusieurs secondes). Le flux jouable,
             // lui, sera de toute façon ré-extrait au moment de lire.
             if (!skipCache) {
-                val cached = sourceCache.get(cacheKey)
+                val cached = sourceCache.get(cacheKey, expected)
                 val cachedProviders = cached?.mapNotNull { it.provider }?.distinct().orEmpty()
                 if (cached != null && cachedProviders.isNotEmpty()) {
                     if (generation != loadGeneration) return@launch
@@ -444,16 +458,6 @@ class DetailsViewModel : ViewModel() {
                     return@launch
                 }
             }
-
-            // Réglages utilisateur : providers désactivés + ordre de priorité.
-            val disabled = settings.disabledProviders.first()
-            val order = settings.providerOrder.first()
-            val providers = ProviderRegistry.all
-                .filter { it.name !in disabled }
-                .sortedBy { p ->
-                    order.indexOf(p.name).let { if (it == -1) order.size + ProviderRegistry.all.indexOf(p) else it }
-                }
-            val rank = providers.mapIndexed { i, p -> p.name to i }.toMap()
             if (generation != loadGeneration) return@launch
             _sources.value = SourcesState.Active(
                 links = emptyList(),
@@ -492,8 +496,15 @@ class DetailsViewModel : ViewModel() {
             }
 
             if (generation != loadGeneration) return@launch
-            val found = (_sources.value as? SourcesState.Active)?.links.orEmpty()
-            sourceCache.put(cacheKey, found)
+            val active = _sources.value as? SourcesState.Active
+            // Seuls les catalogues qui ont *répondu* comptent comme interrogés :
+            // enregistrer un provider tombé en panne (timeout, domaine mort)
+            // figerait son absence dans le cache, et la fiche resterait amputée
+            // pendant six heures alors qu'il est peut-être déjà revenu.
+            val answered = active?.providers.orEmpty()
+                .filter { it.status == ProviderStatus.DONE || it.status == ProviderStatus.EMPTY }
+                .map { it.name }.toSet()
+            sourceCache.put(cacheKey, active?.links.orEmpty(), answered)
         }
     }
 
