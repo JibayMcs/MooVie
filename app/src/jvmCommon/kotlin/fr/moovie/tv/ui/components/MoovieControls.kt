@@ -34,6 +34,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.Key
@@ -213,7 +215,20 @@ fun MoovieCard(
     val confirm = remember { ConfirmKeyPress() }
     val scope = rememberCoroutineScope()
     DisposableEffect(confirm) { onDispose { confirm.reset() } }
-    val longPressKeys = if (onLongClick == null) {
+
+    // Le menu qui va s'ouvrir détruira ce nœud : on note où rendre le focus
+    // à sa fermeture, sans quoi il repart en haut de l'écran (voir
+    // [MoovieFocusMemory]). Vaut pour l'appui long télécommande comme souris.
+    val selfFocus = remember { FocusRequester() }
+    val focusMemory = LocalMoovieFocusMemory.current
+    val openMenu = onLongClick?.let {
+        {
+            focusMemory.capture(selfFocus)
+            it()
+        }
+    }
+
+    val longPressKeys = if (openMenu == null) {
         Modifier
     } else {
         Modifier.onPreviewKeyEvent { event ->
@@ -234,7 +249,7 @@ fun MoovieCard(
                 KeyEventType.KeyUp -> {
                     val long = confirm.downs >= LONG_PRESS_DOWNS
                     confirm.reset()
-                    if (long) onLongClick()
+                    if (long) openMenu()
                     long
                 }
                 else -> false
@@ -252,11 +267,12 @@ fun MoovieCard(
             .background(Color(0xFF181818))
             .then(if (active) Modifier.border(3.dp, MOOVIE_ACCENT, shape) else Modifier)
             .then(longPressKeys)
+            .focusRequester(selfFocus)
             .combinedClickable(
                 interactionSource = interaction,
                 indication = null,
                 onClick = onClick,
-                onLongClick = onLongClick,
+                onLongClick = openMenu,
             ),
     ) {
         CompositionLocalProvider(LocalMoovieCardActive provides active) {

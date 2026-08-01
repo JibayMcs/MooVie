@@ -60,6 +60,7 @@ import fr.moovie.tv.resources.history_unknown_title
 import fr.moovie.tv.resources.history_yesterday
 import fr.moovie.tv.resources.mark_unwatched
 import fr.moovie.tv.resources.watchlist_open
+import fr.moovie.tv.ui.components.LocalMoovieFocusMemory
 import fr.moovie.tv.ui.components.MOOVIE_ACCENT
 import fr.moovie.tv.ui.components.MoovieButton
 import fr.moovie.tv.ui.components.MoovieCard
@@ -97,6 +98,9 @@ fun HistoryScreenContent(
     showBackButton: Boolean = false,
 ) {
     var menuFor by remember { mutableStateOf<HistoryEntry?>(null) }
+    // Voir MoovieFocusMemory : sans ça, fermer le menu renvoyait le focus
+    // en haut de page et obligeait à re-défiler jusqu'à la vignette visée.
+    val focusMemory = LocalMoovieFocusMemory.current
     // Le focus arrive sur la 1re vignette : sans ça il resterait nulle part et
     // le premier appui sur le D-pad serait perdu. L'historique arrive après la
     // première composition (flux DataStore) : on retente tant que la grille
@@ -171,7 +175,7 @@ fun HistoryScreenContent(
         menuFor?.let { entry ->
             HistoryMenuDialog(
                 entry = entry,
-                onDismiss = { menuFor = null },
+                onDismiss = { menuFor = null; focusMemory.restore() },
                 onOpen = { onOpenTitle(entry.tmdbId, entry.isTv) },
                 onRemove = { onRemove(entry.key) },
                 onMarkUnwatched = { onMarkUnwatched(entry.key) },

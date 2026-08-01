@@ -80,6 +80,7 @@ import fr.moovie.tv.resources.watchlist_add
 import fr.moovie.tv.resources.watchlist_open
 import fr.moovie.tv.resources.watchlist_remove
 import fr.moovie.tv.resources.watchlist_row
+import fr.moovie.tv.ui.components.LocalMoovieFocusMemory
 import fr.moovie.tv.ui.components.MOOVIE_ACCENT
 import fr.moovie.tv.ui.components.MoovieButton
 import fr.moovie.tv.ui.components.MoovieCard
@@ -120,6 +121,9 @@ fun HomeScreenContent(
     val firstContentFocus = remember { FocusRequester() }
     // Entrée du rail dont le menu contextuel (appui long) est ouvert.
     var resumeMenuFor by remember { mutableStateOf<ResumeEntry?>(null) }
+    // Rend le focus à la carte qui a ouvert le menu, plutôt que de le laisser
+    // repartir sur le premier bouton de l'en-tête.
+    val focusMemory = LocalMoovieFocusMemory.current
 
     val rows = (state as? HomeState.Ready)?.rows
     // Valeur par défaut = ce qui prendra le focus en premier. Sans ça le hero
@@ -278,7 +282,7 @@ fun HomeScreenContent(
             CatalogMenuDialog(
                 title = item.displayTitle,
                 inWatchlist = key in watchlistKeys,
-                onDismiss = { catalogMenuFor = null },
+                onDismiss = { catalogMenuFor = null; focusMemory.restore() },
                 onToggle = {
                     if (key in watchlistKeys) onRemoveFromWatchlist(key) else onAddToWatchlist(item)
                 },
@@ -288,7 +292,7 @@ fun HomeScreenContent(
         watchlistMenuFor?.let { entry ->
             WatchlistMenuDialog(
                 entry = entry,
-                onDismiss = { watchlistMenuFor = null },
+                onDismiss = { watchlistMenuFor = null; focusMemory.restore() },
                 onOpen = { onOpenTitle(entry.tmdbId, entry.isTv) },
                 onRemove = { onRemoveFromWatchlist(entry.key) },
             )
@@ -297,7 +301,7 @@ fun HomeScreenContent(
         resumeMenuFor?.let { entry ->
             ResumeMenuDialog(
                 entry = entry,
-                onDismiss = { resumeMenuFor = null },
+                onDismiss = { resumeMenuFor = null; focusMemory.restore() },
                 onRemove = { onRemoveResume(entry.key) },
                 onMarkWatched = { onMarkResumeWatched(entry.key) },
             )
