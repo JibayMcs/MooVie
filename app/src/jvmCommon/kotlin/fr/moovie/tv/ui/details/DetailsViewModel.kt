@@ -164,6 +164,14 @@ class DetailsViewModel : ViewModel() {
         .map { list -> list.associateBy { it.key } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
+    /**
+     * Épisode à reprendre pour la série affichée. Conservé au-delà du
+     * chargement initial : changer de saison à la main ne doit pas déplacer le
+     * repère sur un épisode qui n'a rien à voir, ni le faire disparaître quand
+     * on revient sur la bonne saison.
+     */
+    private var resumeTarget: EpisodeRef? = null
+
     /** Métadonnées du contenu en cours de résolution, persistées quand la lecture démarre. */
     private var pendingMeta: ResumeEntry? = null
 
@@ -198,6 +206,7 @@ class DetailsViewModel : ViewModel() {
         playingLink = null
         this.tmdbId = tmdbId
         this.isTv = isTv
+        resumeTarget = null
         viewModelScope.launch {
             val apiKey = settings.tmdbApiKey.first()
             if (apiKey.isBlank()) {
@@ -241,6 +250,7 @@ class DetailsViewModel : ViewModel() {
                     // premier de la nouvelle saison.
                     val focusEpisode =
                         if (season == target.season) target.episode.coerceAtMost(eps.size) else 1
+                    resumeTarget = EpisodeRef(season, focusEpisode)
                     DetailsState.Tv(d, season, eps, resumeEpisode = focusEpisode)
                 } else {
                     DetailsState.Movie(repo.movieDetails(apiKey, tmdbId))
@@ -288,7 +298,16 @@ class DetailsViewModel : ViewModel() {
             val apiKey = settings.tmdbApiKey.first()
             val repo = TmdbRepository(currentTmdbLanguage())
             runCatching { repo.season(apiKey, tmdbId, season).episodes }
-                .onSuccess { _state.value = tv.copy(season = season, episodes = it) }
+                .onSuccess {
+                    // Le repère ne vaut que pour la saison où l'on s'était
+                    // arrêté : ailleurs, il désignerait un épisode au hasard.
+                    val target = resumeTarget
+                    _state.value = tv.copy(
+                        season = season,
+                        episodes = it,
+                        resumeEpisode = if (target?.season == season) target.episode else 0,
+                    )
+                }
         }
     }
 

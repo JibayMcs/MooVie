@@ -51,6 +51,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
@@ -153,9 +154,34 @@ fun DetailsScreenContent(
     showBackButton: Boolean = false,
 ) {
     val primaryFocus = remember { FocusRequester() }
+    val resumeEpisodeFocus = remember { FocusRequester() }
+
+    // Série reprise en cours : le focus descend sur l'épisode à suivre plutôt
+    // que de rester sur la rangée des saisons — sinon on arrive avec « S1 »
+    // sélectionné alors que la liste affiche une tout autre saison, et il faut
+    // redescendre à la main jusqu'à l'épisode qu'on venait voir.
+    //
+    // Une seule fois par fiche : changer de saison ensuite est un geste
+    // délibéré, et lui reprendre le focus serait insupportable.
+    val seriesId = (state as? DetailsState.Tv)?.details?.id
+    var autoFocusDone by remember(seriesId) { mutableStateOf(false) }
+
     // Le focus est aussi replacé quand on entre/sort d'une fiche d'épisode :
     // le bouton porteur de `primaryFocus` change de nœud à ce moment-là.
     LaunchedEffect(state, selectedEpisode) {
+        val tv = state as? DetailsState.Tv
+        val wantsEpisode = tv != null && tv.resumeEpisode > 0 && selectedEpisode == null && !autoFocusDone
+        if (wantsEpisode) {
+            // La liste d'épisodes n'est pas encore posée au moment où l'état
+            // change : on retente le temps qu'elle le soit.
+            repeat(10) {
+                if (runCatching { resumeEpisodeFocus.requestFocus() }.isSuccess) {
+                    autoFocusDone = true
+                    return@LaunchedEffect
+                }
+                delay(50)
+            }
+        }
         if (state is DetailsState.Movie || state is DetailsState.Tv) {
             runCatching { primaryFocus.requestFocus() }
         }
@@ -344,11 +370,17 @@ fun DetailsScreenContent(
                         Text(stringResource(Res.string.details_episodes_season, s.season), style = MaterialTheme.typography.titleMedium, modifier = hPad)
                         s.episodes.forEach { ep ->
                             val key = episodeKey(s.season, ep.episodeNumber)
+                            val isNext = ep.episodeNumber == s.resumeEpisode
                             Box(modifier = hPad) {
                                 EpisodeRow(
                                     ep = ep,
                                     isWatched = key in watched,
-                                    isNext = ep.episodeNumber == s.resumeEpisode,
+                                    isNext = isNext,
+                                    modifier = if (isNext) {
+                                        Modifier.focusRequester(resumeEpisodeFocus)
+                                    } else {
+                                        Modifier
+                                    },
                                     progress = resume[key]?.progress,
                                     // OK = fiche de l'épisode (comme un film) ;
                                     // OK long = bascule vu / non vu.
@@ -922,19 +954,16 @@ private fun EpisodeRow(
     progress: Float?,
     onOpen: () -> Unit,
     onToggleWatched: () -> Unit,
-    /**
-     * Épisode à reprendre ou à suivre. Repéré par une pastille plutôt que par le
-     * focus : à l'arrivée sur une fiche, le focus doit rester sur l'action
-     * principale, pas descendre au milieu de la liste.
-     */
+    /** Épisode à reprendre ou à suivre : barre accent, et cible du focus d'arrivée. */
     isNext: Boolean = false,
+    modifier: Modifier = Modifier,
 ) {
     // OK → fiche de l'épisode ; OK long → bascule vu/non vu.
     MoovieCard(
         onClick = onOpen,
         onLongClick = onToggleWatched,
         focusedScale = 1.02f,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(8.dp),
