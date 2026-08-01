@@ -60,6 +60,11 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
@@ -334,11 +339,24 @@ fun DetailsScreenContent(
                                 contentPadding = PaddingValues(horizontal = 48.dp),
                             ) {
                                 itemsIndexed(s.details.seasons.filter { it.seasonNumber > 0 }) { index, season ->
+                                    val isCurrent = season.seasonNumber == s.season
                                     MoovieButton(
                                         onClick = { onSelectSeason(season.seasonNumber) },
-                                        modifier = if (index == 0) Modifier.focusRequester(primaryFocus) else Modifier,
+                                        // La saison affichée se lit au soulignement,
+                                        // comme partout ailleurs. Le « ● » collé au
+                                        // libellé était un marqueur d'avant le thème :
+                                        // deux langages pour un même état.
+                                        selected = isCurrent,
+                                        // Et le focus arrive sur elle, pas sur S1 —
+                                        // sinon on remonte des saisons pour se
+                                        // retrouver au début d'une série qu'on suit.
+                                        modifier = if (isCurrent) {
+                                            Modifier.focusRequester(primaryFocus)
+                                        } else {
+                                            Modifier
+                                        },
                                     ) {
-                                        Text(if (season.seasonNumber == s.season) "● S${season.seasonNumber}" else "S${season.seasonNumber}")
+                                        Text("S${season.seasonNumber}")
                                     }
                                 }
                                 // En fin de rangée (atteignable au D-pad) : œil = marquer la
@@ -368,10 +386,29 @@ fun DetailsScreenContent(
                             }
                         }
                         Text(stringResource(Res.string.details_episodes_season, s.season), style = MaterialTheme.typography.titleMedium, modifier = hPad)
+                        val firstEpisode = s.episodes.firstOrNull()?.episodeNumber
                         s.episodes.forEach { ep ->
                             val key = episodeKey(s.season, ep.episodeNumber)
                             val isNext = ep.episodeNumber == s.resumeEpisode
-                            Box(modifier = hPad) {
+                            // Remonter depuis le 1er épisode va sur la saison
+                            // *affichée*, pas sur S1 : la recherche de focus
+                            // native prend le voisin le plus proche et renverrait
+                            // au début d'une série suivie depuis des saisons.
+                            // Même remède que la descente en-tête → contenu.
+                            val upToSeason = if (ep.episodeNumber == firstEpisode) {
+                                Modifier.onPreviewKeyEvent { event ->
+                                    if (event.type == KeyEventType.KeyDown &&
+                                        event.key == Key.DirectionUp
+                                    ) {
+                                        runCatching { primaryFocus.requestFocus() }.isSuccess
+                                    } else {
+                                        false
+                                    }
+                                }
+                            } else {
+                                Modifier
+                            }
+                            Box(modifier = hPad.then(upToSeason)) {
                                 EpisodeRow(
                                     ep = ep,
                                     isWatched = key in watched,

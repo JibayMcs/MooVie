@@ -669,7 +669,13 @@ fun PlayerOptionsDialog(sections: List<PlayerOptionSection>, onDismiss: () -> Un
             section.options.forEach { add(DialogRow.Item(it)) }
         }
     }
-    val firstItemIndex = rows.indexOfFirst { it is DialogRow.Item }
+    // Le focus va sur l'option **active** (la vitesse en cours, la piste
+    // choisie), pas sur la première de la liste : c'est de là qu'on veut
+    // repartir. À défaut d'option active, la première fait l'affaire.
+    val focusItemIndex = rows
+        .indexOfFirst { it is DialogRow.Item && it.option.selected }
+        .takeIf { it >= 0 }
+        ?: rows.indexOfFirst { it is DialogRow.Item }
 
     Dialog(onDismissRequest = onDismiss) {
         Column(
@@ -697,7 +703,7 @@ fun PlayerOptionsDialog(sections: List<PlayerOptionSection>, onDismiss: () -> Un
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .then(
-                                    if (index == firstItemIndex) {
+                                    if (index == focusItemIndex) {
                                         Modifier.focusRequester(firstOption)
                                     } else {
                                         Modifier

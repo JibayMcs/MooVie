@@ -67,6 +67,10 @@ fun <T> MoovieSelect(
             ) {
                 Text(title, style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.height(4.dp))
+                // Le focus atterrit sur l'option **retenue**, pas sur la
+                // première de la liste : à l'ouverture on veut voir où l'on en
+                // est, et changer d'un cran — pas repartir du début et compter.
+                val focusIndex = options.indexOf(selected).takeIf { it >= 0 } ?: 0
                 options.forEachIndexed { index, option ->
                     val isSelected = option == selected
                     MoovieButton(
@@ -77,7 +81,7 @@ fun <T> MoovieSelect(
                         selected = isSelected,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .then(if (index == 0) Modifier.focusRequester(firstFocus) else Modifier),
+                            .then(if (index == focusIndex) Modifier.focusRequester(firstFocus) else Modifier),
                     ) {
                         if (isSelected) {
                             Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
