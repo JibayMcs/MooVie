@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -86,6 +87,7 @@ import fr.moovie.tv.ui.components.MoovieCard
 import fr.moovie.tv.ui.components.MoovieIconButton
 import fr.moovie.tv.ui.components.MoovieMarqueeText
 import fr.moovie.tv.ui.components.MoovieRail
+import fr.moovie.tv.ui.components.scrollAsWholeBlock
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -160,13 +162,21 @@ fun HomeScreenContent(
         // Marges horizontales portées par les enfants (contentPadding pour les
         // rangées) : les conteneurs scrollables s'étendent jusqu'aux bords de
         // l'écran et ne rognent plus les cartes/boutons agrandis par le focus.
-        Column(modifier = Modifier.fillMaxSize().padding(vertical = 32.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 32.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text("Moo-vie", style = MaterialTheme.typography.headlineMedium)
+        // Marges verticales resserrées : chaque dp repris ici va au bloc
+        // « titre + rangée », qui doit tenir en entier sous un héros fixe.
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(top = 32.dp, bottom = 16.dp),
+        ) {
+            // Le wordmark « Moo-vie » et sa rangée dédiée sont partis : ils
+            // coûtaient ~56 dp de haut pour une information qu'on connaît déjà
+            // (on est dans l'app). Récupérés, ils laissent enfin passer une
+            // rangée d'affiches entière sous un héros qui, lui, reste fixe.
+            // Les boutons se posent en surimpression du héros, dans sa moitié
+            // droite restée vide.
+            Box(modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                if (state is HomeState.Ready) Hero(featured)
                 // Descente explicite depuis l'en-tête : la 1re carte est hors du
                 // faisceau vertical du D-pad, la recherche de focus native échoue.
                 val headerDown = Modifier.onPreviewKeyEvent { event ->
@@ -176,7 +186,10 @@ fun HomeScreenContent(
                         false
                     }
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(
+                    modifier = Modifier.align(Alignment.TopEnd).padding(horizontal = 32.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
                     MoovieIconButton(
                         onClick = onOpenSearch,
                         icon = Icons.Default.Search,
@@ -208,17 +221,7 @@ fun HomeScreenContent(
                     )
                 }
             }
-            Spacer(Modifier.height(16.dp))
-
-            // Le hero décrit la carte focalisée : il doit rester visible pendant
-            // qu'on déplace ce focus. Dans la liste défilante, il partait vers le
-            // haut dès la première rangée franchie — l'information n'était donc
-            // jamais là au moment où elle sert. Il est désormais fixe sous
-            // l'en-tête, et ce sont les rangées qui défilent dessous.
-            if (state is HomeState.Ready) {
-                Hero(featured)
-                Spacer(Modifier.height(24.dp))
-            }
+            Spacer(Modifier.height(if (state is HomeState.Ready) 12.dp else 16.dp))
 
             when (val s = state) {
                 HomeState.Loading -> Text(stringResource(Res.string.common_loading), modifier = Modifier.padding(horizontal = 32.dp))
@@ -326,7 +329,12 @@ private sealed interface HeroTarget {
  * Hauteur fixe : le hero est le 1er élément d'une LazyColumn, une hauteur
  * variable ferait sauter toutes les rangées au changement de focus.
  */
-private val HERO_HEIGHT = 176.dp
+/**
+ * Hauteur du héros. Calibrée pour qu'une rangée d'affiches entière tienne
+ * dessous en 1080p (540 dp de haut) : héros + marges + rangée = l'écran. La
+ * rallonger recoupe les affiches en bas, ce qui était le défaut d'origine.
+ */
+private val HERO_HEIGHT = 148.dp
 
 @Composable
 private fun Hero(target: HeroTarget?, modifier: Modifier = Modifier) {
@@ -361,12 +369,17 @@ private fun CatalogHero(item: TmdbItem) {
             }
         }
         Spacer(Modifier.height(10.dp))
-        Box(modifier = Modifier.fillMaxWidth(0.6f)) {
+        // Pleine largeur : à 60 % le synopsis se coupait au milieu d'une phrase
+        // alors que la moitié droite de l'écran était vide.
+        Box(modifier = Modifier.fillMaxWidth()) {
             Text(
                 item.overview.orEmpty(),
                 style = MaterialTheme.typography.bodyLarge,
                 color = Color(0xFFDDDDDD),
-                maxLines = 3,
+                // Deux lignes sur toute la largeur portent plus de texte que
+                // trois sur 60 % : on ne perd rien, et la rangée d'affiches
+                // récupère la hauteur qui lui manquait.
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
         }
@@ -377,7 +390,7 @@ private fun CatalogHero(item: TmdbItem) {
 @Composable
 private fun ResumeHero(entry: ResumeEntry) {
     val remaining = formatDuration(((entry.durationMs - entry.positionMs) / 60_000).toInt())
-    Column {
+    Column(modifier = Modifier.scrollAsWholeBlock()) {
         Text(
             stringResource(Res.string.home_continue_watching),
             style = MaterialTheme.typography.titleMedium,
@@ -560,7 +573,7 @@ private fun CatalogRow(
     onMenu: (TmdbItem) -> Unit = {},
     firstFocus: FocusRequester? = null,
 ) {
-    Column {
+    Column(modifier = Modifier.scrollAsWholeBlock()) {
         Text(
             text = row.title,
             style = MaterialTheme.typography.titleLarge,
@@ -672,7 +685,7 @@ private fun WatchlistRow(
     onMenu: (WatchlistEntry) -> Unit,
     firstFocus: FocusRequester? = null,
 ) {
-    Column {
+    Column(modifier = Modifier.scrollAsWholeBlock()) {
         Text(
             stringResource(Res.string.watchlist_row),
             style = MaterialTheme.typography.titleLarge,

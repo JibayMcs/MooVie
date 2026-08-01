@@ -52,16 +52,20 @@ import kotlinx.coroutines.launch
  * l'impression que les rangées du dessus « sautent » pendant qu'on parcourt
  * celle du dessous.
  *
- * On intercepte donc la demande à hauteur de la rangée et on ne transmet plus le
- * rectangle de la carte, mais **celui de la rangée entière**. Rangée déjà
- * visible → le parent n'a rien à faire, donc plus aucun mouvement vertical.
- * Rangée partiellement hors écran (on descend d'une rangée à l'autre) → le
- * parent défile pour la montrer, ce qui est exactement le comportement voulu.
- * C'est pour ça qu'on ne se contente pas d'ignorer la demande.
+ * On intercepte donc la demande et on ne transmet plus au parent le rectangle de
+ * l'élément focalisé, mais **celui du bloc entier**. Bloc déjà visible → le
+ * parent n'a rien à faire, donc plus aucun mouvement vertical. Bloc
+ * partiellement hors écran (on descend d'une rangée à l'autre) → le parent
+ * défile pour le montrer, ce qui est exactement le comportement voulu. C'est
+ * pour ça qu'on ne se contente pas d'ignorer la demande.
+ *
+ * À poser aussi **autour du titre + rangée**, pas seulement autour de la
+ * `LazyRow` : sinon le parent ne connaît que les cartes, et sous un en-tête fixe
+ * le titre de la rangée se retrouve rogné juste au-dessus du bord.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun Modifier.keepVerticalStill(): Modifier {
+fun Modifier.scrollAsWholeBlock(): Modifier {
     var size by remember { mutableStateOf(IntSize.Zero) }
     val responder = remember {
         object : BringIntoViewResponder {
@@ -101,7 +105,7 @@ fun MoovieRail(
     row: @Composable () -> Unit,
 ) {
     if (!isPointerUi) {
-        Box(modifier = modifier.keepVerticalStill()) { row() }
+        Box(modifier = modifier.scrollAsWholeBlock()) { row() }
         return
     }
 
@@ -120,7 +124,7 @@ fun MoovieRail(
 
     Box(
         modifier = modifier
-            .keepVerticalStill()
+            .scrollAsWholeBlock()
             .hoverable(hoverSource)
             .onPreviewKeyEvent { event ->
                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
