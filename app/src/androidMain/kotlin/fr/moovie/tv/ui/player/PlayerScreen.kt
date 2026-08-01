@@ -604,6 +604,8 @@ fun PlayerScreen(
         }
 
         // Pastille de mise à jour, en haut à droite (le titre occupe la gauche).
+        // L'horloge occupe ce même coin : la pastille se pose alors *sous* elle,
+        // sinon les deux se superposent et deviennent illisibles.
         if (showUpdateChip && updateVersion != null) {
             PlayerUpdateChip(
                 version = updateVersion,
@@ -613,7 +615,7 @@ fun PlayerScreen(
                 },
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(end = 48.dp, top = 32.dp),
+                    .padding(end = 48.dp, top = if (clock != null) 76.dp else 32.dp),
             )
         }
 
