@@ -3,11 +3,11 @@ package fr.moovie.tv.data.sources
 import fr.moovie.tv.core.sources.model.EmbedLink
 import fr.moovie.tv.core.sources.model.PlayableStream
 import fr.moovie.tv.core.sources.model.StreamFormat
+import fr.moovie.tv.core.sources.port.HttpGateway
+import fr.moovie.tv.core.sources.port.getBody
 import fr.moovie.tv.core.sources.port.SourceExtractor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
-import okhttp3.Request
 
 /**
  * Extracteur uqload — port de uqload_utils.py + _extract_uqload_media_url
@@ -17,7 +17,7 @@ import okhttp3.Request
  * **HLS** (master.m3u8) en plus du MP4, dé-package Dean Edwards, et en-têtes
  * Referer/Origin alignés sur le domaine réel du lien.
  */
-class UqloadExtractor(private val http: OkHttpClient) : SourceExtractor {
+class UqloadExtractor(private val http: HttpGateway) : SourceExtractor {
 
     override val hoster = "uqload"
 
@@ -30,16 +30,15 @@ class UqloadExtractor(private val http: OkHttpClient) : SourceExtractor {
         val candidates = listOf(validated, validated.replace("/embed-", "/"))
 
         val html = candidates.firstNotNullOfOrNull { url ->
-            runCatching {
-                val req = Request.Builder()
-                    .url(url)
-                    .header("User-Agent", Ua.BROWSER)
-                    .header("Accept", "text/html,*/*")
-                    .header("Referer", "$origin/")
-                    .header("Origin", origin)
-                    .build()
-                http.newCall(req).execute().use { if (it.isSuccessful) it.body?.string() else null }
-            }.getOrNull()
+            http.getBody(
+                url,
+                mapOf(
+                    "User-Agent" to Ua.BROWSER,
+                    "Accept" to "text/html,*/*",
+                    "Referer" to "$origin/",
+                    "Origin" to origin,
+                ),
+            )
         } ?: return@withContext null
 
         if ("File was deleted" in html) return@withContext null

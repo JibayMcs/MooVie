@@ -3,6 +3,8 @@ package fr.moovie.tv.data.sources
 import fr.moovie.tv.core.sources.model.EmbedLink
 import fr.moovie.tv.core.sources.model.PlayableStream
 import fr.moovie.tv.core.sources.model.StreamFormat
+import fr.moovie.tv.core.sources.port.HttpGateway
+import fr.moovie.tv.core.sources.port.getBody
 import fr.moovie.tv.core.sources.port.SourceExtractor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -10,8 +12,6 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
-import okhttp3.OkHttpClient
-import okhttp3.Request
 import javax.crypto.Cipher
 import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.SecretKeySpec
@@ -21,7 +21,7 @@ import javax.crypto.spec.SecretKeySpec
  * Appelle l'API `/api/v1/video`, qui renvoie un hex chiffré AES-CBC ; on
  * déchiffre (clé/IV statiques) et on lit l'URL m3u8 dans le JGON (`cf`/`source`).
  */
-class SeekStreamingExtractor(private val http: OkHttpClient) : SourceExtractor {
+class SeekStreamingExtractor(private val http: HttpGateway) : SourceExtractor {
 
     override val hoster = "seekstreaming"
 
@@ -36,15 +36,15 @@ class SeekStreamingExtractor(private val http: OkHttpClient) : SourceExtractor {
             val videoId = extractVideoId(link.url) ?: return@runCatching null
             val apiUrl = "https://$domain/api/v1/video?id=$videoId&w=1920&h=1080&r="
 
-            val req = Request.Builder()
-                .url(apiUrl)
-                .header("User-Agent", Ua.BROWSER)
-                .header("Accept", "*/*")
-                .header("Referer", "https://$domain/")
-                .header("Origin", "https://$domain")
-                .build()
-            val hex = http.newCall(req).execute().use { if (it.isSuccessful) it.body?.string() else null }
-                ?.trim()?.trim('"') ?: return@runCatching null
+            val hex = http.getBody(
+                apiUrl,
+                mapOf(
+                    "User-Agent" to Ua.BROWSER,
+                    "Accept" to "*/*",
+                    "Referer" to "https://$domain/",
+                    "Origin" to "https://$domain",
+                ),
+            )?.trim()?.trim('"') ?: return@runCatching null
 
             val decrypted = decrypt(hex) ?: return@runCatching null
             val obj = json.parseToJsonElement(decrypted).jsonObject

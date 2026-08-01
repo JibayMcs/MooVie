@@ -3,13 +3,10 @@ package fr.moovie.tv.data.sources
 import fr.moovie.tv.core.sources.model.EmbedLink
 import fr.moovie.tv.core.sources.model.PlayableStream
 import fr.moovie.tv.core.sources.model.StreamFormat
+import fr.moovie.tv.core.sources.port.HttpGateway
+import fr.moovie.tv.core.sources.port.HttpRequest
+import fr.moovie.tv.core.sources.port.HttpResponse
 import fr.moovie.tv.core.sources.port.SourceExtractor
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import okhttp3.HttpUrl
-import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
-import okhttp3.OkHttpClient
-import okhttp3.Request
 
 /**
  * Extracteur VOE — l'hébergeur le plus présent sur les sites FR (≈16 des 109
@@ -20,10 +17,10 @@ import okhttp3.Request
  * de suite, de façon reproductible, avec un domaine cible différent à chaque
  * appel. Deux conséquences directes sur le code :
  *
- *  - `followRedirects` est **désactivé** ici et la chaîne est déroulée à la
- *    main. OkHttp plafonne à 20 redirections en dur (`MAX_FOLLOW_UPS`, non
- *    configurable) et lève `ProtocolException: Too many follow-up requests`
- *    bien avant l'arrivée. Les cookies n'y changent rien (testé).
+ *  - les redirections sont **déroulées à la main** (`followRedirects = false`).
+ *    OkHttp plafonne à 20 en dur (`MAX_FOLLOW_UPS`, non configurable) et lève
+ *    `ProtocolException: Too many follow-up requests` bien avant l'arrivée. Les
+ *    cookies n'y changent rien (testé).
  *  - après les 302 vient un dernier saut **en JavaScript** : une page de 753 o
  *    dont tout le contenu utile est `window.location.href = '…'`. La boucle
  *    traite les deux formes de saut indifféremment.
@@ -37,11 +34,7 @@ import okhttp3.Request
  * fonctionne sans mise à jour de l'app. [canHandle] ne conserve les motifs
  * connus que comme voie rapide, pour s'épargner une requête.
  */
-class VoeExtractor(http: OkHttpClient) : SourceExtractor {
-
-    // Client dédié : voir la note sur les 28 redirections ci-dessus. Il partage
-    // le pool de connexions et le DNS (DoH) du client commun.
-    private val http: OkHttpClient = http.newBuilder().followRedirects(false).build()
+class VoeExtractor(private val http: HttpGateway) : SourceExtractor {
 
     override val hoster = "voe"
 
@@ -53,65 +46,58 @@ class VoeExtractor(http: OkHttpClient) : SourceExtractor {
 
     override fun canHandle(url: String): Boolean = hostPattern.containsMatchIn(url)
 
-    override suspend fun extract(link: EmbedLink): PlayableStream? = withContext(Dispatchers.IO) {
-        runCatching {
-            var url = link.url.toHttpUrlOrNull() ?: return@runCatching null
+    override suspend fun extract(link: EmbedLink): PlayableStream? {
+        var url = link.url
 
-            repeat(MAX_HOPS) {
-                val (next, html) = hop(url) ?: return@runCatching null
+        repeat(MAX_HOPS) {
+            val resp = hop(url) ?: return null
 
-                if (next != null) {
-                    url = next
-                    return@repeat
-                }
-
-                // Page terminale : soit elle porte la charge utile, soit ce
-                // n'est pas du VOE et on se tait (contrat du reniflage).
-                val source = VoePayload.findSource(html ?: return@runCatching null)
-                    ?: return@runCatching null
-
-                return@runCatching PlayableStream(
-                    url = source,
-                    // `source` est une master playlist déjà complète ; le repli
-                    // `direct_access_url` de VoePayload est un mp4.
-                    format = if (source.contains(".m3u8")) StreamFormat.HLS else StreamFormat.MP4,
-                    headers = mapOf(
-                        "Referer" to "${url.scheme}://${url.host}/",
-                        "User-Agent" to Ua.BROWSER,
-                    ),
-                    language = link.language,
-                )
+            val next = nextHop(resp)
+            if (next != null && next != url) {
+                url = next
+                return@repeat
             }
-            null // plafond de sauts atteint sans page terminale
-        }.getOrNull()
+
+            // Page terminale : soit elle porte la charge utile, soit ce n'est
+            // pas du VOE et on se tait (contrat du reniflage).
+            if (!resp.isSuccessful) return null
+            val source = VoePayload.findSource(resp.body ?: return null) ?: return null
+
+            return PlayableStream(
+                url = source,
+                // `source` est une master playlist déjà complète ; le repli
+                // `direct_access_url` de VoePayload est un mp4.
+                format = if (source.contains(".m3u8")) StreamFormat.HLS else StreamFormat.MP4,
+                headers = mapOf("Referer" to originOf(resp.url, url) + "/", "User-Agent" to Ua.BROWSER),
+                language = link.language,
+            )
+        }
+        return null // plafond de sauts atteint sans page terminale
     }
 
-    /**
-     * Un saut. Retourne (destination, null) s'il faut continuer — redirection
-     * HTTP ou saut JavaScript — ou (null, html) si la page est terminale.
-     */
-    private fun hop(url: HttpUrl): Pair<HttpUrl?, String?>? {
-        val req = Request.Builder()
-            .url(url)
-            .header("User-Agent", Ua.BROWSER)
-            .header("Referer", "${url.scheme}://${url.host}/")
-            .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
-            .build()
+    private suspend fun hop(url: String): HttpResponse? = http.fetch(
+        HttpRequest(
+            url = url,
+            headers = mapOf(
+                "User-Agent" to Ua.BROWSER,
+                "Referer" to originOf(url, url) + "/",
+                "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            ),
+            followRedirects = false,
+        ),
+    )
 
-        return runCatching {
-            http.newCall(req).execute().use { resp ->
-                if (resp.isRedirect) {
-                    // Location peut être relative : on la résout contre l'URL courante.
-                    val target = resp.header("Location")?.let { url.resolve(it) }
-                    return@use if (target != null) target to null else null
-                }
-                if (!resp.isSuccessful) return@use null
+    /** Destination du saut suivant : en-tête `Location`, ou redirection JS. */
+    private fun nextHop(resp: HttpResponse): String? {
+        if (resp.isRedirect) return resp.header("Location")?.let { resolve(resp.url, it) }
+        return JS_REDIRECT.find(resp.body.orEmpty())?.groupValues?.get(1)
+    }
 
-                val body = resp.body?.string() ?: return@use null
-                val js = JS_REDIRECT.find(body)?.groupValues?.get(1)?.toHttpUrlOrNull()
-                if (js != null && js != url) js to null else null to body
-            }
-        }.getOrNull()
+    /** Résout une cible éventuellement relative contre l'URL courante. */
+    private fun resolve(base: String, target: String): String = when {
+        target.startsWith("http") -> target
+        target.startsWith("/") -> originOf(base, base) + target
+        else -> base.substringBeforeLast('/') + "/" + target
     }
 
     private companion object {

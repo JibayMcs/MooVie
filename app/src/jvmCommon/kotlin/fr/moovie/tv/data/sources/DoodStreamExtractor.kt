@@ -3,11 +3,11 @@ package fr.moovie.tv.data.sources
 import fr.moovie.tv.core.sources.model.EmbedLink
 import fr.moovie.tv.core.sources.model.PlayableStream
 import fr.moovie.tv.core.sources.model.StreamFormat
+import fr.moovie.tv.core.sources.port.HttpGateway
+import fr.moovie.tv.core.sources.port.getBody
 import fr.moovie.tv.core.sources.port.SourceExtractor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
-import okhttp3.Request
 
 /**
  * Extracteur DoodStream (dood.* / d000d.com…) — port de doodstream_extract_handler
@@ -15,7 +15,7 @@ import okhttp3.Request
  * `/pass_md5/…/token`, appelle ce endpoint pour obtenir l'URL de base, puis
  * construit l'URL finale du mp4 (base + 10 chars aléatoires + token + expiry).
  */
-class DoodStreamExtractor(private val http: OkHttpClient) : SourceExtractor {
+class DoodStreamExtractor(private val http: HttpGateway) : SourceExtractor {
 
     override val hoster = "dood"
 
@@ -47,14 +47,8 @@ class DoodStreamExtractor(private val http: OkHttpClient) : SourceExtractor {
         }.getOrNull()
     }
 
-    private fun get(url: String, referer: String): String? {
-        val req = Request.Builder()
-            .url(url)
-            .header("User-Agent", Ua.BROWSER)
-            .header("Referer", referer)
-            .build()
-        return http.newCall(req).execute().use { if (it.isSuccessful) it.body?.string() else null }
-    }
+    private suspend fun get(url: String, referer: String): String? =
+        http.getBody(url, mapOf("User-Agent" to Ua.BROWSER, "Referer" to referer))
 
     companion object {
         private val DOOD_HOST = Regex("""dood|d0{3,4}d|dooood|ds2play|doods""", RegexOption.IGNORE_CASE)

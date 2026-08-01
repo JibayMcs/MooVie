@@ -2,6 +2,7 @@ package fr.moovie.tv.data.sources
 
 import fr.moovie.tv.core.sources.model.EmbedLink
 import fr.moovie.tv.core.sources.model.PlayableStream
+import fr.moovie.tv.core.sources.port.HttpGateway
 import fr.moovie.tv.core.sources.port.SourceExtractor
 import fr.moovie.tv.core.sources.port.SourceProvider
 import fr.moovie.tv.core.sources.usecase.StreamResolution
@@ -19,6 +20,10 @@ import java.util.concurrent.TimeUnit
  */
 object ExtractorRegistry {
 
+    /**
+     * Client HTTP brut. Encore exposé parce que les providers s'en servent
+     * directement ; ils passeront au port à leur tour.
+     */
     val http: OkHttpClient = OkHttpClient.Builder()
         // DoH : les domaines sources sont bloqués par DNS chez les FAI.
         .dns(AppDns)
@@ -27,24 +32,27 @@ object ExtractorRegistry {
         .followRedirects(true)
         .build()
 
-    private val voe = VoeExtractor(http)
+    /** Seule porte de sortie réseau des extracteurs. */
+    val gateway: HttpGateway = OkHttpGateway(http)
+
+    private val voe = VoeExtractor(gateway)
 
     private val resolution = StreamResolution(
         extractors = listOf(
-            FsvidExtractor(http),
-            VidzyExtractor(http),
-            UqloadExtractor(http),
-            DoodStreamExtractor(http),
-            SibnetExtractor(http),
-            SeekStreamingExtractor(http),
-            AnsembedExtractor(http),
+            FsvidExtractor(gateway),
+            VidzyExtractor(gateway),
+            UqloadExtractor(gateway),
+            DoodStreamExtractor(gateway),
+            SibnetExtractor(gateway),
+            SeekStreamingExtractor(gateway),
+            AnsembedExtractor(gateway),
             voe,
-            LuluExtractor(http),
+            LuluExtractor(gateway),
         ),
         // Du plus spécifique au plus générique : VOE se reconnaît à une charge
         // utile qui n'appartient qu'à lui, PackedM3u8Extractor à une simple forme
         // de page, donc en dernier.
-        sniffers = listOf(voe, PackedM3u8Extractor(http)),
+        sniffers = listOf(voe, PackedM3u8Extractor(gateway)),
     )
 
     fun extractorFor(url: String): SourceExtractor? = resolution.extractorFor(url)

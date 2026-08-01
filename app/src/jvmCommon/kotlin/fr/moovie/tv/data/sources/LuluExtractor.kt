@@ -3,11 +3,9 @@ package fr.moovie.tv.data.sources
 import fr.moovie.tv.core.sources.model.EmbedLink
 import fr.moovie.tv.core.sources.model.PlayableStream
 import fr.moovie.tv.core.sources.model.StreamFormat
+import fr.moovie.tv.core.sources.port.HttpGateway
+import fr.moovie.tv.core.sources.port.getBody
 import fr.moovie.tv.core.sources.port.SourceExtractor
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
-import okhttp3.Request
 
 /**
  * Extracteur LuluStream (luluvdo.com, luluvid.com…).
@@ -21,7 +19,7 @@ import okhttp3.Request
  * La m3u8 porte un jeton horodaté (`t`, `s`, `e`) : elle expire, d'où la
  * résolution au moment de lire et non au moment de lister.
  */
-class LuluExtractor(private val http: OkHttpClient) : SourceExtractor {
+class LuluExtractor(private val http: HttpGateway) : SourceExtractor {
 
     override val hoster = "lulustream"
 
@@ -31,29 +29,27 @@ class LuluExtractor(private val http: OkHttpClient) : SourceExtractor {
 
     override fun canHandle(url: String): Boolean = hostPattern.containsMatchIn(url)
 
-    override suspend fun extract(link: EmbedLink): PlayableStream? = withContext(Dispatchers.IO) {
-        runCatching {
-            // Referer sur le domaine de l'embed lui-même : le CDN le vérifie, et
-            // le domaine bouge — d'où originOf() plutôt qu'une constante.
-            val origin = originOf(link.url, "https://luluvdo.com")
-            val req = Request.Builder()
-                .url(link.url)
-                .header("User-Agent", Ua.BROWSER)
-                .header("Referer", "$origin/")
-                .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
-                .build()
+    override suspend fun extract(link: EmbedLink): PlayableStream? {
+        // Referer sur le domaine de l'embed lui-même : le CDN le vérifie, et le
+        // domaine bouge — d'où originOf() plutôt qu'une constante.
+        val origin = originOf(link.url, "https://luluvdo.com")
 
-            val html = http.newCall(req).execute().use { if (it.isSuccessful) it.body?.string() else null }
-                ?: return@runCatching null
+        val html = http.getBody(
+            link.url,
+            mapOf(
+                "User-Agent" to Ua.BROWSER,
+                "Referer" to "$origin/",
+                "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            ),
+        ) ?: return null
 
-            val m3u8 = PackedJs.findM3u8(html, link.url) ?: return@runCatching null
+        val m3u8 = PackedJs.findM3u8(html, link.url) ?: return null
 
-            PlayableStream(
-                url = m3u8,
-                format = StreamFormat.HLS,
-                headers = mapOf("Referer" to "$origin/", "User-Agent" to Ua.BROWSER),
-                language = link.language,
-            )
-        }.getOrNull()
+        return PlayableStream(
+            url = m3u8,
+            format = StreamFormat.HLS,
+            headers = mapOf("Referer" to "$origin/", "User-Agent" to Ua.BROWSER),
+            language = link.language,
+        )
     }
 }
