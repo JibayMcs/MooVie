@@ -21,7 +21,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -35,6 +34,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import fr.moovie.tv.ui.theme.MoovieShape
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -64,7 +64,7 @@ import fr.moovie.tv.resources.search_no_results
 import fr.moovie.tv.resources.search_recent
 import fr.moovie.tv.resources.search_remove_query
 import fr.moovie.tv.resources.search_title
-import fr.moovie.tv.ui.components.MOOVIE_ACCENT
+import fr.moovie.tv.ui.theme.MOOVIE_ACCENT
 import fr.moovie.tv.ui.components.MoovieButton
 import fr.moovie.tv.ui.components.MoovieCard
 import fr.moovie.tv.ui.components.MoovieIconButton
@@ -117,7 +117,7 @@ fun SearchScreenContent(
         Dialog(onDismissRequest = { menuFor = null }) {
             Column(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(14.dp))
+                    .clip(MoovieShape)
                     .background(Color(0xF5161616))
                     .padding(28.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -211,7 +211,7 @@ private fun SearchField(
     Box(
         modifier = modifier
             .fillMaxWidth(0.7f)
-            .border(1.5.dp, Color(0xFF555555), RoundedCornerShape(8.dp))
+            .border(1.5.dp, Color(0xFF555555), MoovieShape)
             .padding(horizontal = 16.dp, vertical = 14.dp),
     ) {
         if (value.isEmpty()) {

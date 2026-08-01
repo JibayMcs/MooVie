@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -17,6 +16,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import fr.moovie.tv.ui.theme.MoovieShape
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
@@ -136,7 +136,7 @@ fun MoovieScreensaver(
             modifier = Modifier
                 .offset { IntOffset(x.roundToInt(), y.roundToInt()) }
                 .size(width = POSTER_WIDTH, height = POSTER_WIDTH * 3 / 2)
-                .clip(RoundedCornerShape(12.dp)),
+                .clip(MoovieShape),
             contentAlignment = Alignment.Center,
         ) {
             if (posterUrl != null) {

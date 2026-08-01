@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
@@ -43,6 +42,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import fr.moovie.tv.ui.theme.MoovieShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -94,7 +94,7 @@ import fr.moovie.tv.ui.player.toPlayerSegments
 import fr.moovie.tv.ui.player.audioSection
 import fr.moovie.tv.ui.player.speedSection
 import fr.moovie.tv.ui.player.subtitleSection
-import fr.moovie.tv.ui.components.MOOVIE_ACCENT
+import fr.moovie.tv.ui.theme.MOOVIE_ACCENT
 import fr.moovie.tv.ui.components.MoovieButton
 import fr.moovie.tv.ui.components.MoovieIconButton
 import fr.moovie.tv.ui.components.MoovieScreensaver
@@ -685,7 +685,7 @@ internal fun DesktopPlayerScreen(
                 color = Color(0xFFDDDDDD),
                 modifier = Modifier
                     .align(Alignment.Center)
-                    .clip(RoundedCornerShape(10.dp))
+                    .clip(MoovieShape)
                     .background(Color(0xB3000000))
                     .padding(horizontal = 18.dp, vertical = 12.dp),
             )

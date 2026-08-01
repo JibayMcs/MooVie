@@ -21,7 +21,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
@@ -42,6 +41,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import fr.moovie.tv.ui.theme.MoovieShape
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
@@ -84,7 +84,7 @@ import fr.moovie.tv.resources.watchlist_open
 import fr.moovie.tv.resources.watchlist_remove
 import fr.moovie.tv.resources.watchlist_row
 import fr.moovie.tv.ui.components.LocalMoovieFocusMemory
-import fr.moovie.tv.ui.components.MOOVIE_ACCENT
+import fr.moovie.tv.ui.theme.MOOVIE_ACCENT
 import fr.moovie.tv.ui.components.MoovieButton
 import fr.moovie.tv.ui.components.MoovieCard
 import fr.moovie.tv.ui.components.MoovieIconButton
@@ -521,7 +521,7 @@ private fun ResumeMenuDialog(
     Dialog(onDismissRequest = onDismiss) {
         Column(
             modifier = Modifier
-                .clip(RoundedCornerShape(14.dp))
+                .clip(MoovieShape)
                 .background(Color(0xF5161616))
                 .padding(28.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -825,7 +825,7 @@ private fun WatchlistMenuDialog(
     Dialog(onDismissRequest = onDismiss) {
         Column(
             modifier = Modifier
-                .clip(RoundedCornerShape(14.dp))
+                .clip(MoovieShape)
                 .background(Color(0xF5161616))
                 .padding(28.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -862,7 +862,7 @@ private fun CatalogMenuDialog(
     Dialog(onDismissRequest = onDismiss) {
         Column(
             modifier = Modifier
-                .clip(RoundedCornerShape(14.dp))
+                .clip(MoovieShape)
                 .background(Color(0xF5161616))
                 .padding(28.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),

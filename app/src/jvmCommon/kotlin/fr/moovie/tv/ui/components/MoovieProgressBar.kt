@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import fr.moovie.tv.ui.theme.MoovieGradient
 
 /**
  * Barre de progression de lecture.
@@ -26,7 +27,6 @@ fun MoovieProgressBar(
     /** Avancement entre 0 et 1 (les valeurs hors bornes sont ramenées dedans). */
     progress: Float,
     modifier: Modifier = Modifier,
-    color: Color = MOOVIE_ACCENT,
     trackColor: Color = Color(0x66FFFFFF),
 ) {
     Box(modifier = modifier.background(trackColor)) {
@@ -34,7 +34,9 @@ fun MoovieProgressBar(
             modifier = Modifier
                 .fillMaxHeight()
                 .fillMaxWidth(progress.coerceIn(0f, 1f))
-                .background(color),
+                // Dégradé identité plutôt qu'un aplat : c'est le seul endroit de
+                // l'app où la bannière se déploie sur une vraie longueur.
+                .background(MoovieGradient),
         )
     }
 }

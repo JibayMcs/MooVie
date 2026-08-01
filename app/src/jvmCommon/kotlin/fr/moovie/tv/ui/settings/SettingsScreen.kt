@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -31,6 +30,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import fr.moovie.tv.ui.theme.MoovieShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
@@ -410,7 +410,7 @@ private fun ProviderRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
+            .clip(MoovieShape)
             .background(if (index % 2 == 0) Color(0xFF161616) else Color.Transparent)
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -473,7 +473,7 @@ private fun ApiKeyField(value: String, onValueChange: (String) -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .border(1.dp, Color(0xFF555555), RoundedCornerShape(6.dp))
+            .border(1.dp, Color(0xFF555555), MoovieShape)
             .padding(horizontal = 12.dp, vertical = 10.dp),
     ) {
         if (value.isEmpty()) {

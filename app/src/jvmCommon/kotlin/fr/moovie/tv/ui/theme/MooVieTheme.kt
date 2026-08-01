@@ -10,7 +10,7 @@ import androidx.compose.ui.graphics.Color
 // Thème partagé TV + desktop (Material3 multiplateforme). Sur TV, il est
 // englobé par le thème tv-material tant que des écrans tv-material subsistent.
 private val MooVieColors = darkColorScheme(
-    primary = Color(0xFFB5302C),
+    primary = MOOVIE_MAGENTA,
     onPrimary = Color.White,
     background = Color(0xFF0A0A0A),
     onBackground = Color(0xFFF2F2F2),

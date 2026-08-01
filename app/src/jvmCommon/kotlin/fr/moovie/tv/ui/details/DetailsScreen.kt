@@ -34,7 +34,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -54,6 +53,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import fr.moovie.tv.ui.theme.MoovieShape
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
@@ -103,7 +103,7 @@ import fr.moovie.tv.resources.watchlist_remove
 import fr.moovie.tv.core.format.formatDuration
 import fr.moovie.tv.ui.format.formatMediaDate
 import fr.moovie.tv.ui.components.LocalMoovieCardActive
-import fr.moovie.tv.ui.components.MOOVIE_ACCENT
+import fr.moovie.tv.ui.theme.MOOVIE_ACCENT
 import fr.moovie.tv.ui.components.MoovieButton
 import fr.moovie.tv.ui.components.MoovieCard
 import fr.moovie.tv.ui.components.MoovieIconButton
@@ -454,7 +454,7 @@ fun DetailsScreenContent(
         ) {
             Row(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(24.dp))
+                    .clip(MoovieShape)
                     .background(Color(0xF21E1E1E))
                     .padding(horizontal = 20.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -742,7 +742,7 @@ private fun SkeletonRows(modifier: Modifier = Modifier) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(46.dp)
-                    .clip(RoundedCornerShape(10.dp))
+                    .clip(MoovieShape)
                     .background(Color.White.copy(alpha = alpha * 0.15f)),
             )
         }
@@ -786,7 +786,7 @@ private fun MovieHeader(details: MovieDetails, isWatched: Boolean) {
                 // de l'écran dès que le focus descend sur « Lecture ».
                 .width(160.dp)
                 .aspectRatio(2f / 3f)
-                .clip(RoundedCornerShape(10.dp))
+                .clip(MoovieShape)
                 .background(Color(0xFF222222)),
         ) {
             AsyncImage(
@@ -869,7 +869,7 @@ private fun EpisodeDetail(
             modifier = Modifier
                 .width(420.dp)
                 .aspectRatio(16f / 9f)
-                .clip(RoundedCornerShape(10.dp))
+                .clip(MoovieShape)
                 .background(Color(0xFF222222)),
         ) {
             AsyncImage(
@@ -974,14 +974,14 @@ private fun EpisodeRow(
                     modifier = Modifier
                         .width(4.dp)
                         .height(90.dp)
-                        .clip(RoundedCornerShape(2.dp))
+                        .clip(MoovieShape)
                         .background(MOOVIE_ACCENT),
                 )
             }
             Box(
                 modifier = Modifier
                     .size(160.dp, 90.dp)
-                    .clip(RoundedCornerShape(6.dp))
+                    .clip(MoovieShape)
                     .background(Color(0xFF222222)),
             ) {
                 AsyncImage(
@@ -1081,7 +1081,7 @@ private fun CastRow(cast: List<CastMember>) {
                     Box(
                         modifier = Modifier
                             .size(80.dp)
-                            .clip(CircleShape)
+                            .clip(MoovieShape)
                             .background(Color(0xFF222222)),
                     ) {
                         AsyncImage(

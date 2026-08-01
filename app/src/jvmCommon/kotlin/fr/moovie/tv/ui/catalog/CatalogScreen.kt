@@ -55,7 +55,7 @@ import fr.moovie.tv.resources.explore_series
 import fr.moovie.tv.resources.search_loading
 import fr.moovie.tv.resources.search_needs_key
 import fr.moovie.tv.resources.watchlist_added
-import fr.moovie.tv.ui.components.MOOVIE_ACCENT
+import fr.moovie.tv.ui.theme.MOOVIE_ACCENT
 import fr.moovie.tv.ui.components.MoovieButton
 import fr.moovie.tv.ui.components.MoovieCard
 import fr.moovie.tv.ui.components.MoovieIconButton

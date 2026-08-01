@@ -1,6 +1,7 @@
 package fr.moovie.tv.ui.components
 
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
@@ -46,26 +47,30 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import fr.moovie.tv.ui.theme.MoovieGradient
+import fr.moovie.tv.ui.theme.MoovieShape
+import fr.moovie.tv.ui.theme.moovieSurface
+import fr.moovie.tv.ui.theme.rememberGlow
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-/** Vert « actif/sélectionné » (outline), commun à tous les contrôles. */
-val SELECTED_GREEN = Color(0xFF4CAF50)
-
-/** Rouge accent de l'app (focus/hover). */
-val MOOVIE_ACCENT = Color(0xFFB5302C)
-
-private val BUTTON_SHAPE = RoundedCornerShape(10.dp)
-private val REST_BG = Color(0xFF1E1E1E)
-private val REST_FG = Color(0xFFEDEDED)
+/**
+ * Couleurs de contenu. Il n'y a plus de couleur de *fond* : au repos un bouton
+ * n'est que son libellé ou son icône, et tout le reste — verre, halo, liseré
+ * dégradé — n'apparaît qu'au focus (voir `moovieSurface`).
+ */
+private val REST_FG = Color(0xFFC9C9C9)
+private val ACTIVE_FG = Color.White
 private val DISABLED_FG = Color(0xFF5A5A5A)
-private val PRESSED_BG = Color(0xFF8E2523)
 
 /**
- * Bouton stylé de l'app, 100 % foundation (aucune dépendance tv-material) :
- * sombre au repos, accent rouge au focus D-pad ou au survol souris, [selected]
- * ajoute une outline verte (état actif/choisi).
+ * Bouton de l'app, 100 % foundation (aucune dépendance tv-material).
+ *
+ * Au repos : **rien**. Pas de fond, pas de bordure — seulement le libellé ou
+ * l'icône. Au focus D-pad ou au survol : verre translucide, halo dégradé et
+ * liseré aux couleurs de la bannière. [selected] garde le liseré seul, pour
+ * marquer l'option retenue sans rallumer tout l'écran.
  */
 @Composable
 fun MoovieButton(
@@ -81,16 +86,15 @@ fun MoovieButton(
     val hovered by interaction.collectIsHoveredAsState()
     val pressed by interaction.collectIsPressedAsState()
     val active = enabled && (focused || hovered)
-    val scale by animateFloatAsState(if (active) 1.05f else 1f)
+    // Agrandissement plus sobre qu'avant : sans fond plein, un bouton qui gonfle
+    // se remarque déjà beaucoup.
+    val scale by animateFloatAsState(if (active) 1.03f else 1f, label = "moovieButtonScale")
+    val glow = rememberGlow(active)
 
-    val bg = when {
-        pressed && enabled -> PRESSED_BG
-        active -> MOOVIE_ACCENT
-        else -> REST_BG
-    }
     val fg = when {
         !enabled -> DISABLED_FG
-        active || pressed -> Color.White
+        active || pressed -> ACTIVE_FG
+        selected -> ACTIVE_FG
         else -> REST_FG
     }
 
@@ -100,9 +104,13 @@ fun MoovieButton(
                 scaleX = scale
                 scaleY = scale
             }
-            .clip(BUTTON_SHAPE)
-            .background(bg)
-            .then(if (selected) Modifier.border(2.dp, SELECTED_GREEN, BUTTON_SHAPE) else Modifier)
+            .clip(MoovieShape)
+            .moovieSurface(
+                active = active,
+                selected = selected,
+                pressed = pressed && enabled,
+                glowAlpha = glow,
+            )
             .clickable(interactionSource = interaction, indication = null, enabled = enabled, onClick = onClick)
             .padding(contentPadding),
         verticalAlignment = Alignment.CenterVertically,
@@ -117,7 +125,7 @@ fun MoovieButton(
 
 /**
  * Bouton icône compact (actions secondaires : réglages, tri, vu/non vu…).
- * Même langage visuel que [MoovieButton], avec outline verte si [selected].
+ * Même langage visuel que [MoovieButton] : au repos, seule l'icône est visible.
  */
 @Composable
 fun MoovieIconButton(
@@ -200,8 +208,7 @@ fun MoovieCard(
     val focused by interaction.collectIsFocusedAsState()
     val hovered by interaction.collectIsHoveredAsState()
     val active = focused || hovered
-    val scale by animateFloatAsState(if (active) focusedScale else 1f)
-    val shape = RoundedCornerShape(10.dp)
+    val scale by animateFloatAsState(if (active) focusedScale else 1f, label = "moovieCardScale")
 
     // `combinedClickable` ne déclenche onLongClick qu'au pointeur : sur une
     // télécommande, maintenir OK ne produisait rien. Android répète les KeyDown
@@ -263,9 +270,17 @@ fun MoovieCard(
                 scaleX = scale
                 scaleY = scale
             }
-            .clip(shape)
-            .background(Color(0xFF181818))
-            .then(if (active) Modifier.border(3.dp, MOOVIE_ACCENT, shape) else Modifier)
+            .clip(MoovieShape)
+            .background(Color(0xFF141414))
+            // Le focus se lit sur le cadre dégradé, pas sur un aplat : l'affiche
+            // reste le sujet, la carte n'est qu'un support.
+            .then(
+                if (active) {
+                    Modifier.border(BorderStroke(3.dp, MoovieGradient), MoovieShape)
+                } else {
+                    Modifier
+                },
+            )
             .then(longPressKeys)
             .focusRequester(selfFocus)
             .combinedClickable(

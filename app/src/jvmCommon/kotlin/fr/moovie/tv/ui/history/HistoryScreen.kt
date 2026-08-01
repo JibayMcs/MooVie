@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
@@ -35,6 +34,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import fr.moovie.tv.ui.theme.MoovieShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -64,7 +64,7 @@ import fr.moovie.tv.resources.history_yesterday
 import fr.moovie.tv.resources.mark_unwatched
 import fr.moovie.tv.resources.watchlist_open
 import fr.moovie.tv.ui.components.LocalMoovieFocusMemory
-import fr.moovie.tv.ui.components.MOOVIE_ACCENT
+import fr.moovie.tv.ui.theme.MOOVIE_ACCENT
 import fr.moovie.tv.ui.components.MoovieButton
 import fr.moovie.tv.ui.components.MoovieCard
 import fr.moovie.tv.ui.components.MoovieIconButton
@@ -379,7 +379,7 @@ private fun StatCard(
 ) {
     Row(
         modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
+            .clip(MoovieShape)
             .background(Color(0xFF161616))
             .padding(14.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -393,7 +393,7 @@ private fun StatCard(
                 modifier = Modifier
                     .width(64.dp)
                     .aspectRatio(16f / 9f)
-                    .clip(RoundedCornerShape(6.dp)),
+                    .clip(MoovieShape),
             )
         }
         Column {
@@ -425,7 +425,7 @@ private fun HistoryMenuDialog(
     Dialog(onDismissRequest = onDismiss) {
         Column(
             modifier = Modifier
-                .clip(RoundedCornerShape(14.dp))
+                .clip(MoovieShape)
                 .background(Color(0xF5161616))
                 .padding(28.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),

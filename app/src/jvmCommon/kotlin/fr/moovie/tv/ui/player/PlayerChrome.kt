@@ -24,7 +24,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ClosedCaption
@@ -47,6 +46,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import fr.moovie.tv.ui.theme.MoovieShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -90,7 +90,7 @@ import fr.moovie.tv.resources.player_speed
 import fr.moovie.tv.resources.player_subtitles
 import fr.moovie.tv.resources.player_subtitles_off
 import fr.moovie.tv.resources.player_update_chip
-import fr.moovie.tv.ui.components.MOOVIE_ACCENT
+import fr.moovie.tv.ui.theme.MOOVIE_ACCENT
 import fr.moovie.tv.ui.components.MoovieButton
 import fr.moovie.tv.ui.components.MoovieIconButton
 import org.jetbrains.compose.resources.stringResource
@@ -472,7 +472,7 @@ private fun PlayerSeekBar(
                         )
                     }
                     .onSizeChanged { tipWidth = it.width }
-                    .clip(RoundedCornerShape(6.dp))
+                    .clip(MoovieShape)
                     .background(Color(0xF21E1E1E))
                     .padding(horizontal = 8.dp, vertical = 4.dp),
             )
@@ -570,7 +570,7 @@ fun PlayerAutoNextCountdown(
 ) {
     Row(
         modifier = modifier
-            .clip(RoundedCornerShape(14.dp))
+            .clip(MoovieShape)
             .background(Color(0xF21E1E1E))
             .padding(horizontal = 20.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -654,7 +654,7 @@ fun PlayerOptionsDialog(sections: List<PlayerOptionSection>, onDismiss: () -> Un
         Column(
             modifier = Modifier
                 .width(380.dp)
-                .clip(RoundedCornerShape(14.dp))
+                .clip(MoovieShape)
                 .background(Color(0xF5161616))
                 .padding(24.dp),
         ) {
