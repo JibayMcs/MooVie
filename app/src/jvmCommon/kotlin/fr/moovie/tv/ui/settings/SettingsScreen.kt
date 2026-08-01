@@ -245,6 +245,12 @@ fun SettingsScreenContent(
                     SettingRow(label = stringResource(Res.string.settings_language)) {
                         languageSelector()
                     }
+                    SettingRow(
+                        label = stringResource(Res.string.settings_player_clock),
+                        help = stringResource(Res.string.settings_player_clock_help),
+                    ) {
+                        OnOff(value = playerClock, onChange = onSetPlayerClock)
+                    }
                 }
 
                 SettingsSection.INTRO -> {
@@ -259,12 +265,6 @@ fun SettingsScreenContent(
                         help = stringResource(Res.string.settings_autoplay_help),
                     ) {
                         OnOff(value = autoPlayNext, onChange = onSetAutoPlayNext)
-                    }
-                    SettingRow(
-                        label = stringResource(Res.string.settings_player_clock),
-                        help = stringResource(Res.string.settings_player_clock_help),
-                    ) {
-                        OnOff(value = playerClock, onChange = onSetPlayerClock)
                     }
                 }
 
