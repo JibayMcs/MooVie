@@ -73,5 +73,6 @@ object ProviderRegistry {
         AnimeSamaProvider(ExtractorRegistry.http),
         CoflixProvider(ExtractorRegistry.http),
         CinestreamProvider(ExtractorRegistry.http),
+        FrembedProvider(ExtractorRegistry.gateway),
     )
 }
