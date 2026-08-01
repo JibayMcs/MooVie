@@ -488,13 +488,31 @@ internal fun DesktopPlayerScreen(
      * quand il y en a un — sinon (film, fin de série) on rend la main à la
      * fiche, exactement comme sur Android TV.
      */
+    /**
+     * Marque le média terminé : sortie de « Reprendre la lecture » et bascule
+     * en « vu ». Un seul point de passage pour les deux façons de finir un
+     * média — fin atteinte et générique passé — sinon la seconde oublie ce que
+     * la première fait, ce qui laissait l'épisode dans la reprise alors qu'on
+     * venait d'en sauter le générique. `saveScope` survit à la fermeture du
+     * lecteur, le temps que l'écriture aboutisse.
+     */
+    fun markFinished() {
+        if (mediaKey.isNotBlank() && lengthMs > 0) {
+            saveScope.launch { progress.save(mediaKey, lengthMs, lengthMs) }
+        }
+    }
+
     fun doSkip() {
         when (activeSkip) {
             SkipKind.INTRO -> media?.intro?.firstOrNull()?.endMs?.let { controller.seekTo(it) }
-            SkipKind.CREDITS -> if (nextSeason > 0 && nextEpisode > 0) {
-                onNextEpisode(nextSeason, nextEpisode)
-            } else {
-                onBack()
+            SkipKind.CREDITS -> {
+                // Passer le générique, c'est avoir fini le média.
+                markFinished()
+                if (nextSeason > 0 && nextEpisode > 0) {
+                    onNextEpisode(nextSeason, nextEpisode)
+                } else {
+                    onBack()
+                }
             }
             null -> Unit
         }
@@ -516,7 +534,7 @@ internal fun DesktopPlayerScreen(
     // (film, fin de série) ou auto-play coupé : simple retour.
     LaunchedEffect(finished) {
         if (!finished) return@LaunchedEffect
-        if (mediaKey.isNotBlank() && lengthMs > 0) progress.save(mediaKey, lengthMs, lengthMs)
+        markFinished()
         val hasNext = nextSeason > 0 && nextEpisode > 0
         if (!hasNext || !autoPlayNext) {
             onBack()

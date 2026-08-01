@@ -53,6 +53,10 @@ import fr.moovie.tv.data.settings.ScreensaverDelay
 import fr.moovie.tv.data.settings.SettingsRepository
 import fr.moovie.tv.data.watch.WatchProgressRepository
 import fr.moovie.tv.ui.components.MoovieScreensaver
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 
 /**
@@ -221,6 +225,25 @@ fun PlayerScreen(
             durationMs = controller.durationMs()
             bufferedMs = controller.bufferedMs()
             delay(500)
+        }
+    }
+
+    // Scope volontairement détaché de la composition : la comptabilité de fin
+    // part au moment précis où l'on quitte le lecteur, et un
+    // `rememberCoroutineScope` serait annulé avant que DataStore ait écrit.
+    val exitScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.IO) }
+
+    /**
+     * Marque le média terminé : sortie de « Reprendre la lecture » et bascule
+     * en « vu ». Un seul point de passage pour les deux façons de finir un
+     * média — fin atteinte et générique passé — sinon la seconde oublie ce que
+     * la première fait, ce qui laissait l'épisode dans la reprise alors qu'on
+     * venait d'en sauter le générique.
+     */
+    fun markFinished() {
+        val duration = controller.durationMs()
+        if (mediaKey.isNotBlank() && duration > 0) {
+            exitScope.launch { progress.save(mediaKey, duration, duration) }
         }
     }
 
@@ -394,8 +417,7 @@ fun PlayerScreen(
     // Sans suite (film, fin de série) ou auto-play coupé : simple retour.
     LaunchedEffect(ended) {
         if (!ended) return@LaunchedEffect
-        val duration = controller.durationMs()
-        if (mediaKey.isNotBlank() && duration > 0) progress.save(mediaKey, duration, duration)
+        markFinished()
 
         val hasNext = pid != null && pid.isTv && nextSeason > 0 && nextEpisode > 0
         if (!hasNext || !autoPlayNext) {
@@ -432,6 +454,8 @@ fun PlayerScreen(
         when (activeSkip) {
             SkipKind.INTRO -> m.intro.firstOrNull()?.endMs?.let { controller.seekTo(it) }
             SkipKind.CREDITS -> {
+                // Passer le générique, c'est avoir fini le média.
+                markFinished()
                 if (pid != null && pid.isTv) {
                     onNextEpisode(pid.tmdbId, pid.season, pid.episode + 1)
                 } else {
