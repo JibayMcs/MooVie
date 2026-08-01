@@ -11,6 +11,9 @@ import fr.moovie.tv.core.sources.port.SourceProvider
 import fr.moovie.tv.data.sources.ExtractorRegistry
 import fr.moovie.tv.core.sources.model.PlayableStream
 import fr.moovie.tv.data.sources.isStreamPlayable
+import fr.moovie.tv.data.sources.streamQuality
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import fr.moovie.tv.data.sources.ProviderRegistry
 import fr.moovie.tv.data.sources.SourceCacheRepository
 import fr.moovie.tv.data.tmdb.Episode
@@ -52,6 +55,46 @@ class DetailsViewModel : ViewModel() {
 
     private val _sources = MutableStateFlow<SourcesState>(SourcesState.Idle)
     val sources: StateFlow<SourcesState> = _sources
+
+    /**
+     * Qualité vidéo par URL d'embed, remplie au fil de l'eau.
+     *
+     * Aucun catalogue ne l'annonce en listant ses liens : il faut résoudre
+     * l'embed puis lire la master playlist. C'est trop lent pour bloquer
+     * l'ouverture du panneau, d'où une mesure en arrière-plan dont le résultat
+     * arrive quand il arrive. Le cache est volontairement à vie de session : une
+     * même source ne doit pas être re-résolue à chaque va-et-vient dans la fiche.
+     */
+    private val _qualities = MutableStateFlow<Map<String, String>>(emptyMap())
+    val qualities: StateFlow<Map<String, String>> = _qualities
+
+    /** URLs déjà mesurées ou en cours, pour ne jamais lancer deux fois le même travail. */
+    private val qualityRequested = mutableSetOf<String>()
+
+    /**
+     * Limite le nombre de mesures simultanées. Sans elle, ouvrir un panneau de
+     * dix-sept sources déclencherait dix-sept résolutions d'un coup : de quoi
+     * saturer une TV d'entrée de gamme et se faire remarquer des hébergeurs,
+     * pour un simple libellé.
+     */
+    private val qualitySlots = Semaphore(3)
+
+    /**
+     * Demande la qualité d'un lien. Sans effet si elle est déjà connue ou en
+     * cours de mesure. Un échec est silencieux : la ligne garde son libellé de
+     * repli plutôt que d'afficher une erreur pour une information d'appoint.
+     */
+    fun requestQuality(link: EmbedLink) {
+        if (!qualityRequested.add(link.url)) return
+        viewModelScope.launch {
+            val label = runCatching {
+                qualitySlots.withPermit {
+                    ExtractorRegistry.resolve(link)?.let { streamQuality(it) }
+                }
+            }.getOrNull() ?: return@launch
+            _qualities.value = _qualities.value + (link.url to label)
+        }
+    }
 
     /** Flux prêt à jouer (émis une fois qu'un extracteur a résolu un lien). */
     private val _resolved = MutableStateFlow<PlayableStream?>(null)

@@ -6,6 +6,9 @@ import fr.moovie.tv.core.sources.port.HttpMethod
 import fr.moovie.tv.core.sources.port.HttpRequest
 import fr.moovie.tv.core.sources.port.getBody
 import fr.moovie.tv.core.sources.usecase.isDurationAcceptable
+import fr.moovie.tv.core.sources.model.StreamFormat
+import fr.moovie.tv.core.sources.usecase.hlsHeight
+import fr.moovie.tv.core.sources.usecase.qualityLabel
 
 /**
  * Vérifie qu'un flux résolu est réellement joignable.
@@ -73,6 +76,23 @@ private fun sumExtInf(playlist: String): Double? {
 }
 
 private val EXTINF = Regex("""#EXTINF:\s*([\d.]+)""")
+
+/**
+ * Qualité annoncée par un flux, ou null si illisible.
+ *
+ * Coûteuse par nature : aucun catalogue n'annonce la qualité en listant ses
+ * liens, il faut donc résoudre l'embed puis lire la master playlist. À n'appeler
+ * qu'en arrière-plan, et à mettre en cache — sans quoi on doublerait le trafic
+ * vers les hébergeurs pour un simple libellé.
+ */
+suspend fun streamQuality(
+    stream: PlayableStream,
+    http: HttpGateway = ExtractorRegistry.gateway,
+): String? {
+    if (stream.format != StreamFormat.HLS) return null
+    val body = http.getBody(stream.url, stream.headers) ?: return null
+    return qualityLabel(hlsHeight(body))
+}
 
 /** Retourne null quand la méthode elle-même est refusée (à réessayer autrement). */
 private suspend fun probe(http: HttpGateway, stream: PlayableStream, head: Boolean): Boolean? {

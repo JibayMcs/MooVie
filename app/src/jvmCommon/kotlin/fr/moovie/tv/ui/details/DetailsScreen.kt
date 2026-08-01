@@ -92,8 +92,9 @@ import fr.moovie.tv.resources.details_trying_source
 import fr.moovie.tv.resources.details_seasons
 import fr.moovie.tv.resources.details_sources
 import fr.moovie.tv.resources.details_source_via
+import fr.moovie.tv.resources.details_catalogue_count
+import fr.moovie.tv.resources.details_source_count
 import fr.moovie.tv.resources.details_sources_searching
-import fr.moovie.tv.resources.details_sources_summary
 import fr.moovie.tv.resources.mark_season_unwatched
 import fr.moovie.tv.resources.mark_season_watched
 import fr.moovie.tv.resources.mark_unwatched
@@ -108,6 +109,7 @@ import fr.moovie.tv.ui.components.MoovieIconButton
 import fr.moovie.tv.ui.components.MoovieMarqueeText
 import fr.moovie.tv.ui.components.MoovieRail
 import kotlinx.coroutines.delay
+import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -140,6 +142,9 @@ fun DetailsScreenContent(
     onOpenPanel: () -> Unit,
     onClosePanel: () -> Unit,
     onPickSource: (EmbedLink) -> Unit,
+    /** Qualité vidéo mesurée par URL d'embed (voir DetailsViewModel.qualities). */
+    sourceQualities: Map<String, String> = emptyMap(),
+    onRequestQuality: (EmbedLink) -> Unit = {},
     onDismissQuickPlay: () -> Unit,
     onBack: () -> Unit,
     // Desktop uniquement : bouton retour à l'écran (sur TV, la télécommande a
@@ -387,7 +392,14 @@ fun DetailsScreenContent(
             modifier = Modifier.align(Alignment.CenterEnd),
         ) {
             lastActive.value?.let { active ->
-                SourcesSlideOver(state = active, preferred = streamLang, resolveError = resolveError, onPick = onPickSource)
+                SourcesSlideOver(
+                    state = active,
+                    preferred = streamLang,
+                    resolveError = resolveError,
+                    onPick = onPickSource,
+                    qualities = sourceQualities,
+                    onRequestQuality = onRequestQuality,
+                )
             }
         }
 
@@ -453,6 +465,10 @@ private fun SourcesSlideOver(
     preferred: StreamLanguage,
     resolveError: String?,
     onPick: (EmbedLink) -> Unit,
+    /** Qualité mesurée par URL d'embed, remplie au fil de l'eau. */
+    qualities: Map<String, String>,
+    /** Demande la mesure d'un lien ; sans effet si elle est déjà connue. */
+    onRequestQuality: (EmbedLink) -> Unit,
 ) {
     val links = state.links
     val grouped = links.groupBy { it.language ?: "?" }
@@ -525,21 +541,26 @@ private fun SourcesSlideOver(
                             modifier = Modifier.padding(top = if (sectionIndex == 0) 0.dp else 8.dp),
                         )
                     }
-                    // Numérote les liens qu'aucune donnée ne distingue (même
-                    // hébergeur, même variante, même catalogue). Mieux vaut
-                    // « Vidzy · 2 » qu'un troisième bouton identique : au moins
-                    // l'utilisateur sait qu'il en essaie un autre.
-                    val ranks = sourcesInLang
-                        .groupingBy { Triple(it.hoster, it.variant, it.provider) }
-                        .eachCount()
-                    val seen = mutableMapOf<Triple<String, String?, String?>, Int>()
+                    // Numérote les liens que la ligne afficherait à l'identique.
+                    // Le regroupement porte sur ce qui est **visible** — hébergeur
+                    // et variante — et surtout pas sur le catalogue : celui-ci
+                    // n'apparaît plus dès qu'une qualité est mesurée, et deux
+                    // « Voe / 720p » de catalogues différents redevenaient alors
+                    // impossibles à départager.
+                    val ranks = sourcesInLang.groupingBy { it.hoster to it.variant }.eachCount()
+                    val seen = mutableMapOf<Pair<String, String?>, Int>()
 
                     itemsIndexed(sourcesInLang, key = { _, l -> l.url }) { linkIndex, link ->
-                        val id = Triple(link.hoster, link.variant, link.provider)
+                        val id = link.hoster to link.variant
                         val rank = seen.merge(id, 1, Int::plus) ?: 1
+                        // La mesure part quand la ligne entre à l'écran : dans une
+                        // LazyColumn, seules les lignes visibles sont composées, donc
+                        // on ne résout pas trente liens pour en montrer six.
+                        LaunchedEffect(link.url) { onRequestQuality(link) }
                         SourceRow(
                             link = link,
                             rank = if ((ranks[id] ?: 1) > 1) rank else null,
+                            quality = qualities[link.url],
                             onClick = { onPick(link) },
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -576,6 +597,7 @@ private fun SourcesSlideOver(
 private fun SourceRow(
     link: EmbedLink,
     rank: Int?,
+    quality: String?,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -588,11 +610,17 @@ private fun SourceRow(
                 },
                 style = MaterialTheme.typography.titleSmall,
             )
-            link.provider?.let {
+            // La qualité prime dès qu'elle est connue : c'est le critère de choix.
+            // En attendant, le catalogue plutôt qu'une ligne vide — mieux vaut
+            // apprendre d'où vient la source que de regarder un trou.
+            val secondary = quality ?: link.provider?.let {
+                stringResource(Res.string.details_source_via, it)
+            }
+            secondary?.let {
                 Text(
-                    stringResource(Res.string.details_source_via, it),
+                    it,
                     style = MaterialTheme.typography.labelSmall,
-                    color = Color.White.copy(alpha = 0.65f),
+                    color = Color.White.copy(alpha = if (quality != null) 0.9f else 0.55f),
                 )
             }
         }
@@ -647,7 +675,9 @@ private fun SourcesSummary(
         }
         if (sourceCount > 0) {
             Text(
-                stringResource(Res.string.details_sources_summary, sourceCount, withResults),
+                pluralStringResource(Res.plurals.details_source_count, sourceCount, sourceCount) +
+                    " · " +
+                    pluralStringResource(Res.plurals.details_catalogue_count, withResults, withResults),
                 style = MaterialTheme.typography.labelMedium,
                 color = Color(0xFFCCCCCC),
             )

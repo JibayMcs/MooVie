@@ -32,6 +32,7 @@ fun DetailsScreen(
     val resolved by viewModel.resolved.collectAsStateWithLifecycle()
     val inWatchlist by viewModel.inWatchlist.collectAsStateWithLifecycle()
     val resolveError by viewModel.resolveError.collectAsStateWithLifecycle()
+    val sourceQualities by viewModel.qualities.collectAsStateWithLifecycle()
     val streamLang by viewModel.streamLanguage.collectAsStateWithLifecycle()
     val watched by viewModel.watched.collectAsStateWithLifecycle()
     val resume by viewModel.resume.collectAsStateWithLifecycle()
@@ -113,6 +114,8 @@ fun DetailsScreen(
         onOpenPanel = viewModel::openPanel,
         onClosePanel = viewModel::closePanel,
         onPickSource = viewModel::play,
+        sourceQualities = sourceQualities,
+        onRequestQuality = viewModel::requestQuality,
         onDismissQuickPlay = viewModel::dismissQuickPlay,
         onBack = onBack,
     )

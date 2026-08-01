@@ -179,6 +179,13 @@
     <string name="explore_series">Séries</string>
     <string name="explore_no_results">Aucun titre dans ce genre.</string>
     <string name="details_source_via">via %1$s</string>
-    <string name="details_sources_summary">%1$d sources · %2$d catalogues</string>
     <string name="details_sources_searching">Recherche…</string>
+    <plurals name="details_source_count">
+        <item quantity="one">%1$d source</item>
+        <item quantity="other">%1$d sources</item>
+    </plurals>
+    <plurals name="details_catalogue_count">
+        <item quantity="one">%1$d catalogue</item>
+        <item quantity="other">%1$d catalogues</item>
+    </plurals>
 </resources>
