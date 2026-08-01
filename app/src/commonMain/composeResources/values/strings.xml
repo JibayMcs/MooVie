@@ -22,7 +22,7 @@
     <string name="home_tmdb_error">Échec du chargement TMDB : %1$s</string>
     <string name="home_open_settings">Ouvrir les réglages</string>
     <string name="home_continue_watching">Reprendre la lecture</string>
-    <string name="home_minutes_left">%1$d min restantes</string>
+    <string name="home_time_left">%1$s restantes</string>
     <string name="home_in_progress">En cours</string>
     <string name="resume_remove">Retirer de la liste de lecture</string>
 
@@ -38,7 +38,6 @@
     <string name="search_remove_query">Supprimer « %1$s »</string>
 
     <!-- Fiche -->
-    <string name="details_runtime">%1$s • %2$s min</string>
     <string name="details_cast">Casting</string>
     <string name="details_sources">Sources</string>
     <string name="details_play">▶  Lire</string>
@@ -51,7 +50,6 @@
     <string name="mark_season_unwatched">Marquer la saison non vue</string>
     <string name="details_episodes_season">Épisodes (saison %1$d)</string>
     <string name="details_episode_header">%1$s · Saison %2$d</string>
-    <string name="details_episode_runtime">%1$d min</string>
     <string name="details_no_player">Aucun lecteur %1$s n'a fonctionné.</string>
     <string name="details_lang_missing">Aucune source en %1$s — autres langues disponibles.</string>
     <string name="details_no_sources">Aucune source disponible pour ce titre.</string>

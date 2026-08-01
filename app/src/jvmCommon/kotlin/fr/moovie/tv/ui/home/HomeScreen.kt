@@ -30,7 +30,6 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -38,11 +37,13 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -54,6 +55,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -65,8 +67,10 @@ import fr.moovie.tv.resources.Res
 import fr.moovie.tv.resources.common_loading
 import fr.moovie.tv.resources.history_title
 import fr.moovie.tv.resources.home_continue_watching
+import fr.moovie.tv.core.format.formatDuration
+import fr.moovie.tv.ui.components.MoovieProgressBar
 import fr.moovie.tv.resources.home_in_progress
-import fr.moovie.tv.resources.home_minutes_left
+import fr.moovie.tv.resources.home_time_left
 import fr.moovie.tv.resources.home_open_settings
 import fr.moovie.tv.resources.home_search
 import fr.moovie.tv.resources.home_settings
@@ -126,6 +130,21 @@ fun HomeScreenContent(
             ?: rows?.firstOrNull()?.items?.firstOrNull()?.let { HeroTarget.Catalog(it) }
     }
     val featured = focused ?: fallback
+
+    // Opacité du hero pendant le défilement : 1 en haut de liste, 0 dès qu'il a
+    // parcouru sa propre hauteur. `derivedStateOf` pour ne recomposer que le
+    // hero, et pas toute la page à chaque pixel de scroll.
+    val listState = rememberLazyListState()
+    val heroPx = with(LocalDensity.current) { HERO_HEIGHT.toPx() }
+    val heroAlpha by remember(heroPx) {
+        derivedStateOf {
+            if (listState.firstVisibleItemIndex > 0) {
+                0f
+            } else {
+                (1f - listState.firstVisibleItemScrollOffset / heroPx).coerceIn(0f, 1f)
+            }
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize().background(Color(0xFF0A0A0A))) {
         // Backdrop dynamique avec fondu enchaîné quand l'élément focalisé change.
@@ -201,10 +220,15 @@ fun HomeScreenContent(
                     MoovieButton(onClick = onOpenSettings) { Text(stringResource(Res.string.home_open_settings)) }
                 }
                 is HomeState.Ready -> LazyColumn(
+                    state = listState,
                     verticalArrangement = Arrangement.spacedBy(24.dp),
                     contentPadding = PaddingValues(bottom = 48.dp),
                 ) {
-                    item { Hero(featured) }
+                    // Le hero s'efface au fil du défilement au lieu d'être
+                    // tranché par le bord haut : sinon sa barre de progression,
+                    // dernier élément de la colonne, restait seule à l'écran
+                    // sous l'en-tête, sans le titre qu'elle décrit.
+                    item { Hero(featured, modifier = Modifier.graphicsLayer { alpha = heroAlpha }) }
                     if (resume.isNotEmpty()) {
                         item {
                             ResumeRow(
@@ -303,9 +327,9 @@ private sealed interface HeroTarget {
 private val HERO_HEIGHT = 176.dp
 
 @Composable
-private fun Hero(target: HeroTarget?) {
+private fun Hero(target: HeroTarget?, modifier: Modifier = Modifier) {
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .height(HERO_HEIGHT)
             .padding(horizontal = 32.dp, vertical = 8.dp),
@@ -350,7 +374,7 @@ private fun CatalogHero(item: TmdbItem) {
 /** Hero d'une entrée « Reprendre » : progression plutôt que synopsis. */
 @Composable
 private fun ResumeHero(entry: ResumeEntry) {
-    val remainMin = ((entry.durationMs - entry.positionMs) / 60_000).coerceAtLeast(0)
+    val remaining = formatDuration(((entry.durationMs - entry.positionMs) / 60_000).toInt())
     Column {
         Text(
             stringResource(Res.string.home_continue_watching),
@@ -370,8 +394,8 @@ private fun ResumeHero(entry: ResumeEntry) {
                 Text(it, style = MaterialTheme.typography.titleMedium, color = Color(0xFFCCCCCC))
             }
             Text(
-                if (entry.durationMs > 0) {
-                    stringResource(Res.string.home_minutes_left, remainMin)
+                if (entry.durationMs > 0 && remaining != null) {
+                    stringResource(Res.string.home_time_left, remaining)
                 } else {
                     stringResource(Res.string.home_in_progress)
                 },
@@ -380,10 +404,8 @@ private fun ResumeHero(entry: ResumeEntry) {
             )
         }
         Spacer(Modifier.height(12.dp))
-        LinearProgressIndicator(
-            progress = { entry.progress },
-            color = MOOVIE_ACCENT,
-            trackColor = Color(0x66FFFFFF),
+        MoovieProgressBar(
+            progress = entry.progress,
             modifier = Modifier.fillMaxWidth(0.3f).height(4.dp),
         )
     }
@@ -476,7 +498,7 @@ private fun ResumeCard(
     onFocusEntry: (ResumeEntry) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val remainMin = ((entry.durationMs - entry.positionMs) / 60_000).coerceAtLeast(0)
+    val remaining = formatDuration(((entry.durationMs - entry.positionMs) / 60_000).toInt())
     MoovieCard(
         onClick = onClick,
         onLongClick = onLongClick,
@@ -498,9 +520,8 @@ private fun ResumeCard(
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),
                 )
-                LinearProgressIndicator(
-                    progress = { entry.progress },
-                    color = MOOVIE_ACCENT,
+                MoovieProgressBar(
+                    progress = entry.progress,
                     trackColor = Color(0x99000000),
                     modifier = Modifier.fillMaxWidth().height(4.dp).align(Alignment.BottomCenter),
                 )
@@ -513,7 +534,11 @@ private fun ResumeCard(
                 Text(
                     text = listOfNotNull(
                         entry.episodeLabel,
-                        if (entry.durationMs > 0) stringResource(Res.string.home_minutes_left, remainMin) else null,
+                        if (entry.durationMs > 0 && remaining != null) {
+                            stringResource(Res.string.home_time_left, remaining)
+                        } else {
+                            null
+                        },
                     ).joinToString(" · ").ifBlank { stringResource(Res.string.home_in_progress) },
                     style = MaterialTheme.typography.labelSmall,
                     color = Color(0xFF9A9A9A),

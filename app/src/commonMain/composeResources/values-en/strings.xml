@@ -20,7 +20,7 @@
     <string name="home_tmdb_error">TMDB load failed: %1$s</string>
     <string name="home_open_settings">Open Settings</string>
     <string name="home_continue_watching">Continue watching</string>
-    <string name="home_minutes_left">%1$d min left</string>
+    <string name="home_time_left">%1$s left</string>
     <string name="home_in_progress">In progress</string>
     <string name="resume_remove">Remove from watch list</string>
 
@@ -36,7 +36,6 @@
     <string name="search_remove_query">Remove “%1$s”</string>
 
     <!-- Details -->
-    <string name="details_runtime">%1$s • %2$s min</string>
     <string name="details_cast">Cast</string>
     <string name="details_sources">Sources</string>
     <string name="details_play">▶  Play</string>
@@ -49,7 +48,6 @@
     <string name="mark_season_unwatched">Mark season unwatched</string>
     <string name="details_episodes_season">Episodes (season %1$d)</string>
     <string name="details_episode_header">%1$s · Season %2$d</string>
-    <string name="details_episode_runtime">%1$d min</string>
     <string name="details_no_player">No %1$s player worked.</string>
     <string name="details_lang_missing">No %1$s source — other languages available.</string>
     <string name="details_no_sources">No source available for this title.</string>

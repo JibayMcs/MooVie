@@ -77,7 +77,6 @@ import fr.moovie.tv.resources.common_back
 import fr.moovie.tv.resources.common_loading
 import fr.moovie.tv.resources.details_cast
 import fr.moovie.tv.resources.details_episode_header
-import fr.moovie.tv.resources.details_episode_runtime
 import fr.moovie.tv.resources.details_episodes_season
 import fr.moovie.tv.resources.details_lang_missing
 import fr.moovie.tv.resources.details_lang_unavailable
@@ -85,7 +84,6 @@ import fr.moovie.tv.resources.details_no_sources
 import fr.moovie.tv.resources.details_play
 import fr.moovie.tv.resources.details_playing
 import fr.moovie.tv.resources.details_resume
-import fr.moovie.tv.resources.details_runtime
 import fr.moovie.tv.resources.details_searching
 import fr.moovie.tv.resources.details_searching_source
 import fr.moovie.tv.resources.details_trying_source
@@ -101,12 +99,15 @@ import fr.moovie.tv.resources.mark_unwatched
 import fr.moovie.tv.resources.mark_watched
 import fr.moovie.tv.resources.watchlist_add
 import fr.moovie.tv.resources.watchlist_remove
+import fr.moovie.tv.core.format.formatDuration
+import fr.moovie.tv.ui.format.formatMediaDate
 import fr.moovie.tv.ui.components.LocalMoovieCardActive
 import fr.moovie.tv.ui.components.MOOVIE_ACCENT
 import fr.moovie.tv.ui.components.MoovieButton
 import fr.moovie.tv.ui.components.MoovieCard
 import fr.moovie.tv.ui.components.MoovieIconButton
 import fr.moovie.tv.ui.components.MoovieMarqueeText
+import fr.moovie.tv.ui.components.MoovieProgressBar
 import fr.moovie.tv.ui.components.MoovieRail
 import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.pluralStringResource
@@ -782,9 +783,9 @@ private fun MovieHeader(details: MovieDetails, isWatched: Boolean) {
                 details.year?.let {
                     Text(it, style = MaterialTheme.typography.titleSmall, color = Color(0xFFCCCCCC))
                 }
-                details.runtime?.takeIf { it > 0 }?.let {
+                formatDuration(details.runtime)?.let {
                     Text(
-                        stringResource(Res.string.details_episode_runtime, it),
+                        it,
                         style = MaterialTheme.typography.titleSmall,
                         color = Color(0xFFCCCCCC),
                     )
@@ -862,12 +863,12 @@ private fun EpisodeDetail(
                 if (isWatched) WatchedBadge()
             }
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                ep.airDate?.takeIf { it.isNotBlank() }?.let {
+                formatMediaDate(ep.airDate)?.let {
                     Text(it, style = MaterialTheme.typography.titleSmall, color = Color(0xFFCCCCCC))
                 }
-                ep.runtime?.let {
+                formatDuration(ep.runtime)?.let {
                     Text(
-                        stringResource(Res.string.details_episode_runtime, it),
+                        it,
                         style = MaterialTheme.typography.titleSmall,
                         color = Color(0xFFCCCCCC),
                     )
@@ -949,9 +950,8 @@ private fun EpisodeRow(
                 }
                 // Épisode commencé : mini-barre de progression sur la vignette.
                 if (!isWatched && progress != null && progress > 0f) {
-                    LinearProgressIndicator(
-                        progress = { progress },
-                        color = MOOVIE_ACCENT,
+                    MoovieProgressBar(
+                        progress = progress,
                         trackColor = Color(0x66000000),
                         modifier = Modifier.fillMaxWidth().height(4.dp).align(Alignment.BottomCenter),
                     )

@@ -20,7 +20,7 @@
     <string name="home_tmdb_error">Error al cargar TMDB: %1$s</string>
     <string name="home_open_settings">Abrir Ajustes</string>
     <string name="home_continue_watching">Seguir viendo</string>
-    <string name="home_minutes_left">%1$d min restantes</string>
+    <string name="home_time_left">%1$s restantes</string>
     <string name="home_in_progress">En curso</string>
     <string name="resume_remove">Quitar de la lista</string>
 
@@ -36,7 +36,6 @@
     <string name="search_remove_query">Eliminar «%1$s»</string>
 
     <!-- Ficha -->
-    <string name="details_runtime">%1$s • %2$s min</string>
     <string name="details_cast">Reparto</string>
     <string name="details_sources">Fuentes</string>
     <string name="details_play">▶  Reproducir</string>
@@ -49,7 +48,6 @@
     <string name="mark_season_unwatched">Marcar temporada no vista</string>
     <string name="details_episodes_season">Episodios (temporada %1$d)</string>
     <string name="details_episode_header">%1$s · Temporada %2$d</string>
-    <string name="details_episode_runtime">%1$d min</string>
     <string name="details_no_player">Ningún reproductor %1$s funcionó.</string>
     <string name="details_lang_missing">Sin fuente en %1$s — otros idiomas disponibles.</string>
     <string name="details_no_sources">No hay fuente disponible para este título.</string>
