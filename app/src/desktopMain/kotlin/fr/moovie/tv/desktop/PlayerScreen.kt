@@ -80,6 +80,7 @@ import fr.moovie.tv.ui.player.PLAYER_AUTO_NEXT_SECONDS
 import fr.moovie.tv.ui.player.PLAYER_SEEK_STEP_MS
 import fr.moovie.tv.ui.player.PLAYER_UPDATE_CHIP_MS
 import fr.moovie.tv.ui.player.PlayerAutoNextCountdown
+import fr.moovie.tv.ui.player.PlayerDurationGuard
 import fr.moovie.tv.ui.player.PlayerControlBar
 import fr.moovie.tv.ui.player.PlayerDialogKind
 import fr.moovie.tv.ui.player.PlayerOptionsDialog
@@ -232,6 +233,8 @@ internal fun DesktopPlayerScreen(
     onUpdateSelected: () -> Unit = {},
     /** Affiche du titre, utilisée par l'écran de veille. */
     posterUrl: String = "",
+    /** Durée annoncée par TMDB, en minutes (0 = inconnue) — voir [PlayerDurationGuard]. */
+    expectedMinutes: Int = 0,
     isFullscreen: Boolean,
     onToggleFullscreen: () -> Unit,
     onBack: () -> Unit,
@@ -292,6 +295,16 @@ internal fun DesktopPlayerScreen(
 
     /** Vue du lecteur exposée à la chrome partagée. */
     val controller = remember { VlcjPlayerController(player) }
+
+    // Même garde-fou que sur Android TV, et volontairement le même code : un
+    // flux nettement plus court que le média annoncé emprunte le chemin d'échec
+    // habituel, et la cascade passe à la source suivante.
+    PlayerDurationGuard(
+        controller = controller,
+        mediaId = streamUrl,
+        expectedMinutes = expectedMinutes,
+        onTooShort = onPlaybackFailed,
+    )
 
     var tracks by remember { mutableStateOf(PlayerTracks()) }
     var speed by remember { mutableStateOf(1f) }

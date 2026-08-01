@@ -36,5 +36,14 @@ sealed interface Screen {
         val nextEpisode: Int = 0,
         /** Affiche du titre, utilisée par l'écran de veille. */
         val posterUrl: String = "",
+        /**
+         * Durée annoncée par TMDB, en minutes (0 = inconnue).
+         *
+         * Sert au garde-fou du lecteur : une source qui rend un flux bien plus
+         * court que le média n'est pas le média. La cascade filtre déjà ce
+         * qu'elle peut mesurer avant d'ouvrir, mais elle ne sait le faire que
+         * sur du HLS — le lecteur, lui, connaît la durée quel que soit le format.
+         */
+        val expectedMinutes: Int = 0,
     ) : Screen
 }

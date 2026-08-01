@@ -174,6 +174,7 @@ class MainActivity : ComponentActivity() {
                                 updateVersion = (updateState as? UpdateState.Available)?.version,
                                 onUpdateSelected = { bannerOnPlayer = true },
                                 posterUrl = s.posterUrl,
+                                expectedMinutes = s.expectedMinutes,
                                 onBack = { nav.pop() },
                                 // Le flux a cassé une fois ouvert : retour à la
                                 // fiche, qui reprend la cascade sur l'hébergeur

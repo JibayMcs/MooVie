@@ -199,6 +199,7 @@ private fun DesktopApp(
                     updateVersion = (updateState as? UpdateState.Available)?.version,
                     onUpdateSelected = { bannerOnPlayer = true },
                     posterUrl = s.posterUrl,
+                    expectedMinutes = s.expectedMinutes,
                     isFullscreen = isFullscreen,
                     onToggleFullscreen = onToggleFullscreen,
                     onBack = { nav.pop() },

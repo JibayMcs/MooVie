@@ -75,6 +75,7 @@ fun DetailsScreen(
                         nextSeason = viewModel.playbackNext?.first ?: 0,
                         nextEpisode = viewModel.playbackNext?.second ?: 0,
                         posterUrl = viewModel.playbackPoster,
+                        expectedMinutes = viewModel.playbackMinutes ?: 0,
                     ),
                 )
             }

@@ -219,6 +219,7 @@ internal fun DesktopDetailsScreen(
                         nextSeason = vm.playbackNext?.first ?: 0,
                         nextEpisode = vm.playbackNext?.second ?: 0,
                         posterUrl = vm.playbackPoster,
+                        expectedMinutes = vm.playbackMinutes ?: 0,
                     ),
                 )
             }

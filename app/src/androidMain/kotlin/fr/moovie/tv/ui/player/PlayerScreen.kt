@@ -102,6 +102,8 @@ fun PlayerScreen(
     onUpdateSelected: () -> Unit = {},
     /** Affiche du titre, utilisée par l'écran de veille. */
     posterUrl: String = "",
+    /** Durée annoncée par TMDB, en minutes (0 = inconnue) — voir [PlayerDurationGuard]. */
+    expectedMinutes: Int = 0,
     onBack: () -> Unit,
     onNextEpisode: (tmdbId: Int, season: Int, episode: Int) -> Unit = { _, _, _ -> },
     /** Le flux a cassé en lecture : rend la main à la cascade de sources. */
@@ -232,6 +234,15 @@ fun PlayerScreen(
             }
         }
     }
+
+    // Flux nettement plus court que le média annoncé (logo, bande-annonce) :
+    // on emprunte le chemin d'échec habituel, la cascade passe à la suivante.
+    PlayerDurationGuard(
+        controller = controller,
+        mediaId = streamUrl,
+        expectedMinutes = expectedMinutes,
+        onTooShort = onPlaybackFailed,
+    )
 
     // ── Intro / générique (TheIntroDB) ───────────────────────────────────────
     val pid = remember(mediaKey) { parseMediaKey(mediaKey) }

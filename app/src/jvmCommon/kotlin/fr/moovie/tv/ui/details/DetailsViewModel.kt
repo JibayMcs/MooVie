@@ -247,7 +247,8 @@ class DetailsViewModel : ViewModel() {
      * d'indisponibilité). Null quand TMDB ne l'annonce pas — le contrôle est
      * alors simplement ignoré.
      */
-    private var playbackMinutes: Int? = null
+    var playbackMinutes: Int? = null
+        private set
 
     /** Sous-titre du lecteur : année (film) ou « S1 · E3 — Nom » (épisode). */
     var playbackSubtitle: String = ""
