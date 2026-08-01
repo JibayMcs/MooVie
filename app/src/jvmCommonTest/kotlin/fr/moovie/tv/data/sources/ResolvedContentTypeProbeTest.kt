@@ -37,13 +37,24 @@ class ResolvedContentTypeProbeTest {
                 println("%-12s %-6s".format(link.hoster, "non"))
                 continue
             }
-            val resp = ExtractorRegistry.gateway.fetch(
+            // HEAD *et* GET borné : un 405 sur HEAD ne dit rien du flux, il dit
+            // seulement que la méthode est refusée. Confondre les deux, c'est
+            // conclure « page HTML » sur un en-tête d'erreur de méthode.
+            val head = ExtractorRegistry.gateway.fetch(
                 HttpRequest(url = stream.url, method = HttpMethod.HEAD, headers = stream.headers),
             )
+            val get = ExtractorRegistry.gateway.fetch(
+                HttpRequest(
+                    url = stream.url,
+                    headers = stream.headers + ("Range" to "bytes=0-64"),
+                ),
+            )
             println(
-                "%-12s %-6s %-6s %-28s %s".format(
-                    link.hoster, stream.format, resp?.status ?: "—",
-                    resp?.header("Content-Type") ?: "—", stream.url.take(40),
+                "%-12s %-5s HEAD %-4s %-22s │ GET %-4s %-26s %s".format(
+                    link.hoster, stream.format,
+                    head?.status ?: "—", head?.header("Content-Type")?.take(20) ?: "—",
+                    get?.status ?: "—", get?.header("Content-Type")?.take(24) ?: "—",
+                    get?.body?.take(24)?.replace(Regex("[^\\x20-\\x7e]"), "."),
                 ),
             )
         }

@@ -59,6 +59,16 @@ class DoodStreamExtractor(private val http: HttpGateway) : SourceExtractor {
          *
          * Ces deux-là répondent 403 à curl mais 200 à notre client : leur absence
          * n'était pas un blocage anti-bot, seulement un domaine non reconnu.
+         *
+         * ⚠️ Ils ne lisent pourtant pas, et **ce n'est pas un bug d'ici** :
+         * l'algorithme ci-dessus est conforme au `makePlay()` de leur propre page
+         * (10 caractères aléatoires + `?token=…&expiry=` + `Date.now()`), et cinq
+         * variantes de construction d'URL ont été essayées. Leur endpoint
+         * `/pass_md5/` renvoie une base sur `cloudatacdn.com`, **domaine parqué**
+         * qui sert une page d'annonces. Rien à corriger tant qu'ils n'ont pas
+         * remis un CDN en face ; le filtre de type de contenu de la sonde écarte
+         * proprement le lien en attendant. Les motifs restent en place pour que
+         * ça reparte tout seul le jour où leur CDN revit.
          */
         private val DOOD_HOST = Regex(
             """dood|d0{3,4}d|dooood|ds2play|doods|dsvplay|playmogo""",
