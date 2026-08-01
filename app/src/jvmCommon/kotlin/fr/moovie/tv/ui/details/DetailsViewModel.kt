@@ -7,6 +7,9 @@ import fr.moovie.tv.data.settings.StreamLanguage
 import fr.moovie.tv.data.settings.currentTmdbLanguage
 import fr.moovie.tv.core.sources.model.EmbedLink
 import fr.moovie.tv.core.sources.model.MediaRef
+import fr.moovie.tv.core.watch.EpisodeRef
+import fr.moovie.tv.core.watch.episodeToResume
+import fr.moovie.tv.core.watch.parseEpisodeKey
 import fr.moovie.tv.core.sources.port.SourceProvider
 import fr.moovie.tv.data.sources.ExtractorRegistry
 import fr.moovie.tv.core.sources.model.PlayableStream
@@ -205,9 +208,40 @@ class DetailsViewModel : ViewModel() {
             runCatching {
                 if (isTv) {
                     val d = repo.tvDetails(apiKey, tmdbId)
-                    val firstSeason = d.seasons.map { it.seasonNumber }.filter { it > 0 }.minOrNull() ?: 1
-                    val eps = repo.season(apiKey, tmdbId, firstSeason).episodes
-                    DetailsState.Tv(d, firstSeason, eps)
+                    val seasons = d.seasons.map { it.seasonNumber }.filter { it > 0 }.sorted()
+                    val firstSeason = seasons.firstOrNull() ?: 1
+
+                    // Reprendre là où on en est plutôt que systématiquement à la
+                    // saison 1 : sur une série suivie depuis des semaines, c'est
+                    // le seul endroit où l'on ne veut pas atterrir.
+                    val target = episodeToResume(
+                        inProgress = watchRepo.continueWatching.first()
+                            .firstOrNull { it.isTv && it.tmdbId == tmdbId && it.season > 0 }
+                            ?.let { EpisodeRef(it.season, it.episode) },
+                        watched = watchRepo.watched.first()
+                            .mapNotNull { key -> parseEpisodeKey(key, tmdbId) }
+                            .toSet(),
+                        firstSeason = firstSeason,
+                    )
+
+                    // La règle peut désigner un épisode au-delà de la saison
+                    // (saison terminée) : c'est ici, et seulement ici, qu'on
+                    // connaît la longueur réelle des saisons pour basculer sur
+                    // la suivante.
+                    var season = if (target.season in seasons) target.season else firstSeason
+                    var eps = repo.season(apiKey, tmdbId, season).episodes
+                    if (target.episode > eps.size) {
+                        val next = seasons.firstOrNull { it > season }
+                        if (next != null) {
+                            season = next
+                            eps = repo.season(apiKey, tmdbId, season).episodes
+                        }
+                    }
+                    // Si la saison a changé en route, l'épisode visé redevient le
+                    // premier de la nouvelle saison.
+                    val focusEpisode =
+                        if (season == target.season) target.episode.coerceAtMost(eps.size) else 1
+                    DetailsState.Tv(d, season, eps, resumeEpisode = focusEpisode)
                 } else {
                     DetailsState.Movie(repo.movieDetails(apiKey, tmdbId))
                 }

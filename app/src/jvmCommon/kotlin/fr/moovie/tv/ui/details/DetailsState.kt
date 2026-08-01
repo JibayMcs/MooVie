@@ -8,7 +8,18 @@ import fr.moovie.tv.data.tmdb.TvDetails
 sealed interface DetailsState {
     data object Loading : DetailsState
     data class Movie(val details: MovieDetails) : DetailsState
-    data class Tv(val details: TvDetails, val season: Int, val episodes: List<Episode>) : DetailsState
+    /**
+     * @param resumeEpisode épisode à reprendre ou à suivre dans [season]
+     *   (0 = aucun). Sert à le repérer d'un coup d'œil dans la liste, sans lui
+     *   donner le focus : à l'arrivée sur la fiche, le focus doit rester sur
+     *   l'action principale.
+     */
+    data class Tv(
+        val details: TvDetails,
+        val season: Int,
+        val episodes: List<Episode>,
+        val resumeEpisode: Int = 0,
+    ) : DetailsState
     data class Error(val message: String) : DetailsState
 }
 

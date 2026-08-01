@@ -348,6 +348,7 @@ fun DetailsScreenContent(
                                 EpisodeRow(
                                     ep = ep,
                                     isWatched = key in watched,
+                                    isNext = ep.episodeNumber == s.resumeEpisode,
                                     progress = resume[key]?.progress,
                                     // OK = fiche de l'épisode (comme un film) ;
                                     // OK long = bascule vu / non vu.
@@ -921,6 +922,12 @@ private fun EpisodeRow(
     progress: Float?,
     onOpen: () -> Unit,
     onToggleWatched: () -> Unit,
+    /**
+     * Épisode à reprendre ou à suivre. Repéré par une pastille plutôt que par le
+     * focus : à l'arrivée sur une fiche, le focus doit rester sur l'action
+     * principale, pas descendre au milieu de la liste.
+     */
+    isNext: Boolean = false,
 ) {
     // OK → fiche de l'épisode ; OK long → bascule vu/non vu.
     MoovieCard(
@@ -933,6 +940,15 @@ private fun EpisodeRow(
             modifier = Modifier.fillMaxWidth().padding(8.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            if (isNext) {
+                Box(
+                    modifier = Modifier
+                        .width(4.dp)
+                        .height(90.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(MOOVIE_ACCENT),
+                )
+            }
             Box(
                 modifier = Modifier
                     .size(160.dp, 90.dp)
