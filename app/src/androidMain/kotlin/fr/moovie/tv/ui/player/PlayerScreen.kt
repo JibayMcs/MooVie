@@ -68,6 +68,9 @@ private val RESUME_KEYS = setOf(
     Key.Spacebar,
 )
 
+/** Touches de validation : OK de la télécommande, Entrée d'un clavier. */
+private val CONFIRM_KEYS = setOf(Key.DirectionCenter, Key.Enter, Key.NumPadEnter)
+
 /**
  * Lecteur natif Media3/ExoPlayer.
  *
@@ -465,6 +468,23 @@ fun PlayerScreen(
                     return@onPreviewKeyEvent true
                 }
                 if (!controlsVisible) {
+                    // Exception au réveil : le bouton « Passer » est fait pour
+                    // être utilisé barre masquée, et le focus lui est donné
+                    // explicitement dans ce cas. Valider dessus doit donc
+                    // l'actionner.
+                    //
+                    // Sans ce cas, l'appui était consommé pour réveiller la barre,
+                    // le focus filait au bouton Lecture — et le KeyUp, lui, n'est
+                    // pas consommé : il atterrissait sur ce bouton. Appuyer sur
+                    // « Passer l'intro » mettait donc le film en pause sans rien
+                    // passer, alors que le focus visuel était bien sur le bouton.
+                    // D'où le swallowUntilRelease : la fin de l'appui ne doit
+                    // atteindre personne.
+                    if (activeSkip != null && event.key in CONFIRM_KEYS) {
+                        doSkip()
+                        swallowUntilRelease = true
+                        return@onPreviewKeyEvent true
+                    }
                     // Barre masquée : la 1re touche ne fait que réveiller les
                     // contrôles (play/pause agit quand même), elle n'est pas
                     // transmise aux boutons — sinon on déclencherait une action

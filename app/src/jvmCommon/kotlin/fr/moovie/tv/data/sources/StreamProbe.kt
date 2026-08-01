@@ -4,6 +4,8 @@ import fr.moovie.tv.core.sources.model.PlayableStream
 import fr.moovie.tv.core.sources.port.HttpGateway
 import fr.moovie.tv.core.sources.port.HttpMethod
 import fr.moovie.tv.core.sources.port.HttpRequest
+import fr.moovie.tv.core.sources.port.getBody
+import fr.moovie.tv.core.sources.usecase.isDurationAcceptable
 
 /**
  * Vérifie qu'un flux résolu est réellement joignable.
@@ -20,16 +22,57 @@ import fr.moovie.tv.core.sources.port.HttpRequest
  */
 suspend fun isStreamPlayable(
     stream: PlayableStream,
+    expectedMinutes: Int? = null,
     http: HttpGateway = ExtractorRegistry.gateway,
 ): Boolean {
     if (stream.url.isBlank()) return false
 
     // HEAD d'abord : rien à télécharger si l'hôte le supporte.
-    probe(http, stream, head = true)?.let { return it }
+    val reachable = probe(http, stream, head = true)
     // Certains hôtes répondent 405/501 à HEAD, ou l'ignorent : on retombe sur un
     // GET borné aux deux premiers octets, assez pour valider l'accès.
-    return probe(http, stream, head = false) ?: false
+        ?: probe(http, stream, head = false) ?: false
+    if (!reachable) return false
+
+    // Joignable ne veut pas dire « c'est bien le média demandé ». Certaines
+    // sources servent un logo animé ou une bande-annonce de quelques secondes à
+    // la place du film : le lecteur s'ouvre, lit dix secondes et s'arrête.
+    // Relevé sur Dune (155 min) : trois liens « premium » mesuraient moins
+    // d'une minute. La durée n'est mesurable que sur HLS ; ailleurs on laisse
+    // passer plutôt que d'écarter à l'aveugle.
+    if (expectedMinutes == null) return true
+    return isDurationAcceptable(hlsDurationSeconds(http, stream), expectedMinutes)
 }
+
+/**
+ * Durée totale d'un flux HLS, en secondes, ou null si non mesurable.
+ *
+ * Somme des `#EXTINF` de la playlist média. Une master playlist ne liste que des
+ * variantes : on descend alors dans la première, qui suffit — toutes les
+ * variantes d'un même média ont la même durée.
+ */
+private suspend fun hlsDurationSeconds(http: HttpGateway, stream: PlayableStream): Double? {
+    val body = http.getBody(stream.url, stream.headers) ?: return null
+    if (!body.startsWith("#EXTM3U")) return null
+
+    sumExtInf(body)?.let { return it }
+
+    val variant = body.lineSequence()
+        .map { it.trim() }
+        .firstOrNull { it.isNotEmpty() && !it.startsWith("#") }
+        ?: return null
+    val absolute = if (variant.startsWith("http")) variant
+    else stream.url.substringBefore('?').substringBeforeLast('/') + "/" + variant
+
+    return http.getBody(absolute, stream.headers)?.let { sumExtInf(it) }
+}
+
+private fun sumExtInf(playlist: String): Double? {
+    val total = EXTINF.findAll(playlist).mapNotNull { it.groupValues[1].toDoubleOrNull() }.sum()
+    return if (EXTINF.containsMatchIn(playlist)) total else null
+}
+
+private val EXTINF = Regex("""#EXTINF:\s*([\d.]+)""")
 
 /** Retourne null quand la méthode elle-même est refusée (à réessayer autrement). */
 private suspend fun probe(http: HttpGateway, stream: PlayableStream, head: Boolean): Boolean? {

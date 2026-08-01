@@ -239,6 +239,16 @@ class DetailsViewModel : ViewModel() {
     var playbackTitle: String = ""
         private set
 
+    /**
+     * Durée annoncée par TMDB pour le contenu en cours de résolution, en minutes.
+     *
+     * Sert de garde-fou dans la cascade : une source qui rend un flux de quelques
+     * secondes ne sert pas le média demandé (logo, bande-annonce, message
+     * d'indisponibilité). Null quand TMDB ne l'annonce pas — le contrôle est
+     * alors simplement ignoré.
+     */
+    private var playbackMinutes: Int? = null
+
     /** Sous-titre du lecteur : année (film) ou « S1 · E3 — Nom » (épisode). */
     var playbackSubtitle: String = ""
         private set
@@ -273,6 +283,7 @@ class DetailsViewModel : ViewModel() {
         val movie = _state.value as? DetailsState.Movie ?: return
         playbackKey = movieKey()
         playbackTitle = movie.details.title
+        playbackMinutes = movie.details.runtime
         playbackSubtitle = movie.details.year.orEmpty()
         playbackNext = null
         playbackPoster = movie.details.posterUrl() ?: movie.details.backdropUrl().orEmpty()
@@ -305,6 +316,9 @@ class DetailsViewModel : ViewModel() {
             ?.firstOrNull { it.episodeNumber == episode }
         val still = ep?.stillUrl()
         playbackTitle = tv.details.name
+        // Durée de l'épisode et non de la série : TMDB ne l'annonce pas toujours,
+        // auquel cas le garde-fou de durée est simplement inactif.
+        playbackMinutes = ep?.runtime
         playbackSubtitle = "S$season · E$episode" + (ep?.name?.takeIf { it.isNotBlank() }?.let { " — $it" } ?: "")
         playbackNext = nextEpisodeAfter(tv.details, season, episode)
         playbackPoster = tv.details.posterUrl() ?: tv.details.backdropUrl().orEmpty()
@@ -594,7 +608,9 @@ class DetailsViewModel : ViewModel() {
                     // liens à durée de vie courte et répondent 403 derrière. Sans
                     // cette sonde, la cascade s'arrêtait sur un lien mort et le
                     // lecteur s'ouvrait sur « lecture impossible ».
-                    if (stream != null && stream.url.isNotBlank() && isStreamPlayable(stream)) {
+                    if (stream != null && stream.url.isNotBlank() &&
+                        isStreamPlayable(stream, playbackMinutes)
+                    ) {
                         if (gen != resolveGen) return@launch
                         pendingMeta?.let { watchRepo.register(it) }
                         playingLink = next
