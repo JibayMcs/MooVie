@@ -726,6 +726,13 @@ class DetailsViewModel : ViewModel() {
         val gen = ++resolveGen
         viewModelScope.launch {
             val stream = runCatching { ExtractorRegistry.resolve(link) }.getOrNull()
+                // Une URL bien formée ne veut pas dire un flux servi. Vidzy rend
+                // par exemple une playlist signée que son CDN refuse ensuite en
+                // 403 : le lecteur s'ouvrait, échouait, et renvoyait aussitôt sur
+                // la fiche sans rien expliquer. La lecture rapide faisait déjà
+                // cette vérification, le choix manuel non — d'où un comportement
+                // différent selon le chemin emprunté pour la même source.
+                ?.takeIf { runCatching { isStreamPlayable(it, playbackMinutes) }.getOrDefault(false) }
             // Titre changé pendant la résolution : ne pas écraser la lecture courante.
             if (gen != resolveGen) return@launch
             if (stream != null) {
