@@ -38,13 +38,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -56,7 +54,6 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -138,21 +135,6 @@ fun HomeScreenContent(
     }
     val featured = focused ?: fallback
 
-    // Opacité du hero pendant le défilement : 1 en haut de liste, 0 dès qu'il a
-    // parcouru sa propre hauteur. `derivedStateOf` pour ne recomposer que le
-    // hero, et pas toute la page à chaque pixel de scroll.
-    val listState = rememberLazyListState()
-    val heroPx = with(LocalDensity.current) { HERO_HEIGHT.toPx() }
-    val heroAlpha by remember(heroPx) {
-        derivedStateOf {
-            if (listState.firstVisibleItemIndex > 0) {
-                0f
-            } else {
-                (1f - listState.firstVisibleItemScrollOffset / heroPx).coerceIn(0f, 1f)
-            }
-        }
-    }
-
     Box(modifier = Modifier.fillMaxSize().background(Color(0xFF0A0A0A))) {
         // Backdrop dynamique avec fondu enchaîné quand l'élément focalisé change.
         Crossfade(
@@ -228,6 +210,16 @@ fun HomeScreenContent(
             }
             Spacer(Modifier.height(16.dp))
 
+            // Le hero décrit la carte focalisée : il doit rester visible pendant
+            // qu'on déplace ce focus. Dans la liste défilante, il partait vers le
+            // haut dès la première rangée franchie — l'information n'était donc
+            // jamais là au moment où elle sert. Il est désormais fixe sous
+            // l'en-tête, et ce sont les rangées qui défilent dessous.
+            if (state is HomeState.Ready) {
+                Hero(featured)
+                Spacer(Modifier.height(24.dp))
+            }
+
             when (val s = state) {
                 HomeState.Loading -> Text(stringResource(Res.string.common_loading), modifier = Modifier.padding(horizontal = 32.dp))
                 is HomeState.NeedsApiKey -> Column(modifier = Modifier.padding(horizontal = 32.dp)) {
@@ -236,15 +228,9 @@ fun HomeScreenContent(
                     MoovieButton(onClick = onOpenSettings) { Text(stringResource(Res.string.home_open_settings)) }
                 }
                 is HomeState.Ready -> LazyColumn(
-                    state = listState,
                     verticalArrangement = Arrangement.spacedBy(24.dp),
                     contentPadding = PaddingValues(bottom = 48.dp),
                 ) {
-                    // Le hero s'efface au fil du défilement au lieu d'être
-                    // tranché par le bord haut : sinon sa barre de progression,
-                    // dernier élément de la colonne, restait seule à l'écran
-                    // sous l'en-tête, sans le titre qu'elle décrit.
-                    item { Hero(featured, modifier = Modifier.graphicsLayer { alpha = heroAlpha }) }
                     if (resume.isNotEmpty()) {
                         item {
                             ResumeRow(
