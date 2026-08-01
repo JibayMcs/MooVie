@@ -15,14 +15,16 @@ no account, no ads.
 | Home | Trending |
 |:---:|:---:|
 | ![Home](.github/screenshots/01-home.jpg) | ![Trending rails](.github/screenshots/02-rails.jpg) |
-| **Search** | **Movie details** |
-| ![Search](.github/screenshots/05-search.jpg) | ![Movie details](.github/screenshots/03-movie.jpg) |
-| **Show details** | **Episode details** |
-| ![Show details](.github/screenshots/06-tv.jpg) | ![Episode details](.github/screenshots/07-episode.jpg) |
-| **Sources panel** | **Player** |
-| ![Sources panel](.github/screenshots/04-sources.jpg) | ![Player](.github/screenshots/08-player.jpg) |
-| **Settings** | **Screensaver** |
-| ![Settings](.github/screenshots/09-settings.jpg) | ![Screensaver](.github/screenshots/10-screensaver.jpg) |
+| **Search** | **Catalogue** |
+| ![Search](.github/screenshots/05-search.jpg) | ![Catalogue](.github/screenshots/11-catalog.jpg) |
+| **Movie details** | **Show details** |
+| ![Movie details](.github/screenshots/03-movie.jpg) | ![Show details](.github/screenshots/06-tv.jpg) |
+| **Episode details** | **Sources panel** |
+| ![Episode details](.github/screenshots/07-episode.jpg) | ![Sources panel](.github/screenshots/04-sources.jpg) |
+| **Player** | **Settings** |
+| ![Player](.github/screenshots/08-player.jpg) | ![Settings](.github/screenshots/09-settings.jpg) |
+| **Screensaver** | |
+| ![Screensaver](.github/screenshots/10-screensaver.jpg) | |
 
 > UI available in French, English and Spanish.
 

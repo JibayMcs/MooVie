@@ -15,14 +15,16 @@ depuis une seule base de code Kotlin Multiplatform. L'extraction des sources se 
 | Accueil | Tendances |
 |:---:|:---:|
 | ![Accueil](.github/screenshots/01-home.jpg) | ![Rangées tendances](.github/screenshots/02-rails.jpg) |
-| **Recherche** | **Fiche film** |
-| ![Recherche](.github/screenshots/05-search.jpg) | ![Fiche film](.github/screenshots/03-movie.jpg) |
-| **Fiche série** | **Fiche épisode** |
-| ![Fiche série](.github/screenshots/06-tv.jpg) | ![Fiche épisode](.github/screenshots/07-episode.jpg) |
-| **Panneau sources** | **Lecteur** |
-| ![Panneau sources](.github/screenshots/04-sources.jpg) | ![Lecteur](.github/screenshots/08-player.jpg) |
-| **Réglages** | **Écran de veille** |
-| ![Réglages](.github/screenshots/09-settings.jpg) | ![Écran de veille](.github/screenshots/10-screensaver.jpg) |
+| **Recherche** | **Catalogue** |
+| ![Recherche](.github/screenshots/05-search.jpg) | ![Catalogue](.github/screenshots/11-catalog.jpg) |
+| **Fiche film** | **Fiche série** |
+| ![Fiche film](.github/screenshots/03-movie.jpg) | ![Fiche série](.github/screenshots/06-tv.jpg) |
+| **Fiche épisode** | **Panneau sources** |
+| ![Fiche épisode](.github/screenshots/07-episode.jpg) | ![Panneau sources](.github/screenshots/04-sources.jpg) |
+| **Lecteur** | **Réglages** |
+| ![Lecteur](.github/screenshots/08-player.jpg) | ![Réglages](.github/screenshots/09-settings.jpg) |
+| **Écran de veille** | |
+| ![Écran de veille](.github/screenshots/10-screensaver.jpg) | |
 
 > Captures prises en anglais ; l'interface est disponible en français, anglais et espagnol.
 
