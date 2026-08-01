@@ -2,6 +2,7 @@ package fr.moovie.tv.desktop
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -109,15 +110,24 @@ fun main() {
             },
         ) {
             MooVieTheme {
-                DesktopApp(
-                    nav = nav,
-                    onRegisterBack = { innerBack = it },
-                    isFullscreen = isFullscreen,
-                    onToggleFullscreen = {
-                        windowState.placement =
-                            if (isFullscreen) WindowPlacement.Floating else WindowPlacement.Fullscreen
-                    },
-                )
+                // L'animation se pose au-dessus de l'app, comme sur Android :
+                // l'accueil charge derrière et le temps d'animation est du temps
+                // de chargement gagné.
+                var splashDone by remember { mutableStateOf(false) }
+                Box(modifier = Modifier.fillMaxSize()) {
+                    DesktopApp(
+                        nav = nav,
+                        onRegisterBack = { innerBack = it },
+                        isFullscreen = isFullscreen,
+                        onToggleFullscreen = {
+                            windowState.placement =
+                                if (isFullscreen) WindowPlacement.Floating else WindowPlacement.Fullscreen
+                        },
+                    )
+                    if (!splashDone) {
+                        DesktopSplash(onFinished = { splashDone = true })
+                    }
+                }
             }
         }
     }

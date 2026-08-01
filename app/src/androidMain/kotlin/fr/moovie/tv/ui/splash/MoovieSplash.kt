@@ -24,6 +24,8 @@ import coil3.gif.AnimatedImageDecoder
 import coil3.ImageLoader
 import coil3.request.ImageRequest
 import fr.moovie.tv.R
+import fr.moovie.tv.resources.Res
+import fr.moovie.tv.shared.SPLASH_FILE
 import kotlinx.coroutines.delay
 
 /**
@@ -58,6 +60,7 @@ internal val SPLASH_BACKGROUND = Color(0xFF1A073C)
  *
  * @param onFinished appelé une fois l'animation jouée et le fondu terminé.
  */
+@OptIn(org.jetbrains.compose.resources.ExperimentalResourceApi::class)
 @Composable
 fun MoovieSplash(onFinished: () -> Unit) {
     val context = LocalContext.current
@@ -69,6 +72,13 @@ fun MoovieSplash(onFinished: () -> Unit) {
     // noire, ce qui donnerait un splash cassé. On sert donc la dernière image,
     // celle qui porte le logo achevé.
     val animated = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P
+
+    // Le fichier vit dans les ressources partagées : le desktop lit exactement
+    // le même octet pour octet, plutôt qu'une copie qui dériverait.
+    var bytes by remember { mutableStateOf<ByteArray?>(null) }
+    LaunchedEffect(animated) {
+        if (animated) bytes = runCatching { Res.readBytes(SPLASH_FILE) }.getOrNull()
+    }
 
     val loader = remember(animated) {
         ImageLoader.Builder(context)
@@ -97,7 +107,7 @@ fun MoovieSplash(onFinished: () -> Unit) {
     ) {
         AsyncImage(
             model = ImageRequest.Builder(context)
-                .data(if (animated) R.raw.moovie_splash else R.drawable.moovie_splash_last)
+                .data(if (animated) bytes else R.drawable.moovie_splash_last)
                 .build(),
             imageLoader = loader,
             contentDescription = null,
