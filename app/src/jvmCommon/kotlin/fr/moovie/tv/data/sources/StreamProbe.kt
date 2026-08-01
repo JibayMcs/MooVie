@@ -44,5 +44,31 @@ private suspend fun probe(http: HttpGateway, stream: PlayableStream, head: Boole
 
     // 405 / 501 : la méthode est refusée, pas la ressource.
     if (head && (resp.status == 405 || resp.status == 501)) return null
-    return resp.isSuccessful
+    if (!resp.isSuccessful) return false
+
+    // Un 200 ne suffit pas. Un extracteur peut produire une URL bien formée que
+    // l'hébergeur sert en page d'erreur HTML : ExoPlayer la refuse ensuite en
+    // UnrecognizedInputFormatException, et l'utilisateur voit « lecture
+    // impossible » sur une source annoncée bonne. Constaté sur DoodStream, dont
+    // l'URL calculée renvoie du text/html.
+    return isPlayableContentType(resp.header("Content-Type"))
+}
+
+/**
+ * Un type de contenu compatible avec un flux vidéo.
+ *
+ * Volontairement permissif sur l'absence d'en-tête : beaucoup de CDN n'en
+ * envoient pas sur un HEAD, et refuser par défaut écarterait des sources
+ * valides. On ne rejette que ce qui est *manifestement* autre chose.
+ */
+internal fun isPlayableContentType(contentType: String?): Boolean {
+    val type = contentType?.substringBefore(';')?.trim()?.lowercase() ?: return true
+    if (type.isEmpty()) return true
+    return when {
+        type.startsWith("video/") || type.startsWith("audio/") -> true
+        type.startsWith("application/") -> "html" !in type && "json" !in type && "xhtml" !in type
+        type.startsWith("binary/") -> true
+        // text/html, text/plain… : page d'erreur, jamais un flux.
+        else -> false
+    }
 }
