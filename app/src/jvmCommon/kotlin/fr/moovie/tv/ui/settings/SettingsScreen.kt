@@ -35,6 +35,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.key.Key
@@ -186,6 +187,11 @@ fun SettingsScreenContent(
                     selected = entry == section,
                     modifier = Modifier
                         .fillMaxWidth()
+                        // La section suit le focus : parcourir le volet gauche au
+                        // D-pad montre directement les réglages visés. Valider
+                        // pour changer de section obligeait à un aller-retour par
+                        // catégorie juste pour savoir ce qu'elle contient.
+                        .onFocusChanged { if (it.isFocused) section = entry }
                         .then(if (index == 0) Modifier.focusRequester(firstSectionFocus) else Modifier),
                 ) {
                     // weight : le libellé occupe la ligne, donc reste aligné à gauche.

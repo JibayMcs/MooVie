@@ -106,6 +106,7 @@ internal fun DesktopSearchScreen(
 @Composable
 internal fun DesktopHistoryScreen(
     onOpenTitle: (tmdbId: Int, isTv: Boolean) -> Unit,
+    onBack: () -> Unit,
 ) {
     val vm = Vm.history
     val days by vm.days.collectAsState()
@@ -117,6 +118,8 @@ internal fun DesktopHistoryScreen(
         onOpenTitle = onOpenTitle,
         onRemove = vm::remove,
         onMarkUnwatched = vm::markUnwatched,
+        onBack = onBack,
+        showBackButton = true,
     )
 }
 

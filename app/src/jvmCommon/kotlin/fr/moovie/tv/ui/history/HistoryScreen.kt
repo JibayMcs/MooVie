@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Icon
@@ -43,6 +44,7 @@ import androidx.compose.ui.window.Dialog
 import coil3.compose.AsyncImage
 import fr.moovie.tv.data.watch.HistoryEntry
 import fr.moovie.tv.resources.Res
+import fr.moovie.tv.resources.common_back
 import fr.moovie.tv.resources.history_empty
 import fr.moovie.tv.resources.history_day_pattern
 import fr.moovie.tv.resources.history_episodes
@@ -61,6 +63,7 @@ import fr.moovie.tv.resources.watchlist_open
 import fr.moovie.tv.ui.components.MOOVIE_ACCENT
 import fr.moovie.tv.ui.components.MoovieButton
 import fr.moovie.tv.ui.components.MoovieCard
+import fr.moovie.tv.ui.components.MoovieIconButton
 import fr.moovie.tv.ui.components.MoovieMarqueeText
 import java.text.SimpleDateFormat
 import kotlinx.coroutines.delay
@@ -88,6 +91,10 @@ fun HistoryScreenContent(
     onOpenTitle: (tmdbId: Int, isTv: Boolean) -> Unit,
     onRemove: (String) -> Unit,
     onMarkUnwatched: (String) -> Unit,
+    onBack: () -> Unit = {},
+    // Desktop uniquement : sur TV, la télécommande a sa touche Retour et un
+    // bouton à l'écran ne ferait que voler le focus à la première vignette.
+    showBackButton: Boolean = false,
 ) {
     var menuFor by remember { mutableStateOf<HistoryEntry?>(null) }
     // Le focus arrive sur la 1re vignette : sans ça il resterait nulle part et
@@ -105,11 +112,23 @@ fun HistoryScreenContent(
 
     Box(modifier = Modifier.fillMaxSize().background(Color(0xFF0A0A0A))) {
         Column(modifier = Modifier.fillMaxSize().padding(vertical = 32.dp)) {
-            Text(
-                stringResource(Res.string.history_title),
-                style = MaterialTheme.typography.headlineMedium,
+            Row(
                 modifier = Modifier.padding(horizontal = 32.dp),
-            )
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                if (showBackButton) {
+                    MoovieIconButton(
+                        onClick = onBack,
+                        icon = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = stringResource(Res.string.common_back),
+                    )
+                }
+                Text(
+                    stringResource(Res.string.history_title),
+                    style = MaterialTheme.typography.headlineMedium,
+                )
+            }
             Spacer(Modifier.height(16.dp))
 
             if (days.isEmpty()) {
