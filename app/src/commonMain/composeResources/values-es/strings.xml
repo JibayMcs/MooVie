@@ -187,4 +187,6 @@
     <string name="catalog_title">Catálogo</string>
     <string name="catalog_pick_genre">Elige un género a la izquierda para explorar el catálogo.</string>
     <string name="catalog_open">Catálogo</string>
+    <string name="media_movie">Película</string>
+    <string name="media_series">Serie</string>
 </resources>

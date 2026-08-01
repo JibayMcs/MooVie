@@ -65,6 +65,7 @@ import fr.moovie.tv.data.watch.WatchlistEntry
 import fr.moovie.tv.resources.Res
 import fr.moovie.tv.resources.catalog_open
 import fr.moovie.tv.resources.common_loading
+import fr.moovie.tv.resources.history_episodes
 import fr.moovie.tv.resources.history_title
 import fr.moovie.tv.resources.home_continue_watching
 import fr.moovie.tv.core.format.formatDuration
@@ -74,6 +75,8 @@ import fr.moovie.tv.resources.home_time_left
 import fr.moovie.tv.resources.home_open_settings
 import fr.moovie.tv.resources.home_search
 import fr.moovie.tv.resources.home_settings
+import fr.moovie.tv.resources.media_movie
+import fr.moovie.tv.resources.media_series
 import fr.moovie.tv.resources.mark_watched
 import fr.moovie.tv.resources.resume_remove
 import fr.moovie.tv.resources.watchlist_add
@@ -88,6 +91,7 @@ import fr.moovie.tv.ui.components.MoovieIconButton
 import fr.moovie.tv.ui.components.MoovieMarqueeText
 import fr.moovie.tv.ui.components.MoovieRail
 import fr.moovie.tv.ui.components.scrollAsWholeBlock
+import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -253,6 +257,7 @@ fun HomeScreenContent(
                                 entries = watchlist,
                                 onOpenTitle = onOpenTitle,
                                 onMenu = { watchlistMenuFor = it },
+                                onFocusEntry = { focused = HeroTarget.Watchlist(it) },
                                 firstFocus = if (resume.isEmpty()) firstContentFocus else null,
                             )
                         }
@@ -318,17 +323,18 @@ fun HomeScreenContent(
 private sealed interface HeroTarget {
     data class Catalog(val item: TmdbItem) : HeroTarget
     data class Resume(val entry: ResumeEntry) : HeroTarget
+    data class Watchlist(val entry: WatchlistEntry) : HeroTarget
 
     fun backdropUrl(): String? = when (this) {
         is Catalog -> item.backdropUrl()
         is Resume -> entry.imageUrl
+        // L'affiche fait office de fond : une entrée mise de côté ne porte pas
+        // d'image large. Floutée et rognée, elle ne sert de toute façon que de
+        // nappe de couleur.
+        is Watchlist -> entry.imageUrl
     }
 }
 
-/**
- * Hauteur fixe : le hero est le 1er élément d'une LazyColumn, une hauteur
- * variable ferait sauter toutes les rangées au changement de focus.
- */
 /**
  * Hauteur du héros. Calibrée pour qu'une rangée d'affiches entière tienne
  * dessous en 1080p (540 dp de haut) : héros + marges + rangée = l'écran. La
@@ -347,6 +353,7 @@ private fun Hero(target: HeroTarget?, modifier: Modifier = Modifier) {
         when (target) {
             is HeroTarget.Catalog -> CatalogHero(target.item)
             is HeroTarget.Resume -> ResumeHero(target.entry)
+            is HeroTarget.Watchlist -> WatchlistHero(target.entry)
             null -> Unit
         }
     }
@@ -422,6 +429,45 @@ private fun ResumeHero(entry: ResumeEntry) {
         MoovieProgressBar(
             progress = entry.progress,
             modifier = Modifier.fillMaxWidth(0.3f).height(4.dp),
+        )
+    }
+}
+
+/**
+ * Hero d'une entrée « À regarder plus tard ».
+ *
+ * Volontairement sobre : une entrée mise de côté ne porte ni synopsis, ni note,
+ * ni année — seulement ce qu'il fallait pour dessiner sa carte sans requête
+ * TMDB. Inventer une ligne de plus demanderait d'aller la chercher au moment
+ * même où le focus se déplace, pour un bandeau qu'on quitte aussitôt.
+ */
+@Composable
+private fun WatchlistHero(entry: WatchlistEntry) {
+    Column {
+        Text(
+            stringResource(Res.string.watchlist_row),
+            style = MaterialTheme.typography.titleMedium,
+            color = MOOVIE_ACCENT,
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            entry.title,
+            style = MaterialTheme.typography.displaySmall,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            listOfNotNull(
+                stringResource(
+                    if (entry.isTv) Res.string.media_series else Res.string.media_movie,
+                ),
+                entry.totalEpisodes.takeIf { entry.isTv && it > 0 }?.let {
+                    pluralStringResource(Res.plurals.history_episodes, it, it)
+                },
+            ).joinToString(" · "),
+            style = MaterialTheme.typography.titleMedium,
+            color = Color(0xFFCCCCCC),
         )
     }
 }
@@ -683,6 +729,7 @@ private fun WatchlistRow(
     entries: List<WatchlistEntry>,
     onOpenTitle: (Int, Boolean) -> Unit,
     onMenu: (WatchlistEntry) -> Unit,
+    onFocusEntry: (WatchlistEntry) -> Unit,
     firstFocus: FocusRequester? = null,
 ) {
     Column(modifier = Modifier.scrollAsWholeBlock()) {
@@ -704,11 +751,18 @@ private fun WatchlistRow(
                         entry = entry,
                         onClick = { onOpenTitle(entry.tmdbId, entry.isTv) },
                         onLongClick = { onMenu(entry) },
-                        modifier = if (index == 0 && firstFocus != null) {
-                            Modifier.focusRequester(firstFocus)
-                        } else {
-                            Modifier
-                        },
+                        modifier = Modifier
+                            // Le hero décrit la carte focalisée : ce rappel
+                            // manquait ici, et le bandeau restait figé sur la
+                            // dernière carte de la rangée précédente.
+                            .onFocusChanged { if (it.hasFocus) onFocusEntry(entry) }
+                            .then(
+                                if (index == 0 && firstFocus != null) {
+                                    Modifier.focusRequester(firstFocus)
+                                } else {
+                                    Modifier
+                                },
+                            ),
                     )
                 }
             }
