@@ -21,6 +21,18 @@ data class EmbedLink(
     val language: String? = null,
     /** Catalogue d'origine, renseigné à l'agrégation, pour la priorité. */
     val provider: String? = null,
+    /**
+     * Ce que la source déclare pour distinguer deux liens du **même hébergeur
+     * dans la même langue** : doublage (« VF France », « VF Québec »), palier de
+     * qualité (« Premium », « 1080p »)…
+     *
+     * Sans lui, la liste des sources affiche trois boutons « Vidzy » identiques
+     * et l'utilisateur choisit à l'aveugle. C'est exactement le cas de
+     * french-stream, dont les clés `vff` / `vfq` / `premium` étaient toutes
+     * écrasées en « VF ». Null quand la source ne déclare rien — on n'invente
+     * pas un critère qui n'existe pas.
+     */
+    val variant: String? = null,
 )
 
 /**

@@ -178,4 +178,7 @@
     <string name="explore_movies">Films</string>
     <string name="explore_series">Séries</string>
     <string name="explore_no_results">Aucun titre dans ce genre.</string>
+    <string name="details_source_via">via %1$s</string>
+    <string name="details_sources_summary">%1$d sources · %2$d catalogues</string>
+    <string name="details_sources_searching">Recherche…</string>
 </resources>

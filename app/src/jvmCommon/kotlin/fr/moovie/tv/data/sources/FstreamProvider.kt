@@ -130,7 +130,15 @@ class FstreamProvider(private val http: OkHttpClient) : SourceProvider {
             for ((version, urlEl) in versions) {
                 val raw = (urlEl as? JsonPrimitive)?.content?.trim().orEmpty()
                 if (raw.isBlank()) continue
-                links += EmbedLink(url = expandUrl(hoster, raw), hoster = hoster, language = mapLanguage(version))
+                links += EmbedLink(
+                    url = expandUrl(hoster, raw),
+                    hoster = hoster,
+                    language = mapLanguage(version),
+                    // La clé de version distingue plusieurs copies d'un même
+                    // hébergeur dans la même langue : sans elle, la liste affiche
+                    // trois « Vidzy » indiscernables.
+                    variant = variantLabel(version),
+                )
             }
         }
         return links.distinctBy { it.url }
@@ -185,11 +193,31 @@ class FstreamProvider(private val http: OkHttpClient) : SourceProvider {
         else -> version.uppercase()
     }
 
+
     companion object {
         const val BASE = "https://french-stream.one"
         const val UA =
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
         const val COOKIE = "fsschal=1; dle_skin=VFV25; dle_newpm=0"
+
+        /**
+         * Libellé lisible de la clé de version, ou null quand elle n'apporte rien
+         * de plus que la section de langue déjà affichée.
+         *
+         * `vff` et `vfq` sont deux **doublages** distincts — France et Québec —
+         * que les spectateurs francophones différencient parfaitement. Les écraser
+         * tous les deux en « VF » privait la liste de son seul repère : c'est ce
+         * qui produisait trois boutons « Vidzy » impossibles à départager.
+         */
+        fun variantLabel(version: String): String? = when (version.lowercase()) {
+            "vff" -> "VF France"
+            "vfq" -> "VF Québec"
+            "premium" -> "Premium"
+            "voeng" -> "VO anglais"
+            "vostfr_hd" -> "VOSTFR HD"
+            // "vf", "vostfr", "vo", "default" : redondants avec la langue.
+            else -> null
+        }
 
         private val LOCATION_HREF = Regex("""location\.href=['"]([^'"]+)['"]""")
         private val YEAR_PAREN = Regex("""\((\d{4})\)""")

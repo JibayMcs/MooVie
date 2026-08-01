@@ -74,6 +74,10 @@ class FrembedProvider(private val http: HttpGateway) : SourceProvider {
                         // (« matthewhotelscience » pour un lien Voe).
                         hoster = slug ?: hosterOf(embed),
                         language = languageOf(o["lang"]?.jsonPrimitive?.contentOrNull()),
+                        // L'API porte un palier de qualité, souvent null. Quand il
+                        // est là, c'est ce qui départage deux liens du même
+                        // hébergeur dans la liste.
+                        variant = o["quality"]?.jsonPrimitive?.contentOrNull(),
                     )
                 }
             }.mapNotNull { it.await() }.distinctBy { it.url }

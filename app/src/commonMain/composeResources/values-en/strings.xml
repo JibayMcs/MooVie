@@ -176,4 +176,7 @@
     <string name="explore_movies">Movies</string>
     <string name="explore_series">Shows</string>
     <string name="explore_no_results">No titles in this genre.</string>
+    <string name="details_source_via">via %1$s</string>
+    <string name="details_sources_summary">%1$d sources · %2$d catalogues</string>
+    <string name="details_sources_searching">Searching…</string>
 </resources>

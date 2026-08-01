@@ -70,6 +70,7 @@ import fr.moovie.tv.data.settings.StreamLanguage
 import fr.moovie.tv.core.sources.model.EmbedLink
 import fr.moovie.tv.data.tmdb.CastMember
 import fr.moovie.tv.data.tmdb.Episode
+import fr.moovie.tv.data.tmdb.MovieDetails
 import fr.moovie.tv.data.watch.ResumeEntry
 import fr.moovie.tv.resources.Res
 import fr.moovie.tv.resources.common_back
@@ -90,6 +91,9 @@ import fr.moovie.tv.resources.details_searching_source
 import fr.moovie.tv.resources.details_trying_source
 import fr.moovie.tv.resources.details_seasons
 import fr.moovie.tv.resources.details_sources
+import fr.moovie.tv.resources.details_source_via
+import fr.moovie.tv.resources.details_sources_searching
+import fr.moovie.tv.resources.details_sources_summary
 import fr.moovie.tv.resources.mark_season_unwatched
 import fr.moovie.tv.resources.mark_season_watched
 import fr.moovie.tv.resources.mark_unwatched
@@ -188,17 +192,10 @@ fun DetailsScreenContent(
                 }
                 is DetailsState.Movie -> {
                     val movieWatched = movieKey in watched
-                    Row(
-                        modifier = hPad,
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        Text(s.details.title, style = MaterialTheme.typography.headlineMedium)
-                        if (movieWatched) WatchedBadge()
-                    }
-                    s.details.year?.let { Text(stringResource(Res.string.details_runtime, it, s.details.runtime?.toString() ?: "?"), modifier = hPad) }
-                    Text(s.details.overview, style = MaterialTheme.typography.bodyMedium, modifier = hPad)
-                    CastRow(s.details.credits?.cast.orEmpty())
+                    // Même mise en page que la fiche d'épisode — visuel à gauche,
+                    // métadonnées et synopsis à droite — pour que les deux fiches
+                    // du catalogue se ressemblent au lieu de diverger.
+                    MovieHeader(details = s.details, isWatched = movieWatched)
 
                     // Bouton Lire direct : loader pendant le chargement des sources,
                     // cliquable dès qu'un lien dans la langue préférée existe,
@@ -265,6 +262,10 @@ fun DetailsScreenContent(
                             selected = inWatchlist,
                         )
                     }
+                    // Casting sous les boutons, comme sur la fiche d'épisode : la
+                    // descente au D-pad atteint d'abord Lire, pas une vignette
+                    // d'acteur.
+                    CastRow(s.details.credits?.cast.orEmpty())
                 }
                 is DetailsState.Tv -> {
                     val selected = selectedEpisode
@@ -489,7 +490,7 @@ private fun SourcesSlideOver(
                 modifier = Modifier.fillMaxWidth().then(pPad),
             )
         }
-        ProviderChips(state.providers, modifier = pPad)
+        SourcesSummary(state.providers, sourceCount = links.size, modifier = pPad)
 
         resolveError?.let {
             Text(it, style = MaterialTheme.typography.labelMedium, color = Color(0xFFE06A6A), modifier = pPad)
@@ -524,16 +525,32 @@ private fun SourcesSlideOver(
                             modifier = Modifier.padding(top = if (sectionIndex == 0) 0.dp else 8.dp),
                         )
                     }
+                    // Numérote les liens qu'aucune donnée ne distingue (même
+                    // hébergeur, même variante, même catalogue). Mieux vaut
+                    // « Vidzy · 2 » qu'un troisième bouton identique : au moins
+                    // l'utilisateur sait qu'il en essaie un autre.
+                    val ranks = sourcesInLang
+                        .groupingBy { Triple(it.hoster, it.variant, it.provider) }
+                        .eachCount()
+                    val seen = mutableMapOf<Triple<String, String?, String?>, Int>()
+
                     itemsIndexed(sourcesInLang, key = { _, l -> l.url }) { linkIndex, link ->
-                        val isFirst = sectionIndex == 0 && linkIndex == 0
-                        MoovieButton(
+                        val id = Triple(link.hoster, link.variant, link.provider)
+                        val rank = seen.merge(id, 1, Int::plus) ?: 1
+                        SourceRow(
+                            link = link,
+                            rank = if ((ranks[id] ?: 1) > 1) rank else null,
                             onClick = { onPick(link) },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .then(if (isFirst) Modifier.focusRequester(firstFocus) else Modifier),
-                        ) {
-                            Text(link.hoster.replaceFirstChar { it.uppercase() })
-                        }
+                                .then(
+                                    if (sectionIndex == 0 && linkIndex == 0) {
+                                        Modifier.focusRequester(firstFocus)
+                                    } else {
+                                        Modifier
+                                    },
+                                ),
+                        )
                     }
                 }
             }
@@ -542,30 +559,105 @@ private fun SourcesSlideOver(
 }
 
 /** Pastilles de progression par provider (chargement / trouvé / vide / échec). */
+/**
+ * Une source dans le panneau.
+ *
+ * Le nom d'hébergeur seul ne suffisait pas : trois liens « Vidzy » côte à côte
+ * ne se distinguaient par rien, et le choix se faisait à l'aveugle. La ligne
+ * porte donc ce que la source déclare vraiment — la **variante** (doublage,
+ * palier de qualité) mise en évidence à droite, et le **catalogue** d'origine en
+ * seconde ligne. À défaut de tout critère, un rang numérique.
+ *
+ * Les couleurs secondaires sont des blancs transparents plutôt qu'un gris fixe :
+ * le fond du bouton passe au rouge d'accentuation quand il a le focus, et un
+ * gris y deviendrait illisible.
+ */
 @Composable
-private fun ProviderChips(providers: List<ProviderProgress>, modifier: Modifier = Modifier) {
-    Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        providers.forEach { p ->
-            Row(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color(0xFF1E1E1E))
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                when (p.status) {
-                    ProviderStatus.LOADING -> CircularProgressIndicator(
-                        color = MOOVIE_ACCENT,
-                        strokeWidth = 2.dp,
-                        modifier = Modifier.size(12.dp),
-                    )
-                    ProviderStatus.DONE -> Text("✓", color = Color(0xFF5FD98A), style = MaterialTheme.typography.labelMedium)
-                    ProviderStatus.EMPTY -> Text("—", color = Color(0xFF8A8A8A), style = MaterialTheme.typography.labelMedium)
-                    ProviderStatus.FAILED -> Text("✕", color = Color(0xFFE06A6A), style = MaterialTheme.typography.labelMedium)
-                }
-                Text(p.name, style = MaterialTheme.typography.labelMedium, color = Color(0xFFCCCCCC))
+private fun SourceRow(
+    link: EmbedLink,
+    rank: Int?,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    MoovieButton(onClick = onClick, modifier = modifier) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                buildString {
+                    append(link.hoster.replaceFirstChar { it.uppercase() })
+                    if (rank != null) append(" · $rank")
+                },
+                style = MaterialTheme.typography.titleSmall,
+            )
+            link.provider?.let {
+                Text(
+                    stringResource(Res.string.details_source_via, it),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White.copy(alpha = 0.65f),
+                )
             }
+        }
+        link.variant?.let {
+            Text(
+                it,
+                style = MaterialTheme.typography.labelMedium,
+                color = Color.White.copy(alpha = 0.85f),
+            )
+        }
+    }
+}
+
+/**
+ * Synthèse compacte de la recherche de sources.
+ *
+ * Remplace une puce par catalogue : à cinq providers, la rangée débordait de
+ * l'écran — la dernière puce sortait du cadre et le nom s'y cassait en colonne.
+ * Chaque ligne de la liste indiquant désormais son catalogue d'origine, ces
+ * puces faisaient doublon.
+ *
+ * Ne reste ici que ce que la liste ne dit pas : l'avancement, et les catalogues
+ * en échec — un catalogue vide n'est pas une information utile, un catalogue
+ * cassé en est une.
+ */
+@Composable
+private fun SourcesSummary(
+    providers: List<ProviderProgress>,
+    sourceCount: Int,
+    modifier: Modifier = Modifier,
+) {
+    val loading = providers.count { it.status == ProviderStatus.LOADING }
+    val withResults = providers.count { it.status == ProviderStatus.DONE }
+    val failed = providers.filter { it.status == ProviderStatus.FAILED }
+
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        if (loading > 0) {
+            CircularProgressIndicator(
+                color = MOOVIE_ACCENT,
+                strokeWidth = 2.dp,
+                modifier = Modifier.size(12.dp),
+            )
+            Text(
+                stringResource(Res.string.details_sources_searching),
+                style = MaterialTheme.typography.labelMedium,
+                color = Color(0xFFCCCCCC),
+            )
+        }
+        if (sourceCount > 0) {
+            Text(
+                stringResource(Res.string.details_sources_summary, sourceCount, withResults),
+                style = MaterialTheme.typography.labelMedium,
+                color = Color(0xFFCCCCCC),
+            )
+        }
+        if (failed.isNotEmpty()) {
+            Text(
+                failed.joinToString(", ") { "✕ ${it.name}" },
+                style = MaterialTheme.typography.labelMedium,
+                color = Color(0xFFE06A6A),
+            )
         }
     }
 }
@@ -604,6 +696,85 @@ private fun WatchedBadge(modifier: Modifier = Modifier) {
         contentAlignment = Alignment.Center,
     ) {
         Text("✓", color = Color(0xFF5FD98A), style = MaterialTheme.typography.labelMedium)
+    }
+}
+
+/**
+ * En-tête d'une fiche film, calqué sur celui d'un épisode : visuel à gauche,
+ * métadonnées et synopsis à droite.
+ *
+ * Les deux fiches du catalogue avaient divergé — l'épisode montrait son visuel,
+ * sa date, sa durée et sa note ; le film se contentait d'un titre suivi d'une
+ * ligne de texte. Même gabarit des deux côtés, à une différence près : une
+ * affiche est au format 2:3 là où une vignette d'épisode est en 16:9.
+ */
+@Composable
+private fun MovieHeader(details: MovieDetails, isWatched: Boolean) {
+    Row(
+        modifier = Modifier.padding(horizontal = 48.dp).fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(28.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                // Calé sur la *hauteur* de la vignette d'épisode (420 × 16:9 ≈
+                // 236 dp), pas sur sa largeur : une affiche 2:3 de 240 dp de large
+                // en ferait 360 de haut et repousserait titre, genres et note hors
+                // de l'écran dès que le focus descend sur « Lecture ».
+                .width(160.dp)
+                .aspectRatio(2f / 3f)
+                .clip(RoundedCornerShape(10.dp))
+                .background(Color(0xFF222222)),
+        ) {
+            AsyncImage(
+                model = details.posterUrl() ?: details.backdropUrl(),
+                contentDescription = details.title,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            val genres = details.genres.mapNotNull { it.name.takeIf(String::isNotBlank) }
+            if (genres.isNotEmpty()) {
+                Text(
+                    genres.take(3).joinToString(" · "),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MOOVIE_ACCENT,
+                )
+            }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(details.title, style = MaterialTheme.typography.headlineSmall)
+                if (isWatched) WatchedBadge()
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                details.year?.let {
+                    Text(it, style = MaterialTheme.typography.titleSmall, color = Color(0xFFCCCCCC))
+                }
+                details.runtime?.takeIf { it > 0 }?.let {
+                    Text(
+                        stringResource(Res.string.details_episode_runtime, it),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = Color(0xFFCCCCCC),
+                    )
+                }
+                if (details.voteAverage > 0) {
+                    Text(
+                        "★ %.1f".format(details.voteAverage),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = Color(0xFFE6B800),
+                    )
+                }
+            }
+            if (details.overview.isNotBlank()) {
+                Text(
+                    details.overview,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color(0xFFDDDDDD),
+                )
+            }
+        }
     }
 }
 
