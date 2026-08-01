@@ -22,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import fr.moovie.tv.ui.theme.MoovieGradient
 import androidx.compose.ui.unit.dp
 import fr.moovie.tv.resources.Res
 import fr.moovie.tv.resources.update_available
@@ -53,11 +54,10 @@ fun UpdateBanner(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(
-                    Brush.horizontalGradient(
-                        listOf(Color(0xFFE85D04), Color(0xFFB5179E), Color(0xFF3A0CA3)),
-                    ),
-                )
+                // Le dégradé de l'app, pas une seconde version approchante :
+                // ce bandeau avait ses propres teintes, proches sans être les
+                // mêmes — deux identités pour un seul produit.
+                .background(MoovieGradient)
                 .padding(horizontal = 32.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(16.dp),

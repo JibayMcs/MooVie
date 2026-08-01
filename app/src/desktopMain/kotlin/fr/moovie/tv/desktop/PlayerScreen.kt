@@ -43,6 +43,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import fr.moovie.tv.ui.theme.MoovieShape
+import fr.moovie.tv.ui.theme.moovieSurface
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -687,6 +688,9 @@ internal fun DesktopPlayerScreen(
                     .align(Alignment.Center)
                     .clip(MoovieShape)
                     .background(Color(0xB3000000))
+                    // Même liseré que le reste de l'app : ce message est
+                    // propre au desktop, il n'a pas à parler une autre langue.
+                    .moovieSurface(active = false, selected = true)
                     .padding(horizontal = 18.dp, vertical = 12.dp),
             )
         }
