@@ -5,6 +5,18 @@ import fr.moovie.tv.core.sources.port.HttpRequest
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 
+/** Hébergeurs proposés par les catalogues mais jamais résolus. */
+private val HOSTERS = setOf("netu", "waaw", "filmoon", "savefiles", "serix", "flemmix")
+
+/**
+ * Retire les commentaires JS avant d'y chercher des indices d'extraction.
+ *
+ * Sans ça, un gabarit de lecteur qui garde en commentaire une URL d'exemple
+ * fait croire à une piste exploitable. C'est arrivé deux fois sur waaw.
+ */
+private fun stripComments(html: String): String =
+    html.replace(Regex("""/\*.*?\*/""", RegexOption.DOT_MATCHES_ALL), " ")
+
 /**
  * Sonde de diagnostic — PAS un test unitaire.
  *
@@ -15,10 +27,10 @@ import kotlin.test.Test
  * n'est pas l'absence d'extracteur mais une URL morte — le même piège que le
  * gabarit périmé de waaw.
  */
-class NetuDiagnosticProbeTest {
+class HosterFeasibilityProbeTest {
 
     @Test
-    fun probeNetu() = runBlocking {
+    fun probeHosterFeasibility() = runBlocking {
         if (System.getProperty("moovie.probe") == null) return@runBlocking
 
         val medias = listOf(
@@ -31,7 +43,7 @@ class NetuDiagnosticProbeTest {
             val netu = ProviderRegistry.all.flatMap { p ->
                 runCatching { p.sourcesFor(media) }.getOrDefault(emptyList())
                     .map { it to p.name }
-            }.filter { it.first.hoster.contains("netu", ignoreCase = true) }
+            }.filter { it.first.hoster.lowercase() in HOSTERS }
 
             println("\n════════ $media ════════")
             println("liens netu : ${netu.size}")
@@ -49,9 +61,16 @@ class NetuDiagnosticProbeTest {
                 println("  type      : ${resp?.header("Content-Type")}")
                 resp?.body?.take(180)?.replace("\n", " ")?.let { println("  début     : $it") }
                 resp?.body?.let { b ->
-                    val hints = listOf("m3u8", "eval(function", "sources", "jwplayer", "atob", "mp4")
-                        .filter { h -> h in b }
+                    val live = stripComments(b)
+                    val hints = listOf("m3u8", "eval(function", "jwplayer", "sources:")
+                        .filter { h -> h in live }
                     println("  indices   : " + hints.joinToString().ifEmpty { "aucun" })
+                    // Le même piège deux fois : chercher « m3u8 » dans le corps
+                    // brut fait passer du code mort pour une piste. Chez waaw,
+                    // l'unique occurrence était une URL d'exemple de 2018 —
+                    // jeton expiré fin 2020 — enfermée dans un bloc commenté.
+                    val dead = "m3u8" in b && "m3u8" !in live
+                    if (dead) println("  ⚠️ m3u8 présent mais **en commentaire** : gabarit mort, pas une piste")
                 }
             }
         }
