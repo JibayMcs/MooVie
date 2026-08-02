@@ -165,6 +165,12 @@ fun SettingsScreenContent(
     languageSelector: @Composable () -> Unit,
 ) {
     var section by remember { mutableStateOf(SettingsSection.API) }
+    // La section ne suit le focus que si celui-ci vient d'un appui haut/bas dans
+    // le volet. Compose replie le focus sur le premier élément focalisable quand
+    // celui qui le portait disparaît : sans ce garde-fou, un contrôle du volet
+    // droit qui s'efface (une étape de sauvegarde qui passe à la suivante)
+    // ramenait le focus ici et faisait sauter la section affichée.
+    var navKeyDriven by remember { mutableStateOf(true) }
     // Focus initial sur la 1re section, pas sur un contrôle : le champ clé TMDB
     // s'auto-focaliserait et ouvrirait le clavier à l'entrée dans l'écran.
     val firstSectionFocus = remember { FocusRequester() }
@@ -177,6 +183,24 @@ fun SettingsScreenContent(
                 .width(NAV_WIDTH)
                 .fillMaxHeight()
                 .background(Color(0xFF141414))
+                // Défilant : à neuf sections, la liste dépasse la hauteur d'un
+                // écran 1080p et poussait le bouton Retour hors champ.
+                .verticalScroll(rememberScrollState())
+                // Piloté par les touches et non par le focus perdu : Compose
+                // notifie la perte avant le gain, et un drapeau remis à zéro sur
+                // la perte annulait le changement de section qu'il devait servir.
+                .onPreviewKeyEvent { event ->
+                    if (event.type == KeyEventType.KeyDown) {
+                        when (event.key) {
+                            Key.DirectionUp, Key.DirectionDown -> navKeyDriven = true
+                            // Droite : on quitte le volet. Un retour du focus ici
+                            // sans nouvel appui sera un repli, pas un choix.
+                            Key.DirectionRight -> navKeyDriven = false
+                            else -> Unit
+                        }
+                    }
+                    false
+                }
                 .padding(vertical = 40.dp, horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
@@ -195,14 +219,16 @@ fun SettingsScreenContent(
                         // D-pad montre directement les réglages visés. Valider
                         // pour changer de section obligeait à un aller-retour par
                         // catégorie juste pour savoir ce qu'elle contient.
-                        .onFocusChanged { if (it.isFocused) section = entry }
+                        .onFocusChanged { if (it.isFocused && navKeyDriven) section = entry }
                         .then(if (index == 0) Modifier.focusRequester(firstSectionFocus) else Modifier),
                 ) {
                     // weight : le libellé occupe la ligne, donc reste aligné à gauche.
                     Text(sectionLabel(entry), modifier = Modifier.weight(1f))
                 }
             }
-            Spacer(Modifier.weight(1f))
+            // Écart fixe, plus un poids : dans une colonne défilante, `weight`
+            // ne repousse plus rien vers le bas et le bouton disparaissait.
+            Spacer(Modifier.height(20.dp))
             MoovieButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(Res.string.common_back), modifier = Modifier.weight(1f))
             }
