@@ -48,6 +48,7 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.MediaSession
 import androidx.media3.ui.PlayerView
 import fr.moovie.tv.ui.format.formatNowDateTime
+import fr.moovie.tv.core.player.matchAudioTrack
 import fr.moovie.tv.data.intro.IntroDbRepository
 import fr.moovie.tv.data.intro.IntroMedia
 import fr.moovie.tv.data.settings.ScreensaverDelay
@@ -263,6 +264,27 @@ fun PlayerScreen(
             durationMs = controller.durationMs()
             bufferedMs = controller.bufferedMs()
             delay(500)
+        }
+    }
+
+    /** Clé de titre (`tv:<id>`) : la préférence audio vaut pour toute la série. */
+    val titleKey = remember(mediaKey) {
+        parseMediaKey(mediaKey)?.let { if (it.isTv) "tv:${it.tmdbId}" else null }
+    }
+
+    // Réapplique la piste audio retenue sur cette série. Le libellé, jamais
+    // l'identifiant : celui-ci est propre au flux (voir matchAudioTrack).
+    var audioRestored by remember(mediaKey) { mutableStateOf(false) }
+    LaunchedEffect(tracks.audio, titleKey) {
+        val key = titleKey ?: return@LaunchedEffect
+        if (audioRestored || tracks.audio.size < 2) return@LaunchedEffect
+        val remembered = progress.audioTrack(key) ?: return@LaunchedEffect
+        val target = matchAudioTrack(remembered, tracks.audio.map { it.label }) ?: return@LaunchedEffect
+        val track = tracks.audio.firstOrNull { it.label == target } ?: return@LaunchedEffect
+        audioRestored = true
+        if (!track.selected) {
+            controller.selectAudio(track.id)
+            tracks = controller.tracks()
         }
     }
 
@@ -724,6 +746,13 @@ fun PlayerScreen(
                     audioSection(tracks) { trackId ->
                         controller.selectAudio(trackId)
                         tracks = controller.tracks()
+                        // Retenu au niveau du *titre* : on choisit une langue
+                        // pour une série, pas pour un épisode.
+                        titleKey?.let { key ->
+                            tracks.audio.firstOrNull { it.id == trackId }?.label?.let { label ->
+                                exitScope.launch { progress.setAudioTrack(key, label) }
+                            }
+                        }
                         dialog = null
                     },
                 ).filter { it.options.isNotEmpty() },

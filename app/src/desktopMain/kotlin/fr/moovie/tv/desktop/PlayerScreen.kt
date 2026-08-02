@@ -90,6 +90,7 @@ import fr.moovie.tv.ui.player.SkipKind
 import fr.moovie.tv.ui.player.PlayerTitleOverlay
 import fr.moovie.tv.ui.player.PlayerTracks
 import fr.moovie.tv.ui.player.PlayerUpdateChip
+import fr.moovie.tv.core.player.matchAudioTrack
 import fr.moovie.tv.ui.player.parseMediaKey
 import fr.moovie.tv.ui.player.toPlayerSegments
 import fr.moovie.tv.ui.player.audioSection
@@ -439,6 +440,27 @@ internal fun DesktopPlayerScreen(
             header("Referer")?.let { add(":http-referrer=$it") }
         }
         player.media().play(streamUrl, *options.toTypedArray())
+    }
+
+    /** Clé de titre (`tv:<id>`) : la préférence audio vaut pour toute la série. */
+    val titleKey = remember(mediaKey) {
+        parseMediaKey(mediaKey)?.let { if (it.isTv) "tv:${it.tmdbId}" else null }
+    }
+
+    // Réapplique la piste audio retenue sur cette série — par libellé, jamais
+    // par identifiant : libVLC numérote ses pistes par flux (voir matchAudioTrack).
+    var audioRestored by remember(mediaKey) { mutableStateOf(false) }
+    LaunchedEffect(tracks.audio, titleKey) {
+        val key = titleKey ?: return@LaunchedEffect
+        if (audioRestored || tracks.audio.size < 2) return@LaunchedEffect
+        val remembered = progress.audioTrack(key) ?: return@LaunchedEffect
+        val target = matchAudioTrack(remembered, tracks.audio.map { it.label }) ?: return@LaunchedEffect
+        val track = tracks.audio.firstOrNull { it.label == target } ?: return@LaunchedEffect
+        audioRestored = true
+        if (!track.selected) {
+            controller.selectAudio(track.id)
+            tracks = controller.tracks()
+        }
     }
 
     // Suivi de l'état du lecteur + sauvegarde périodique de la position (~5 s).
@@ -871,6 +893,13 @@ internal fun DesktopPlayerScreen(
                     audioSection(tracks) { trackId ->
                         controller.selectAudio(trackId)
                         tracks = controller.tracks()
+                        // Retenu au niveau du *titre* : on choisit une langue
+                        // pour une série, pas pour un épisode.
+                        titleKey?.let { key ->
+                            tracks.audio.firstOrNull { it.id == trackId }?.label?.let { label ->
+                                saveScope.launch { progress.setAudioTrack(key, label) }
+                            }
+                        }
                         dialog = null
                     },
                 ).filter { it.options.isNotEmpty() },

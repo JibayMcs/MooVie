@@ -16,6 +16,7 @@ private const val SEEN_PREFIX = "seen:"
 private const val LATER_PREFIX = "later:"
 private const val HIST_PREFIX = "hist:"
 private const val META_PREFIX = "meta:"
+private const val AUDIO_PREFIX = "audio:"
 
 /**
  * Suivi de lecture : reprise (position + métadonnées) et statut vu/non vu.
@@ -138,6 +139,22 @@ class WatchProgressRepository {
     }
 
     /** Retire un contenu du rail « Reprendre » (sans toucher au statut vu). */
+    /**
+     * Piste audio retenue pour un titre, sous forme de **libellé** et non
+     * d'identifiant : celui-ci est propre au flux, et le rejouer d'un épisode à
+     * l'autre désignerait une piste au hasard (voir `matchAudioTrack`).
+     *
+     * Clé au niveau du titre (`tv:<id>`) : on choisit une langue pour une série,
+     * pas pour un épisode.
+     */
+    suspend fun audioTrack(titleKey: String): String? =
+        store.data.first()[stringPreferencesKey(AUDIO_PREFIX + titleKey)]?.takeIf { it.isNotBlank() }
+
+    suspend fun setAudioTrack(titleKey: String, label: String) {
+        if (titleKey.isBlank() || label.isBlank()) return
+        store.edit { it[stringPreferencesKey(AUDIO_PREFIX + titleKey)] = label }
+    }
+
     suspend fun remove(key: String) {
         store.edit { it.remove(stringPreferencesKey(RESUME_PREFIX + key)) }
     }
