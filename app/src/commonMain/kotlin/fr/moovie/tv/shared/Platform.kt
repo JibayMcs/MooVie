@@ -11,3 +11,12 @@ expect val platformName: String
  * capture des touches gauche/droite.
  */
 expect val isPointerUi: Boolean
+
+/**
+ * Version de l'app telle qu'affichée à l'utilisateur (« 1.10.0 »).
+ *
+ * Elle vient du `versionName` sur Android et de la propriété système
+ * `moovie.version` sur desktop, mais les deux sortent du même `appVersion` du
+ * build : ce pont évite d'avoir à choisir lequel lire depuis le code partagé.
+ */
+expect val appVersionName: String

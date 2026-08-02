@@ -75,6 +75,57 @@ class WatchProgressRepository {
         store.edit { it.remove(stringPreferencesKey(HIST_PREFIX + key)) }
     }
 
+    /** Fiches mémorisées, pour l'export. */
+    suspend fun titles(): Map<String, TitleMeta> = store.data.first().asMap()
+        .mapNotNull { (k, v) ->
+            if (!k.name.startsWith(META_PREFIX)) return@mapNotNull null
+            val meta = runCatching { json.decodeFromString<TitleMeta>(v as String) }.getOrNull()
+            meta?.let { k.name.removePrefix(META_PREFIX) to it }
+        }
+        .toMap()
+
+    /** Pistes audio retenues, par titre, pour l'export. */
+    suspend fun audioTracks(): Map<String, String> = store.data.first().asMap()
+        .mapNotNull { (k, v) ->
+            if (!k.name.startsWith(AUDIO_PREFIX)) return@mapNotNull null
+            (v as? String)?.takeIf { it.isNotBlank() }?.let { k.name.removePrefix(AUDIO_PREFIX) to it }
+        }
+        .toMap()
+
+    /**
+     * Réécrit tout le suivi d'un coup, à l'import.
+     *
+     * On efface avant d'écrire : `mergeBackup` rend l'**état final voulu**, que
+     * l'utilisateur ait choisi de fusionner ou de remplacer. Repartir de zéro
+     * évite qu'une entrée que la fusion a écartée survive faute d'être écrasée.
+     * Les fiches ([TitleMeta]) échappent au ménage : elles ne coûtent rien et
+     * portent les affiches de l'historique.
+     */
+    suspend fun replaceAll(
+        resume: List<ResumeEntry>,
+        watchlist: List<WatchlistEntry>,
+        watched: Set<String>,
+        history: List<HistoryEntry>,
+        audioTracks: Map<String, String>,
+        titles: Map<String, TitleMeta> = emptyMap(),
+    ) {
+        store.edit { prefs ->
+            prefs.asMap().keys
+                .filter { key ->
+                    listOf(RESUME_PREFIX, SEEN_PREFIX, LATER_PREFIX, HIST_PREFIX, AUDIO_PREFIX)
+                        .any { key.name.startsWith(it) }
+                }
+                .forEach { prefs.remove(it) }
+
+            resume.forEach { prefs[stringPreferencesKey(RESUME_PREFIX + it.key)] = json.encodeToString(it) }
+            watchlist.forEach { prefs[stringPreferencesKey(LATER_PREFIX + it.key)] = json.encodeToString(it) }
+            watched.forEach { prefs[booleanPreferencesKey(SEEN_PREFIX + it)] = true }
+            history.forEach { prefs[stringPreferencesKey(HIST_PREFIX + it.key)] = json.encodeToString(it) }
+            audioTracks.forEach { (k, v) -> prefs[stringPreferencesKey(AUDIO_PREFIX + k)] = v }
+            titles.forEach { (k, v) -> prefs[stringPreferencesKey(META_PREFIX + k)] = json.encodeToString(v) }
+        }
+    }
+
     /** Position sauvegardée en ms (0 si aucune / terminé). */
     suspend fun position(key: String): Long = entry(key)?.positionMs ?: 0L
 

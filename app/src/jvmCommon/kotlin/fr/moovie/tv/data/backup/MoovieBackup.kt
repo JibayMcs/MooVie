@@ -2,8 +2,11 @@ package fr.moovie.tv.data.backup
 
 import fr.moovie.tv.data.watch.HistoryEntry
 import fr.moovie.tv.data.watch.ResumeEntry
+import fr.moovie.tv.data.watch.TitleMeta
 import fr.moovie.tv.data.watch.WatchlistEntry
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
 /**
  * Contenu d'un fichier de sauvegarde Moo-vie.
@@ -38,6 +41,12 @@ data class MoovieBackup(
     val history: List<HistoryEntry> = emptyList(),
     /** Piste audio retenue par titre (`tv:1396` → « French »). */
     val audioTracks: Map<String, String> = emptyMap(),
+    /**
+     * Fiches relevées à l'ouverture d'un titre (nom, affiche, genres). Sans
+     * elles, l'historique importé s'afficherait en vignettes vides tant que
+     * l'utilisateur n'a pas rouvert chaque fiche.
+     */
+    val titles: Map<String, TitleMeta> = emptyMap(),
 
     /**
      * Clé TMDB. **C'est un secret** : sans elle l'import ne dispenserait pas de
@@ -57,7 +66,6 @@ data class MoovieBackup(
 @Serializable
 data class BackupSettings(
     val streamLanguage: String? = null,
-    val appLanguage: String? = null,
     val disabledProviders: List<String> = emptyList(),
     val providerOrder: List<String> = emptyList(),
     val dohEnabled: Boolean? = null,
@@ -69,6 +77,34 @@ data class BackupSettings(
     val updateInterval: String? = null,
     val screensaverDelay: String? = null,
 )
+
+/**
+ * Lecture et écriture du fichier.
+ *
+ * Séparé du dépôt pour rester éprouvable sans magasin DataStore : c'est la
+ * frontière entre l'app et un fichier venu d'ailleurs, donc l'endroit où une
+ * régression se paie par un import raté.
+ */
+object BackupJson {
+
+    private val json = Json {
+        prettyPrint = true
+        ignoreUnknownKeys = true
+        encodeDefaults = true
+    }
+
+    fun encode(backup: MoovieBackup): String = json.encodeToString(backup)
+
+    /**
+     * Rend null si ce n'est pas du JSON Moo-vie, ou si le format est plus
+     * récent que ce que cette version sait lire — mieux vaut refuser
+     * franchement que d'importer une moitié de sauvegarde.
+     */
+    fun decode(raw: String): MoovieBackup? =
+        runCatching { json.decodeFromString<MoovieBackup>(raw) }
+            .getOrNull()
+            ?.takeIf { it.version <= MoovieBackup.FORMAT_VERSION }
+}
 
 /** Ce qu'un fichier contient, pour l'aperçu **avant** d'agir. */
 data class BackupSummary(
