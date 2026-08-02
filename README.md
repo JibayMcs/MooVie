@@ -94,6 +94,27 @@ Layout: `app/src/commonMain` (resources), `app/src/jvmCommon` (ViewModels, repos
 shared UI), `app/src/androidMain`, `app/src/desktopMain`. A preconfigured Android TV
 emulator and its test scripts live in `emulator/`.
 
+## Contributing
+
+**Contributions are open and wanted.** The desktop builds are the ones that need
+eyes most: they are produced by CI for Linux, Windows and macOS, but each of those
+lands on hardware, drivers and a libVLC install that nobody here can reproduce.
+Testing one of them on your own machine is genuinely useful work.
+
+If anything misbehaves — a build that won't start, a stream that plays on Android TV
+but not on desktop, a control the remote can't reach — please
+[open an issue](https://github.com/JibayMcs/MooVie/issues). What helps most:
+
+- your platform and version (distribution, Windows/macOS build, TV box model)
+- the app version, from **Settings → Updates**
+- what you expected, and what happened instead
+- for a playback problem: the title, and which source you picked in the panel
+
+Pull requests are welcome too — a new source provider or host extractor is the most
+valuable kind, since every dead link costs someone a title. `.claude/skills/add-source/`
+documents how one is written and, more importantly, how to *measure* whether it earns
+its place.
+
 ## License
 
 Open source, for personal use. Moo-vie hosts no content: it only resolves links that are

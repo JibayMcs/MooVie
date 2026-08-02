@@ -96,6 +96,27 @@ Découpage : `app/src/commonMain` (ressources), `app/src/jvmCommon` (ViewModels,
 UI partagée), `app/src/androidMain`, `app/src/desktopMain`. Un émulateur Android TV
 préconfiguré et ses scripts de test sont dans `emulator/`.
 
+## Contribuer
+
+**Les contributions sont libres et souhaitées.** Ce sont les versions desktop qui ont
+le plus besoin de regards : la CI les produit pour Linux, Windows et macOS, mais
+chacune atterrit sur un matériel, des pilotes et une installation libVLC que personne
+ici ne peut reproduire. Tester l'une d'elles sur ta machine est un vrai coup de main.
+
+Si quoi que ce soit se passe mal — une version qui ne démarre pas, un flux qui passe
+sur Android TV mais pas sur desktop, un contrôle que la télécommande n'atteint pas —
+[ouvre une issue](https://github.com/JibayMcs/MooVie/issues). Ce qui aide le plus :
+
+- ta plateforme et sa version (distribution, build Windows/macOS, modèle de box TV)
+- la version de l'app, dans **Réglages → Mises à jour**
+- ce que tu attendais, et ce qui s'est produit à la place
+- pour un problème de lecture : le titre, et la source choisie dans le panneau
+
+Les pull requests sont bienvenues aussi — un nouveau catalogue de sources ou un
+extracteur d'hébergeur est le plus utile, chaque lien mort coûtant un titre à
+quelqu'un. `.claude/skills/add-source/` explique comment on en écrit un et, surtout,
+comment *mesurer* s'il mérite sa place.
+
 ## Licence
 
 Open source, pour un usage personnel. Moo-vie n'héberge aucun contenu : elle ne fait que
