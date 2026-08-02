@@ -45,6 +45,12 @@ depuis une seule base de code Kotlin Multiplatform. L'extraction des sources se 
 - **Lecture auto de l'épisode suivant** — décompte de 10 s en fin d'épisode, annulable, qui
   bascule sur la saison suivante en fin de saison.
 - **Écran de veille** — l'affiche rebondit à l'écran quand la lecture reste en pause.
+- **Sauvegarde & restauration** — exporte ta progression, ta liste, ton historique et tes
+  réglages sur une clé USB, et retrouve-les sur un autre appareil. L'import montre le
+  contenu du fichier avant d'agir (compteurs, date d'export, appareil d'origine) et laisse
+  choisir entre **fusionner** — la progression la plus récente gagne, rien n'est perdu — et
+  **remplacer**. Un écran de premier lancement propose la restauration plutôt que de
+  déposer l'utilisateur sur un accueil vide.
 - **Cache disque** — réponses TMDB et liens de sources résolus mis en cache.
 - **Mises à jour intégrées** — vérification périodique des releases GitHub : bandeau sur
   l'accueil, pastille discrète pendant la lecture.

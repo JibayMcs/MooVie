@@ -44,6 +44,11 @@ no account, no ads.
 - **Auto-play next episode** — 10 s countdown at the end of an episode, cancellable,
   rolling over to the next season.
 - **Screensaver** — the poster bounces around the screen while playback stays paused.
+- **Backup & restore** — export your progress, watchlist, history and settings to a USB
+  stick, and pick them up on another device. The import previews the file before acting
+  (counts, export date, source device) and lets you **merge** — most recent progress wins,
+  nothing is lost — or **replace**. A first-launch screen offers the restore instead of
+  dropping you on an empty home.
 - **Offline-friendly** — TMDB responses and resolved source links are cached on disk.
 - **In-app updates** — periodic check against GitHub Releases; a banner on the home
   screen, a discreet chip during playback.
