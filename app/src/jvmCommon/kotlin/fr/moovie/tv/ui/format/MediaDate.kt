@@ -59,6 +59,21 @@ private fun formatterFor(locale: Locale): DateTimeFormatter = formatters.getOrPu
 }
 
 /**
+ * Instant daté dans la langue de l'app : « 02/08/2026 · 14:30 ».
+ *
+ * Sert à l'aperçu d'une sauvegarde, où la date répond à la seule question qui
+ * compte avant d'importer : est-ce plus récent que ce que j'ai ici ? D'où
+ * l'heure, deux exports du même jour étant le cas courant.
+ */
+fun formatBackupDate(ms: Long): String {
+    if (ms <= 0) return "—"
+    val locale = Locale.getDefault()
+    val moment = java.time.Instant.ofEpochMilli(ms).atZone(java.time.ZoneId.systemDefault())
+    val time = DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT).withLocale(locale).format(moment)
+    return "${formatterFor(locale).format(moment)} · $time"
+}
+
+/**
  * Date et heure courantes, dans la langue de l'app : « sam. 1 août · 21:42 ».
  *
  * Format long-mais-abrégé pour la date (jour de semaine + jour + mois) et

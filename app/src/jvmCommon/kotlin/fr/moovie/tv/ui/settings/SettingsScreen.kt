@@ -60,6 +60,7 @@ import fr.moovie.tv.resources.screensaver_never
 import fr.moovie.tv.resources.settings_autoplay
 import fr.moovie.tv.resources.settings_autoplay_help
 import fr.moovie.tv.resources.settings_cat_api
+import fr.moovie.tv.resources.settings_cat_backup
 import fr.moovie.tv.resources.settings_cat_dns
 import fr.moovie.tv.resources.settings_cat_intro
 import fr.moovie.tv.resources.settings_cat_playback
@@ -95,6 +96,7 @@ import fr.moovie.tv.resources.settings_update_interval
 import fr.moovie.tv.resources.update_every_hours
 import fr.moovie.tv.resources.update_every_minutes
 import fr.moovie.tv.resources.update_never
+import fr.moovie.tv.ui.backup.BackupSection
 import fr.moovie.tv.ui.components.MoovieButton
 import fr.moovie.tv.ui.components.MoovieIconButton
 import fr.moovie.tv.ui.components.MoovieSelect
@@ -107,7 +109,9 @@ import org.jetbrains.compose.resources.stringResource
 private val NAV_WIDTH = 260.dp
 
 /** Sections de l'écran, dans l'ordre d'affichage du volet gauche. */
-private enum class SettingsSection { API, PLAYBACK, INTRO, HISTORY, SCREENSAVER, UPDATE, DNS, SOURCES }
+private enum class SettingsSection {
+    API, PLAYBACK, INTRO, HISTORY, SCREENSAVER, UPDATE, DNS, SOURCES, BACKUP,
+}
 
 @Composable
 private fun sectionLabel(section: SettingsSection): String = stringResource(
@@ -120,6 +124,7 @@ private fun sectionLabel(section: SettingsSection): String = stringResource(
         SettingsSection.UPDATE -> Res.string.settings_cat_update
         SettingsSection.DNS -> Res.string.settings_cat_dns
         SettingsSection.SOURCES -> Res.string.settings_cat_sources
+        SettingsSection.BACKUP -> Res.string.settings_cat_backup
     },
 )
 
@@ -375,6 +380,10 @@ fun SettingsScreenContent(
                         )
                     }
                 }
+
+                // Seule section à porter son propre état : c'est un parcours en
+                // plusieurs étapes, pas un réglage. Voir [BackupSection].
+                SettingsSection.BACKUP -> BackupSection()
             }
         }
     }
