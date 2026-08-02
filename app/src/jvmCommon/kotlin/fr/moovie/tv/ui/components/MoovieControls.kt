@@ -72,6 +72,7 @@ private val DISABLED_FG = Color(0xFF5A5A5A)
  * liseré aux couleurs de la bannière. [selected] garde le liseré seul, pour
  * marquer l'option retenue sans rallumer tout l'écran.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MoovieButton(
     onClick: () -> Unit,
@@ -79,6 +80,12 @@ fun MoovieButton(
     selected: Boolean = false,
     enabled: Boolean = true,
     contentPadding: PaddingValues = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+    /**
+     * Appui long OK / clic droit. Même mécanique que [MoovieCard] : sur une
+     * télécommande, `combinedClickable` seul ne déclenche rien, Android se
+     * contentant de répéter les KeyDown tant que la touche est tenue.
+     */
+    onLongClick: (() -> Unit)? = null,
     content: @Composable RowScope.() -> Unit,
 ) {
     val interaction = remember { MutableInteractionSource() }
@@ -111,14 +118,65 @@ fun MoovieButton(
                 pressed = pressed && enabled,
                 glowAlpha = glow,
             )
-            .clickable(interactionSource = interaction, indication = null, enabled = enabled, onClick = onClick)
+            .then(longPressKeys(onLongClick))
+            .combinedClickable(
+                interactionSource = interaction,
+                indication = null,
+                enabled = enabled,
+                onClick = onClick,
+                onLongClick = onLongClick,
+            )
             .padding(contentPadding),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        CompositionLocalProvider(LocalContentColor provides fg) {
+        // Le contenu peut réagir au focus (afficher un ✕, dérouler un titre…)
+        // sans que chaque appelant ait à propager l'état.
+        CompositionLocalProvider(LocalContentColor provides fg, LocalMoovieCardActive provides active) {
             ProvideTextStyle(MaterialTheme.typography.labelLarge) {
                 content()
             }
+        }
+    }
+}
+
+/**
+ * Détection de l'appui long au D-pad, partagée par [MoovieButton] et
+ * [MoovieCard].
+ *
+ * `combinedClickable` ne déclenche `onLongClick` qu'au pointeur : sur une
+ * télécommande, maintenir OK ne produisait rien. Android répète les KeyDown tant
+ * que la touche est tenue — on les compte, et on avale le KeyUp final pour que
+ * le clic simple ne parte pas en plus de l'appui long.
+ *
+ * L'appui long ne se déclenche qu'au **relâchement**, jamais pendant que la
+ * touche est tenue : une popup ouverte sous une touche encore enfoncée recevait
+ * aussitôt la fin de l'appui et validait sa première action.
+ */
+@Composable
+private fun longPressKeys(onLongClick: (() -> Unit)?): Modifier {
+    if (onLongClick == null) return Modifier
+    val confirm = remember { ConfirmKeyPress() }
+    val scope = rememberCoroutineScope()
+    DisposableEffect(confirm) { onDispose { confirm.reset() } }
+    return Modifier.onPreviewKeyEvent { event ->
+        if (event.key !in CONFIRM_KEYS) return@onPreviewKeyEvent false
+        when (event.type) {
+            KeyEventType.KeyDown -> {
+                confirm.downs++
+                confirm.watchdog?.cancel()
+                confirm.watchdog = scope.launch {
+                    delay(CONFIRM_RELEASE_MS)
+                    confirm.downs = 0
+                }
+                confirm.downs >= LONG_PRESS_DOWNS
+            }
+            KeyEventType.KeyUp -> {
+                val long = confirm.downs >= LONG_PRESS_DOWNS
+                confirm.reset()
+                if (long) onLongClick()
+                long
+            }
+            else -> false
         }
     }
 }

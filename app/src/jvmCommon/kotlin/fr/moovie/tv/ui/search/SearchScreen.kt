@@ -63,11 +63,13 @@ import fr.moovie.tv.resources.search_loading
 import fr.moovie.tv.resources.search_needs_key
 import fr.moovie.tv.resources.search_no_results
 import fr.moovie.tv.resources.search_recent
+import fr.moovie.tv.resources.search_recent_hint
 import fr.moovie.tv.resources.search_remove_query
 import fr.moovie.tv.resources.search_title
 import fr.moovie.tv.resources.search_voice
 import fr.moovie.tv.ui.theme.MOOVIE_ACCENT
 import fr.moovie.tv.ui.components.MoovieButton
+import fr.moovie.tv.ui.components.LocalMoovieCardActive
 import fr.moovie.tv.ui.components.MoovieCard
 import fr.moovie.tv.ui.components.MoovieIconButton
 import fr.moovie.tv.ui.components.MoovieMarqueeText
@@ -287,35 +289,47 @@ private fun HistorySection(
         return
     }
     Column(modifier = modifier) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Text(stringResource(Res.string.search_recent), style = MaterialTheme.typography.titleMedium)
-            MoovieIconButton(
-                onClick = onClear,
-                icon = Icons.Default.DeleteSweep,
-                contentDescription = stringResource(Res.string.search_clear_history),
-            )
-        }
+        Text(stringResource(Res.string.search_recent), style = MaterialTheme.typography.titleMedium)
+        Spacer(Modifier.height(4.dp))
+        // La suppression par appui long ne se devine pas : on l'annonce une
+        // fois, discrètement, plutôt que d'accoler un ✕ à chaque terme — c'est
+        // ce doublement de boutons qui alourdissait la rangée.
+        Text(
+            stringResource(Res.string.search_recent_hint),
+            style = MaterialTheme.typography.labelMedium,
+            color = Color(0xFF888888),
+        )
         Spacer(Modifier.height(12.dp))
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             history.forEach { q ->
-                // Chip = relancer la recherche ; ✕ accolé = supprimer cette entrée.
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    MoovieButton(onClick = { onPick(q) }) { Text(q) }
-                    MoovieIconButton(
-                        onClick = { onRemove(q) },
-                        icon = Icons.Default.Close,
-                        contentDescription = stringResource(Res.string.search_remove_query, q),
-                    )
+                // Un seul élément focalisable par terme : OK relance la
+                // recherche, l'appui long la retire. Le ✕ n'apparaît que sur le
+                // terme focalisé — un repère, pas une seconde cible.
+                MoovieButton(onClick = { onPick(q) }, onLongClick = { onRemove(q) }) {
+                    Text(q)
+                    if (LocalMoovieCardActive.current) {
+                        Spacer(Modifier.width(8.dp))
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = stringResource(Res.string.search_remove_query, q),
+                            modifier = Modifier.size(14.dp),
+                        )
+                    }
                 }
+            }
+            // Le vidage complet vit dans la même rangée que ce qu'il vide,
+            // plutôt qu'en icône nue collée au titre.
+            MoovieButton(onClick = onClear) {
+                Icon(
+                    Icons.Default.DeleteSweep,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(Res.string.search_clear_history))
             }
         }
     }
