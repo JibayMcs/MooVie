@@ -191,4 +191,5 @@
     <string name="media_series">Serie</string>
     <string name="settings_player_clock">Fecha y hora en el reproductor</string>
     <string name="settings_player_clock_help">Muestra la fecha y la hora en la parte superior del reproductor cuando los controles están visibles.</string>
+    <string name="search_voice">Búsqueda por voz</string>
 </resources>

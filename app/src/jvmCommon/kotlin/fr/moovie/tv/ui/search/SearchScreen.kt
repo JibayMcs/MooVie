@@ -26,6 +26,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -64,6 +65,7 @@ import fr.moovie.tv.resources.search_no_results
 import fr.moovie.tv.resources.search_recent
 import fr.moovie.tv.resources.search_remove_query
 import fr.moovie.tv.resources.search_title
+import fr.moovie.tv.resources.search_voice
 import fr.moovie.tv.ui.theme.MOOVIE_ACCENT
 import fr.moovie.tv.ui.components.MoovieButton
 import fr.moovie.tv.ui.components.MoovieCard
@@ -103,6 +105,12 @@ fun SearchScreenContent(
     watchlistKeys: Set<String> = emptySet(),
     onAddToWatchlist: (TmdbItem) -> Unit = {},
     onRemoveFromWatchlist: (String) -> Unit = {},
+    /**
+     * Dictée vocale. Null quand la plateforme n'en propose pas — le bouton
+     * disparaît alors au lieu d'être affiché et inerte. C'est le cas du
+     * desktop, et d'un Android TV sans moteur de reconnaissance installé.
+     */
+    onVoiceSearch: (() -> Unit)? = null,
 ) {
     var menuFor by remember { mutableStateOf<TmdbItem?>(null) }
     val fieldFocus = remember { FocusRequester() }
@@ -160,13 +168,29 @@ fun SearchScreenContent(
         )
         Spacer(Modifier.height(16.dp))
 
-        SearchField(
-            value = query,
-            onValueChange = onQueryChange,
-            // Valider sur le clavier ferme l'IME et saute au 1er résultat.
-            onSubmit = { runCatching { firstResultFocus.requestFocus() } },
-            modifier = Modifier.padding(horizontal = 40.dp).focusRequester(fieldFocus),
-        )
+        Row(
+            modifier = Modifier.padding(horizontal = 40.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            SearchField(
+                value = query,
+                onValueChange = onQueryChange,
+                // Valider sur le clavier ferme l'IME et saute au 1er résultat.
+                onSubmit = { runCatching { firstResultFocus.requestFocus() } },
+                modifier = Modifier.weight(1f).focusRequester(fieldFocus),
+            )
+            // La télécommande a un micro ; l'app imposait un clavier virtuel,
+            // lettre par lettre à la flèche. Le bouton est à droite du champ,
+            // donc à un cran du focus d'arrivée.
+            onVoiceSearch?.let { speak ->
+                MoovieIconButton(
+                    onClick = speak,
+                    icon = Icons.Default.Mic,
+                    contentDescription = stringResource(Res.string.search_voice),
+                )
+            }
+        }
         Spacer(Modifier.height(24.dp))
 
         when {
@@ -210,7 +234,6 @@ private fun SearchField(
     val focusManager = LocalFocusManager.current
     Box(
         modifier = modifier
-            .fillMaxWidth(0.7f)
             .border(1.5.dp, Color(0xFF555555), MoovieShape)
             .padding(horizontal = 16.dp, vertical = 14.dp),
     ) {
@@ -230,11 +253,20 @@ private fun SearchField(
                 // Sans ça, le champ avale le D-pad bas : impossible d'atteindre
                 // l'historique/les résultats à la télécommande.
                 .onPreviewKeyEvent { event ->
-                    if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionDown) {
-                        focusManager.moveFocus(FocusDirection.Down)
-                        true
-                    } else {
-                        false
+                    if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                    when (event.key) {
+                        Key.DirectionDown -> {
+                            focusManager.moveFocus(FocusDirection.Down)
+                            true
+                        }
+                        // Le champ avale aussi la flèche droite pour déplacer
+                        // son curseur : sans ça, le bouton micro posé à sa
+                        // droite était tout simplement inatteignable à la
+                        // télécommande. Le curseur se pilote de toute façon
+                        // depuis le clavier virtuel, qui a le focus quand il
+                        // est ouvert — ces touches ne nous parviennent alors pas.
+                        Key.DirectionRight -> focusManager.moveFocus(FocusDirection.Right)
+                        else -> false
                     }
                 },
         )

@@ -12,6 +12,22 @@
     <uses-feature android:name="android.software.leanback" android:required="true" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
 
+
+    <!--
+      Visibilité des paquets (Android 11+, targetSdk 34) : sans cette
+      déclaration, `queryIntentActivities` ne voit aucun moteur de
+      reconnaissance vocale, et le bouton micro n'apparaîtrait sur aucun
+      appareil — panne silencieuse.
+    -->
+    <queries>
+        <intent>
+            <action android:name="android.speech.action.RECOGNIZE_SPEECH" />
+        </intent>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+    </queries>
+
     <application
         android:name=".MooVieApp"
         android:allowBackup="true"

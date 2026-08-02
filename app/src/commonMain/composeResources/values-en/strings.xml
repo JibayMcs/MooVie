@@ -191,4 +191,5 @@
     <string name="media_series">Series</string>
     <string name="settings_player_clock">Date and time in the player</string>
     <string name="settings_player_clock_help">Shows the date and time at the top of the player while the controls are visible.</string>
+    <string name="search_voice">Voice search</string>
 </resources>
