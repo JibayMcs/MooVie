@@ -130,8 +130,9 @@ class FstreamProvider(private val http: OkHttpClient) : SourceProvider {
             for ((version, urlEl) in versions) {
                 val raw = (urlEl as? JsonPrimitive)?.content?.trim().orEmpty()
                 if (raw.isBlank()) continue
+                val url = usableUrl(raw) ?: continue
                 links += EmbedLink(
-                    url = expandUrl(hoster, raw),
+                    url = url,
                     hoster = hoster,
                     language = mapLanguage(version),
                     // La clé de version distingue plusieurs copies d'un même
@@ -166,7 +167,9 @@ class FstreamProvider(private val http: OkHttpClient) : SourceProvider {
             for ((hoster, urlEl) in providers) {
                 val raw = (urlEl as? JsonPrimitive)?.content?.trim().orEmpty()
                 if (raw.isBlank()) continue
-                links += EmbedLink(url = expandUrl(hoster, raw), hoster = hoster, language = mapLanguage(lang))
+                usableUrl(raw)?.let { url ->
+                    links += EmbedLink(url = url, hoster = hoster, language = mapLanguage(lang))
+                }
             }
         }
         return links.distinctBy { it.url }
@@ -181,9 +184,21 @@ class FstreamProvider(private val http: OkHttpClient) : SourceProvider {
 
     private fun extractPageId(url: String): String? = PAGE_ID.find(url)?.groupValues?.get(1)
 
-    /** netu : "vid123" (sans protocole) → lien fembed complet. */
-    private fun expandUrl(hoster: String, raw: String): String =
-        if (hoster.equals("netu", true) && !raw.startsWith("http")) "https://www.fembed.com/v/$raw" else raw
+    /**
+     * Certaines entrées ne sont pas des URL mais un identifiant nu. On les
+     * écarte plutôt que de les développer.
+     *
+     * L'ancienne version fabriquait `https://www.fembed.com/v/<id>` pour netu —
+     * or **fembed a fermé en 2022** et l'hôte ne résout même plus. Chaque entrée
+     * de ce type produisait donc un lien mort par construction : une ligne de
+     * plus dans le panneau des sources, une résolution tentée pour rien, et un
+     * utilisateur qui essaie une source condamnée d'avance. Mesuré en sondant
+     * les liens « netu » : échec réseau, hôte injoignable.
+     *
+     * Tant qu'on ne sait pas vers quel hébergeur un identifiant nu pointe
+     * réellement, ne rien proposer vaut mieux que proposer faux.
+     */
+    private fun usableUrl(raw: String): String? = raw.takeIf { it.startsWith("http") }
 
     private fun mapLanguage(version: String): String = when (version.lowercase()) {
         // "default" sur French-Stream = version française du site.
