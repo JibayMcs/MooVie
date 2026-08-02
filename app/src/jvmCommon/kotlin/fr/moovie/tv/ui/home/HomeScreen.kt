@@ -342,6 +342,15 @@ private sealed interface HeroTarget {
  */
 private val HERO_HEIGHT = 148.dp
 
+/**
+ * Place réservée au coin haut droit, où les boutons de la barre sont posés en
+ * surimpression du héros depuis le retrait du wordmark. Sans elle, un titre
+ * long passe **dessous** — constaté sur « Star Wars, épisode III - La Revanche
+ * des Sith ». Ne s'applique qu'au titre : le synopsis, plus bas, garde toute la
+ * largeur, qu'on était justement allé chercher.
+ */
+private val HERO_TITLE_END_INSET = 250.dp
+
 @Composable
 private fun Hero(target: HeroTarget?, modifier: Modifier = Modifier) {
     Box(
@@ -367,6 +376,7 @@ private fun CatalogHero(item: TmdbItem) {
             style = MaterialTheme.typography.displaySmall,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(end = HERO_TITLE_END_INSET),
         )
         Spacer(Modifier.height(6.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -409,6 +419,7 @@ private fun ResumeHero(entry: ResumeEntry) {
             style = MaterialTheme.typography.displaySmall,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(end = HERO_TITLE_END_INSET),
         )
         Spacer(Modifier.height(6.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -455,6 +466,7 @@ private fun WatchlistHero(entry: WatchlistEntry) {
             style = MaterialTheme.typography.displaySmall,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(end = HERO_TITLE_END_INSET),
         )
         Spacer(Modifier.height(6.dp))
         Text(
