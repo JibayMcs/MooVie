@@ -33,6 +33,8 @@ import fr.moovie.tv.resources.details_resolve_error
 import fr.moovie.tv.resources.details_tmdb_error
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -481,17 +483,10 @@ class DetailsViewModel : ViewModel() {
         // l'obligation d'appuyer deux fois sur OK pour lancer un épisode.
         _sources.value = SourcesState.Active(links = emptyList(), providers = emptyList())
         viewModelScope.launch {
-            // Réglages utilisateur : providers désactivés + ordre de priorité.
             // Lus AVANT le cache : une entrée n'est resservie que si elle a
             // interrogé tous les catalogues actifs aujourd'hui, sinon une mise à
             // jour qui en ajoute un resterait invisible sur les fiches déjà vues.
-            val disabled = settings.disabledProviders.first()
-            val order = settings.providerOrder.first()
-            val providers = ProviderRegistry.all
-                .filter { it.name !in disabled }
-                .sortedBy { p ->
-                    order.indexOf(p.name).let { if (it == -1) order.size + ProviderRegistry.all.indexOf(p) else it }
-                }
+            val providers = activeProviders()
             val rank = providers.mapIndexed { i, p -> p.name to i }.toMap()
             val expected = providers.map { it.name }.toSet()
 
@@ -560,6 +555,73 @@ class DetailsViewModel : ViewModel() {
             sourceCache.put(cacheKey, active?.links.orEmpty(), answered)
         }
     }
+
+    /**
+     * Catalogues actifs, dans l'ordre de priorité de l'utilisateur.
+     *
+     * Un seul point de vérité : le chargement d'une fiche et le préchargement de
+     * l'épisode suivant doivent interroger exactement le même ensemble, sinon le
+     * cache serait rempli par un ensemble et jugé incomplet par l'autre — et
+     * rejeté à chaque lecture.
+     */
+    private suspend fun activeProviders(): List<SourceProvider> {
+        val disabled = settings.disabledProviders.first()
+        val order = settings.providerOrder.first()
+        return ProviderRegistry.all
+            .filter { it.name !in disabled }
+            .sortedBy { p ->
+                order.indexOf(p.name).let { if (it == -1) order.size + ProviderRegistry.all.indexOf(p) else it }
+            }
+    }
+
+    /**
+     * Interroge à l'avance les catalogues pour un épisode, et range le résultat
+     * dans le cache des sources.
+     *
+     * Appelé par le lecteur quand l'épisode en cours approche de sa fin : les
+     * requêtes catalogues prennent plusieurs secondes, et jusqu'ici l'enchaînement
+     * automatique les payait *après* le générique, écran noir à l'appui. Faites
+     * pendant que l'épisode joue encore, elles ne coûtent rien de visible.
+     *
+     * **On ne précharge que la liste des liens, jamais le flux résolu.** Une URL
+     * extraite expire souvent en moins de deux heures et se lie parfois à l'IP :
+     * la mettre en cache reviendrait à préparer un lien mort. La résolution reste
+     * donc au moment de lire.
+     */
+    fun prefetchEpisodeSources(season: Int, episode: Int) {
+        val tv = _state.value as? DetailsState.Tv ?: return
+        if (season <= 0 || episode <= 0) return
+        val key = episodeKey(season, episode)
+        if (!prefetched.add(key)) return
+
+        viewModelScope.launch {
+            val providers = activeProviders()
+            // Déjà en cache et complet : rien à faire, et surtout pas de trafic
+            // vers les hébergeurs pour un résultat qu'on a déjà.
+            if (sourceCache.get(key, providers.map { it.name }.toSet()) != null) return@launch
+
+            val media = MediaRef.Episode(tmdbId, tv.details.name, tv.details.year, season, episode)
+            val answered = mutableSetOf<String>()
+            val links = coroutineScope {
+                providers.map { provider ->
+                    async(Dispatchers.IO) {
+                        val result = runCatching {
+                            withTimeoutOrNull(PROVIDER_TIMEOUT_MS) { provider.sourcesFor(media) }
+                        }.getOrNull()
+                        // Un catalogue en panne n'est pas « interrogé » : sans ça
+                        // son absence serait figée dans le cache pour six heures.
+                        if (result != null) answered += provider.name
+                        result.orEmpty().map { it.copy(provider = provider.name) }
+                    }
+                }.awaitAll().flatten()
+            }.distinctBy { it.url }
+
+            if (links.isNotEmpty()) sourceCache.put(key, links, answered)
+        }
+    }
+
+    /** Épisodes déjà préchargés dans cette session, pour ne pas le refaire. */
+    private val prefetched = mutableSetOf<String>()
 
     /** Ouvre le panneau des sources (choix manuel). Recharge si nécessaire. */
     fun openPanel() {

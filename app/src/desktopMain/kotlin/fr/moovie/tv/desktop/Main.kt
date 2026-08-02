@@ -231,6 +231,10 @@ private fun DesktopApp(
                     // Enchaînement : remplace l'entrée du lecteur par la fiche
                     // du nouvel épisode, sinon chaque épisode ajouterait une
                     // marche à remonter pour revenir à la série.
+                    // Prépare les sources de l'épisode suivant pendant que
+                    // celui-ci joue : le ViewModel de fiche vit à l'échelle
+                    // de la fenêtre, il connaît donc encore la série.
+                    onPrefetchNext = { Vm.details.prefetchEpisodeSources(s.nextSeason, s.nextEpisode) },
                     onNextEpisode = { season, episode ->
                         val details = nav.current as? Screen.Details
                         nav.replace(

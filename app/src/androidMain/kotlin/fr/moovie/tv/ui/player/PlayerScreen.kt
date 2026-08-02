@@ -92,6 +92,13 @@ private val CONFIRM_KEYS = setOf(Key.DirectionCenter, Key.Enter, Key.NumPadEnter
  * minuteurs.
  */
 @OptIn(UnstableApi::class)
+/**
+ * Fraction de l'épisode au-delà de laquelle on précharge les sources du
+ * suivant. Assez tard pour que l'épisode soit probablement fini, assez tôt
+ * pour que les catalogues aient le temps de répondre.
+ */
+private const val PREFETCH_AT = 0.80
+
 @Composable
 fun PlayerScreen(
     streamUrl: String,
@@ -111,6 +118,8 @@ fun PlayerScreen(
     expectedMinutes: Int = 0,
     onBack: () -> Unit,
     onNextEpisode: (tmdbId: Int, season: Int, episode: Int) -> Unit = { _, _, _ -> },
+    /** Appelé une fois quand l'épisode approche de sa fin (voir PREFETCH_AT). */
+    onPrefetchNext: () -> Unit = {},
     /** Le flux a cassé en lecture : rend la main à la cascade de sources. */
     onPlaybackFailed: () -> Unit = onBack,
 ) {
@@ -277,12 +286,26 @@ fun PlayerScreen(
     }
 
     // Sauvegarde périodique de la position (résolution ~5 s pour la reprise).
+    // La même boucle sert à amorcer le préchargement de l'épisode suivant :
+    // inutile d'ajouter une minuterie pour une question qu'on se pose déjà.
     LaunchedEffect(mediaKey) {
         if (mediaKey.isBlank()) return@LaunchedEffect
+        var prefetchAsked = false
         while (true) {
             delay(5000)
             if (controller.isPlaying) {
-                progress.save(mediaKey, controller.positionMs(), controller.durationMs())
+                val position = controller.positionMs()
+                val duration = controller.durationMs()
+                progress.save(mediaKey, position, duration)
+
+                // Assez tard pour que l'épisode soit probablement fini, assez
+                // tôt pour que les catalogues aient le temps de répondre — ils
+                // mettent plusieurs secondes, et c'est ce délai qu'on payait
+                // jusqu'ici en écran noir après le générique.
+                if (!prefetchAsked && duration > 0 && position >= duration * PREFETCH_AT) {
+                    prefetchAsked = true
+                    onPrefetchNext()
+                }
             }
         }
     }

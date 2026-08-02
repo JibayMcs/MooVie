@@ -125,6 +125,13 @@ import java.io.File
 import java.nio.ByteBuffer
 
 /**
+ * Fraction de l'épisode au-delà de laquelle on précharge les sources du
+ * suivant. Même seuil que sur Android : les deux lecteurs doivent se
+ * comporter pareil.
+ */
+private const val PREFETCH_AT = 0.80
+
+/**
  * Réception des frames libVLC (RV32/BGRA) exposées à Compose : la vidéo est
  * dessinée comme n'importe quelle image → les contrôles sont de vrais overlays
  * (pas d'interop Swing, pas de clignotement au masquage) et le plein écran est
@@ -240,6 +247,8 @@ internal fun DesktopPlayerScreen(
     onToggleFullscreen: () -> Unit,
     onBack: () -> Unit,
     onNextEpisode: (season: Int, episode: Int) -> Unit,
+    /** Appelé une fois quand l'épisode approche de sa fin (voir PREFETCH_AT). */
+    onPrefetchNext: () -> Unit = {},
     /** Le flux a cassé en lecture : rend la main à la cascade de sources. */
     onPlaybackFailed: () -> Unit = onBack,
 ) {
@@ -435,6 +444,7 @@ internal fun DesktopPlayerScreen(
     // Suivi de l'état du lecteur + sauvegarde périodique de la position (~5 s).
     LaunchedEffect(mediaKey) {
         var ticks = 0
+        var prefetchAsked = false
         while (true) {
             delay(500)
             isPlaying = player.status().isPlaying
@@ -448,6 +458,14 @@ internal fun DesktopPlayerScreen(
             ticks++
             if (ticks % 10 == 0 && mediaKey.isNotBlank() && isPlaying) {
                 progress.save(mediaKey, timeMs, lengthMs)
+
+                // Même déclencheur que sur Android : les catalogues répondent en
+                // plusieurs secondes, autant les payer pendant que l'épisode
+                // joue encore plutôt qu'après le générique.
+                if (!prefetchAsked && lengthMs > 0 && timeMs >= lengthMs * PREFETCH_AT) {
+                    prefetchAsked = true
+                    onPrefetchNext()
+                }
             }
         }
     }

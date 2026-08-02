@@ -181,6 +181,13 @@ class MainActivity : ComponentActivity() {
                                 subtitles = s.subtitles,
                                 title = s.title,
                                 subtitle = s.subtitle,
+                                // Prépare les sources de l'épisode suivant
+                                // pendant que celui-ci joue encore : le
+                                // ViewModel de la fiche est à l'échelle de
+                                // l'Activity, il connaît donc encore la série.
+                                onPrefetchNext = {
+                                    detailsViewModel.prefetchEpisodeSources(s.nextSeason, s.nextEpisode)
+                                },
                                 nextSeason = s.nextSeason,
                                 nextEpisode = s.nextEpisode,
                                 updateVersion = (updateState as? UpdateState.Available)?.version,
