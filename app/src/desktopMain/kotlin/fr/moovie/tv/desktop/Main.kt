@@ -36,6 +36,8 @@ import fr.moovie.tv.ui.components.MoovieButton
 import fr.moovie.tv.ui.navigation.NavStack
 import fr.moovie.tv.ui.navigation.Screen
 import fr.moovie.tv.ui.navigation.rememberNavStack
+import fr.moovie.tv.ui.onboarding.OnboardingScreen
+import fr.moovie.tv.ui.onboarding.rememberStartScreen
 import fr.moovie.tv.ui.theme.MooVieTheme
 import fr.moovie.tv.ui.update.UpdateBanner
 import fr.moovie.tv.ui.update.UpdateState
@@ -69,13 +71,18 @@ fun main() {
         // média, le lecteur n'a aucun titre à interroger.
         val testStream = remember { System.getenv("MOOVIE_TEST_STREAM") }
         val testKey = remember { System.getenv("MOOVIE_TEST_KEY").orEmpty() }
-        val nav = rememberNavStack(
-            if (testStream.isNullOrBlank()) {
-                Screen.Home
+        // Racine résolue avant de bâtir la pile : sans clé TMDB on démarre sur
+        // l'écran d'installation, et l'accueil vide n'apparaît pas même le temps
+        // d'une image. La pile se reconstruit une fois la réponse connue — rien
+        // n'a encore pu s'y empiler.
+        val start = rememberStartScreen(
+            override = if (testStream.isNullOrBlank()) {
+                null
             } else {
                 Screen.Player(testStream, mediaKey = testKey)
             },
         )
+        val nav = remember(start) { NavStack(start ?: Screen.Home) }
         // Retour *interne* à un écran uniquement (panneau des sources, fiche
         // d'épisode). Null quand l'écran n'a rien à fermer : Échap dépile alors.
         var innerBack: (() -> Unit)? by remember { mutableStateOf(null) }
@@ -115,6 +122,7 @@ fun main() {
                 // de chargement gagné.
                 var splashDone by remember { mutableStateOf(false) }
                 Box(modifier = Modifier.fillMaxSize()) {
+                    if (start != null) {
                     DesktopApp(
                         nav = nav,
                         onRegisterBack = { innerBack = it },
@@ -124,6 +132,7 @@ fun main() {
                                 if (isFullscreen) WindowPlacement.Floating else WindowPlacement.Fullscreen
                         },
                     )
+                    }
                     if (!splashDone) {
                         DesktopSplash(onFinished = { splashDone = true })
                     }
@@ -177,6 +186,12 @@ private fun DesktopApp(
                 onOpenSearch = { nav.push(Screen.Search) },
                 onOpenHistory = { nav.push(Screen.History) },
                 onOpenCatalog = { nav.push(Screen.Catalog) },
+            )
+            Screen.Onboarding -> OnboardingScreen(
+                onOpenSettings = { nav.push(Screen.Settings) },
+                // Remplace au lieu d'empiler : une fois installé, revenir sur
+                // l'écran d'installation n'aurait plus rien à proposer.
+                onReady = { nav.replace(Screen.Home) },
             )
             Screen.Settings -> DesktopSettingsScreen(onBack = { nav.pop() })
             Screen.Catalog -> DesktopCatalogScreen(

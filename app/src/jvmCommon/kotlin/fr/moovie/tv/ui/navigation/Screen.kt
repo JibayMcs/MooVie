@@ -3,6 +3,14 @@ package fr.moovie.tv.ui.navigation
 /** Destinations de l'app. Étendre au fur et à mesure (recherche, catalogue…). */
 sealed interface Screen {
     data object Home : Screen
+
+    /**
+     * Accueil de première installation : restaurer une sauvegarde, ou saisir la
+     * clé TMDB. C'est la racine de la pile tant qu'aucune clé n'est enregistrée —
+     * sans elle l'accueil n'a rien à afficher, et y déposer l'utilisateur ne lui
+     * apprend ni ce qui manque ni ce qu'il peut déjà récupérer.
+     */
+    data object Onboarding : Screen
     data object Settings : Screen
     data object Search : Screen
     data object History : Screen

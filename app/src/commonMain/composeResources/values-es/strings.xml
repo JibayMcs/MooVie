@@ -234,4 +234,11 @@
     <string name="backup_report_history">%1$d líneas de historial añadidas</string>
     <string name="backup_cancel">Cancelar</string>
     <string name="backup_finish">Finalizar</string>
+    <string name="onboarding_title">Bienvenido a Moo-vie</string>
+    <string name="onboarding_intro">Dos formas de empezar, según si vienes de otro dispositivo o instalas Moo-vie por primera vez.</string>
+    <string name="onboarding_restore">Ya he usado Moo-vie</string>
+    <string name="onboarding_restore_help">Restaura tus puntos de reproducción, tu lista, tu historial y tu clave TMDB desde una copia en memoria USB.</string>
+    <string name="onboarding_fresh">Primera instalación</string>
+    <string name="onboarding_fresh_help">Introduce tu clave TMDB, gratuita en themoviedb.org. Es la que alimenta el catálogo, los carteles y las fichas.</string>
+    <string name="onboarding_no_key">La copia importada no contenía una clave TMDB. Introdúcela en los ajustes para terminar la instalación.</string>
 </resources>

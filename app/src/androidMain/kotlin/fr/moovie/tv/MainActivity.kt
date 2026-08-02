@@ -32,6 +32,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import fr.moovie.tv.ui.splash.MoovieSplash
 import fr.moovie.tv.ui.navigation.Screen
 import fr.moovie.tv.ui.navigation.rememberNavStack
+import fr.moovie.tv.ui.onboarding.OnboardingScreen
+import fr.moovie.tv.ui.onboarding.rememberStartScreen
 import fr.moovie.tv.ui.details.DetailsScreen
 import fr.moovie.tv.ui.history.HistoryScreen
 import fr.moovie.tv.ui.home.HomeScreen
@@ -90,9 +92,12 @@ class MainActivity : ComponentActivity() {
                         // titre à interroger et n'affiche ni segments ni boutons.
                         val testStream = remember { intent?.getStringExtra("test_stream") }
                         val testKey = remember { intent?.getStringExtra("test_key").orEmpty() }
-                        val nav = rememberNavStack(
-                            if (testStream.isNullOrBlank()) {
-                                Screen.Home
+                        // Racine résolue avant de bâtir la pile : sans clé TMDB
+                        // on démarre sur l'écran d'installation, et l'accueil
+                        // vide n'apparaît pas même le temps d'une image.
+                        val start = rememberStartScreen(
+                            override = if (testStream.isNullOrBlank()) {
+                                null
                             } else {
                                 Screen.Player(
                                     streamUrl = testStream,
@@ -101,7 +106,8 @@ class MainActivity : ComponentActivity() {
                                     subtitle = "S1 · E1 — chrome partagée",
                                 )
                             },
-                        )
+                        ) ?: return@Column
+                        val nav = rememberNavStack(start)
                         // Pendant la lecture, la bannière rétrécirait la vidéo :
                         // le lecteur affiche une pastille discrète à la place, et
                         // la bannière n'apparaît qu'une fois celle-ci activée.
@@ -143,6 +149,13 @@ class MainActivity : ComponentActivity() {
                                 onOpenSearch = { nav.push(Screen.Search) },
                                 onOpenHistory = { nav.push(Screen.History) },
                                 onOpenCatalog = { nav.push(Screen.Catalog) },
+                            )
+                            Screen.Onboarding -> OnboardingScreen(
+                                onOpenSettings = { nav.push(Screen.Settings) },
+                                // Remplace au lieu d'empiler : une fois installé,
+                                // revenir en arrière sur l'écran d'installation
+                                // n'aurait plus rien à proposer.
+                                onReady = { nav.replace(Screen.Home) },
                             )
                             Screen.Settings -> SettingsScreen(
                                 onBack = { nav.pop() },
