@@ -193,4 +193,5 @@
     <string name="settings_player_clock_help">Muestra la fecha y la hora en la parte superior del reproductor cuando los controles están visibles.</string>
     <string name="search_voice">Búsqueda por voz</string>
     <string name="search_recent_hint">Mantén pulsada una búsqueda para eliminarla</string>
+    <string name="home_row_because">Porque viste %1$s</string>
 </resources>

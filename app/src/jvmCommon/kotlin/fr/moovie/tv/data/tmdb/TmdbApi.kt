@@ -16,6 +16,15 @@ interface TmdbApi {
         @Query("language") language: String,
     ): TmdbPageResult
 
+    /** Titres proches d'un titre donné : la rangée « Parce que tu as regardé… ». */
+    @GET("{media}/{id}/recommendations")
+    suspend fun recommendations(
+        @Path("media") media: String, // "movie" | "tv"
+        @Path("id") id: Int,
+        @Query("api_key") apiKey: String,
+        @Query("language") language: String,
+    ): TmdbPageResult
+
     @GET("{media}/top_rated")
     suspend fun topRated(
         @Path("media") media: String, // "movie" | "tv"

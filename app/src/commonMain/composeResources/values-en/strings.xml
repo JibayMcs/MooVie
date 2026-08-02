@@ -193,4 +193,5 @@
     <string name="settings_player_clock_help">Shows the date and time at the top of the player while the controls are visible.</string>
     <string name="search_voice">Voice search</string>
     <string name="search_recent_hint">Long-press a search to remove it</string>
+    <string name="home_row_because">Because you watched %1$s</string>
 </resources>

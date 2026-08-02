@@ -94,6 +94,17 @@ class TmdbRepository(
             .results
             .filter { it.mediaType == "movie" || it.mediaType == "tv" }
 
+    /**
+     * Titres recommandés à partir d'un titre déjà vu.
+     *
+     * TMDB range parfois des entrées sans affiche : elles feraient un trou gris
+     * dans la rangée, on les écarte ici plutôt que dans l'UI.
+     */
+    suspend fun recommendations(apiKey: String, isTv: Boolean, id: Int): List<TmdbItem> =
+        api.recommendations(if (isTv) "tv" else "movie", id, apiKey, language)
+            .results
+            .filter { it.posterUrl() != null }
+
     /** Genres du catalogue, dans la langue de l'app (listes distinctes film / série). */
     suspend fun genres(apiKey: String, isTv: Boolean): List<Genre> =
         api.genres(if (isTv) "tv" else "movie", apiKey, language).genres

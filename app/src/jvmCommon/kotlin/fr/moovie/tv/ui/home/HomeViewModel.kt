@@ -13,6 +13,7 @@ import fr.moovie.tv.resources.Res
 import fr.moovie.tv.resources.home_needs_key
 import fr.moovie.tv.resources.home_no_results_key
 import fr.moovie.tv.resources.home_row_top_movies
+import fr.moovie.tv.resources.home_row_because
 import fr.moovie.tv.resources.home_row_trending_movies
 import fr.moovie.tv.resources.home_row_trending_tv
 import fr.moovie.tv.resources.home_tmdb_error
@@ -20,6 +21,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.getString
 
@@ -96,11 +98,45 @@ class HomeViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Rangée « Parce que tu as regardé X », bâtie sur le dernier titre terminé.
+     *
+     * C'est la rangée qui joue avec la force de l'app plutôt que contre : elle
+     * remonte des titres **proches de ce qu'on regarde déjà**, donc souvent plus
+     * anciens — et ce sont eux qui ont des sources VF. Une rangée de nouveautés
+     * ferait l'inverse : mesuré sur un film sorti quatre jours plus tôt, un seul
+     * lien VF, et mort.
+     *
+     * Retourne null quand il n'y a pas d'historique ou rien à proposer : la
+     * rangée disparaît plutôt que d'afficher un titre vide.
+     */
+    private suspend fun recommendationRow(repo: TmdbRepository, apiKey: String): HomeRow? {
+        val seed = watchRepo.history.first().firstOrNull() ?: return null
+        val items = runCatching { repo.recommendations(apiKey, seed.isTv, seed.tmdbId) }
+            .getOrDefault(emptyList())
+        if (items.isEmpty()) return null
+
+        // Proposer ce qu'on a déjà vu, ou ce qu'on est en train de regarder,
+        // n'a aucun intérêt — et le titre source lui-même reviendrait parfois.
+        val seen = watchRepo.watched.first()
+        val inProgress = watchRepo.continueWatching.first().map { it.key }.toSet()
+        val fresh = items.filterNot { item ->
+            val key = if (item.isTv) "tv:${item.id}" else "movie:${item.id}"
+            key in seen || key in inProgress || (item.id == seed.tmdbId && item.isTv == seed.isTv)
+        }
+        if (fresh.isEmpty()) return null
+
+        return HomeRow(getString(Res.string.home_row_because, seed.title), fresh)
+    }
+
     private suspend fun loadRows(apiKey: String) {
         _state.value = HomeState.Loading
         val repo = TmdbRepository(currentTmdbLanguage())
         runCatching {
-            listOf(
+            listOfNotNull(
+                // En tête, avant les tendances : c'est la seule rangée qui parle
+                // de ce que *cet* utilisateur regarde.
+                recommendationRow(repo, apiKey),
                 HomeRow(getString(Res.string.home_row_trending_movies), repo.trendingMovies(apiKey)),
                 HomeRow(getString(Res.string.home_row_trending_tv), repo.trendingTv(apiKey)),
                 HomeRow(getString(Res.string.home_row_top_movies), repo.topRatedMovies(apiKey)),
