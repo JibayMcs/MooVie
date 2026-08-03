@@ -42,8 +42,9 @@ no account, no ads.
 - **One-press playback** — sources load as soon as a title opens; a single
   **Play / Resume** picks the best source in your language (VF / VOSTFR / VO). A sources
   panel is there for manual host selection. Most catalogues are French-speaking, so
-  **original-language playback has its own catalogue**, keyed on the TMDB id; VO and
-  VOSTFR stand in for each other since they carry the same audio.
+  **original-language playback has its own catalogue**, keyed on the TMDB id. Languages
+  are never substituted for one another — VOSTFR carries burnt-in French subtitles you
+  cannot turn off, so it is not a stand-in for VO.
 - **Player** — resume at timecode, subtitle and audio track selection, playback speed,
   15 s seek, scrub mode on the progress bar, remote media keys.
 - **Subtitles** (OpenSubtitles) — searched from the player, ranked by language, frame

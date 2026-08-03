@@ -45,8 +45,9 @@ depuis une seule base de code Kotlin Multiplatform. L'extraction des sources se 
   bouton **Lire / Reprendre** joue la meilleure source dans ta langue (VF / VOSTFR / VO).
   Le panneau de sources reste là pour choisir un hébergeur à la main. Les catalogues
   étant francophones pour la plupart, la **version originale a son propre catalogue**,
-  indexé sur l'identifiant TMDB ; VO et VOSTFR se remplacent l'une l'autre, leur piste
-  audio étant la même.
+  indexé sur l'identifiant TMDB. Aucune langue ne se substitue à une autre : le VOSTFR
+  porte des sous-titres français incrustés qu'on ne peut pas retirer, ce n'est donc pas
+  un remplaçant de la VO.
 - **Lecteur** — reprise au timecode, choix des sous-titres et de la piste audio, vitesse de
   lecture, seek 15 s, mode scrub sur la barre de progression, touches média de la télécommande.
 - **Sous-titres** (OpenSubtitles) — cherchés depuis le lecteur, classés par langue,

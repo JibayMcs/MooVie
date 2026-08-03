@@ -543,7 +543,11 @@ private fun SourcesSlideOver(
 ) {
     val links = state.links
     val grouped = links.groupBy { it.language ?: "?" }
-    val order = (listOf(preferred.name, "VF", "VOSTFR", "VO") + grouped.keys).distinct()
+    // La langue préférée d'abord, puis celles du réglage dans leur ordre de
+    // déclaration, puis tout ce que les catalogues auraient étiqueté autrement :
+    // une langue inédite apparaît ainsi sans qu'on ait touché à ce code.
+    val order = (listOf(preferred.name) + StreamLanguage.entries.map { it.name } + grouped.keys)
+        .distinct()
     val sections = order.filter { grouped.containsKey(it) }.map { it to grouped.getValue(it) }
     val prefMissing = links.isNotEmpty() && !grouped.containsKey(preferred.name)
     val firstFocus = remember { FocusRequester() }
