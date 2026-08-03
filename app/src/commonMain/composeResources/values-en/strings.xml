@@ -241,4 +241,24 @@
     <string name="onboarding_fresh">First install</string>
     <string name="onboarding_fresh_help">Enter your TMDB key, free on themoviedb.org. It is what feeds the catalogue, the posters and the details.</string>
     <string name="onboarding_no_key">The imported backup did not contain a TMDB key. Enter it in the settings to finish the setup.</string>
+    <string name="settings_cat_subtitles">Subtitles</string>
+    <string name="subtitles_intro">Subtitles come from OpenSubtitles. They work without an account, but the number of downloads per day is then very limited, and your remaining quota stays invisible.</string>
+    <string name="subtitles_account">OpenSubtitles account</string>
+    <string name="subtitles_account_help">Optional. Connecting your account raises the daily limit and lets the app show what you have left.</string>
+    <string name="subtitles_username">Username</string>
+    <string name="subtitles_password">Password</string>
+    <string name="subtitles_remember">Stay signed in</string>
+    <string name="subtitles_remember_help">OpenSubtitles cannot extend a session: it expires after 24 h. Staying signed in therefore means keeping your password on this device, to reopen the session without asking again. It is never included in a backup.</string>
+    <string name="subtitles_login">Sign in</string>
+    <string name="subtitles_logout">Sign out</string>
+    <string name="subtitles_connecting">Signing in…</string>
+    <string name="subtitles_connected_as">Signed in as %1$s</string>
+    <string name="subtitles_error_credentials">Wrong username or password.</string>
+    <string name="subtitles_error_rate">Too many attempts. Wait a minute before trying again.</string>
+    <string name="subtitles_error_network">OpenSubtitles is unreachable. Check your connection.</string>
+    <string name="subtitles_quota_known">You have %1$d of %2$d downloads left today</string>
+    <string name="subtitles_quota_unknown">Quota unknown — it only appears after a download, or by connecting your account.</string>
+    <string name="subtitles_languages">Languages searched</string>
+    <string name="subtitles_languages_help">In order: the first one wins over the others when ranking the subtitles on offer. At least one language must stay on.</string>
+    <string name="subtitles_no_key">This build was compiled without an OpenSubtitles key: subtitles are disabled.</string>
 </resources>

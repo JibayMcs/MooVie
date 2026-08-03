@@ -66,6 +66,7 @@ import fr.moovie.tv.resources.settings_cat_intro
 import fr.moovie.tv.resources.settings_cat_playback
 import fr.moovie.tv.resources.settings_cat_screensaver
 import fr.moovie.tv.resources.settings_cat_sources
+import fr.moovie.tv.resources.settings_cat_subtitles
 import fr.moovie.tv.resources.settings_cat_update
 import fr.moovie.tv.resources.settings_disable
 import fr.moovie.tv.resources.settings_dns_help
@@ -98,6 +99,7 @@ import fr.moovie.tv.resources.update_every_minutes
 import fr.moovie.tv.resources.update_never
 import fr.moovie.tv.ui.backup.BackupSection
 import fr.moovie.tv.ui.components.MoovieButton
+import fr.moovie.tv.ui.subtitles.SubtitlesSection
 import fr.moovie.tv.ui.components.MoovieIconButton
 import fr.moovie.tv.ui.components.MoovieSelect
 import org.jetbrains.compose.resources.stringResource
@@ -110,7 +112,7 @@ private val NAV_WIDTH = 260.dp
 
 /** Sections de l'écran, dans l'ordre d'affichage du volet gauche. */
 private enum class SettingsSection {
-    API, PLAYBACK, INTRO, HISTORY, SCREENSAVER, UPDATE, DNS, SOURCES, BACKUP,
+    API, PLAYBACK, INTRO, SUBTITLES, HISTORY, SCREENSAVER, UPDATE, DNS, SOURCES, BACKUP,
 }
 
 @Composable
@@ -124,6 +126,7 @@ private fun sectionLabel(section: SettingsSection): String = stringResource(
         SettingsSection.UPDATE -> Res.string.settings_cat_update
         SettingsSection.DNS -> Res.string.settings_cat_dns
         SettingsSection.SOURCES -> Res.string.settings_cat_sources
+        SettingsSection.SUBTITLES -> Res.string.settings_cat_subtitles
         SettingsSection.BACKUP -> Res.string.settings_cat_backup
     },
 )
@@ -381,7 +384,11 @@ fun SettingsScreenContent(
                     }
                 }
 
-                // Seule section à porter son propre état : c'est un parcours en
+                // Comme la sauvegarde : un parcours (se connecter), pas un
+                // réglage. D'où son état porté par elle-même.
+                SettingsSection.SUBTITLES -> SubtitlesSection()
+
+                // Seule autre section à porter son propre état : c'est un parcours en
                 // plusieurs étapes, pas un réglage. Voir [BackupSection].
                 SettingsSection.BACKUP -> BackupSection()
             }
@@ -550,3 +557,4 @@ private fun ApiKeyField(value: String, onValueChange: (String) -> Unit) {
         )
     }
 }
+

@@ -243,4 +243,24 @@
     <string name="onboarding_fresh">Première installation</string>
     <string name="onboarding_fresh_help">Saisis ta clé TMDB, gratuite sur themoviedb.org. C'est elle qui alimente le catalogue, les affiches et les fiches.</string>
     <string name="onboarding_no_key">La sauvegarde importée ne contenait pas de clé TMDB. Saisis-la dans les réglages pour terminer l'installation.</string>
+    <string name="settings_cat_subtitles">Sous-titres</string>
+    <string name="subtitles_intro">Les sous-titres viennent d'OpenSubtitles. Ils fonctionnent sans compte, mais le nombre de téléchargements par jour est alors très limité, et ton quota restant reste invisible.</string>
+    <string name="subtitles_account">Compte OpenSubtitles</string>
+    <string name="subtitles_account_help">Facultatif. Connecter ton compte relève la limite quotidienne et permet d'afficher ce qu'il te reste.</string>
+    <string name="subtitles_username">Identifiant</string>
+    <string name="subtitles_password">Mot de passe</string>
+    <string name="subtitles_remember">Rester connecté</string>
+    <string name="subtitles_remember_help">OpenSubtitles ne sait pas prolonger une session : elle expire au bout de 24 h. Rester connecté suppose donc de conserver ton mot de passe sur cet appareil, pour rouvrir la session sans te le redemander. Il n'est jamais inclus dans une sauvegarde.</string>
+    <string name="subtitles_login">Se connecter</string>
+    <string name="subtitles_logout">Se déconnecter</string>
+    <string name="subtitles_connecting">Connexion…</string>
+    <string name="subtitles_connected_as">Connecté en tant que %1$s</string>
+    <string name="subtitles_error_credentials">Identifiant ou mot de passe incorrect.</string>
+    <string name="subtitles_error_rate">Trop de tentatives. Attends une minute avant de réessayer.</string>
+    <string name="subtitles_error_network">OpenSubtitles est injoignable. Vérifie ta connexion.</string>
+    <string name="subtitles_quota_known">Il te reste %1$d téléchargements sur %2$d pour aujourd'hui</string>
+    <string name="subtitles_quota_unknown">Quota inconnu — il n'apparaît qu'après un téléchargement, ou en connectant ton compte.</string>
+    <string name="subtitles_languages">Langues recherchées</string>
+    <string name="subtitles_languages_help">Dans l'ordre : la première passe avant les autres au moment de classer les sous-titres proposés. Au moins une langue doit rester active.</string>
+    <string name="subtitles_no_key">Cette version a été compilée sans clé OpenSubtitles : les sous-titres sont désactivés.</string>
 </resources>

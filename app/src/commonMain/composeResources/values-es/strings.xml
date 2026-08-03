@@ -241,4 +241,24 @@
     <string name="onboarding_fresh">Primera instalación</string>
     <string name="onboarding_fresh_help">Introduce tu clave TMDB, gratuita en themoviedb.org. Es la que alimenta el catálogo, los carteles y las fichas.</string>
     <string name="onboarding_no_key">La copia importada no contenía una clave TMDB. Introdúcela en los ajustes para terminar la instalación.</string>
+    <string name="settings_cat_subtitles">Subtítulos</string>
+    <string name="subtitles_intro">Los subtítulos vienen de OpenSubtitles. Funcionan sin cuenta, pero el número de descargas diarias es entonces muy limitado y tu cuota restante queda invisible.</string>
+    <string name="subtitles_account">Cuenta de OpenSubtitles</string>
+    <string name="subtitles_account_help">Opcional. Conectar tu cuenta eleva el límite diario y permite mostrar lo que te queda.</string>
+    <string name="subtitles_username">Usuario</string>
+    <string name="subtitles_password">Contraseña</string>
+    <string name="subtitles_remember">Mantener la sesión</string>
+    <string name="subtitles_remember_help">OpenSubtitles no puede prolongar una sesión: caduca a las 24 h. Mantener la sesión implica por tanto guardar tu contraseña en este dispositivo, para reabrirla sin volver a pedírtela. Nunca se incluye en una copia de seguridad.</string>
+    <string name="subtitles_login">Iniciar sesión</string>
+    <string name="subtitles_logout">Cerrar sesión</string>
+    <string name="subtitles_connecting">Conectando…</string>
+    <string name="subtitles_connected_as">Conectado como %1$s</string>
+    <string name="subtitles_error_credentials">Usuario o contraseña incorrectos.</string>
+    <string name="subtitles_error_rate">Demasiados intentos. Espera un minuto antes de reintentar.</string>
+    <string name="subtitles_error_network">OpenSubtitles no responde. Comprueba tu conexión.</string>
+    <string name="subtitles_quota_known">Te quedan %1$d descargas de %2$d para hoy</string>
+    <string name="subtitles_quota_unknown">Cuota desconocida — solo aparece tras una descarga, o conectando tu cuenta.</string>
+    <string name="subtitles_languages">Idiomas buscados</string>
+    <string name="subtitles_languages_help">En orden: el primero prevalece sobre los demás al clasificar los subtítulos ofrecidos. Al menos un idioma debe permanecer activo.</string>
+    <string name="subtitles_no_key">Esta versión se compiló sin clave de OpenSubtitles: los subtítulos están desactivados.</string>
 </resources>

@@ -1,6 +1,7 @@
 package fr.moovie.tv.data.settings
 
 import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import fr.moovie.tv.data.net.DohProvider
@@ -113,6 +114,76 @@ class SettingsRepository {
     suspend fun setDohProvider(value: DohProvider) =
         store.edit { it[DOH_PROVIDER] = value.name }
 
+    // ─── Compte OpenSubtitles ────────────────────────────────────────────────
+    //
+    // La *clé* d'API n'est pas ici : elle identifie l'application et vit dans le
+    // binaire. Ce qui est propre à l'utilisateur, c'est son compte, et lui seul.
+    // Sans compte, le téléchargement reste possible mais très plafonné.
+
+    val osUsername: Flow<String> = store.data.map { it[OS_USERNAME].orEmpty() }
+
+    /**
+     * Mot de passe, conservé **uniquement si l'utilisateur l'a demandé**.
+     *
+     * Il n'existe aucun endpoint de rafraîchissement chez OpenSubtitles : le
+     * jeton vaut 24 h et le renouveler impose de renvoyer les identifiants. Se
+     * souvenir de la connexion signifie donc mécaniquement garder le mot de
+     * passe — on le dit à l'utilisateur plutôt que de le cacher derrière une
+     * case à cocher anodine.
+     *
+     * Il ne part **jamais** dans une sauvegarde : une clé d'API se révoque et ne
+     * vaut que pour un service, un mot de passe se réutilise ailleurs.
+     */
+    val osPassword: Flow<String> = store.data.map { it[OS_PASSWORD].orEmpty() }
+
+    val osRemember: Flow<Boolean> = store.data.map { it[OS_REMEMBER] ?: false }
+
+    /** Jeton de session. Vide = déconnecté. */
+    val osToken: Flow<String> = store.data.map { it[OS_TOKEN].orEmpty() }
+
+    /** Instant d'obtention du jeton, pour savoir quand il expire (24 h). */
+    val osTokenAt: Flow<Long> = store.data.map { it[OS_TOKEN_AT] ?: 0L }
+
+    suspend fun setOsCredentials(username: String, password: String, remember: Boolean) =
+        store.edit {
+            it[OS_USERNAME] = username
+            it[OS_REMEMBER] = remember
+            // Oublier, c'est effacer : garder le mot de passe d'un utilisateur
+            // qui vient de décocher la case serait le trahir.
+            if (remember) it[OS_PASSWORD] = password else it.remove(OS_PASSWORD)
+        }
+
+    suspend fun setOsSession(token: String, atMs: Long) = store.edit {
+        it[OS_TOKEN] = token
+        it[OS_TOKEN_AT] = atMs
+    }
+
+    suspend fun clearOsSession() = store.edit {
+        it.remove(OS_TOKEN)
+        it.remove(OS_TOKEN_AT)
+    }
+
+    /** Déconnexion complète : la session *et* ce qui permettait de la rouvrir. */
+    suspend fun forgetOsAccount() = store.edit {
+        listOf(OS_TOKEN, OS_TOKEN_AT, OS_USERNAME, OS_PASSWORD, OS_REMEMBER)
+            .forEach { key -> it.remove(key) }
+    }
+
+    /**
+     * Langues de sous-titres recherchées, **dans l'ordre de préférence**.
+     *
+     * L'ordre n'est pas décoratif : c'est lui que le classement des candidats
+     * suit en premier critère. La première langue de la liste passe donc avant
+     * toutes les autres, quelle que soit la popularité du sous-titre.
+     */
+    val subtitleLanguages: Flow<List<String>> = store.data.map { prefs ->
+        prefs[SUBTITLE_LANGUAGES]?.split(',')?.filter { it.isNotBlank() }
+            ?: listOf("fr", "en")
+    }
+
+    suspend fun setSubtitleLanguages(value: List<String>) =
+        store.edit { it[SUBTITLE_LANGUAGES] = value.joinToString(",") }
+
     suspend fun setTmdbApiKey(value: String) =
         store.edit { it[TMDB_API_KEY] = value.trim() }
 
@@ -143,5 +214,11 @@ class SettingsRepository {
         val PLAYER_CLOCK = booleanPreferencesKey("player_clock")
         val UPDATE_INTERVAL = stringPreferencesKey("update_interval")
         val SCREENSAVER_DELAY = stringPreferencesKey("screensaver_delay")
+        val OS_USERNAME = stringPreferencesKey("os_username")
+        val OS_PASSWORD = stringPreferencesKey("os_password")
+        val OS_REMEMBER = booleanPreferencesKey("os_remember")
+        val OS_TOKEN = stringPreferencesKey("os_token")
+        val OS_TOKEN_AT = longPreferencesKey("os_token_at")
+        val SUBTITLE_LANGUAGES = stringPreferencesKey("subtitle_languages")
     }
 }
