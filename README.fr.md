@@ -23,8 +23,8 @@ depuis une seule base de code Kotlin Multiplatform. L'extraction des sources se 
 | ![Fiche épisode](.github/screenshots/07-episode.jpg) | ![Panneau sources](.github/screenshots/04-sources.jpg) |
 | **Lecteur** | **Réglages** |
 | ![Lecteur](.github/screenshots/08-player.jpg) | ![Réglages](.github/screenshots/09-settings.jpg) |
-| **Écran de veille** | |
-| ![Écran de veille](.github/screenshots/10-screensaver.jpg) | |
+| **Sous-titres** | **Écran de veille** |
+| ![Réglages des sous-titres](.github/screenshots/12-subtitles.jpg) | ![Écran de veille](.github/screenshots/10-screensaver.jpg) |
 
 > Captures prises en anglais ; l'interface est disponible en français, anglais et espagnol.
 
@@ -41,6 +41,12 @@ depuis une seule base de code Kotlin Multiplatform. L'extraction des sources se 
   Le panneau de sources reste là pour choisir un hébergeur à la main.
 - **Lecteur** — reprise au timecode, choix des sous-titres et de la piste audio, vitesse de
   lecture, seek 15 s, mode scrub sur la barre de progression, touches média de la télécommande.
+- **Sous-titres** (OpenSubtitles) — cherchés depuis le lecteur, classés par langue,
+  cadence et release, et téléchargés uniquement sur un appui explicite, le quota
+  quotidien étant serré. Ceux déjà téléchargés sont marqués, pour ne jamais payer deux
+  fois. Avec un réglage de décalage **et** une correction de cadence : l'appariement
+  exact repose sur une empreinte du fichier vidéo, impossible sur des flux segmentés, si
+  bien que le décalage est le cas normal et non un accident.
 - **Passer intro & générique** (TheIntroDB) — passer le générique enchaîne l'épisode suivant.
 - **Lecture auto de l'épisode suivant** — décompte de 10 s en fin d'épisode, annulable, qui
   bascule sur la saison suivante en fin de saison.
@@ -63,13 +69,6 @@ depuis une seule base de code Kotlin Multiplatform. L'extraction des sources se 
 - **Profils légers** — progression, liste et vu/non vu séparés par profil
   (« Salon » / « Enfants »), choisi au lancement. Les sauvegardes les
   transporteront.
-- **Sous-titres via [OpenSubtitles](https://www.opensubtitles.com)** — avec un
-  réglage de décalage dans le lecteur, parce que l'appariement exact est hors
-  d'atteinte : il repose sur une empreinte du *fichier* vidéo, or nos sources
-  servent des flux segmentés, pas des fichiers. Le décalage est donc le cas
-  normal et non un accident, ce qui fait du réglage la fonctionnalité elle-même
-  plutôt qu'un bonus. Les téléchargements sont plafonnés par jour ; un compte
-  OpenSubtitles gratuit relève ce plafond.
 - **Contribuer à TheIntroDB** — signaler depuis le lecteur un horodatage d'intro
   ou de générique manquant, pour enrichir la base que lisent les boutons
   *Passer l'intro*.
@@ -124,6 +123,27 @@ gratuite dans **Réglages → API & Clés**. Les mises à jour suivantes se font
 Découpage : `app/src/commonMain` (ressources), `app/src/jvmCommon` (ViewModels, repositories,
 UI partagée), `app/src/androidMain`, `app/src/desktopMain`. Un émulateur Android TV
 préconfiguré et ses scripts de test sont dans `emulator/`.
+
+**Les sous-titres fonctionnent tels quels dans les versions publiées** — l'APK,
+l'AppImage, le MSI et le DMG des [Releases](https://github.com/JibayMcs/MooVie/releases)
+embarquent ce qu'il faut. Rien à créer, rien à coller. En option, connecter un compte
+OpenSubtitles dans les réglages relève la limite quotidienne de téléchargements et
+affiche le quota restant.
+
+Le paragraphe qui suit ne concerne que ceux qui **compilent depuis les sources**. Les
+sous-titres reposent sur une *clé de consumer* OpenSubtitles, qui identifie
+l'application ; OpenSubtitles impose une clé unique par application et bannit les comptes
+qui demandent la leur à leurs utilisateurs. Cette clé est injectée à la compilation et
+volontairement absente de ce dépôt : une compilation depuis les sources désactive donc
+simplement les sous-titres — le reste fonctionne. Pour les activer en développement, crée
+ton propre consumer sur [opensubtitles.com](https://www.opensubtitles.com/consumers) et
+dépose la clé dans un fichier `opensubtitles.properties` gitignoré, à la racine :
+
+```properties
+apiKey=TA_CLE_DE_CONSUMER
+```
+
+La variable d'environnement `OPENSUBTITLES_API_KEY` marche aussi, c'est ce qu'utilise la CI.
 
 ## Contribuer
 

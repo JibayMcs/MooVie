@@ -23,8 +23,8 @@ no account, no ads.
 | ![Episode details](.github/screenshots/07-episode.jpg) | ![Sources panel](.github/screenshots/04-sources.jpg) |
 | **Player** | **Settings** |
 | ![Player](.github/screenshots/08-player.jpg) | ![Settings](.github/screenshots/09-settings.jpg) |
-| **Screensaver** | |
-| ![Screensaver](.github/screenshots/10-screensaver.jpg) | |
+| **Subtitles** | **Screensaver** |
+| ![Subtitles settings](.github/screenshots/12-subtitles.jpg) | ![Screensaver](.github/screenshots/10-screensaver.jpg) |
 
 > UI available in French, English and Spanish.
 
@@ -40,6 +40,11 @@ no account, no ads.
   panel is there for manual host selection.
 - **Player** — resume at timecode, subtitle and audio track selection, playback speed,
   15 s seek, scrub mode on the progress bar, remote media keys.
+- **Subtitles** (OpenSubtitles) — searched from the player, ranked by language, frame
+  rate and release, and downloaded only on an explicit press since the daily allowance is
+  small. Already-downloaded ones are marked so you never spend twice. Comes with an offset
+  *and* a frame-rate correction: exact matching relies on hashing the video file, which
+  segmented streams make impossible, so drift is the normal case rather than an accident.
 - **Skip intro & credits** (TheIntroDB) — skipping credits rolls into the next episode.
 - **Auto-play next episode** — 10 s countdown at the end of an episode, cancellable,
   rolling over to the next season.
@@ -60,12 +65,6 @@ no account, no ads.
   second codebase.
 - **Light profiles** — separate progress, watchlist and watched state per profile
   ("Living room" / "Kids"), picked at launch. Backups will carry them.
-- **Subtitles from [OpenSubtitles](https://www.opensubtitles.com)** — with a
-  subtitle offset control in the player, because exact matching is out of reach:
-  it relies on a hash of the video *file*, and our sources serve segmented
-  streams, not files. Drift is therefore the normal case rather than an accident,
-  which makes the offset the feature and not a bonus. Downloads are capped per
-  day; a free OpenSubtitles account raises the cap.
 - **Contribute back to TheIntroDB** — report an intro or credits timestamp from
   the player when it is missing, to fill in the database the *Skip intro* buttons
   read from.
@@ -118,6 +117,26 @@ under **Settings → API & Keys**. Later updates are handled from inside the app
 Layout: `app/src/commonMain` (resources), `app/src/jvmCommon` (ViewModels, repositories,
 shared UI), `app/src/androidMain`, `app/src/desktopMain`. A preconfigured Android TV
 emulator and its test scripts live in `emulator/`.
+
+**Subtitles work out of the box in the published builds** — the APK, AppImage, MSI and
+DMG from [Releases](https://github.com/JibayMcs/MooVie/releases) all ship with what they
+need. Nothing to create, nothing to paste. Optionally, connecting an OpenSubtitles
+account in the settings raises the daily download limit and shows the quota left.
+
+The rest of this paragraph only concerns people **building from source**. Subtitles rely
+on an OpenSubtitles *consumer key*, which identifies the application; OpenSubtitles
+mandates one key per app and bans accounts that ask their users to supply their own. That
+key is injected at build time and is deliberately absent from this repository, so a build
+from source simply turns subtitles off — everything else works. To enable them while
+developing, create your own consumer on
+[opensubtitles.com](https://www.opensubtitles.com/consumers) and drop the key in a
+gitignored `opensubtitles.properties` at the root:
+
+```properties
+apiKey=YOUR_CONSUMER_KEY
+```
+
+`OPENSUBTITLES_API_KEY` in the environment works too, which is what CI uses.
 
 ## Contributing
 
