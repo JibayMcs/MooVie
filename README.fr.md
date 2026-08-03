@@ -10,6 +10,11 @@ depuis une seule base de code Kotlin Multiplatform. L'extraction des sources se 
 
 🇬🇧 [English version](README.md)
 
+> [!IMPORTANT]
+> Moo-vie est en développement actif. Les choses bougent d'une version à l'autre, et
+> quelques aspérités sont à prévoir — les [issues](https://github.com/JibayMcs/MooVie/issues)
+> sont les bienvenues.
+
 ## Captures
 
 | Accueil | Tendances |

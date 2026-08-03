@@ -10,6 +10,10 @@ no account, no ads.
 
 🇫🇷 [Version française](README.fr.md)
 
+> [!IMPORTANT]
+> Moo-vie is under active development. Things move between releases, and some rough
+> edges are expected — [issues](https://github.com/JibayMcs/MooVie/issues) are welcome.
+
 ## Screenshots
 
 | Home | Trending |
