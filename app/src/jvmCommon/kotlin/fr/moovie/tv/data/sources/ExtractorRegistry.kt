@@ -39,6 +39,9 @@ object ExtractorRegistry {
 
     private val resolution = StreamResolution(
         extractors = listOf(
+            // En tête : un lien déjà jouable ne doit traverser aucune autre
+            // règle, et la reconnaissance ne coûte qu'un test d'extension.
+            DirectStreamExtractor(),
             FsvidExtractor(gateway),
             VidzyExtractor(gateway),
             UqloadExtractor(gateway),
@@ -74,5 +77,8 @@ object ProviderRegistry {
         CoflixProvider(ExtractorRegistry.http),
         CinestreamProvider(ExtractorRegistry.http),
         FrembedProvider(ExtractorRegistry.gateway),
+        // Seul catalogue en version originale : c'est lui qui rend le réglage VO
+        // utilisable, et l'app regardable pour un public non francophone.
+        VidapiProvider(ExtractorRegistry.gateway),
     )
 }
