@@ -62,7 +62,7 @@ class MainActivity : ComponentActivity() {
         installSplashScreen()
         super.onCreate(savedInstanceState)
 
-        handleTmdbKey(intent)
+        handleKeyExtras(intent)
 
         setContent {
             // L'animation de lancement se pose *au-dessus* de l'app plutôt que
@@ -246,16 +246,27 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        handleTmdbKey(intent)
+        handleKeyExtras(intent)
     }
 
     /**
-     * Enregistre une clé TMDB passée en extra (test sans clavier TV) :
-     * adb shell am start -n fr.moovie.tv/.MainActivity --es tmdb_key <clé>
+     * Enregistre une clé passée en extra, pour saisir sans clavier de télé :
+     *
+     *   adb shell am start -n fr.moovie.tv/.MainActivity --es tmdb_key <clé>
+     *   adb shell am start -n fr.moovie.tv/.MainActivity --es introdb_key <clé>
+     *
+     * `adb shell input text` ne convient pas : il tronque les chaînes longues
+     * et déforme ponctuation et casse. La clé TheIntroDB, qui fait 90 caractères
+     * avec des `:`, `_` et `-`, en ressort systématiquement fausse — d'où cette
+     * porte d'entrée, réservée à la mise au point.
      */
-    private fun handleTmdbKey(intent: Intent?) {
+    private fun handleKeyExtras(intent: Intent?) {
+        val settings = SettingsRepository()
         intent?.getStringExtra("tmdb_key")?.takeIf { it.isNotBlank() }?.let { key ->
-            lifecycleScope.launch { SettingsRepository().setTmdbApiKey(key) }
+            lifecycleScope.launch { settings.setTmdbApiKey(key) }
+        }
+        intent?.getStringExtra("introdb_key")?.takeIf { it.isNotBlank() }?.let { key ->
+            lifecycleScope.launch { settings.setIntroDbApiKey(key) }
         }
     }
 }
