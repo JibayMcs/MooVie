@@ -45,6 +45,10 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.input.TransformedText
+import androidx.compose.ui.text.input.OffsetMapping
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import fr.moovie.tv.data.net.DohProvider
 import fr.moovie.tv.data.settings.ScreensaverDelay
@@ -537,6 +541,7 @@ private fun ApiKeyField(value: String, onValueChange: (String) -> Unit) {
             singleLine = true,
             textStyle = TextStyle(color = Color.White),
             cursorBrush = SolidColor(Color.White),
+            visualTransformation = MaskedKey,
             modifier = Modifier
                 .fillMaxWidth()
                 // Le champ texte avale les flèches par défaut : sans ça le D-pad
@@ -558,3 +563,25 @@ private fun ApiKeyField(value: String, onValueChange: (String) -> Unit) {
     }
 }
 
+
+/**
+ * Masque la clé TMDB en n'en laissant lire que la fin.
+ *
+ * Une clé d'API n'est pas un mot de passe qu'on ressaisit : on la colle une fois
+ * puis on veut seulement pouvoir vérifier que c'est la bonne. La masquer
+ * entièrement rendrait ce contrôle impossible ; l'afficher en clair la met sur
+ * toutes les captures d'écran, et l'écran des réglages est justement ce qu'on
+ * montre dans une documentation. Les quatre derniers caractères suffisent à
+ * l'identifier sans la livrer.
+ */
+private object MaskedKey : VisualTransformation {
+    private const val VISIBLE_TAIL = 4
+
+    override fun filter(text: AnnotatedString): TransformedText {
+        if (text.length <= VISIBLE_TAIL) return TransformedText(text, OffsetMapping.Identity)
+        val masked = "•".repeat(text.length - VISIBLE_TAIL) + text.text.takeLast(VISIBLE_TAIL)
+        // Le masque garde la longueur d'origine : les positions du curseur et de
+        // la sélection restent donc valables telles quelles.
+        return TransformedText(AnnotatedString(masked), OffsetMapping.Identity)
+    }
+}
