@@ -11,6 +11,17 @@ package fr.moovie.tv.core.sources.model
 sealed interface MediaRef {
 
     val tmdbId: Int
+
+    /**
+     * Titre tel que **les catalogues** le connaissent, donc en français — et
+     * pas celui affiché à l'écran.
+     *
+     * La nuance n'est pas cosmétique : les catalogues visés sont francophones
+     * et rangent « Attack on Titan » sous « L'Attaque des Titans ». Y envoyer
+     * le titre traduit dans la langue de l'interface, c'est chercher un titre
+     * qui n'y figure pas et ne remonter aucune source. La langue de recherche
+     * est une propriété des catalogues, pas une préférence de l'utilisateur.
+     */
     val title: String
     val year: String?
 

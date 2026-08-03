@@ -15,7 +15,9 @@ import fr.moovie.tv.data.sources.ExtractorRegistry
 import fr.moovie.tv.core.sources.model.PlayableStream
 import fr.moovie.tv.data.sources.isStreamPlayable
 import fr.moovie.tv.data.sources.streamQuality
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import fr.moovie.tv.data.sources.ProviderRegistry
 import fr.moovie.tv.data.sources.SourceCacheRepository
@@ -31,6 +33,7 @@ import fr.moovie.tv.resources.details_needs_key
 import fr.moovie.tv.resources.details_no_player
 import fr.moovie.tv.resources.details_resolve_error
 import fr.moovie.tv.resources.details_tmdb_error
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -50,6 +53,15 @@ import org.jetbrains.compose.resources.getString
 
 /** Délai max par provider avant de le marquer en échec (n'affecte que ce provider). */
 private const val PROVIDER_TIMEOUT_MS = 12000L
+
+/**
+ * Langue dans laquelle on interroge les catalogues.
+ *
+ * Constante et non paramétrable : elle décrit les sites visés — tous
+ * francophones — et non l'utilisateur. La rendre configurable reviendrait à
+ * offrir un réglage dont toutes les valeurs sauf une cassent la recherche.
+ */
+private const val CATALOG_LANGUAGE = "fr-FR"
 
 class DetailsViewModel : ViewModel() {
 
@@ -188,6 +200,47 @@ class DetailsViewModel : ViewModel() {
     private var tmdbId = 0
     private var isTv = false
 
+    /**
+     * Titre français du média courant, mémorisé le temps de la fiche.
+     *
+     * C'est un `Deferred` et non une valeur parce que les catalogues sont
+     * interrogés en parallèle : sans ça, dix providers déclencheraient dix fois
+     * la même requête TMDB. Réinitialisé à chaque fiche (voir [start]).
+     */
+    private var catalogTitleAsync: Deferred<String>? = null
+    private val catalogTitleLock = Mutex()
+
+    /**
+     * Titre à envoyer aux catalogues, **toujours en français**.
+     *
+     * Le titre affiché suit la langue de l'interface ; les catalogues, eux, sont
+     * francophones et ne connaissent que le titre français. Les confondre avait
+     * un effet radical : interface en anglais (ou, sur desktop, simple locale
+     * système non française) et plus **aucune** source ne remontait, puisque
+     * seul frembed se repère à l'identifiant TMDB — tous les autres cherchent au
+     * titre.
+     *
+     * Une requête TMDB de plus, et seulement quand l'interface n'est pas déjà en
+     * français. En cas d'échec on retombe sur le titre affiché : mieux vaut une
+     * recherche approximative que pas de recherche du tout.
+     */
+    private suspend fun catalogTitle(displayed: String): String {
+        if (currentTmdbLanguage() == CATALOG_LANGUAGE) return displayed
+        val pending = catalogTitleLock.withLock {
+            catalogTitleAsync ?: viewModelScope.async(Dispatchers.IO) {
+                // Tout est capturé : une exception qui s'échapperait d'un `async`
+                // emporterait le scope du ViewModel avec elle, et donc la fiche.
+                runCatching {
+                    val apiKey = settings.tmdbApiKey.first()
+                    val repo = TmdbRepository(CATALOG_LANGUAGE)
+                    if (isTv) repo.tvDetails(apiKey, tmdbId).name
+                    else repo.movieDetails(apiKey, tmdbId).title
+                }.getOrNull()?.takeIf { it.isNotBlank() } ?: displayed
+            }.also { catalogTitleAsync = it }
+        }
+        return pending.await()
+    }
+
     fun movieKey() = "movie:$tmdbId"
     fun episodeKey(season: Int, episode: Int) = "tv:$tmdbId:s${season}e$episode"
 
@@ -206,6 +259,7 @@ class DetailsViewModel : ViewModel() {
         pendingMeta = null
         rejectedLinks.clear()
         playingLink = null
+        catalogTitleAsync = null
         this.tmdbId = tmdbId
         this.isTv = isTv
         resumeTarget = null
@@ -394,7 +448,9 @@ class DetailsViewModel : ViewModel() {
             imageUrl = movie.details.backdropUrl() ?: movie.details.posterUrl(),
         )
         startSourceLoad {
-            it.sourcesFor(MediaRef.Movie(tmdbId, movie.details.title, movie.details.year))
+            it.sourcesFor(
+                MediaRef.Movie(tmdbId, catalogTitle(movie.details.title), movie.details.year),
+            )
         }
     }
 
@@ -431,7 +487,15 @@ class DetailsViewModel : ViewModel() {
             imageUrl = still ?: tv.details.backdropUrl() ?: tv.details.posterUrl(),
         )
         startSourceLoad {
-            it.sourcesFor(MediaRef.Episode(tmdbId, tv.details.name, tv.details.year, season, episode))
+            it.sourcesFor(
+                MediaRef.Episode(
+                    tmdbId,
+                    catalogTitle(tv.details.name),
+                    tv.details.year,
+                    season,
+                    episode,
+                ),
+            )
         }
     }
 
@@ -600,7 +664,13 @@ class DetailsViewModel : ViewModel() {
             // vers les hébergeurs pour un résultat qu'on a déjà.
             if (sourceCache.get(key, providers.map { it.name }.toSet()) != null) return@launch
 
-            val media = MediaRef.Episode(tmdbId, tv.details.name, tv.details.year, season, episode)
+            val media = MediaRef.Episode(
+                tmdbId,
+                catalogTitle(tv.details.name),
+                tv.details.year,
+                season,
+                episode,
+            )
             val answered = mutableSetOf<String>()
             val links = coroutineScope {
                 providers.map { provider ->
