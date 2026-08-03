@@ -74,6 +74,7 @@ internal fun DesktopHomeScreen(
 @Composable
 internal fun DesktopSearchScreen(
     onOpenTitle: (tmdbId: Int, isTv: Boolean) -> Unit,
+    onBack: () -> Unit,
 ) {
     val vm = Vm.search
     val query by vm.query.collectAsState()
@@ -95,6 +96,8 @@ internal fun DesktopSearchScreen(
         onRemoveFromWatchlist = vm::removeFromWatchlist,
         onRemoveHistory = vm::removeHistory,
         onClearHistory = vm::clearHistory,
+        onBack = onBack,
+        showBackButton = true,
     )
 }
 

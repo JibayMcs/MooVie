@@ -204,6 +204,7 @@ private fun DesktopApp(
             )
             Screen.Search -> DesktopSearchScreen(
                 onOpenTitle = { id, isTv -> nav.push(Screen.Details(id, isTv)) },
+                onBack = { nav.pop() },
             )
             is Screen.Details -> DesktopDetailsScreen(
                 params = s,

@@ -25,6 +25,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.DeleteSweep
@@ -56,6 +57,7 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import fr.moovie.tv.data.tmdb.TmdbItem
 import fr.moovie.tv.resources.Res
+import fr.moovie.tv.resources.common_back
 import fr.moovie.tv.resources.search_clear_history
 import fr.moovie.tv.resources.search_empty_hint
 import fr.moovie.tv.resources.search_hint
@@ -113,6 +115,11 @@ fun SearchScreenContent(
      * desktop, et d'un Android TV sans moteur de reconnaissance installé.
      */
     onVoiceSearch: (() -> Unit)? = null,
+    onBack: () -> Unit = {},
+    // Desktop uniquement, comme pour l'historique : sur TV la télécommande a sa
+    // touche Retour, et un bouton à l'écran ne ferait que voler le focus au
+    // champ de saisie.
+    showBackButton: Boolean = false,
 ) {
     var menuFor by remember { mutableStateOf<TmdbItem?>(null) }
     val fieldFocus = remember { FocusRequester() }
@@ -163,11 +170,23 @@ fun SearchScreenContent(
     // Marges horizontales portées par les enfants : la grille de résultats
     // s'étend jusqu'aux bords et ne rogne plus les cartes agrandies au focus.
     Column(modifier = Modifier.fillMaxSize().padding(vertical = 40.dp)) {
-        Text(
-            stringResource(Res.string.search_title),
-            style = MaterialTheme.typography.headlineMedium,
+        Row(
             modifier = Modifier.padding(horizontal = 40.dp),
-        )
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            if (showBackButton) {
+                MoovieIconButton(
+                    onClick = onBack,
+                    icon = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = stringResource(Res.string.common_back),
+                )
+            }
+            Text(
+                stringResource(Res.string.search_title),
+                style = MaterialTheme.typography.headlineMedium,
+            )
+        }
         Spacer(Modifier.height(16.dp))
 
         Row(
@@ -334,6 +353,7 @@ private fun HistorySection(
         }
     }
 }
+
 
 @Composable
 private fun ResultsGrid(
