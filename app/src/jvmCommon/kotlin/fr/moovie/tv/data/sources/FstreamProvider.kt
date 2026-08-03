@@ -203,8 +203,11 @@ class FstreamProvider(private val http: OkHttpClient) : SourceProvider {
     private fun mapLanguage(version: String): String = when (version.lowercase()) {
         // "default" sur French-Stream = version française du site.
         "vf", "vff", "vfq", "premium", "default" -> "VF"
-        "vostfr" -> "VOSTFR"
-        "vo", "voeng", "vostfr_hd" -> "VO"
+        // `vostfr_hd` est du VOSTFR — un palier de qualité, pas une langue. Le
+        // ranger en VO gonflait la section VO de liens sous-titrés en français
+        // et vidait la section VOSTFR de sa meilleure copie.
+        "vostfr", "vostfr_hd" -> "VOSTFR"
+        "vo", "voeng" -> "VO"
         else -> version.uppercase()
     }
 
