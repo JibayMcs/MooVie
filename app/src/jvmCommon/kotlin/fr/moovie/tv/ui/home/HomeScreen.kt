@@ -2,6 +2,9 @@ package fr.moovie.tv.ui.home
 
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -563,6 +566,28 @@ private fun ResumeMenuDialog(
     LaunchedEffect(Unit) { runCatching { firstAction.requestFocus() } }
 }
 
+/**
+ * Désigne la carte comme sujet du hero, au focus **et au survol**.
+ *
+ * Le focus seul suffisait tant que l'app se pilotait à la télécommande. À la
+ * souris, survoler une carte ne lui donne pas le focus : le hero restait donc
+ * figé sur la première carte, et la seule façon d'en désigner une autre était de
+ * cliquer — ce qui ouvre la fiche au lieu de la présenter.
+ *
+ * Le survol ne *prend* pas le focus, il ne fait que renseigner le hero : lui
+ * confier le focus ferait défiler la rangée sous le curseur au moindre passage.
+ * Sans pointeur (Android TV), rien ne se déclenche jamais.
+ */
+@Composable
+private fun Modifier.heroSubject(onActive: () -> Unit): Modifier {
+    val hoverSource = remember { MutableInteractionSource() }
+    val hovered by hoverSource.collectIsHoveredAsState()
+    LaunchedEffect(hovered) { if (hovered) onActive() }
+    return this
+        .onFocusChanged { if (it.isFocused) onActive() }
+        .hoverable(hoverSource)
+}
+
 @Composable
 private fun ResumeCard(
     entry: ResumeEntry,
@@ -578,7 +603,7 @@ private fun ResumeCard(
         focusedScale = 1.08f,
         modifier = modifier
             .width(260.dp)
-            .onFocusChanged { if (it.isFocused) onFocusEntry(entry) },
+            .heroSubject { onFocusEntry(entry) },
     ) {
         Column {
             Box(
@@ -677,7 +702,7 @@ private fun PosterCard(
         onLongClick = onLongClick,
         modifier = modifier
             .width(150.dp)
-            .onFocusChanged { if (it.isFocused) onFocusItem(item) },
+            .heroSubject { onFocusItem(item) },
     ) {
         Column {
             Box {
@@ -767,7 +792,7 @@ private fun WatchlistRow(
                             // Le hero décrit la carte focalisée : ce rappel
                             // manquait ici, et le bandeau restait figé sur la
                             // dernière carte de la rangée précédente.
-                            .onFocusChanged { if (it.hasFocus) onFocusEntry(entry) }
+                            .heroSubject { onFocusEntry(entry) }
                             .then(
                                 if (index == 0 && firstFocus != null) {
                                     Modifier.focusRequester(firstFocus)
