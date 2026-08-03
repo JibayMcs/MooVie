@@ -55,6 +55,16 @@ depuis une seule base de code Kotlin Multiplatform. L'extraction des sources se 
 - **Mises à jour intégrées** — vérification périodique des releases GitHub : bandeau sur
   l'accueil, pastille discrète pendant la lecture.
 
+## Feuille de route
+
+- **Smartphones et tablettes Android** — en cours. L'interface est aujourd'hui
+  pensée pour un écran de salon et une télécommande ; le portage porte sur les
+  gabarits tactiles et le mode portrait, pas sur une seconde base de code.
+- **Pas de support iOS prévu.** Les contraintes sont lourdes — installation hors
+  store, règles de l'App Store, pile de lecture à refaire — et je n'ai aucun
+  appareil Apple pour tester. Publier quelque chose que je ne peux pas faire
+  tourner moi-même serait pire que de ne pas le publier.
+
 ## Stack
 
 | Couche | Techno |

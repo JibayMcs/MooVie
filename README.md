@@ -53,6 +53,15 @@ no account, no ads.
 - **In-app updates** — periodic check against GitHub Releases; a banner on the home
   screen, a discreet chip during playback.
 
+## Roadmap
+
+- **Android phones & tablets** — work in progress. The UI is built for a 10-foot
+  screen and a D-pad today; the port is about touch layouts and portrait, not a
+  second codebase.
+- **No iOS support planned.** The constraints are heavy — sideloading, App Store
+  policy, a separate player stack — and I have no Apple device to test on.
+  Shipping something I cannot run myself would be worse than not shipping it.
+
 ## Stack
 
 | Layer | Tech |
