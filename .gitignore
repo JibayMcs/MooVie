@@ -11,6 +11,7 @@
 *.keystore
 !debug.keystore
 keystore.properties
+opensubtitles.properties
 /.env
 /graphify-out/
 /.kotlin/

@@ -20,3 +20,15 @@ expect val isPointerUi: Boolean
  * build : ce pont évite d'avoir à choisir lequel lire depuis le code partagé.
  */
 expect val appVersionName: String
+
+/**
+ * Clé de consumer OpenSubtitles, injectée à la compilation. Vide si le build
+ * n'en a pas — les sous-titres se désactivent alors proprement.
+ *
+ * Elle identifie **l'application**, jamais l'utilisateur : OpenSubtitles impose
+ * une clé unique par application et bannit l'accès de ceux qui demandent la leur
+ * à leurs utilisateurs. C'est l'inverse de TMDB, dont la clé est propre à chaque
+ * personne et se saisit donc dans les réglages. Ce qui est propre à
+ * l'utilisateur ici, c'est son compte, et lui seul.
+ */
+expect val openSubtitlesApiKey: String

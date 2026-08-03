@@ -51,6 +51,10 @@ jobs:
           KEYSTORE_FILE: moovie-release.keystore
           KEYSTORE_PASSWORD: ${{ secrets.MOOVIE_KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.MOOVIE_KEY_ALIAS }}
+          # Clé de consumer OpenSubtitles : elle identifie l'application, doit
+          # donc être présente dans les binaires publiés, mais jamais dans le
+          # dépôt. Absente, les sous-titres se désactivent proprement.
+          OPENSUBTITLES_API_KEY: ${{ secrets.MOOVIE_OPENSUBTITLES_KEY }}
 
       - name: Renommer l'APK
         run: cp app/build/outputs/apk/release/app-release.apk moovie-${{ github.ref_name }}.apk
@@ -86,6 +90,8 @@ jobs:
 
       - name: Build paquet desktop (${{ matrix.ext }})
         run: ./gradlew packageDistributionForCurrentOS --no-daemon
+        env:
+          OPENSUBTITLES_API_KEY: ${{ secrets.MOOVIE_OPENSUBTITLES_KEY }}
 
       - name: Renommer le paquet
         shell: bash
@@ -142,6 +148,7 @@ jobs:
           # (« Input length = 1 »).
           LANG: C.UTF-8
           LC_ALL: C.UTF-8
+          OPENSUBTITLES_API_KEY: ${{ secrets.MOOVIE_OPENSUBTITLES_KEY }}
         run: ./gradlew :app:packageAppImage --no-daemon
 
       - name: Renommer

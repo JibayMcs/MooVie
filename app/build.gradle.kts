@@ -25,6 +25,26 @@ val keystoreProps = Properties().apply {
 fun signingValue(propKey: String, envKey: String): String? =
     keystoreProps.getProperty(propKey) ?: System.getenv(envKey)
 
+// Clé de consumer OpenSubtitles. Même dispositif que le keystore : fichier
+// gitignoré en local, secret GitHub en CI, injectée à la compilation.
+//
+// Elle identifie *l'application*, pas l'utilisateur : OpenSubtitles impose une
+// clé unique par application et bannit l'accès de ceux qui demandent la leur à
+// leurs utilisateurs. Elle ne peut donc pas être saisie dans les réglages comme
+// celle de TMDB, et n'a rien à faire dans un dépôt public — d'où l'injection.
+//
+// Absente (build depuis les sources sans clé), les sous-titres se désactivent
+// proprement plutôt que de faire échouer la compilation.
+val openSubtitlesProps = Properties().apply {
+    val f = rootProject.file("opensubtitles.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}
+
+val openSubtitlesApiKey: String =
+    openSubtitlesProps.getProperty("apiKey")
+        ?: System.getenv("OPENSUBTITLES_API_KEY")
+        ?: ""
+
 kotlin {
     androidTarget {
         compilerOptions {
@@ -143,6 +163,7 @@ android {
         targetSdk = 34
         versionCode = 23
         versionName = appVersion
+        buildConfigField("String", "OPENSUBTITLES_API_KEY", "\"$openSubtitlesApiKey\"")
     }
 
     signingConfigs {
@@ -185,6 +206,11 @@ tasks.withType<Test>().configureEach {
     // -Dmoovie.probe=1 est passé à la JVM Gradle, pas à celle des tests : on le
     // relaie explicitement, sinon la sonde se croit non demandée.
     System.getProperty("moovie.probe")?.let { systemProperty("moovie.probe", it) }
+    System.getProperty("moovie.probe.download")
+        ?.let { systemProperty("moovie.probe.download", it) }
+    // Les sondes OpenSubtitles interrogent la vraie API : sans la clé elles
+    // s'abstiennent au lieu d'échouer.
+    systemProperty("moovie.opensubtitles.key", openSubtitlesApiKey)
 }
 
 compose.resources {
@@ -202,6 +228,9 @@ compose.desktop {
         mainClass = desktopMainClass
         // Version lue au runtime par l'updater desktop (bannière de mise à jour).
         jvmArgs += "-Dmoovie.version=$appVersion"
+        // Pendant de BuildConfig côté Android : le desktop lit la clé en
+        // propriété système, comme il lit déjà la version.
+        jvmArgs += "-Dmoovie.opensubtitles.key=$openSubtitlesApiKey"
 
         // JDK dont jpackage tire le runtime embarqué, quand il doit différer de
         // celui qui exécute Gradle. Sous Linux la CI y met l'OpenJDK de la

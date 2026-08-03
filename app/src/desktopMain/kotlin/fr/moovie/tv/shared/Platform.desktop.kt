@@ -6,3 +6,6 @@ actual val platformName: String =
 actual val isPointerUi: Boolean = true
 
 actual val appVersionName: String = System.getProperty("moovie.version") ?: "0.0.0"
+
+actual val openSubtitlesApiKey: String =
+    System.getProperty("moovie.opensubtitles.key").orEmpty()
