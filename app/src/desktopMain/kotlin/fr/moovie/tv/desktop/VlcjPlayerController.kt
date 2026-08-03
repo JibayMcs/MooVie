@@ -4,6 +4,8 @@ import fr.moovie.tv.ui.player.MooviePlayerController
 import fr.moovie.tv.ui.player.PlayerTrack
 import fr.moovie.tv.ui.player.PlayerTracks
 import uk.co.caprica.vlcj.player.base.MediaPlayer
+import java.io.File
+import uk.co.caprica.vlcj.media.MediaSlaveType
 import java.util.concurrent.Executors
 
 /**
@@ -112,4 +114,40 @@ internal class VlcjPlayerController(private val player: MediaPlayer) : MooviePla
         val id = trackId.toIntOrNull() ?: return
         command { player.audio().setTrack(id) }
     }
+
+    /**
+     * libVLC charge un sous-titre externe **à chaud**, sans interrompre la
+     * lecture : c'est un « slave » ajouté au média en cours. Rien à recharger,
+     * contrairement à Media3 qui doit reconstruire son élément.
+     *
+     * Passe par [command] comme tout le reste : appeler libVLC depuis son propre
+     * thread d'évènements ou depuis le fil d'UI bloque ou fait tomber le lecteur.
+     */
+    override fun loadExternalSubtitle(path: String?) {
+        command {
+            if (path == null) {
+                player.subpictures().setTrack(-1)
+            } else {
+                // `select = true` l'active immédiatement, sinon il faudrait
+                // deviner l'identifiant que libVLC vient de lui attribuer.
+                player.media().addSlave(MediaSlaveType.SUBTITLE, File(path).toURI().toString(), true)
+            }
+        }
+    }
+
+    /**
+     * Cadence du flux. libVLC la rend en images par seconde ; 0 quand le
+     * conteneur ne la déclare pas, ce qui arrive souvent en HLS.
+     */
+    override fun videoFps(): Double = runCatching {
+        // libVLC rend la cadence en **rationnel** — 24000/1001 pour du 23,976.
+        // C'est précisément pour ça que la comparaison avec la valeur déclarée
+        // par le catalogue passe par une tolérance : la division ne retombe
+        // jamais exactement sur 23,976.
+        val track = player.media().info()?.videoTracks()?.firstOrNull()
+            ?: return@runCatching 0.0
+        val numerator = track.frameRate()
+        val denominator = track.frameRateBase()
+        if (numerator > 0 && denominator > 0) numerator.toDouble() / denominator else 0.0
+    }.getOrDefault(0.0)
 }

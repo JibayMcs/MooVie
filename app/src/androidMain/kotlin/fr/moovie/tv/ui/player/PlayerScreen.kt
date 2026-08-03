@@ -41,7 +41,7 @@ import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.Tracks
-import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
@@ -50,11 +50,16 @@ import androidx.media3.ui.PlayerView
 import fr.moovie.tv.ui.format.formatNowDateTime
 import fr.moovie.tv.core.player.matchAudioTrack
 import fr.moovie.tv.data.intro.IntroDbRepository
+import androidx.lifecycle.viewmodel.compose.viewModel
 import fr.moovie.tv.data.intro.IntroMedia
 import fr.moovie.tv.data.settings.ScreensaverDelay
 import fr.moovie.tv.data.settings.SettingsRepository
 import fr.moovie.tv.data.watch.WatchProgressRepository
 import fr.moovie.tv.ui.components.MoovieScreensaver
+import fr.moovie.tv.ui.subtitles.PlayerSubtitlesViewModel
+import fr.moovie.tv.ui.subtitles.onlineSubtitleSection
+import fr.moovie.tv.ui.subtitles.subtitleFpsSection
+import fr.moovie.tv.ui.subtitles.subtitleSyncSection
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -92,13 +97,19 @@ private val CONFIRM_KEYS = setOf(Key.DirectionCenter, Key.Enter, Key.NumPadEnter
  * les commandes Media3 via [ExoPlayerController], le focus D-pad et les
  * minuteurs.
  */
-@OptIn(UnstableApi::class)
 /**
  * Fraction de l'épisode au-delà de laquelle on précharge les sources du
  * suivant. Assez tard pour que l'épisode soit probablement fini, assez tôt
  * pour que les catalogues aient le temps de répondre.
  */
 private const val PREFETCH_AT = 0.80
+
+/**
+ * Fenêtre pendant laquelle une erreur de lecture est imputée au rechargement
+ * d'un sous-titre plutôt qu'à la source. Assez large pour couvrir une
+ * re-préparation réseau, assez courte pour ne pas masquer une vraie panne.
+ */
+private const val SUBTITLE_RELOAD_GRACE_MS = 8_000L
 
 @Composable
 fun PlayerScreen(
@@ -141,7 +152,14 @@ fun PlayerScreen(
             if (headers.isNotEmpty()) setDefaultRequestProperties(headers)
         }
         ExoPlayer.Builder(context)
-            .setMediaSourceFactory(DefaultMediaSourceFactory(httpFactory))
+            // `DefaultDataSource` aiguille selon le schéma de l'URI ; `httpFactory`
+            // seule ne sait ouvrir que du http(s). Les sous-titres externes vivent
+            // en `file://` dans le cache : servis par la fabrique HTTP, ils
+            // cassaient sur un ClassCastException (FileURLConnection vers
+            // HttpURLConnection), ce que le lecteur signalait comme un flux mort.
+            .setMediaSourceFactory(
+                DefaultMediaSourceFactory(DefaultDataSource.Factory(context, httpFactory)),
+            )
             .setSeekBackIncrementMs(PLAYER_SEEK_STEP_MS)
             .setSeekForwardIncrementMs(PLAYER_SEEK_STEP_MS)
             // Garde CPU + Wi-Fi éveillés pendant la lecture (évite les coupures
@@ -161,6 +179,16 @@ fun PlayerScreen(
 
     /** Vue du lecteur exposée à la chrome partagée. */
     val controller = remember { ExoPlayerController(player) }
+
+    // Instant du dernier chargement de sous-titre externe.
+    //
+    // Media3 n'accepte une piste externe qu'au montage du média : l'activer
+    // impose de repréparer le flux. Si cette re-préparation échoue, l'erreur
+    // ressemble à s'y méprendre à un flux mort — et la cascade renvoyait à la
+    // fiche pour chercher une autre source, alors que la lecture allait bien une
+    // seconde plus tôt. On distingue les deux par le temps écoulé.
+    var subtitleReloadAt by remember { mutableStateOf(0L) }
+
 
     // Sans MediaSession, Android route les touches média (play/pause/seek de la
     // télécommande) vers la dernière session système au lieu de l'app.
@@ -405,6 +433,16 @@ fun PlayerScreen(
             // codec refusé) : la sonde ne valide qu'un accès au premier octet.
             // On rend la main à la cascade plutôt que de laisser un écran noir.
             override fun onPlayerError(error: PlaybackException) {
+                // Erreur juste après un chargement de sous-titre : c'est la
+                // re-préparation qui a échoué, pas la source. On repart sans le
+                // sous-titre plutôt que de sacrifier la lecture en cours. Le
+                // compteur est remis à zéro : un second échec, lui, est bien un
+                // problème de flux et repart vers la cascade.
+                if (System.currentTimeMillis() - subtitleReloadAt < SUBTITLE_RELOAD_GRACE_MS) {
+                    subtitleReloadAt = 0L
+                    controller.loadExternalSubtitle(null)
+                    return
+                }
                 onPlaybackFailed()
             }
         }
@@ -450,7 +488,29 @@ fun PlayerScreen(
         delay(PLAYER_UPDATE_CHIP_MS)
         updateChipFresh = false
     }
-    val showUpdateChip = updateVersion != null && (updateChipFresh || controlsVisible)
+    // Version à afficher sur la pastille, ou null s'il n'y a rien à montrer :
+    // porter la non-nullité dans la valeur évite de la revérifier plus bas.
+    val subsViewModel: PlayerSubtitlesViewModel = viewModel()
+    val subsState by subsViewModel.state.collectAsStateWithLifecycle()
+    val subsFile by subsViewModel.file.collectAsStateWithLifecycle()
+    // Le fichier arrive déjà recalé : le lecteur n'a qu'à le charger.
+    //
+    // **Jamais sur la valeur initiale.** Un LaunchedEffect se déclenche dès la
+    // première composition, donc avec `null` : sans ce garde-fou, chaque
+    // ouverture du lecteur repréparait le flux qui venait de démarrer — et un
+    // lien d'hébergeur supporte mal d'être redemandé. L'échec remontait alors à
+    // `onPlayerError`, qui rend la main à la cascade : retour à la fiche et
+    // nouvelle résolution des sources, sans que rien n'ait été demandé.
+    var subsApplied by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(subsFile) {
+        if (subsFile == null && subsApplied == null) return@LaunchedEffect
+        subsApplied = subsFile
+        subtitleReloadAt = System.currentTimeMillis()
+        controller.loadExternalSubtitle(subsFile)
+    }
+    DisposableEffect(Unit) { onDispose { subsViewModel.onLeave() } }
+
+    val chipVersion = updateVersion?.takeIf { updateChipFresh || controlsVisible }
 
     // Veille : uniquement sur une lecture en pause, et repoussée à chaque appui
     // (activityTick est incrémenté par le gestionnaire de touches racine).
@@ -651,9 +711,9 @@ fun PlayerScreen(
         // Pastille de mise à jour, en haut à droite (le titre occupe la gauche).
         // L'horloge occupe ce même coin : la pastille se pose alors *sous* elle,
         // sinon les deux se superposent et deviennent illisibles.
-        if (showUpdateChip && updateVersion != null) {
+        if (chipVersion != null) {
             PlayerUpdateChip(
-                version = updateVersion,
+                version = chipVersion,
                 onClick = {
                     controller.pause()
                     onUpdateSelected()
@@ -725,14 +785,38 @@ fun PlayerScreen(
             )
         }
 
+        // Sous-titres en ligne : la recherche ne part qu'à l'ouverture du menu.
+        // Elle est gratuite, mais inutile tant que personne ne la demande — et à
+        // ce moment-là le flux est prêt, donc sa cadence est connue.
+        LaunchedEffect(dialog) {
+            if (dialog == PlayerDialogKind.SUBTITLES && subsState.candidates.isEmpty()) {
+                subsViewModel.load(mediaKey, title, controller.videoFps())
+            }
+        }
+
         when (dialog) {
             PlayerDialogKind.SUBTITLES -> PlayerOptionsDialog(
                 sections = listOf(
                     subtitleSection(tracks) { trackId ->
+                        // Choisir une piste intégrée retire le sous-titre externe :
+                        // les deux affichés ensemble se chevauchent.
+                        subsViewModel.clear()
                         controller.selectSubtitle(trackId)
                         tracks = controller.tracks()
                         dialog = null
                     },
+                    onlineSubtitleSection(subsState) { candidate ->
+                        subsViewModel.pick(candidate)
+                        dialog = null
+                    },
+                    // Le réglage garde la modale ouverte : on ajuste par appuis
+                    // successifs, la refermer à chaque pas serait intenable.
+                    subtitleSyncSection(
+                        state = subsState,
+                        onNudge = subsViewModel::nudge,
+                        onReset = subsViewModel::resetTiming,
+                    ),
+                    subtitleFpsSection(subsState) { subsViewModel.assumeSubtitleFps(it) },
                 ),
                 onDismiss = { dialog = null },
             )

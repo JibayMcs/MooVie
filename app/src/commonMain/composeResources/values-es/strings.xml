@@ -261,4 +261,18 @@
     <string name="subtitles_languages">Idiomas buscados</string>
     <string name="subtitles_languages_help">En orden: el primero prevalece sobre los demás al clasificar los subtítulos ofrecidos. Al menos un idioma debe permanecer activo.</string>
     <string name="subtitles_no_key">Esta versión se compiló sin clave de OpenSubtitles: los subtítulos están desactivados.</string>
+    <string name="player_online_subtitles">Subtítulos en línea</string>
+    <string name="player_subtitles_searching">Buscando…</string>
+    <string name="player_subtitles_none_found">No se encontraron subtítulos para este título.</string>
+    <string name="player_subtitles_quota_out">Cuota agotada. Se renueva a medianoche UTC.</string>
+    <string name="player_subtitles_network">OpenSubtitles no responde.</string>
+    <string name="player_subtitles_sync">Sincronización</string>
+    <string name="player_subtitles_earlier">%1$s s antes</string>
+    <string name="player_subtitles_later">%1$s s después</string>
+    <string name="player_subtitles_sync_reset">Restablecer</string>
+    <string name="player_subtitles_offset">Desfase: %1$s s</string>
+    <string name="player_subtitles_fps">Cadencia del subtítulo</string>
+    <string name="player_subtitles_fps_auto">Automática</string>
+    <string name="player_subtitles_quota_left">%1$d restantes hoy</string>
+    <string name="player_subtitles_downloaded">Descargado</string>
 </resources>

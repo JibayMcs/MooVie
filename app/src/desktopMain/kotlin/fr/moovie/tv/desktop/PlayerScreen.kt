@@ -84,6 +84,10 @@ import fr.moovie.tv.ui.player.PlayerAutoNextCountdown
 import fr.moovie.tv.ui.player.PlayerDurationGuard
 import fr.moovie.tv.ui.player.PlayerControlBar
 import fr.moovie.tv.ui.player.PlayerDialogKind
+import fr.moovie.tv.ui.subtitles.PlayerSubtitlesViewModel
+import fr.moovie.tv.ui.subtitles.onlineSubtitleSection
+import fr.moovie.tv.ui.subtitles.subtitleFpsSection
+import fr.moovie.tv.ui.subtitles.subtitleSyncSection
 import fr.moovie.tv.ui.player.PlayerOptionsDialog
 import fr.moovie.tv.ui.player.PlayerSkipButton
 import fr.moovie.tv.ui.player.SkipKind
@@ -872,14 +876,46 @@ internal fun DesktopPlayerScreen(
             )
         }
 
+val subsViewModel = remember { PlayerSubtitlesViewModel() }
+        val subsState by subsViewModel.state.collectAsState()
+        val subsFile by subsViewModel.file.collectAsState()
+        // libVLC charge le fichier à chaud, sans interrompre la lecture — il arrive
+        // déjà recalé, le lecteur n'a rien à calculer.
+        LaunchedEffect(subsFile) { controller.loadExternalSubtitle(subsFile) }
+        DisposableEffect(Unit) { onDispose { subsViewModel.onLeave() } }
+
+        // Sous-titres en ligne : recherche à l'ouverture du menu seulement. Elle
+        // est gratuite, mais inutile tant que personne ne la demande — et à ce
+        // moment-là le flux est prêt, donc sa cadence est connue.
+        LaunchedEffect(dialog) {
+            if (dialog == PlayerDialogKind.SUBTITLES && subsState.candidates.isEmpty()) {
+                subsViewModel.load(mediaKey, title, controller.videoFps())
+            }
+        }
+
         when (dialog) {
             PlayerDialogKind.SUBTITLES -> PlayerOptionsDialog(
                 sections = listOf(
                     subtitleSection(tracks) { trackId ->
+                        // Une piste intégrée et un sous-titre externe affichés
+                        // ensemble se chevauchent : choisir l'une retire l'autre.
+                        subsViewModel.clear()
                         controller.selectSubtitle(trackId)
                         tracks = controller.tracks()
                         dialog = null
                     },
+                    onlineSubtitleSection(subsState) { candidate ->
+                        subsViewModel.pick(candidate)
+                        dialog = null
+                    },
+                    // Le réglage garde la modale ouverte : on ajuste par appuis
+                    // successifs, la refermer à chaque pas serait intenable.
+                    subtitleSyncSection(
+                        state = subsState,
+                        onNudge = subsViewModel::nudge,
+                        onReset = subsViewModel::resetTiming,
+                    ),
+                    subtitleFpsSection(subsState) { subsViewModel.assumeSubtitleFps(it) },
                 ),
                 onDismiss = { dialog = null },
             )

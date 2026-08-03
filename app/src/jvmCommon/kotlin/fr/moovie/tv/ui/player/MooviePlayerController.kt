@@ -81,6 +81,26 @@ interface MooviePlayerController {
     fun selectSubtitle(trackId: String?)
 
     fun selectAudio(trackId: String)
+
+    /**
+     * Charge un fichier de sous-titres externe, ou le retire si [path] est null.
+     *
+     * Le fichier est déjà **recalé** quand il arrive ici : le décalage et la
+     * correction de cadence sont appliqués au fichier, pas au lecteur. C'est le
+     * seul moyen d'obtenir le même comportement des deux côtés — libVLC sait
+     * décaler des sous-titres, Media3 non, et aucun des deux ne sait étirer une
+     * cadence, qui est pourtant la correction qui compte.
+     */
+    fun loadExternalSubtitle(path: String?)
+
+    /**
+     * Cadence du flux en images par seconde, 0 si inconnue.
+     *
+     * Sert à corriger la dérive d'un sous-titre calé sur une autre cadence — le
+     * `moviehash` d'OpenSubtitles étant hors d'atteinte sur des flux segmentés,
+     * c'est notre seul point d'appui pour synchroniser autre chose qu'à la main.
+     */
+    fun videoFps(): Double = 0.0
 }
 
 /** Vitesses proposées dans le menu du lecteur, communes aux deux plateformes. */

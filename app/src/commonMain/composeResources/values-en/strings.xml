@@ -261,4 +261,18 @@
     <string name="subtitles_languages">Languages searched</string>
     <string name="subtitles_languages_help">In order: the first one wins over the others when ranking the subtitles on offer. At least one language must stay on.</string>
     <string name="subtitles_no_key">This build was compiled without an OpenSubtitles key: subtitles are disabled.</string>
+    <string name="player_online_subtitles">Online subtitles</string>
+    <string name="player_subtitles_searching">Searching…</string>
+    <string name="player_subtitles_none_found">No subtitles found for this title.</string>
+    <string name="player_subtitles_quota_out">Quota used up. It renews at midnight UTC.</string>
+    <string name="player_subtitles_network">OpenSubtitles is unreachable.</string>
+    <string name="player_subtitles_sync">Sync</string>
+    <string name="player_subtitles_earlier">%1$s s earlier</string>
+    <string name="player_subtitles_later">%1$s s later</string>
+    <string name="player_subtitles_sync_reset">Reset</string>
+    <string name="player_subtitles_offset">Offset: %1$s s</string>
+    <string name="player_subtitles_fps">Subtitle frame rate</string>
+    <string name="player_subtitles_fps_auto">Automatic</string>
+    <string name="player_subtitles_quota_left">%1$d left today</string>
+    <string name="player_subtitles_downloaded">Downloaded</string>
 </resources>

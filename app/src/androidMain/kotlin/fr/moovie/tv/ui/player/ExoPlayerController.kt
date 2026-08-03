@@ -1,6 +1,10 @@
 package fr.moovie.tv.ui.player
 
+import android.net.Uri
 import androidx.media3.common.C
+import androidx.media3.common.Format
+import androidx.media3.common.MimeTypes
+import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
@@ -13,6 +17,33 @@ import androidx.media3.common.Tracks
  * adaptateur sait les retraduire en `TrackSelectionOverride`.
  */
 internal class ExoPlayerController(private val player: Player) : MooviePlayerController {
+
+    /** Vrai tant que la piste externe attend d'être sélectionnée. */
+    private var awaitingExternal = false
+
+    init {
+        // Sélectionner la piste externe dès qu'elle apparaît. Sans ça, réactiver
+        // l'affichage laisse ExoPlayer choisir lui-même — et il retient la piste
+        // intégrée du flux, si bien que le sous-titre téléchargé est chargé,
+        // listé, et jamais montré.
+        player.addListener(object : Player.Listener {
+            override fun onTracksChanged(tracks: Tracks) {
+                if (!awaitingExternal) return
+                val group = tracks.groups.firstOrNull {
+                    it.type == C.TRACK_TYPE_TEXT &&
+                        it.length > 0 &&
+                        // ExoPlayer préfixe l'identifiant par l'index de la
+                        // période : « 1:moovie-external-subtitle ». D'où le
+                        // suffixe plutôt qu'une égalité.
+                        it.getTrackFormat(0).id?.endsWith(EXTERNAL_SUBTITLE_ID) == true
+                } ?: return
+                awaitingExternal = false
+                player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+                    .setOverrideForType(TrackSelectionOverride(group.mediaTrackGroup, 0))
+                    .build()
+            }
+        })
+    }
 
     override val isPlaying: Boolean get() = player.isPlaying
 
@@ -55,6 +86,70 @@ internal class ExoPlayerController(private val player: Player) : MooviePlayerCon
             subtitles = groups.toPlayerTracks(C.TRACK_TYPE_TEXT),
             audio = groups.toPlayerTracks(C.TRACK_TYPE_AUDIO),
         )
+    }
+
+    /**
+     * Media3 n'accepte un sous-titre externe qu'au montage du média : il faut
+     * donc reconstruire l'élément courant et repréparer, puis revenir à la
+     * position exacte. C'est une recharge visible — d'où la règle de ne
+     * l'appeler que sur un geste explicite, jamais en réaction continue à un
+     * curseur de réglage.
+     */
+    override fun loadExternalSubtitle(path: String?) {
+        val current = player.currentMediaItem ?: return
+        val position = player.currentPosition
+        val wasPlaying = player.playWhenReady
+
+        val configurations = path?.let {
+            listOf(
+                MediaItem.SubtitleConfiguration.Builder(Uri.fromFile(java.io.File(it)))
+                    .setMimeType(MimeTypes.APPLICATION_SUBRIP)
+                    .setSelectionFlags(C.SELECTION_FLAG_DEFAULT)
+                    // Marqueur pour retrouver *notre* piste parmi celles du flux :
+                    // le drapeau « par défaut » ne suffit pas, ExoPlayer lui
+                    // préfère volontiers une piste intégrée (du CEA-608, ici).
+                    .setId(EXTERNAL_SUBTITLE_ID)
+                    .build(),
+            )
+        }.orEmpty()
+
+        player.setMediaItem(current.buildUpon().setSubtitleConfigurations(configurations).build())
+
+        // **Indispensable** : le lecteur démarre avec les pistes texte coupées,
+        // pour qu'aucun sous-titre n'apparaisse sans qu'on l'ait demandé. Ajouter
+        // le fichier au média ne suffit donc pas — sans cette réactivation il est
+        // chargé puis ignoré, et l'utilisateur ne voit que ce que l'encodeur a
+        // gravé dans l'image.
+        player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+            .clearOverridesOfType(C.TRACK_TYPE_TEXT)
+            .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, path == null)
+            .build()
+
+        // Les pistes n'existent qu'une fois le média préparé : la sélection ne
+        // peut pas se faire ici, elle est différée à leur apparition.
+        awaitingExternal = path != null
+        player.prepare()
+        player.seekTo(position)
+        player.playWhenReady = wasPlaying
+    }
+
+    /**
+     * Cadence déclarée par le format vidéo. Media3 rend `Format.NO_VALUE` quand
+     * le conteneur ne la porte pas — fréquent en HLS, d'où le 0 plutôt qu'une
+     * valeur inventée.
+     */
+    override fun videoFps(): Double {
+        // `videoFormat` appartient à ExoPlayer, pas à l'interface Player qu'on
+        // reçoit : on lit la cadence sur la piste vidéo effectivement retenue.
+        val fps = player.currentTracks.groups
+            .firstOrNull { it.type == C.TRACK_TYPE_VIDEO && it.isSelected }
+            ?.let { group ->
+                (0 until group.length)
+                    .firstOrNull { group.isTrackSelected(it) }
+                    ?.let { group.getTrackFormat(it).frameRate }
+            }
+            ?: return 0.0
+        return if (fps == Format.NO_VALUE.toFloat() || fps <= 0f) 0.0 else fps.toDouble()
     }
 
     override fun selectSubtitle(trackId: String?) {
@@ -116,3 +211,6 @@ internal class ExoPlayerController(private val player: Player) : MooviePlayerCon
             ?: "#${index + 1}"
     }
 }
+
+/** Identifie la piste de sous-titres que nous ajoutons nous-mêmes. */
+private const val EXTERNAL_SUBTITLE_ID = "moovie-external-subtitle"
