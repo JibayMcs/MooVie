@@ -60,6 +60,19 @@ depuis une seule base de code Kotlin Multiplatform. L'extraction des sources se 
 - **Smartphones et tablettes Android** — en cours. L'interface est aujourd'hui
   pensée pour un écran de salon et une télécommande ; le portage porte sur les
   gabarits tactiles et le mode portrait, pas sur une seconde base de code.
+- **Profils légers** — progression, liste et vu/non vu séparés par profil
+  (« Salon » / « Enfants »), choisi au lancement. Les sauvegardes les
+  transporteront.
+- **Sous-titres via [OpenSubtitles](https://www.opensubtitles.com)** — avec un
+  réglage de décalage dans le lecteur, parce que l'appariement exact est hors
+  d'atteinte : il repose sur une empreinte du *fichier* vidéo, or nos sources
+  servent des flux segmentés, pas des fichiers. Le décalage est donc le cas
+  normal et non un accident, ce qui fait du réglage la fonctionnalité elle-même
+  plutôt qu'un bonus. Les téléchargements sont plafonnés par jour ; un compte
+  OpenSubtitles gratuit relève ce plafond.
+- **Contribuer à TheIntroDB** — signaler depuis le lecteur un horodatage d'intro
+  ou de générique manquant, pour enrichir la base que lisent les boutons
+  *Passer l'intro*.
 - **Pas de support iOS prévu.** Les contraintes sont lourdes — installation hors
   store, règles de l'App Store, pile de lecture à refaire — et je n'ai aucun
   appareil Apple pour tester. Publier quelque chose que je ne peux pas faire

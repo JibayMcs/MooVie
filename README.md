@@ -58,6 +58,17 @@ no account, no ads.
 - **Android phones & tablets** — work in progress. The UI is built for a 10-foot
   screen and a D-pad today; the port is about touch layouts and portrait, not a
   second codebase.
+- **Light profiles** — separate progress, watchlist and watched state per profile
+  ("Living room" / "Kids"), picked at launch. Backups will carry them.
+- **Subtitles from [OpenSubtitles](https://www.opensubtitles.com)** — with a
+  subtitle offset control in the player, because exact matching is out of reach:
+  it relies on a hash of the video *file*, and our sources serve segmented
+  streams, not files. Drift is therefore the normal case rather than an accident,
+  which makes the offset the feature and not a bonus. Downloads are capped per
+  day; a free OpenSubtitles account raises the cap.
+- **Contribute back to TheIntroDB** — report an intro or credits timestamp from
+  the player when it is missing, to fill in the database the *Skip intro* buttons
+  read from.
 - **No iOS support planned.** The constraints are heavy — sideloading, App Store
   policy, a separate player stack — and I have no Apple device to test on.
   Shipping something I cannot run myself would be worse than not shipping it.
