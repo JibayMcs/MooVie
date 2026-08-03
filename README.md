@@ -41,7 +41,9 @@ no account, no ads.
   watched/unwatched marking (episode, whole season or movie).
 - **One-press playback** — sources load as soon as a title opens; a single
   **Play / Resume** picks the best source in your language (VF / VOSTFR / VO). A sources
-  panel is there for manual host selection.
+  panel is there for manual host selection. Most catalogues are French-speaking, so
+  **original-language playback has its own catalogue**, keyed on the TMDB id; VO and
+  VOSTFR stand in for each other since they carry the same audio.
 - **Player** — resume at timecode, subtitle and audio track selection, playback speed,
   15 s seek, scrub mode on the progress bar, remote media keys.
 - **Subtitles** (OpenSubtitles) — searched from the player, ranked by language, frame
@@ -50,6 +52,9 @@ no account, no ads.
   *and* a frame-rate correction: exact matching relies on hashing the video file, which
   segmented streams make impossible, so drift is the normal case rather than an accident.
 - **Skip intro & credits** (TheIntroDB) — skipping credits rolls into the next episode.
+  When a segment is missing, an icon in the control bar lets you **report it from the
+  player**: mark the start, mark the end, confirm. Coverage is per episode, so the gaps
+  are common and everyone's report fills them in. Needs a free TheIntroDB key.
 - **Auto-play next episode** — 10 s countdown at the end of an episode, cancellable,
   rolling over to the next season.
 - **Screensaver** — the poster bounces around the screen while playback stays paused.
@@ -69,9 +74,6 @@ no account, no ads.
   second codebase.
 - **Light profiles** — separate progress, watchlist and watched state per profile
   ("Living room" / "Kids"), picked at launch. Backups will carry them.
-- **Contribute back to TheIntroDB** — report an intro or credits timestamp from
-  the player when it is missing, to fill in the database the *Skip intro* buttons
-  read from.
 - **No iOS support planned.** The constraints are heavy — sideloading, App Store
   policy, a separate player stack — and I have no Apple device to test on.
   Shipping something I cannot run myself would be worse than not shipping it.

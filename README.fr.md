@@ -43,7 +43,10 @@ depuis une seule base de code Kotlin Multiplatform. L'extraction des sources se 
   épisode, marquage vu/non vu (épisode, saison entière ou film).
 - **Lecture en un appui** — les sources chargent dès l'ouverture d'une fiche ; un seul
   bouton **Lire / Reprendre** joue la meilleure source dans ta langue (VF / VOSTFR / VO).
-  Le panneau de sources reste là pour choisir un hébergeur à la main.
+  Le panneau de sources reste là pour choisir un hébergeur à la main. Les catalogues
+  étant francophones pour la plupart, la **version originale a son propre catalogue**,
+  indexé sur l'identifiant TMDB ; VO et VOSTFR se remplacent l'une l'autre, leur piste
+  audio étant la même.
 - **Lecteur** — reprise au timecode, choix des sous-titres et de la piste audio, vitesse de
   lecture, seek 15 s, mode scrub sur la barre de progression, touches média de la télécommande.
 - **Sous-titres** (OpenSubtitles) — cherchés depuis le lecteur, classés par langue,
@@ -53,6 +56,10 @@ depuis une seule base de code Kotlin Multiplatform. L'extraction des sources se 
   exact repose sur une empreinte du fichier vidéo, impossible sur des flux segmentés, si
   bien que le décalage est le cas normal et non un accident.
 - **Passer intro & générique** (TheIntroDB) — passer le générique enchaîne l'épisode suivant.
+  Quand un segment manque, une icône de la barre de contrôle permet de le **signaler depuis
+  le lecteur** : marquer le début, marquer la fin, confirmer. La couverture se fait épisode
+  par épisode, les trous sont donc fréquents et chaque signalement les comble. Nécessite une
+  clé TheIntroDB gratuite.
 - **Lecture auto de l'épisode suivant** — décompte de 10 s en fin d'épisode, annulable, qui
   bascule sur la saison suivante en fin de saison.
 - **Écran de veille** — l'affiche rebondit à l'écran quand la lecture reste en pause.
@@ -74,9 +81,6 @@ depuis une seule base de code Kotlin Multiplatform. L'extraction des sources se 
 - **Profils légers** — progression, liste et vu/non vu séparés par profil
   (« Salon » / « Enfants »), choisi au lancement. Les sauvegardes les
   transporteront.
-- **Contribuer à TheIntroDB** — signaler depuis le lecteur un horodatage d'intro
-  ou de générique manquant, pour enrichir la base que lisent les boutons
-  *Passer l'intro*.
 - **Pas de support iOS prévu.** Les contraintes sont lourdes — installation hors
   store, règles de l'App Store, pile de lecture à refaire — et je n'ai aucun
   appareil Apple pour tester. Publier quelque chose que je ne peux pas faire
