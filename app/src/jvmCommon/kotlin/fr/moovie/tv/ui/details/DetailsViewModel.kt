@@ -11,6 +11,7 @@ import fr.moovie.tv.core.watch.EpisodeRef
 import fr.moovie.tv.core.watch.episodeToResume
 import fr.moovie.tv.core.watch.parseEpisodeKey
 import fr.moovie.tv.core.sources.port.SourceProvider
+import fr.moovie.tv.core.sources.usecase.nextLinkFor
 import fr.moovie.tv.data.sources.ExtractorRegistry
 import fr.moovie.tv.core.sources.model.PlayableStream
 import fr.moovie.tv.data.sources.isStreamPlayable
@@ -722,11 +723,11 @@ class DetailsViewModel : ViewModel() {
         playingLink = null
         _resolved.value = null
         val active = _sources.value as? SourcesState.Active ?: return false
-        // Même filtre que la cascade : seule la langue préférée est enchaînée,
-        // sinon on relancerait pour ne rien trouver.
+        // Même filtre que la cascade — repli de langue compris, sinon on
+        // conclurait « plus rien à tenter » devant des liens qu'elle jouerait.
         val lang = streamLanguage.value.name
         val hasAlternative = active.anyLoading ||
-            active.links.any { it.language == lang && it.url !in rejectedLinks }
+            nextLinkFor(active.links, preferred = lang, excluded = rejectedLinks) != null
         if (!hasAlternative) {
             // Plus rien à tenter : sans ce retour, l'utilisateur revenait à la
             // fiche sans la moindre explication. On ouvre le panneau, qui liste
@@ -835,7 +836,7 @@ class DetailsViewModel : ViewModel() {
                     _quickPlay.value = QuickPlayState.Idle
                     return@launch
                 }
-                val next = active.links.firstOrNull { it.language == lang && it.url !in tried }
+                val next = nextLinkFor(active.links, preferred = lang, excluded = tried)
                 if (next != null) {
                     tried += next.url
                     // Affiche l'hébergeur en cours d'essai : la cascade devient
