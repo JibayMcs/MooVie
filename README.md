@@ -129,6 +129,38 @@ valuable kind, since every dead link costs someone a title. `.claude/skills/add-
 documents how one is written and, more importantly, how to *measure* whether it earns
 its place.
 
+## Credits
+
+Moo-vie stands on work done by others.
+
+**Data & services**
+
+- **[TMDB](https://www.themoviedb.org)** — every title, synopsis, poster, backdrop,
+  cast and rating in the app comes from The Movie Database. It is what makes the
+  catalogue a catalogue rather than a list of file names, and the app is useless
+  without an API key of your own.
+  *This product uses the TMDB API but is not endorsed or certified by TMDB.*
+- **[TheIntroDB](https://theintrodb.org)** — community-sourced intro and credits
+  timestamps, behind the *Skip intro* / *Skip credits* buttons and the roll into
+  the next episode.
+- **[Cloudflare](https://1.1.1.1) and [Quad9](https://quad9.net)** — the DNS-over-HTTPS
+  resolvers you can pick from, which is what keeps source lookups working on
+  networks where those domains are blocked at the DNS level.
+
+**Open source**
+
+- [Kotlin](https://kotlinlang.org), [Kotlin Multiplatform](https://kotlinlang.org/docs/multiplatform.html),
+  [Compose Multiplatform](https://www.jetbrains.com/lp/compose-multiplatform/) and
+  [kotlinx.serialization](https://github.com/Kotlin/kotlinx.serialization) — JetBrains
+- [Media3 / ExoPlayer](https://developer.android.com/media/media3) and
+  [DataStore](https://developer.android.com/topic/libraries/architecture/datastore) — Google / AndroidX
+- [VLC / libVLC](https://www.videolan.org) — VideoLAN, via
+  [vlcj](https://github.com/caprica/vlcj) by Caprica Software, which is what plays
+  video on the desktop builds
+- [OkHttp and Retrofit](https://square.github.io/okhttp/) — Square
+- [jsoup](https://jsoup.org) — parses the pages sources are extracted from
+- [Coil](https://coil-kt.github.io/coil/) — image loading and disk cache
+
 ## License
 
 Open source, for personal use. Moo-vie hosts no content: it only resolves links that are

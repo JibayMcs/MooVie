@@ -133,6 +133,38 @@ extracteur d'hébergeur est le plus utile, chaque lien mort coûtant un titre à
 quelqu'un. `.claude/skills/add-source/` explique comment on en écrit un et, surtout,
 comment *mesurer* s'il mérite sa place.
 
+## Crédits
+
+Moo-vie repose sur le travail d'autres personnes.
+
+**Données & services**
+
+- **[TMDB](https://www.themoviedb.org)** — tous les titres, synopsis, affiches,
+  images de fond, castings et notes de l'app viennent de The Movie Database. C'est
+  ce qui fait du catalogue un catalogue plutôt qu'une liste de noms de fichiers, et
+  l'app ne sert à rien sans ta propre clé d'API.
+  *This product uses the TMDB API but is not endorsed or certified by TMDB.*
+- **[TheIntroDB](https://theintrodb.org)** — horodatages d'intro et de générique
+  alimentés par la communauté, derrière les boutons *Passer l'intro* / *Passer le
+  générique* et l'enchaînement de l'épisode suivant.
+- **[Cloudflare](https://1.1.1.1) et [Quad9](https://quad9.net)** — les résolveurs
+  DNS-over-HTTPS proposés au choix, ce qui permet aux sources de rester joignables
+  sur les réseaux où ces domaines sont bloqués au niveau DNS.
+
+**Open source**
+
+- [Kotlin](https://kotlinlang.org), [Kotlin Multiplatform](https://kotlinlang.org/docs/multiplatform.html),
+  [Compose Multiplatform](https://www.jetbrains.com/lp/compose-multiplatform/) et
+  [kotlinx.serialization](https://github.com/Kotlin/kotlinx.serialization) — JetBrains
+- [Media3 / ExoPlayer](https://developer.android.com/media/media3) et
+  [DataStore](https://developer.android.com/topic/libraries/architecture/datastore) — Google / AndroidX
+- [VLC / libVLC](https://www.videolan.org) — VideoLAN, via
+  [vlcj](https://github.com/caprica/vlcj) de Caprica Software, qui assure la lecture
+  vidéo sur les versions desktop
+- [OkHttp et Retrofit](https://square.github.io/okhttp/) — Square
+- [jsoup](https://jsoup.org) — analyse les pages dont les sources sont extraites
+- [Coil](https://coil-kt.github.io/coil/) — chargement des images et cache disque
+
 ## Licence
 
 Open source, pour un usage personnel. Moo-vie n'héberge aucun contenu : elle ne fait que
