@@ -1,6 +1,14 @@
 package fr.moovie.tv.ui.search
 
 import androidx.compose.foundation.background
+import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.hoverable
+import fr.moovie.tv.shared.isPointerUi
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -310,14 +318,17 @@ private fun HistorySection(
     Column(modifier = modifier) {
         Text(stringResource(Res.string.search_recent), style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(4.dp))
-        // La suppression par appui long ne se devine pas : on l'annonce une
-        // fois, discrètement, plutôt que d'accoler un ✕ à chaque terme — c'est
-        // ce doublement de boutons qui alourdissait la rangée.
-        Text(
-            stringResource(Res.string.search_recent_hint),
-            style = MaterialTheme.typography.labelMedium,
-            color = Color(0xFF888888),
-        )
+        // L'appui long ne se devine pas : on l'annonce une fois, discrètement,
+        // plutôt que d'accoler un ✕ à chaque terme — c'est ce doublement de
+        // cibles qui alourdissait la rangée au D-pad. À la souris la croix est
+        // cliquable et se passe d'explication.
+        if (!isPointerUi) {
+            Text(
+                stringResource(Res.string.search_recent_hint),
+                style = MaterialTheme.typography.labelMedium,
+                color = Color(0xFF888888),
+            )
+        }
         Spacer(Modifier.height(12.dp))
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -327,15 +338,21 @@ private fun HistorySection(
                 // Un seul élément focalisable par terme : OK relance la
                 // recherche, l'appui long la retire. Le ✕ n'apparaît que sur le
                 // terme focalisé — un repère, pas une seconde cible.
-                MoovieButton(onClick = { onPick(q) }, onLongClick = { onRemove(q) }) {
+                //
+                // À la souris, cette économie n'a plus lieu d'être : un appui
+                // long au pointeur ne se devine pas, alors que la croix est déjà
+                // là et dit ce qu'elle fait. Elle devient donc cliquable, et
+                // toujours visible. `detectTapGestures` plutôt que `clickable` :
+                // ce dernier rendrait la croix focalisable, soit exactement la
+                // seconde cible qu'on évite à la télécommande.
+                MoovieButton(
+                    onClick = { onPick(q) },
+                    onLongClick = if (isPointerUi) null else ({ onRemove(q) }),
+                ) {
                     Text(q)
-                    if (LocalMoovieCardActive.current) {
-                        Spacer(Modifier.width(8.dp))
-                        Icon(
-                            Icons.Default.Close,
-                            contentDescription = stringResource(Res.string.search_remove_query, q),
-                            modifier = Modifier.size(14.dp),
-                        )
+                    if (isPointerUi || LocalMoovieCardActive.current) {
+                        Spacer(Modifier.width(4.dp))
+                        RemoveQueryCross(query = q, onRemove = { onRemove(q) })
                     }
                 }
             }
@@ -354,6 +371,61 @@ private fun HistorySection(
     }
 }
 
+
+/**
+ * Croix de suppression d'un terme récent.
+ *
+ * Au pointeur elle est une vraie cible, elle a donc besoin de le dire : sans
+ * retour au survol rien ne la distingue du reste du bouton, et cliquer dessus
+ * revient à parier. Fond au survol, teinte qui s'éclaircit, curseur main.
+ *
+ * À la télécommande elle reste ce qu'elle était — un repère sur le terme
+ * focalisé, ni cliquable ni teintée à part : le survol n'y existe pas et rien
+ * ne doit changer.
+ */
+@Composable
+private fun RemoveQueryCross(query: String, onRemove: () -> Unit) {
+    val hoverSource = remember { MutableInteractionSource() }
+    val hovered by hoverSource.collectIsHoveredAsState()
+    val label = stringResource(Res.string.search_remove_query, query)
+
+    Box(
+        contentAlignment = Alignment.Center,
+        // Zone de clic élargie autour d'une icône de 14 dp : viser 14 dp à la
+        // souris demande de la précision.
+        modifier = Modifier
+            .size(24.dp)
+            .then(
+                if (isPointerUi) {
+                    Modifier
+                        .hoverable(hoverSource)
+                        .pointerHoverIcon(PointerIcon.Hand)
+                        .background(
+                            if (hovered) Color(0x33FFFFFF) else Color.Transparent,
+                            MoovieShape,
+                        )
+                        .pointerInput(query) { detectTapGestures { onRemove() } }
+                } else {
+                    Modifier
+                },
+            ),
+    ) {
+        if (isPointerUi) {
+            Icon(
+                Icons.Default.Close,
+                contentDescription = label,
+                tint = if (hovered) Color.White else Color(0xFFAAAAAA),
+                modifier = Modifier.size(14.dp),
+            )
+        } else {
+            Icon(
+                Icons.Default.Close,
+                contentDescription = label,
+                modifier = Modifier.size(14.dp),
+            )
+        }
+    }
+}
 
 @Composable
 private fun ResultsGrid(
