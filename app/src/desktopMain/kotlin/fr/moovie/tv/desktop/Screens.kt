@@ -125,6 +125,7 @@ internal fun DesktopHistoryScreen(
 internal fun DesktopSettingsScreen(onBack: () -> Unit) {
     val vm = Vm.settings
     val apiKey by vm.tmdbApiKey.collectAsState()
+    val introDbKey by vm.introDbApiKey.collectAsState()
     val streamLang by vm.streamLanguage.collectAsState()
     val providers by vm.providers.collectAsState()
     val dohEnabled by vm.dohEnabled.collectAsState()
@@ -138,6 +139,7 @@ internal fun DesktopSettingsScreen(onBack: () -> Unit) {
 
     SettingsScreenContent(
         apiKey = apiKey,
+        introDbKey = introDbKey,
         streamLang = streamLang,
         skipIntroOutro = skipIntroOutro,
         autoPlayNext = autoPlayNext,
@@ -149,6 +151,7 @@ internal fun DesktopSettingsScreen(onBack: () -> Unit) {
         dohProvider = dohProvider,
         providers = providers,
         onSetApiKey = vm::setTmdbApiKey,
+        onSetIntroDbKey = vm::setIntroDbApiKey,
         onSetStreamLanguage = vm::setStreamLanguage,
         onSetSkipIntroOutro = vm::setSkipIntroOutro,
         onSetAutoPlayNext = vm::setAutoPlayNext,

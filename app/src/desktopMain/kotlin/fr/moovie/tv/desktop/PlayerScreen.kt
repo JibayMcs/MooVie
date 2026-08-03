@@ -91,6 +91,10 @@ import fr.moovie.tv.ui.subtitles.subtitleSyncSection
 import fr.moovie.tv.ui.player.PlayerOptionsDialog
 import fr.moovie.tv.ui.player.PlayerSkipButton
 import fr.moovie.tv.ui.player.SkipKind
+import fr.moovie.tv.ui.intro.ReportMarkingBanner
+import fr.moovie.tv.ui.intro.ReportSegmentViewModel
+import fr.moovie.tv.ui.intro.ReportStep
+import fr.moovie.tv.ui.intro.reportSegmentSection
 import fr.moovie.tv.ui.player.PlayerTitleOverlay
 import fr.moovie.tv.ui.player.PlayerTracks
 import fr.moovie.tv.ui.player.PlayerUpdateChip
@@ -503,6 +507,17 @@ internal fun DesktopPlayerScreen(
     val pid = remember(mediaKey) { parseMediaKey(mediaKey) }
     var media by remember(streamUrl) { mutableStateOf<IntroMedia?>(null) }
 
+    // Signalement d'un segment manquant à TheIntroDB.
+    val reportViewModel = remember { ReportSegmentViewModel() }
+    val reportStep by reportViewModel.step.collectAsState()
+    val canReport by reportViewModel.canReport.collectAsState()
+    LaunchedEffect(Unit) { reportViewModel.refreshAvailability() }
+    // Ce que la base ne connaît pas pour ce média : c'est ça, et rien d'autre,
+    // qui décide d'afficher l'icône.
+    val introMissing = media?.intro?.isEmpty() ?: true
+    val creditsMissing = media?.credits?.isEmpty() ?: true
+    LaunchedEffect(pid, media) { reportViewModel.bind(pid, controller.durationMs()) }
+
     // La durée n'est connue qu'une fois le flux ouvert, et elle sert à l'API à
     // choisir la bonne version du titre : on attend qu'elle arrive.
     LaunchedEffect(streamUrl, skipEnabled, pid) {
@@ -724,6 +739,19 @@ internal fun DesktopPlayerScreen(
             modifier = Modifier.align(Alignment.TopCenter),
         ) {
             PlayerTitleOverlay(title = title, subtitle = subtitle)
+            // Au pointeur, marquer se fait au clic : pas de touche à deviner.
+            ReportMarkingBanner(
+                step = reportStep,
+                positionMs = timeMs,
+                onMark = {
+                    reportViewModel.mark(controller.positionMs())
+                    // Voir PlayerScreen (Android) : une intro se relève en deux
+                    // bornes, et la modale n'a rien à montrer avant la seconde.
+                    if (reportViewModel.step.value !is ReportStep.Marking) {
+                        dialog = PlayerDialogKind.REPORT
+                    }
+                },
+            )
         }
 
         // Mise en mémoire tampon : seul repère de chargement disponible ici,
@@ -825,6 +853,15 @@ internal fun DesktopPlayerScreen(
                     tracks = controller.tracks()
                     dialog = PlayerDialogKind.SETTINGS
                 },
+                onReportSegment = if (canReport && (introMissing || creditsMissing)) {
+                    {
+                        reportViewModel.bind(pid, controller.durationMs())
+                        reportViewModel.open(introMissing, creditsMissing)
+                        dialog = PlayerDialogKind.REPORT
+                    }
+                } else {
+                    null
+                },
                 onActivity = { showControls() },
                 onSeekToFraction = { fraction ->
                     if (lengthMs > 0) controller.seekTo((fraction * lengthMs).toLong())
@@ -918,6 +955,25 @@ val subsViewModel = remember { PlayerSubtitlesViewModel() }
                     subtitleFpsSection(subsState) { subsViewModel.assumeSubtitleFps(it) },
                 ),
                 onDismiss = { dialog = null },
+            )
+            PlayerDialogKind.REPORT -> PlayerOptionsDialog(
+                sections = listOf(
+                    reportSegmentSection(
+                        step = reportStep,
+                        onMark = { kind ->
+                            // On chronomètre sur l'image : la modale s'efface.
+                            reportViewModel.startMarking(kind)
+                            dialog = null
+                        },
+                        onAbsent = reportViewModel::declareAbsent,
+                        onSend = reportViewModel::send,
+                        onRedo = { reportViewModel.open(introMissing, creditsMissing) },
+                    ),
+                ),
+                onDismiss = {
+                    dialog = null
+                    reportViewModel.cancel()
+                },
             )
             PlayerDialogKind.SETTINGS -> PlayerOptionsDialog(
                 sections = listOf(

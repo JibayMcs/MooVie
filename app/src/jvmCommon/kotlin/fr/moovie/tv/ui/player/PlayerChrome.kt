@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.FastForward
 import androidx.compose.material.icons.filled.FastRewind
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.MoreTime
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
@@ -84,6 +85,7 @@ import fr.moovie.tv.resources.player_scrub_hint
 import fr.moovie.tv.resources.player_seek_back
 import fr.moovie.tv.resources.player_seek_forward
 import fr.moovie.tv.resources.player_settings
+import fr.moovie.tv.resources.report_segment
 import fr.moovie.tv.resources.player_skip_intro
 import fr.moovie.tv.resources.player_skip_outro
 import fr.moovie.tv.resources.player_speed
@@ -138,6 +140,12 @@ fun PlayerControlBar(
     onNextEpisode: () -> Unit,
     onOpenSubtitles: () -> Unit,
     onOpenSettings: () -> Unit,
+    /**
+     * Signalement d'un segment manquant à TheIntroDB. Null quand il n'y a rien
+     * à signaler — segments déjà connus, ou pas de clé — auquel cas l'icône
+     * n'apparaît pas du tout : une cible inerte est une cible de trop au D-pad.
+     */
+    onReportSegment: (() -> Unit)? = null,
     onActivity: () -> Unit,
     /**
      * Rendu non nul uniquement là où la barre est pilotable au pointeur : active
@@ -205,6 +213,13 @@ fun PlayerControlBar(
                 icon = Icons.Default.ClosedCaption,
                 contentDescription = stringResource(Res.string.player_subtitles),
             )
+            onReportSegment?.let { report ->
+                MoovieIconButton(
+                    onClick = report,
+                    icon = Icons.Default.MoreTime,
+                    contentDescription = stringResource(Res.string.report_segment),
+                )
+            }
             MoovieIconButton(
                 onClick = onOpenSettings,
                 icon = Icons.Default.Settings,

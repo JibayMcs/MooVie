@@ -81,6 +81,9 @@ import fr.moovie.tv.resources.settings_cat_history
 import fr.moovie.tv.resources.settings_enable
 import fr.moovie.tv.resources.settings_hide_history_widgets
 import fr.moovie.tv.resources.settings_history_help
+import fr.moovie.tv.resources.settings_introdb_help
+import fr.moovie.tv.resources.settings_introdb_hint
+import fr.moovie.tv.resources.settings_introdb_key
 import fr.moovie.tv.resources.settings_intro_help
 import fr.moovie.tv.resources.settings_language
 import fr.moovie.tv.resources.settings_move_down
@@ -150,6 +153,7 @@ private fun sectionLabel(section: SettingsSection): String = stringResource(
 @Composable
 fun SettingsScreenContent(
     apiKey: String,
+    introDbKey: String,
     streamLang: StreamLanguage,
     skipIntroOutro: Boolean,
     autoPlayNext: Boolean,
@@ -161,6 +165,7 @@ fun SettingsScreenContent(
     dohProvider: DohProvider,
     providers: List<ProviderSetting>,
     onSetApiKey: (String) -> Unit,
+    onSetIntroDbKey: (String) -> Unit,
     onSetStreamLanguage: (StreamLanguage) -> Unit,
     onSetSkipIntroOutro: (Boolean) -> Unit,
     onSetAutoPlayNext: (Boolean) -> Unit,
@@ -262,11 +267,30 @@ fun SettingsScreenContent(
             )
 
             when (section) {
-                SettingsSection.API -> SettingRow(
-                    label = stringResource(Res.string.settings_tmdb_key),
-                    help = stringResource(Res.string.settings_tmdb_help),
-                ) {
-                    ApiKeyField(value = apiKey, onValueChange = onSetApiKey)
+                SettingsSection.API -> {
+                    SettingRow(
+                        label = stringResource(Res.string.settings_tmdb_key),
+                        help = stringResource(Res.string.settings_tmdb_help),
+                    ) {
+                        ApiKeyField(
+                            value = apiKey,
+                            hint = stringResource(Res.string.settings_tmdb_hint),
+                            onValueChange = onSetApiKey,
+                        )
+                    }
+                    // Deuxième clé, et deuxième modèle : celle de TheIntroDB
+                    // identifie un contributeur, pas l'application. D'où sa
+                    // place ici, à côté de celle de TMDB.
+                    SettingRow(
+                        label = stringResource(Res.string.settings_introdb_key),
+                        help = stringResource(Res.string.settings_introdb_help),
+                    ) {
+                        ApiKeyField(
+                            value = introDbKey,
+                            hint = stringResource(Res.string.settings_introdb_hint),
+                            onValueChange = onSetIntroDbKey,
+                        )
+                    }
                 }
 
                 SettingsSection.PLAYBACK -> {
@@ -524,7 +548,7 @@ private fun updateIntervalLabel(interval: UpdateInterval): String = when {
 }
 
 @Composable
-private fun ApiKeyField(value: String, onValueChange: (String) -> Unit) {
+private fun ApiKeyField(value: String, hint: String, onValueChange: (String) -> Unit) {
     val focusManager = LocalFocusManager.current
     Box(
         modifier = Modifier
@@ -533,7 +557,7 @@ private fun ApiKeyField(value: String, onValueChange: (String) -> Unit) {
             .padding(horizontal = 12.dp, vertical = 10.dp),
     ) {
         if (value.isEmpty()) {
-            Text(stringResource(Res.string.settings_tmdb_hint), color = Color(0xFF888888))
+            Text(hint, color = Color(0xFF888888))
         }
         BasicTextField(
             value = value,

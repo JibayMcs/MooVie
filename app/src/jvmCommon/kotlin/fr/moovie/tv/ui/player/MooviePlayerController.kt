@@ -147,7 +147,7 @@ fun parseMediaKey(key: String): PlaybackId? {
 }
 
 /** Menu ouvert par la barre de contrôles. */
-enum class PlayerDialogKind { SUBTITLES, SETTINGS }
+enum class PlayerDialogKind { SUBTITLES, SETTINGS, REPORT }
 
 /** `1:23:45` au-delà d'une heure, `23:45` sinon. */
 fun formatPlayerTime(ms: Long): String {

@@ -56,6 +56,10 @@ import fr.moovie.tv.data.settings.ScreensaverDelay
 import fr.moovie.tv.data.settings.SettingsRepository
 import fr.moovie.tv.data.watch.WatchProgressRepository
 import fr.moovie.tv.ui.components.MoovieScreensaver
+import fr.moovie.tv.ui.intro.ReportMarkingBanner
+import fr.moovie.tv.ui.intro.ReportSegmentViewModel
+import fr.moovie.tv.ui.intro.ReportStep
+import fr.moovie.tv.ui.intro.reportSegmentSection
 import fr.moovie.tv.ui.subtitles.PlayerSubtitlesViewModel
 import fr.moovie.tv.ui.subtitles.onlineSubtitleSection
 import fr.moovie.tv.ui.subtitles.subtitleFpsSection
@@ -110,6 +114,13 @@ private const val PREFETCH_AT = 0.80
  * re-préparation réseau, assez courte pour ne pas masquer une vraie panne.
  */
 private const val SUBTITLE_RELOAD_GRACE_MS = 8_000L
+
+/**
+ * Pas fin de déplacement pendant un signalement. À la seconde : viser la fin
+ * d'une intro demande cette précision, et les 15 s des flèches horizontales ne
+ * servent qu'à s'en approcher.
+ */
+private const val REPORT_FINE_STEP_MS = 1_000L
 
 @Composable
 fun PlayerScreen(
@@ -390,6 +401,20 @@ fun PlayerScreen(
         )
     }
 
+    val reportViewModel: ReportSegmentViewModel = viewModel()
+    val reportStep by reportViewModel.step.collectAsStateWithLifecycle()
+    val canReport by reportViewModel.canReport.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit) { reportViewModel.refreshAvailability() }
+
+    // Ce que TheIntroDB ne connaît pas pour cet épisode. `media` à null couvre
+    // les deux cas qui se ressemblent de l'extérieur : titre absent de la base,
+    // ou réseau muet.
+    val introMissing = media?.intro?.isEmpty() ?: true
+    val creditsMissing = media?.credits?.isEmpty() ?: true
+    LaunchedEffect(pid, media) {
+        reportViewModel.bind(pid, controller.durationMs())
+    }
+
     // Détermine le segment actif selon la position courante.
     LaunchedEffect(media) {
         val m = media
@@ -636,6 +661,40 @@ fun PlayerScreen(
                     cancelAutoNext()
                     return@onPreviewKeyEvent true
                 }
+                // Capture en cours : OK relève la position, Retour abandonne.
+                // Prioritaire sur tout le reste, y compris la mise en pause —
+                // pendant qu'on chronomètre, OK ne peut vouloir dire qu'une
+                // chose. Le KeyUp est avalé pour qu'il n'atteigne pas la barre
+                // au moment où elle réapparaît.
+                if (reportStep is ReportStep.Marking) {
+                    when (event.key) {
+                        in CONFIRM_KEYS -> {
+                            reportViewModel.mark(controller.positionMs())
+                            // Une intro se relève en deux bornes : tant que la
+                            // seconde manque, ouvrir la modale la ferait
+                            // apparaître vide par-dessus l'image qu'on est
+                            // justement en train de chronométrer.
+                            if (reportViewModel.step.value !is ReportStep.Marking) {
+                                dialog = PlayerDialogKind.REPORT
+                            }
+                            swallowUntilRelease = true
+                        }
+                        Key.Back, Key.Escape -> reportViewModel.cancel()
+                        // On doit pouvoir **se déplacer** pendant la capture :
+                        // attendre qu'une intro qu'on connaît déjà se termine
+                        // est absurde quand on peut aller directement au bon
+                        // endroit. Deux granularités, mappées naturellement sur
+                        // la croix : horizontal pour approcher, vertical pour
+                        // ajuster à la seconde. Le timecode visé est affiché.
+                        Key.DirectionLeft -> controller.seekBy(-PLAYER_SEEK_STEP_MS)
+                        Key.DirectionRight -> controller.seekBy(PLAYER_SEEK_STEP_MS)
+                        Key.DirectionDown -> controller.seekBy(-REPORT_FINE_STEP_MS)
+                        Key.DirectionUp -> controller.seekBy(REPORT_FINE_STEP_MS)
+                        else -> return@onPreviewKeyEvent true
+                    }
+                    positionMs = controller.positionMs()
+                    return@onPreviewKeyEvent true
+                }
                 if (!controlsVisible) {
                     // Exception au réveil : le bouton « Passer » est fait pour
                     // être utilisé barre masquée, et le focus lui est donné
@@ -705,6 +764,7 @@ fun PlayerScreen(
             modifier = Modifier.align(Alignment.TopCenter),
         ) {
             PlayerTitleOverlay(title = title, subtitle = subtitle, clock = clock)
+            ReportMarkingBanner(reportStep, positionMs)
         }
 
         // Bouton « Passer l'intro / le générique », au-dessus de la barre pour
@@ -794,6 +854,15 @@ fun PlayerScreen(
                 },
                 onOpenSubtitles = { dialog = PlayerDialogKind.SUBTITLES },
                 onOpenSettings = { dialog = PlayerDialogKind.SETTINGS },
+                onReportSegment = if (canReport && (introMissing || creditsMissing)) {
+                    {
+                        reportViewModel.bind(pid, controller.durationMs())
+                        reportViewModel.open(introMissing, creditsMissing)
+                        dialog = PlayerDialogKind.REPORT
+                    }
+                } else {
+                    null
+                },
                 onActivity = { activityTick++ },
             )
         }
@@ -832,6 +901,29 @@ fun PlayerScreen(
                     subtitleFpsSection(subsState) { subsViewModel.assumeSubtitleFps(it) },
                 ),
                 onDismiss = { dialog = null },
+            )
+            PlayerDialogKind.REPORT -> PlayerOptionsDialog(
+                sections = listOf(
+                    reportSegmentSection(
+                        step = reportStep,
+                        onMark = { kind ->
+                            // La capture se fait sur l'image : la modale doit
+                            // disparaître, sinon on chronomètre à l'aveugle.
+                            reportViewModel.startMarking(kind)
+                            dialog = null
+                            controlsVisible = false
+                        },
+                        onAbsent = reportViewModel::declareAbsent,
+                        onSend = reportViewModel::send,
+                        onRedo = {
+                            reportViewModel.open(introMissing, creditsMissing)
+                        },
+                    ),
+                ),
+                onDismiss = {
+                    dialog = null
+                    reportViewModel.cancel()
+                },
             )
             PlayerDialogKind.SETTINGS -> PlayerOptionsDialog(
                 sections = listOf(

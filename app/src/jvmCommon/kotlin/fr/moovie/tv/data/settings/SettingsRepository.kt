@@ -114,6 +114,20 @@ class SettingsRepository {
     suspend fun setDohProvider(value: DohProvider) =
         store.edit { it[DOH_PROVIDER] = value.name }
 
+    /**
+     * Clé TheIntroDB, propre à **l'utilisateur**.
+     *
+     * Contrairement à celle d'OpenSubtitles, qui identifie l'application et vit
+     * dans le binaire, celle-ci identifie un contributeur : ses signalements
+     * comptent dix fois plus dans la moyenne qui lui est servie. Elle se saisit
+     * donc ici, comme celle de TMDB. Facultative — sans elle la lecture des
+     * segments fonctionne, seul le signalement est fermé.
+     */
+    val introDbApiKey: Flow<String> = store.data.map { it[INTRODB_API_KEY].orEmpty() }
+
+    suspend fun setIntroDbApiKey(value: String) =
+        store.edit { it[INTRODB_API_KEY] = value }
+
     // ─── Compte OpenSubtitles ────────────────────────────────────────────────
     //
     // La *clé* d'API n'est pas ici : elle identifie l'application et vit dans le
@@ -214,6 +228,7 @@ class SettingsRepository {
         val PLAYER_CLOCK = booleanPreferencesKey("player_clock")
         val UPDATE_INTERVAL = stringPreferencesKey("update_interval")
         val SCREENSAVER_DELAY = stringPreferencesKey("screensaver_delay")
+        val INTRODB_API_KEY = stringPreferencesKey("introdb_api_key")
         val OS_USERNAME = stringPreferencesKey("os_username")
         val OS_PASSWORD = stringPreferencesKey("os_password")
         val OS_REMEMBER = booleanPreferencesKey("os_remember")

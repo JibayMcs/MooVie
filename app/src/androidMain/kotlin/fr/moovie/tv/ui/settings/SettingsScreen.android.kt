@@ -49,6 +49,7 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = viewModel(),
 ) {
     val apiKey by viewModel.tmdbApiKey.collectAsStateWithLifecycle()
+    val introDbKey by viewModel.introDbApiKey.collectAsStateWithLifecycle()
     val streamLang by viewModel.streamLanguage.collectAsStateWithLifecycle()
     val providers by viewModel.providers.collectAsStateWithLifecycle()
     val dohEnabled by viewModel.dohEnabled.collectAsStateWithLifecycle()
@@ -62,6 +63,7 @@ fun SettingsScreen(
 
     SettingsScreenContent(
         apiKey = apiKey,
+        introDbKey = introDbKey,
         streamLang = streamLang,
         skipIntroOutro = skipIntroOutro,
         autoPlayNext = autoPlayNext,
@@ -73,6 +75,7 @@ fun SettingsScreen(
         dohProvider = dohProvider,
         providers = providers,
         onSetApiKey = viewModel::setTmdbApiKey,
+        onSetIntroDbKey = viewModel::setIntroDbApiKey,
         onSetStreamLanguage = viewModel::setStreamLanguage,
         onSetSkipIntroOutro = viewModel::setSkipIntroOutro,
         onSetAutoPlayNext = viewModel::setAutoPlayNext,
