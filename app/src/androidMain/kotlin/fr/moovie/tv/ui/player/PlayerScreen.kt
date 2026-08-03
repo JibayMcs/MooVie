@@ -655,13 +655,26 @@ fun PlayerScreen(
                         return@onPreviewKeyEvent true
                     }
                     // Barre masquée : la 1re touche ne fait que réveiller les
-                    // contrôles (play/pause agit quand même), elle n'est pas
-                    // transmise aux boutons — sinon on déclencherait une action
-                    // invisible pour l'utilisateur.
-                    if (event.key == Key.MediaPlayPause || event.key == Key.MediaPlay ||
-                        event.key == Key.MediaPause || event.key == Key.Spacebar
+                    // contrôles, elle n'est pas transmise aux boutons — sinon on
+                    // déclencherait une action invisible pour l'utilisateur.
+                    //
+                    // Deux exceptions, où l'intention ne fait aucun doute : les
+                    // touches média, et **OK**. Sur une télécommande de TV, OK
+                    // devant une image sans contrôles veut dire « mets en
+                    // pause » ; obliger à un premier appui pour révéler la barre
+                    // puis à un second pour agir fait payer deux gestes ce que
+                    // l'utilisateur demandait au premier.
+                    val confirm = event.key in CONFIRM_KEYS
+                    if (confirm || event.key == Key.MediaPlayPause ||
+                        event.key == Key.MediaPlay || event.key == Key.MediaPause ||
+                        event.key == Key.Spacebar
                     ) {
                         controller.togglePause()
+                        // OK va donner le focus au bouton Lecture en réveillant
+                        // la barre, et le KeyUp — qui n'est pas consommé —
+                        // l'atteindrait : la pause serait aussitôt annulée. Même
+                        // piège que pour « Passer l'intro » juste au-dessus.
+                        if (confirm) swallowUntilRelease = true
                     }
                     wake()
                     return@onPreviewKeyEvent true
