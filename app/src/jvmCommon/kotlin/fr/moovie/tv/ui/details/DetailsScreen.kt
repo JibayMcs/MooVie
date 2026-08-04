@@ -275,7 +275,9 @@ fun DetailsScreenContent(
 
         // Scroll pleine largeur + marges portées par les enfants : les éléments
         // agrandis au focus débordent dans la marge au lieu d'être rognés.
-        val hPad = Modifier.padding(horizontal = 48.dp)
+        // 48 dp de marge, c'est le recul d'un salon. Sur 448 dp de large elles
+        // mangent un cinquième de l'écran à elles seules.
+        val hPad = Modifier.padding(horizontal = if (compact) 16.dp else 48.dp)
         // Marge haute agrandie sur desktop pour que le titre passe sous le
         // bouton retour en overlay (sinon ils se chevauchent).
         val topPad = if (showBackButton) 96.dp else 48.dp
@@ -305,7 +307,11 @@ fun DetailsScreenContent(
                     // Même mise en page que la fiche d'épisode — visuel à gauche,
                     // métadonnées et synopsis à droite — pour que les deux fiches
                     // du catalogue se ressemblent au lieu de diverger.
-                    MovieHeader(details = s.details, isWatched = movieWatched)
+                    MovieHeader(
+                        details = s.details,
+                        isWatched = movieWatched,
+                        showOverview = !compact,
+                    )
 
                     // Bouton Lire direct : loader pendant le chargement des sources,
                     // cliquable dès qu'un lien dans la langue préférée existe,
@@ -370,6 +376,17 @@ fun DetailsScreenContent(
                                 if (inWatchlist) Res.string.watchlist_remove else Res.string.watchlist_add,
                             ),
                             selected = inWatchlist,
+                        )
+                    }
+                    // Synopsis après les boutons sur téléphone : le glisser avant
+                    // reléguait « Lire » sous dix-sept lignes de résumé, donc hors
+                    // écran, pour un film qu'on venait pourtant de choisir.
+                    if (compact && s.details.overview.isNotBlank()) {
+                        Text(
+                            s.details.overview,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color(0xFFDDDDDD),
+                            modifier = hPad,
                         )
                     }
                     // Casting sous les boutons, comme sur la fiche d'épisode : la
@@ -967,18 +984,28 @@ private fun WatchedBadge(modifier: Modifier = Modifier) {
  * affiche est au format 2:3 là où une vignette d'épisode est en 16:9.
  */
 @Composable
-private fun MovieHeader(details: MovieDetails, isWatched: Boolean) {
-    Row(
-        modifier = Modifier.padding(horizontal = 48.dp).fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(28.dp),
-    ) {
+private fun MovieHeader(
+    details: MovieDetails,
+    isWatched: Boolean,
+    /**
+     * Faux sur téléphone : le synopsis y est rendu **après** les boutons, pas
+     * avant. Dix-sept lignes de résumé entre le titre et « Lire » obligeaient à
+     * faire défiler la page pour lancer un film qu'on venait déjà de choisir.
+     */
+    showOverview: Boolean = true,
+) {
+    val compact = useBottomNav
+    // Côte à côte, l'affiche laisse 230 dp au texte : le synopsis s'y replie sur
+    // quatre mots par ligne et déroule dix-sept lignes, tandis que la moitié
+    // gauche reste vide sous l'affiche. Empilé, chaque bloc a toute la largeur.
+    val header = @Composable {
         Box(
             modifier = Modifier
                 // Calé sur la *hauteur* de la vignette d'épisode (420 × 16:9 ≈
                 // 236 dp), pas sur sa largeur : une affiche 2:3 de 240 dp de large
                 // en ferait 360 de haut et repousserait titre, genres et note hors
                 // de l'écran dès que le focus descend sur « Lecture ».
-                .width(160.dp)
+                .width(if (compact) 150.dp else 160.dp)
                 .aspectRatio(2f / 3f)
                 .clip(MoovieShape)
                 .background(Color(0xFF222222)),
@@ -990,7 +1017,48 @@ private fun MovieHeader(details: MovieDetails, isWatched: Boolean) {
                 modifier = Modifier.fillMaxSize(),
             )
         }
+    }
+
+    if (compact) {
+        Column(
+            modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            header()
+            MovieMeta(
+                details = details,
+                isWatched = isWatched,
+                showOverview = showOverview,
+                centered = true,
+            )
+        }
+        return
+    }
+
+    Row(
+        modifier = Modifier.padding(horizontal = 48.dp).fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(28.dp),
+    ) {
+        header()
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            MovieMeta(details = details, isWatched = isWatched, showOverview = showOverview)
+        }
+    }
+}
+
+/** Genres, titre, année/durée/note, et le synopsis quand il a sa place ici. */
+@Composable
+private fun MovieMeta(
+    details: MovieDetails,
+    isWatched: Boolean,
+    showOverview: Boolean,
+    centered: Boolean = false,
+) {
+    Column(
+        horizontalAlignment = if (centered) Alignment.CenterHorizontally else Alignment.Start,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
             val genres = details.genres.mapNotNull { it.name.takeIf(String::isNotBlank) }
             if (genres.isNotEmpty()) {
                 Text(
@@ -1025,14 +1093,13 @@ private fun MovieHeader(details: MovieDetails, isWatched: Boolean) {
                     )
                 }
             }
-            if (details.overview.isNotBlank()) {
+            if (showOverview && details.overview.isNotBlank()) {
                 Text(
                     details.overview,
                     style = MaterialTheme.typography.bodyMedium,
                     color = Color(0xFFDDDDDD),
                 )
             }
-        }
     }
 }
 
