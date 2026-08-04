@@ -112,6 +112,7 @@ import fr.moovie.tv.core.format.formatDuration
 import fr.moovie.tv.ui.format.formatMediaDate
 import fr.moovie.tv.ui.components.LocalMoovieCardActive
 import fr.moovie.tv.ui.theme.MOOVIE_ACCENT
+import fr.moovie.tv.ui.adaptive.useBottomNav
 import fr.moovie.tv.ui.components.MoovieButton
 import fr.moovie.tv.ui.components.MoovieCard
 import fr.moovie.tv.ui.components.MoovieIconButton
@@ -131,6 +132,44 @@ import org.jetbrains.compose.resources.stringResource
  * qu'on vient consulter.
  */
 private val SERIES_PANE_WIDTH = 380.dp
+
+/**
+ * Dispose les deux volets d'une série : description à gauche, épisodes à droite
+ * sur grand écran — l'un au-dessus de l'autre sur téléphone.
+ *
+ * Le conteneur fournit à l'appelant les modificateurs de chaque volet plutôt que
+ * de les laisser au point d'appel : `weight` n'existe que dans le scope de la
+ * `Row` ou de la `Column`, il doit donc être construit ici, une fois le sens de
+ * l'empilement décidé.
+ */
+@Composable
+private fun SeriesPanes(
+    compact: Boolean,
+    modifier: Modifier = Modifier,
+    content: @Composable (headerModifier: Modifier, listModifier: Modifier) -> Unit,
+) {
+    if (compact) {
+        Column(
+            modifier = modifier,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            content(
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                Modifier.weight(1f).fillMaxWidth(),
+            )
+        }
+    } else {
+        Row(
+            modifier = modifier,
+            horizontalArrangement = Arrangement.spacedBy(24.dp),
+        ) {
+            content(
+                Modifier.width(SERIES_PANE_WIDTH).padding(start = 48.dp),
+                Modifier.weight(1f).fillMaxHeight(),
+            )
+        }
+    }
+}
 
 /**
  * Fiche film/série partagée TV + desktop : état hoisté (le ViewModel reste côté
@@ -172,6 +211,10 @@ fun DetailsScreenContent(
     showBackButton: Boolean = false,
 ) {
     val primaryFocus = remember { FocusRequester() }
+    // Téléphone : les deux volets de la série s'empilent au lieu de se partager
+    // la largeur. 380 dp de description sur 448 dp d'écran ne laissaient rien
+    // aux épisodes.
+    val compact = useBottomNav
     val resumeEpisodeFocus = remember { FocusRequester() }
     // Hissé jusqu'ici parce que le placement du focus de reprise en a besoin :
     // dans une LazyColumn, un épisode hors écran n'est pas composé du tout, donc
@@ -360,12 +403,12 @@ fun DetailsScreenContent(
                         // largeur pour trois lignes prend à la liste la hauteur
                         // de trois épisodes. Côte à côte, la description garde
                         // sa place et la liste récupère toute la colonne.
-                        Row(
+                        SeriesPanes(
+                            compact = compact,
                             modifier = Modifier.weight(1f).fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(24.dp),
-                        ) {
+                        ) { headerModifier, listModifier ->
                         Column(
-                            modifier = Modifier.width(SERIES_PANE_WIDTH).padding(start = 48.dp),
+                            modifier = headerModifier,
                             verticalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
                         // En-tête posé hors du défilement : il décrit ce qu'on
@@ -382,7 +425,9 @@ fun DetailsScreenContent(
                             text = s.seasonOverview.ifBlank { s.details.overview },
                             // Colonne étroite : le texte y tient sur plus de
                             // lignes, et il reste de la place sous les saisons.
-                            lines = 8,
+                            // Empilé sur téléphone, il mange en revanche la
+                            // liste d'épisodes — on le resserre.
+                            lines = if (compact) 3 else 8,
                             style = MaterialTheme.typography.bodyMedium,
                             // Déroulé en continu : dans l'en-tête il n'y a pas
                             // de carte à focaliser pour déclencher la lecture,
@@ -465,10 +510,14 @@ fun DetailsScreenContent(
                         // défaut corrigé sur les rangées de l'accueil.
                         LazyColumn(
                             state = episodesState,
-                            modifier = Modifier.weight(1f).fillMaxHeight(),
+                            modifier = listModifier,
                             // Marges dans le contentPadding : l'agrandissement au
                             // focus déborde dedans au lieu d'être rogné.
-                            contentPadding = PaddingValues(end = 48.dp, bottom = 24.dp),
+                            contentPadding = if (compact) {
+                                PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                            } else {
+                                PaddingValues(end = 48.dp, bottom = 24.dp)
+                            },
                             verticalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
                         item {
