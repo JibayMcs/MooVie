@@ -201,6 +201,9 @@ class DetailsViewModel : ViewModel() {
     private var tmdbId = 0
     private var isTv = false
 
+    /** Épisode explicitement demandé à l'ouverture (voir [start]). */
+    private var requestedResume: EpisodeRef? = null
+
     /**
      * Titre français du média courant, mémorisé le temps de la fiche.
      *
@@ -245,8 +248,23 @@ class DetailsViewModel : ViewModel() {
     fun movieKey() = "movie:$tmdbId"
     fun episodeKey(season: Int, episode: Int) = "tv:$tmdbId:s${season}e$episode"
 
-    fun start(tmdbId: Int, isTv: Boolean) {
+    /**
+     * Ouvre une fiche.
+     *
+     * [resumeSeason]/[resumeEpisode] désignent l'épisode à mettre en avant quand
+     * l'appelant le connaît — typiquement une carte de « Reprendre la lecture ».
+     * Ils priment sur la déduction faite depuis l'historique : la carte cliquée
+     * dit sans ambiguïté où l'utilisateur veut aller, là où la déduction doit
+     * arbitrer entre plusieurs épisodes en cours et peut désigner l'autre.
+     * À zéro, on retombe sur la déduction.
+     */
+    fun start(tmdbId: Int, isTv: Boolean, resumeSeason: Int = 0, resumeEpisode: Int = 0) {
         if (this.tmdbId == tmdbId && _state.value !is DetailsState.Loading) return
+        requestedResume = if (resumeSeason > 0 && resumeEpisode > 0) {
+            EpisodeRef(resumeSeason, resumeEpisode)
+        } else {
+            null
+        }
         // Le ViewModel est partagé entre fiches (scope Activity) : purge l'état
         // de la fiche précédente (panneau sources, erreurs) avant de charger.
         quickPlayJob?.cancel()
@@ -280,7 +298,7 @@ class DetailsViewModel : ViewModel() {
                     // Reprendre là où on en est plutôt que systématiquement à la
                     // saison 1 : sur une série suivie depuis des semaines, c'est
                     // le seul endroit où l'on ne veut pas atterrir.
-                    val target = episodeToResume(
+                    val target = requestedResume ?: episodeToResume(
                         inProgress = watchRepo.continueWatching.first()
                             .firstOrNull { it.isTv && it.tmdbId == tmdbId && it.season > 0 }
                             ?.let { EpisodeRef(it.season, it.episode) },

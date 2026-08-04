@@ -141,11 +141,17 @@ class MainActivity : ComponentActivity() {
                             Screen.Home -> HomeScreen(
                                 onOpenTitle = { id, isTv -> nav.push(Screen.Details(id, isTv)) },
                                 onResume = { e ->
+                                    // Pas de lecture directe : on ouvre la fiche,
+                                    // saison de reprise sélectionnée et focus sur
+                                    // l'épisode à suivre. Lancer un flux depuis
+                                    // l'accueil enlevait tout choix — reprendre
+                                    // ailleurs, revoir le résumé, changer de
+                                    // source — pour un appui qui ne demandait
+                                    // que « où j'en suis ».
                                     nav.push(
                                         Screen.Details(
                                             tmdbId = e.tmdbId,
                                             isTv = e.isTv,
-                                            autoSources = true,
                                             resumeSeason = e.season,
                                             resumeEpisode = e.episode,
                                         ),

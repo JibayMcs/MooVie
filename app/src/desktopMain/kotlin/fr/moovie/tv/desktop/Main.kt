@@ -176,11 +176,12 @@ private fun DesktopApp(
             Screen.Home -> DesktopHomeScreen(
                 onOpenTitle = { id, isTv -> nav.push(Screen.Details(id, isTv)) },
                 onResume = { e ->
+                    // Voir MainActivity : le rail ouvre la fiche, il ne lance
+                    // plus la lecture.
                     nav.push(
                         Screen.Details(
                             tmdbId = e.tmdbId,
                             isTv = e.isTv,
-                            autoSources = true,
                             resumeSeason = e.season,
                             resumeEpisode = e.episode,
                         ),

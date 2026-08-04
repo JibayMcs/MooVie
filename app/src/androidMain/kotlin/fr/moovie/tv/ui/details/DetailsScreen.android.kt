@@ -42,7 +42,7 @@ fun DetailsScreen(
     // Reprise depuis l'accueil : lance la lecture directe une seule fois, dès que la fiche est chargée.
     val autoConsumed = remember { mutableStateOf(false) }
 
-    LaunchedEffect(tmdbId, isTv) { viewModel.start(tmdbId, isTv) }
+    LaunchedEffect(tmdbId, isTv) { viewModel.start(tmdbId, isTv, resumeSeason, resumeEpisode) }
     LaunchedEffect(state) {
         if (autoSources && !autoConsumed.value) {
             when (state) {

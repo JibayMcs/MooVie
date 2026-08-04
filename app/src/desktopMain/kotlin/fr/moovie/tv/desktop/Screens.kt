@@ -198,7 +198,9 @@ internal fun DesktopDetailsScreen(
     // Reprise depuis l'accueil : lance la lecture directe une seule fois.
     val autoConsumed = remember { mutableStateOf(false) }
 
-    LaunchedEffect(params.tmdbId, params.isTv) { vm.start(params.tmdbId, params.isTv) }
+    LaunchedEffect(params.tmdbId, params.isTv) {
+        vm.start(params.tmdbId, params.isTv, params.resumeSeason, params.resumeEpisode)
+    }
     LaunchedEffect(state) {
         if (params.autoSources && !autoConsumed.value) {
             when (state) {
