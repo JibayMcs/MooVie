@@ -60,6 +60,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
@@ -69,6 +70,7 @@ import fr.moovie.tv.resources.common_back
 import fr.moovie.tv.resources.search_clear_history
 import fr.moovie.tv.resources.search_empty_hint
 import fr.moovie.tv.resources.search_hint
+import fr.moovie.tv.resources.search_hint_short
 import fr.moovie.tv.resources.search_loading
 import fr.moovie.tv.resources.search_needs_key
 import fr.moovie.tv.resources.search_no_results
@@ -77,6 +79,7 @@ import fr.moovie.tv.resources.search_recent_hint
 import fr.moovie.tv.resources.search_remove_query
 import fr.moovie.tv.resources.search_title
 import fr.moovie.tv.resources.search_voice
+import fr.moovie.tv.ui.adaptive.useBottomNav
 import fr.moovie.tv.ui.theme.MOOVIE_ACCENT
 import fr.moovie.tv.ui.components.MoovieButton
 import fr.moovie.tv.ui.components.LocalMoovieCardActive
@@ -99,6 +102,13 @@ import fr.moovie.tv.resources.watchlist_add
 import fr.moovie.tv.resources.watchlist_remove
 import androidx.compose.foundation.shape.CircleShape
 import fr.moovie.tv.resources.watchlist_added
+
+/**
+ * Marge horizontale de l'écran. 40 dp est un recul de salon ; sur les 448 dp
+ * d'un téléphone, les deux côtés réunis mangeaient un cinquième de la largeur.
+ */
+@Composable
+private fun searchHPad(): Dp = if (useBottomNav) 16.dp else 40.dp
 
 /**
  * Écran de recherche partagé TV + desktop : état hoisté (le ViewModel reste
@@ -179,7 +189,7 @@ fun SearchScreenContent(
     // s'étend jusqu'aux bords et ne rogne plus les cartes agrandies au focus.
     Column(modifier = Modifier.fillMaxSize().padding(vertical = 40.dp)) {
         Row(
-            modifier = Modifier.padding(horizontal = 40.dp),
+            modifier = Modifier.padding(horizontal = searchHPad()),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
@@ -198,7 +208,7 @@ fun SearchScreenContent(
         Spacer(Modifier.height(16.dp))
 
         Row(
-            modifier = Modifier.padding(horizontal = 40.dp),
+            modifier = Modifier.padding(horizontal = searchHPad()),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -232,15 +242,15 @@ fun SearchScreenContent(
                 onPick = onQueryChange,
                 onRemove = onRemoveHistory,
                 onClear = onClearHistory,
-                modifier = Modifier.padding(horizontal = 40.dp),
+                modifier = Modifier.padding(horizontal = searchHPad()),
             )
-            results is SearchState.Loading -> Text(stringResource(Res.string.search_loading), color = Color(0xFFBBBBBB), modifier = Modifier.padding(horizontal = 40.dp))
+            results is SearchState.Loading -> Text(stringResource(Res.string.search_loading), color = Color(0xFFBBBBBB), modifier = Modifier.padding(horizontal = searchHPad()))
             results is SearchState.NeedsKey -> Text(
                 stringResource(Res.string.search_needs_key),
                 color = Color(0xFFE0A0A0),
-                modifier = Modifier.padding(horizontal = 40.dp),
+                modifier = Modifier.padding(horizontal = searchHPad()),
             )
-            results is SearchState.Empty -> Text(stringResource(Res.string.search_no_results, query), color = Color(0xFFBBBBBB), modifier = Modifier.padding(horizontal = 40.dp))
+            results is SearchState.Empty -> Text(stringResource(Res.string.search_no_results, query), color = Color(0xFFBBBBBB), modifier = Modifier.padding(horizontal = searchHPad()))
             results is SearchState.Results -> ResultsGrid(
                 items = results.items,
                 firstFocus = firstResultFocus,
@@ -267,7 +277,20 @@ private fun SearchField(
             .padding(horizontal = 16.dp, vertical = 14.dp),
     ) {
         if (value.isEmpty()) {
-            Text(stringResource(Res.string.search_hint), color = Color(0xFF888888), fontSize = 18.sp)
+            Text(
+                // Invite courte sur téléphone : la longue se repliait sur deux
+                // lignes et étirait le champ d'autant, alors qu'il ne contiendra
+                // jamais qu'une ligne de saisie.
+                stringResource(
+                    if (useBottomNav) Res.string.search_hint_short else Res.string.search_hint,
+                ),
+                color = Color(0xFF888888),
+                fontSize = 18.sp,
+                // Garde-fou : quelle que soit la traduction, le champ reste haut
+                // d'une ligne.
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
         BasicTextField(
             value = value,
@@ -436,7 +459,10 @@ private fun ResultsGrid(
     onMenu: (TmdbItem) -> Unit = {},
 ) {
     LazyVerticalGrid(
-        columns = GridCells.Fixed(6),
+        // 6 colonnes, c'est calibré sur les 960 dp d'un 1080p. Sur les 448 dp
+        // d'un téléphone en portrait, chaque affiche tombait à 57 dp de large —
+        // et son titre à « Dun… ».
+        columns = GridCells.Fixed(if (useBottomNav) 3 else 6),
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
         // Marges intérieures : la grille clippe à ses bords, les cartes

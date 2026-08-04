@@ -30,6 +30,7 @@
     <!-- Búsqueda -->
     <string name="search_title">Búsqueda</string>
     <string name="search_hint">Busca una película, una serie, un anime…</string>
+    <string name="search_hint_short">Buscar…</string>
     <string name="search_loading">Buscando…</string>
     <string name="search_needs_key">Falta la clave TMDB — configúrala en Ajustes.</string>
     <string name="search_no_results">Sin resultados para «%1$s».</string>
