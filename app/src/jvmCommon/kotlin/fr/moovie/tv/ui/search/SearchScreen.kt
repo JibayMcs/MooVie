@@ -79,6 +79,7 @@ import fr.moovie.tv.resources.search_recent_hint
 import fr.moovie.tv.resources.search_remove_query
 import fr.moovie.tv.resources.search_title
 import fr.moovie.tv.resources.search_voice
+import fr.moovie.tv.ui.adaptive.isTouchUi
 import fr.moovie.tv.ui.adaptive.useBottomNav
 import fr.moovie.tv.ui.theme.MOOVIE_ACCENT
 import fr.moovie.tv.ui.components.MoovieButton
@@ -338,14 +339,40 @@ private fun HistorySection(
         Text(stringResource(Res.string.search_empty_hint), color = Color(0xFF888888), modifier = modifier)
         return
     }
+    // Croix de suppression visible en permanence dès qu'on désigne directement
+    // — souris ou doigt. Elle n'apparaissait qu'au *focus*, ce qui n'existe pas
+    // au tactile : sur téléphone, retirer une recherche ne passait plus que par
+    // l'appui long, un geste que rien ne montre.
+    val directRemove = isPointerUi || isTouchUi
     Column(modifier = modifier) {
-        Text(stringResource(Res.string.search_recent), style = MaterialTheme.typography.titleMedium)
+        if (isTouchUi) {
+            // Le vidage remonte sur la ligne du titre, réduit à son icône : il
+            // qualifie la section entière, et le libellé n'apprenait rien qu'une
+            // corbeille à côté de « Recherches récentes » ne dise déjà.
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    stringResource(Res.string.search_recent),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                MoovieIconButton(
+                    onClick = onClear,
+                    icon = Icons.Default.DeleteSweep,
+                    contentDescription = stringResource(Res.string.search_clear_history),
+                )
+            }
+        } else {
+            Text(stringResource(Res.string.search_recent), style = MaterialTheme.typography.titleMedium)
+        }
         Spacer(Modifier.height(4.dp))
         // L'appui long ne se devine pas : on l'annonce une fois, discrètement,
         // plutôt que d'accoler un ✕ à chaque terme — c'est ce doublement de
-        // cibles qui alourdissait la rangée au D-pad. À la souris la croix est
-        // cliquable et se passe d'explication.
-        if (!isPointerUi) {
+        // cibles qui alourdissait la rangée au D-pad. Là où la croix est visible
+        // et cliquable, elle se passe d'explication.
+        if (!directRemove) {
             Text(
                 stringResource(Res.string.search_recent_hint),
                 style = MaterialTheme.typography.labelMedium,
@@ -370,25 +397,32 @@ private fun HistorySection(
                 // seconde cible qu'on évite à la télécommande.
                 MoovieButton(
                     onClick = { onPick(q) },
-                    onLongClick = if (isPointerUi) null else ({ onRemove(q) }),
+                    // Inutile là où la croix est déjà là et dit ce qu'elle fait —
+                    // et sur un téléphone, l'appui long est surtout un geste
+                    // qu'on déclenche par accident en faisant défiler.
+                    onLongClick = if (directRemove) null else ({ onRemove(q) }),
                 ) {
                     Text(q)
-                    if (isPointerUi || LocalMoovieCardActive.current) {
+                    if (directRemove || LocalMoovieCardActive.current) {
                         Spacer(Modifier.width(4.dp))
                         RemoveQueryCross(query = q, onRemove = { onRemove(q) })
                     }
                 }
             }
-            // Le vidage complet vit dans la même rangée que ce qu'il vide,
-            // plutôt qu'en icône nue collée au titre.
-            MoovieButton(onClick = onClear) {
-                Icon(
-                    Icons.Default.DeleteSweep,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp),
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(Res.string.search_clear_history))
+            // Au D-pad, le vidage reste dans la rangée de ce qu'il vide : on ne
+            // l'atteint qu'en traversant les termes, donc jamais par accident.
+            // Au doigt il est monté à côté du titre, hors de portée d'un appui
+            // qui visait une recherche.
+            if (!isTouchUi) {
+                MoovieButton(onClick = onClear) {
+                    Icon(
+                        Icons.Default.DeleteSweep,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(Res.string.search_clear_history))
+                }
             }
         }
     }
