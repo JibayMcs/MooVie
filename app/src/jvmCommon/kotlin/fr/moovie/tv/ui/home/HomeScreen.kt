@@ -194,6 +194,12 @@ fun HomeScreenContent(
             // rangée d'affiches entière sous un héros qui, lui, reste fixe.
             // Les boutons se posent en surimpression du héros, dans sa moitié
             // droite restée vide.
+            // Rien de tout cela au doigt : le héros décrivait l'élément
+            // *focalisé*, et il n'y a pas de focus au tactile — il restait donc
+            // figé sur le premier titre, à décrire quelque chose que personne
+            // n'avait désigné. Sa hauteur revient aux rangées, qui en manquent.
+            // Le fond flou, lui, reste : il ne prétend rien, il habille.
+            if (!useBottomNav) {
             Box(modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
                 if (state is HomeState.Ready) Hero(featured)
                 // Descente explicite depuis l'en-tête : la 1re carte est hors du
@@ -244,6 +250,7 @@ fun HomeScreenContent(
                     )
                 }
                 }
+            }
             }
             Spacer(Modifier.height(if (state is HomeState.Ready) 12.dp else 16.dp))
 
