@@ -70,6 +70,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -123,6 +124,15 @@ import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 
 /**
+ * Largeur du volet gauche d'une fiche série (titre, résumé, saisons, actions).
+ *
+ * Contenue à dessein : en 1080p l'écran ne fait que 960 dp de large, et chaque
+ * point pris ici est un point de moins pour la liste des épisodes — qui est ce
+ * qu'on vient consulter.
+ */
+private val SERIES_PANE_WIDTH = 380.dp
+
+/**
  * Fiche film/série partagée TV + desktop : état hoisté (le ViewModel reste côté
  * plateforme — chargement TMDB, résolution de sources, suivi de lecture).
  */
@@ -163,6 +173,10 @@ fun DetailsScreenContent(
 ) {
     val primaryFocus = remember { FocusRequester() }
     val resumeEpisodeFocus = remember { FocusRequester() }
+    // Hissé jusqu'ici parce que le placement du focus de reprise en a besoin :
+    // dans une LazyColumn, un épisode hors écran n'est pas composé du tout, donc
+    // son FocusRequester n'existe pas. Il faut défiler jusqu'à lui d'abord.
+    val episodesState = rememberLazyListState()
 
     // Série reprise en cours : le focus descend sur l'épisode à suivre plutôt
     // que de rester sur la rangée des saisons — sinon on arrive avec « S1 »
@@ -180,6 +194,9 @@ fun DetailsScreenContent(
         val tv = state as? DetailsState.Tv
         val wantsEpisode = tv != null && tv.resumeEpisode > 0 && selectedEpisode == null && !autoFocusDone
         if (wantsEpisode) {
+            // +1 : le titre « Épisodes (saison N) » occupe le premier élément.
+            val index = tv.episodes.indexOfFirst { it.episodeNumber == tv.resumeEpisode }
+            if (index >= 0) runCatching { episodesState.scrollToItem(index + 1) }
             // La liste d'épisodes n'est pas encore posée au moment où l'état
             // change : on retente le temps qu'elle le soit.
             repeat(10) {
@@ -223,8 +240,14 @@ fun DetailsScreenContent(
         // haut, faute de quoi l'en-tête reste hors cadre (voir plus bas).
         val pageScroll = rememberScrollState()
         val pageScope = rememberCoroutineScope()
+        // Sur la liste des épisodes d'une série, la page ne défile pas en bloc :
+        // l'en-tête et les saisons restent posés, seuls les épisodes défilent
+        // (voir plus bas). Partout ailleurs — film, fiche d'épisode — le
+        // défilement global reste le bon comportement.
+        val seriesList = state is DetailsState.Tv && selectedEpisode == null
         Column(
-            modifier = Modifier.fillMaxSize().verticalScroll(pageScroll)
+            modifier = Modifier.fillMaxSize()
+                .then(if (seriesList) Modifier else Modifier.verticalScroll(pageScroll))
                 .padding(top = topPad, bottom = 48.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
@@ -332,42 +355,60 @@ fun DetailsScreenContent(
                             onToggleWatched = { onToggleWatched(key) },
                         )
                     } else {
-                        Text(s.details.name, style = MaterialTheme.typography.headlineMedium, modifier = hPad)
-                        s.details.year?.let { Text(it, modifier = hPad) }
-                        Text(s.details.overview, style = MaterialTheme.typography.bodyMedium, maxLines = 4, overflow = TextOverflow.Ellipsis, modifier = hPad)
+                        // Deux volets plutôt qu'un empilement : l'écran fait
+                        // 960 × 540 dp, et un synopsis qui occupe toute la
+                        // largeur pour trois lignes prend à la liste la hauteur
+                        // de trois épisodes. Côte à côte, la description garde
+                        // sa place et la liste récupère toute la colonne.
+                        Row(
+                            modifier = Modifier.weight(1f).fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(24.dp),
+                        ) {
+                        Column(
+                            modifier = Modifier.width(SERIES_PANE_WIDTH).padding(start = 48.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                        // En-tête posé hors du défilement : il décrit ce qu'on
+                        // est en train de parcourir, et le perdre au premier
+                        // appui vers le bas revenait à naviguer à l'aveugle
+                        // dans une liste de vingt épisodes.
+                        Text(s.details.name, style = MaterialTheme.typography.headlineSmall)
+                        // Année et résumé **de la saison** quand TMDB les donne.
+                        // Ils ne l'étaient jamais : le parseur ignorait les deux
+                        // champs, si bien que les vingt-deux saisons d'une série
+                        // affichaient le même texte et la même année.
+                        (s.seasonYear ?: s.details.year)?.let { Text(it) }
+                        ScrollingSynopsis(
+                            text = s.seasonOverview.ifBlank { s.details.overview },
+                            // Colonne étroite : le texte y tient sur plus de
+                            // lignes, et il reste de la place sous les saisons.
+                            lines = 8,
+                            style = MaterialTheme.typography.bodyMedium,
+                            // Déroulé en continu : dans l'en-tête il n'y a pas
+                            // de carte à focaliser pour déclencher la lecture,
+                            // et un résumé tronqué net serait inatteignable.
+                            active = true,
+                        )
                         val seasonAllWatched = s.episodes.isNotEmpty() &&
                             s.episodes.all { episodeKey(s.season, it.episodeNumber) in watched }
-                        Text(stringResource(Res.string.details_seasons), style = MaterialTheme.typography.titleMedium, modifier = hPad)
-                        val seasonsState = rememberLazyListState()
-                        // La rangée des saisons est le premier élément
-                        // focalisable de la page : rien au-dessus ne peut
-                        // prendre le focus, donc remonter s'arrêtait sur elle
-                        // et le titre de la série restait coupé par le bord.
+                        // Bloc de commande resserré : titre, saisons et actions
+                        // se suivent de près pour rendre à la liste la hauteur
+                        // de deux épisodes. L'espacement de 16 dp de la colonne
+                        // parente, appliqué entre chacun, la lui prenait.
                         //
-                        // On intercepte le Haut plutôt que de réagir au focus :
-                        // un défilement déclenché à la prise de focus se faisait
-                        // aussitôt écraser par le `bringIntoView` du système,
-                        // qui s'exécute après. Ici l'appui est sans ambiguïté —
-                        // il n'y a rien au-dessus à atteindre — et un second
-                        // Haut découvre l'en-tête.
-                        MoovieRail(
-                            seasonsState,
-                            modifier = Modifier.onPreviewKeyEvent { event ->
-                                if (event.type == KeyEventType.KeyDown &&
-                                    event.key == Key.DirectionUp &&
-                                    pageScroll.value > 0
-                                ) {
-                                    pageScope.launch { pageScroll.animateScrollTo(0) }
-                                    true
-                                } else {
-                                    false
-                                }
-                            },
-                        ) {
+                        // L'interception du Haut qui ramenait la page en haut a
+                        // disparu avec elle : l'en-tête ne défile plus, il n'y a
+                        // plus rien à découvrir au-dessus.
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(stringResource(Res.string.details_seasons), style = MaterialTheme.typography.titleMedium)
+                        val seasonsState = rememberLazyListState()
+                        MoovieRail(seasonsState) {
                             LazyRow(
                                 state = seasonsState,
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                contentPadding = PaddingValues(horizontal = 48.dp),
+                                // Marge réduite : la colonne est déjà décalée,
+                                // 48 dp de plus rognerait deux saisons.
+                                contentPadding = PaddingValues(horizontal = 4.dp),
                             ) {
                                 itemsIndexed(s.details.seasons.filter { it.seasonNumber > 0 }) { index, season ->
                                     val isCurrent = season.seasonNumber == s.season
@@ -397,10 +438,7 @@ fun DetailsScreenContent(
                         // saisons elles se retrouvaient à vingt-deux boutons du
                         // bord, donc introuvables. Ici elles sont toujours au
                         // même endroit, à un appui vers le bas.
-                        Row(
-                            modifier = hPad,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        ) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             MoovieIconButton(
                                 onClick = onToggleSeasonWatched,
                                 icon = if (seasonAllWatched) Icons.Default.VisibilityOff else Icons.Default.Visibility,
@@ -416,30 +454,63 @@ fun DetailsScreenContent(
                                 selected = inWatchlist,
                             )
                         }
-                        Text(stringResource(Res.string.details_episodes_season, s.season), style = MaterialTheme.typography.titleMedium, modifier = hPad)
-                        val firstEpisode = s.episodes.firstOrNull()?.episodeNumber
-                        s.episodes.forEach { ep ->
+                        }
+                        }
+                        // Volet droit : la liste occupe toute la hauteur.
+                        //
+                        // LazyColumn et non Column défilante : c'est ce qui donne
+                        // `animateScrollToItem`, seul moyen de caler l'épisode
+                        // focalisé en haut — sans quoi il se colle en bas du
+                        // cadre et le suivant reste invisible, exactement le
+                        // défaut corrigé sur les rangées de l'accueil.
+                        LazyColumn(
+                            state = episodesState,
+                            modifier = Modifier.weight(1f).fillMaxHeight(),
+                            // Marges dans le contentPadding : l'agrandissement au
+                            // focus déborde dedans au lieu d'être rogné.
+                            contentPadding = PaddingValues(end = 48.dp, bottom = 24.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                        item {
+                            Text(stringResource(Res.string.details_episodes_season, s.season), style = MaterialTheme.typography.titleMedium)
+                        }
+                        itemsIndexed(s.episodes) { index, ep ->
                             val key = episodeKey(s.season, ep.episodeNumber)
                             val isNext = ep.episodeNumber == s.resumeEpisode
-                            // Remonter depuis le 1er épisode va sur la saison
-                            // *affichée*, pas sur S1 : la recherche de focus
-                            // native prend le voisin le plus proche et renverrait
-                            // au début d'une série suivie depuis des saisons.
-                            // Même remède que la descente en-tête → contenu.
-                            val upToSeason = if (ep.episodeNumber == firstEpisode) {
-                                Modifier.onPreviewKeyEvent { event ->
-                                    if (event.type == KeyEventType.KeyDown &&
-                                        event.key == Key.DirectionUp
-                                    ) {
-                                        runCatching { primaryFocus.requestFocus() }.isSuccess
-                                    } else {
-                                        false
+                            Box(
+                                modifier = Modifier.onPreviewKeyEvent { event ->
+                                    if (event.type != KeyEventType.KeyDown) {
+                                        return@onPreviewKeyEvent false
                                     }
-                                }
-                            } else {
-                                Modifier
-                            }
-                            Box(modifier = hPad.then(upToSeason)) {
+                                    when (event.key) {
+                                        // Gauche = retour aux commandes de la
+                                        // série. Rien n'est à gauche d'un
+                                        // épisode, et remonter jusqu'aux saisons
+                                        // épisode par épisode sur une saison de
+                                        // vingt-cinq était le seul chemin.
+                                        Key.DirectionLeft ->
+                                            runCatching { primaryFocus.requestFocus() }.isSuccess
+                                        // Remonter depuis le 1er épisode va sur
+                                        // la saison *affichée*, pas sur S1 : la
+                                        // recherche de focus native prend le
+                                        // voisin le plus proche et renverrait au
+                                        // début d'une série suivie depuis des
+                                        // saisons.
+                                        Key.DirectionUp -> index == 0 &&
+                                            runCatching { primaryFocus.requestFocus() }.isSuccess
+                                        else -> false
+                                    }
+                                }.onFocusChanged {
+                                    // Voir RowSlot sur l'accueil : le délai laisse
+                                    // passer le `bringIntoView` du système, qui
+                                    // part sur la même prise de focus et
+                                    // écraserait l'alignement.
+                                    if (it.isFocused) pageScope.launch {
+                                        delay(80)
+                                        episodesState.animateScrollToItem(index + 1)
+                                    }
+                                },
+                            ) {
                                 EpisodeRow(
                                     ep = ep,
                                     isWatched = key in watched,
@@ -456,6 +527,8 @@ fun DetailsScreenContent(
                                     onToggleWatched = { onToggleWatched(key) },
                                 )
                             }
+                        }
+                        }
                         }
                     }
                 }
@@ -1094,18 +1167,28 @@ private fun EpisodeRow(
  * inatteignable à la télécommande (texte simplement tronqué).
  */
 @Composable
-private fun ScrollingSynopsis(text: String, lines: Int = 2, modifier: Modifier = Modifier) {
-    val active = LocalMoovieCardActive.current
+private fun ScrollingSynopsis(
+    text: String,
+    lines: Int = 2,
+    modifier: Modifier = Modifier,
+    style: TextStyle = MaterialTheme.typography.bodySmall,
+    /**
+     * Null = suit le focus de la carte qui contient le texte, ce qui est le cas
+     * d'usage d'origine. Forcé à true dans l'en-tête d'une série, où il n'y a
+     * aucune carte à focaliser et où un résumé tronqué resterait inatteignable.
+     */
+    active: Boolean? = null,
+) {
+    val scrolling = active ?: LocalMoovieCardActive.current
     val scroll = rememberScrollState()
-    val style = MaterialTheme.typography.bodySmall
     val density = LocalDensity.current
     val height = remember(style, lines, density) {
         val lineSp = if (style.lineHeight.isSp) style.lineHeight.value else style.fontSize.value * 1.4f
         with(density) { (lineSp * lines).sp.toDp() }
     }
 
-    LaunchedEffect(active, text) {
-        if (!active) {
+    LaunchedEffect(scrolling, text) {
+        if (!scrolling) {
             scroll.scrollTo(0)
             return@LaunchedEffect
         }
