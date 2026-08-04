@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -41,6 +42,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -62,6 +64,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import coil3.compose.AsyncImage
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import fr.moovie.tv.data.tmdb.TmdbItem
 import fr.moovie.tv.data.watch.ResumeEntry
 import fr.moovie.tv.data.watch.WatchlistEntry
@@ -133,6 +138,9 @@ fun HomeScreenContent(
     // Rend le focus à la carte qui a ouvert le menu, plutôt que de le laisser
     // repartir sur le premier bouton de l'en-tête.
     val focusMemory = LocalMoovieFocusMemory.current
+    // Voir RowSlot : la liste doit pouvoir être recalée à la main.
+    val rowsState = rememberLazyListState()
+    val rowsScope = rememberCoroutineScope()
 
     val rows = (state as? HomeState.Ready)?.rows
     // Valeur par défaut = ce qui prendra le focus en premier. Sans ça le hero
@@ -238,49 +246,62 @@ fun HomeScreenContent(
                     MoovieButton(onClick = onOpenSettings) { Text(stringResource(Res.string.home_open_settings)) }
                 }
                 is HomeState.Ready -> LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(24.dp),
+                    state = rowsState,
+                    // 16 et non 24 : voir POSTER_WIDTH — ces huit points, plus
+                    // ceux gagnés sur les affiches, sont ce qui fait tenir le
+                    // titre de la rangée suivante en bas d'écran.
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
                     contentPadding = PaddingValues(bottom = 48.dp),
                 ) {
                     if (resume.isNotEmpty()) {
                         item {
-                            ResumeRow(
-                                entries = resume,
-                                onResume = onResume,
-                                onMenu = { resumeMenuFor = it },
-                                onFocusEntry = { focused = HeroTarget.Resume(it) },
-                                firstFocus = firstContentFocus,
-                            )
+                            RowSlot(0, rowsState, rowsScope) {
+                                ResumeRow(
+                                    entries = resume,
+                                    onResume = onResume,
+                                    onMenu = { resumeMenuFor = it },
+                                    onFocusEntry = { focused = HeroTarget.Resume(it) },
+                                    firstFocus = firstContentFocus,
+                                )
+                            }
                         }
                     }
                     // Juste après « Reprendre » : ce qu'on a mis de côté vient
                     // avant le catalogue, qui est de la découverte.
                     if (watchlist.isNotEmpty()) {
                         item {
-                            WatchlistRow(
-                                entries = watchlist,
-                                onOpenTitle = onOpenTitle,
-                                onMenu = { watchlistMenuFor = it },
-                                onFocusEntry = { focused = HeroTarget.Watchlist(it) },
-                                firstFocus = if (resume.isEmpty()) firstContentFocus else null,
-                            )
+                            RowSlot(if (resume.isEmpty()) 0 else 1, rowsState, rowsScope) {
+                                WatchlistRow(
+                                    entries = watchlist,
+                                    onOpenTitle = onOpenTitle,
+                                    onMenu = { watchlistMenuFor = it },
+                                    onFocusEntry = { focused = HeroTarget.Watchlist(it) },
+                                    firstFocus = if (resume.isEmpty()) firstContentFocus else null,
+                                )
+                            }
                         }
                     }
                     itemsIndexed(s.rows) { rowIndex, row ->
-                        CatalogRow(
-                            row = row,
-                            watched = watched,
-                            onOpenTitle = onOpenTitle,
-                            onFocusItem = { focused = HeroTarget.Catalog(it) },
-                            watchlistKeys = watchlistKeys,
-                            onMenu = { catalogMenuFor = it },
-                            // Sans rail Reprendre ni watchlist, la 1re rangée
-                            // devient la cible de descente depuis l'en-tête.
-                            firstFocus = if (resume.isEmpty() && watchlist.isEmpty() && rowIndex == 0) {
-                                firstContentFocus
-                            } else {
-                                null
-                            },
-                        )
+                        val slot = rowIndex +
+                            (if (resume.isNotEmpty()) 1 else 0) +
+                            (if (watchlist.isNotEmpty()) 1 else 0)
+                        RowSlot(slot, rowsState, rowsScope) {
+                            CatalogRow(
+                                row = row,
+                                watched = watched,
+                                onOpenTitle = onOpenTitle,
+                                onFocusItem = { focused = HeroTarget.Catalog(it) },
+                                watchlistKeys = watchlistKeys,
+                                onMenu = { catalogMenuFor = it },
+                                // Sans rail Reprendre ni watchlist, la 1re rangée
+                                // devient la cible de descente depuis l'en-tête.
+                                firstFocus = if (resume.isEmpty() && watchlist.isEmpty() && rowIndex == 0) {
+                                    firstContentFocus
+                                } else {
+                                    null
+                                },
+                            )
+                        }
                     }
                 }
             }
@@ -344,6 +365,54 @@ private sealed interface HeroTarget {
  * rallonger recoupe les affiches en bas, ce qui était le défaut d'origine.
  */
 private val HERO_HEIGHT = 148.dp
+
+/**
+ * Cale une rangée en haut de la liste dès qu'elle prend le focus.
+ *
+ * Le défilement automatique du focus se contente d'amener la rangée *quelque
+ * part* dans le cadre : elle se retrouve alors collée en bas, la précédente
+ * réduite à une bande d'affiches tronquées au-dessus, et il ne reste rien sous
+ * elle. En l'alignant explicitement, tout l'espace gagné passe en bas — là où
+ * le titre de la rangée suivante doit apparaître.
+ */
+@Composable
+private fun RowSlot(
+    index: Int,
+    state: LazyListState,
+    scope: CoroutineScope,
+    content: @Composable () -> Unit,
+) {
+    Box(
+        modifier = Modifier.onFocusChanged {
+            // Le délai n'est pas décoratif : le `bringIntoView` du système part
+            // sur la même prise de focus et s'exécute après nous. Sans ce
+            // décalage il écrase l'alignement, et la rangée retombe collée en
+            // bas du cadre — c'est exactement ce qu'on cherche à éviter.
+            if (it.hasFocus) scope.launch {
+                delay(80)
+                state.animateScrollToItem(index)
+            }
+        },
+    ) {
+        content()
+    }
+}
+
+/**
+ * Largeur des affiches 2:3 des rangées.
+ *
+ * Calibrée pour qu'une rangée focalisée laisse voir le **titre de la rangée
+ * suivante** en bas d'écran. Sans ce repère, rien ne dit qu'il y a autre chose
+ * plus bas : la rangée occupe toute la hauteur restante et l'écran paraît
+ * terminé. Quelqu'un qui n'a jamais utilisé d'application de streaming n'a
+ * aucune raison de tenter le Bas.
+ *
+ * Mesuré en 1080p / 320 dpi : le bloc d'une rangée fait 310 dp pour 345 dp
+ * disponibles sous le héros, et un titre de section en réclame 28 de plus. Les
+ * ~20 dp manquants viennent d'ici, le reste de l'espacement entre rangées.
+ * Élargir ces affiches referme l'invite.
+ */
+private val POSTER_WIDTH = 138.dp
 
 /**
  * Place réservée au coin haut droit, où les boutons de la barre sont posés en
@@ -701,7 +770,7 @@ private fun PosterCard(
         onClick = onClick,
         onLongClick = onLongClick,
         modifier = modifier
-            .width(150.dp)
+            .width(POSTER_WIDTH)
             .heroSubject { onFocusItem(item) },
     ) {
         Column {
@@ -815,7 +884,7 @@ private fun WatchlistCard(
     onLongClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    MoovieCard(onClick = onClick, onLongClick = onLongClick, modifier = modifier.width(150.dp)) {
+    MoovieCard(onClick = onClick, onLongClick = onLongClick, modifier = modifier.width(POSTER_WIDTH)) {
         Column {
             Box {
                 AsyncImage(
