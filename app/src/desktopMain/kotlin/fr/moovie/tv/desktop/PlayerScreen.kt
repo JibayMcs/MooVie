@@ -843,7 +843,13 @@ internal fun DesktopPlayerScreen(
                     if (nextEpisode > 1) onNextEpisode(nextSeason, nextEpisode - 2)
                 },
                 onNextEpisode = {
-                    if (nextSeason > 0 && nextEpisode > 0) onNextEpisode(nextSeason, nextEpisode)
+                    if (nextSeason > 0 && nextEpisode > 0) {
+                        // Voir PlayerScreen (Android) : « Suivant » vaut fin de
+                        // l'épisode courant, sinon les titres sans données
+                        // TheIntroDB n'ont aucun chemin vers « vu ».
+                        markFinished()
+                        onNextEpisode(nextSeason, nextEpisode)
+                    }
                 },
                 onOpenSubtitles = {
                     tracks = controller.tracks()

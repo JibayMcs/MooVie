@@ -850,7 +850,16 @@ fun PlayerScreen(
                     pid?.let { onNextEpisode(it.tmdbId, it.season, it.episode - 1) }
                 },
                 onNextEpisode = {
-                    pid?.let { onNextEpisode(it.tmdbId, it.season, it.episode + 1) }
+                    pid?.let {
+                        // Passer à l'épisode suivant, c'est en avoir fini avec
+                        // celui-ci — au même titre que sauter le générique. Sans
+                        // ça, les titres absents de TheIntroDB n'avaient aucun
+                        // chemin vers « vu » : faute de segment détecté, le
+                        // bouton « Passer le générique » n'apparaît jamais et
+                        // seul « Suivant » restait, qui ne marquait rien.
+                        markFinished()
+                        onNextEpisode(it.tmdbId, it.season, it.episode + 1)
+                    }
                 },
                 onOpenSubtitles = { dialog = PlayerDialogKind.SUBTITLES },
                 onOpenSettings = { dialog = PlayerDialogKind.SETTINGS },
