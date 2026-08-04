@@ -11,21 +11,37 @@ automatiquement le bon émulateur même si plusieurs tournent.
 
 | `MOOVIE_AVD` | AVD | Android | Écran |
 |---|---|---|---|
-| `tv36` *(défaut)* | `moovie_androidtv_36` | 16 (API 36), x86_64 | 1920×1080 @ 320 dpi |
-| `mibox` | `Xiaomi_Mi_Box_3S_API_23` | 6.0 (API 23), x86 | 1920×1080 @ 320 dpi |
-| `mibox4k` | `Xiaomi_Mi_Box_3S_4K_API_23` | 6.0 (API 23), x86 | 3840×2160 @ 640 dpi |
+| `mibox` *(défaut)* | `Xiaomi_Mi_Box_4_API_28` | 9 (API 28), x86 | 1920×1080 @ 320 dpi |
+| `tv36` | `moovie_androidtv_36` | 16 (API 36), x86_64 | 1920×1080 @ 320 dpi |
 
-Les deux profils `mibox` reproduisent une **Xiaomi Mi Box 3S** : Android 6.0,
-2 Go de RAM, 4 cœurs, 8 Go de stockage. Ils existent parce que `minSdk = 23`
-n'était vérifié sur aucune machine — `tv36` tourne seize versions plus haut.
+`mibox` reproduit la **box de référence du projet**, une Xiaomi Mi Box 4 (nom de
+code « oneday »), et c'est le profil par défaut : un bug qui n'existe que sur
+`tv36` n'atteindra personne, l'inverse est faux. `tv36` reste là pour vérifier le
+comportement sur un Android TV récent — et il démarre plus vite.
 
-**Ce qu'ils ne prouvent pas** : le SoC Amlogic et son GPU Mali (image x86, rendu
-par le GPU de l'hôte), le décodage vidéo matériel, le HDR10, les DRM Widevine L1
-et la télécommande physique. Pour tout ça, seule la box fait foi.
+Les caractéristiques de `mibox` ne sont pas devinées d'une fiche produit : elles
+ont été relevées sur l'appareil, en adb, le 4 août 2026.
 
-**`mibox4k` ne teste pas la mise en page** : 3840/640 et 1920/320 donnent la même
-largeur logique de 960 dp, donc exactement le même agencement. Il sert à vérifier
-le choix des ressources `xxxhdpi` et le coût du rendu, pas ce qui rentre à l'écran.
+| Relevé | Valeur |
+|---|---|
+| `ro.product.model` | `MIBOX4` |
+| `ro.product.device` / `board` | `oneday` |
+| Android | 9 — API 28, build `PI.3933` |
+| `ro.hardware` | `amlogic` |
+| ABI | `armeabi-v7a` **uniquement** (32 bits) |
+| `wm size` / `wm density` | 1920×1080 @ 320 dpi, aucun overscan, aucune surcharge |
+| RAM / cœurs / stockage | 2 Go · 4 · 8 Go (4,9 Go utiles sur `/data`) |
+
+**Ce que ce profil ne prouve pas** : le SoC Amlogic et son GPU (l'image est en
+x86 alors que la box n'exécute que de l'`armeabi-v7a`), le décodage vidéo
+matériel, le HDR, les DRM Widevine et la télécommande physique. Pour tout ça,
+seule la box fait foi — `adb connect <ip>:5555` après avoir activé le débogage
+réseau dans ses options développeur.
+
+**Pas de variante 4K** : la box *sort* de la 4K, mais son interface tourne en
+1080p — `dumpsys display` ne liste que des modes 1920×1080. Un profil 3840×2160
+ne reproduirait aucun appareil réel, et à densité proportionnelle il donnerait de
+toute façon la même largeur logique de 960 dp, donc le même agencement.
 
 ## Prérequis
 - Android SDK + `cmdline-tools/latest` + `emulator` + `platform-tools`
@@ -47,16 +63,22 @@ cd emulator
 ./stop.sh             # arrête l'émulateur
 ```
 
-Sur un autre profil, préfixer la commande :
+Sans rien préciser, ces commandes ciblent `mibox`. Pour l'autre profil, préfixer :
 
 ```bash
-MOOVIE_AVD=mibox ./setup.sh     # UNE fois
-MOOVIE_AVD=mibox ./start.sh --headless
-MOOVIE_AVD=mibox ./build-install.sh
+MOOVIE_AVD=tv36 ./setup.sh     # UNE fois
+MOOVIE_AVD=tv36 ./start.sh --headless
+MOOVIE_AVD=tv36 ./build-install.sh
 ```
 
-Android 6 met **environ deux minutes** à démarrer, contre quelques dizaines de
-secondes pour `tv36` : lance-le en tâche de fond plutôt que de l'attendre.
+Pour changer de défaut le temps d'une session, sans toucher au dépôt :
+
+```bash
+export MOOVIE_AVD=tv36
+```
+
+Les deux profils démarrent en quelques dizaines de secondes. `mibox` est un poil
+plus lent (image x86 32 bits contre x86_64), sans que ça change la boucle de dev.
 
 Boucle de dev : modifie le code → `./build-install.sh` → regarde l'écran (ou
 `./screenshot.sh`). Au premier lancement de l'app, va dans **Réglages → API & Clés**

@@ -3,9 +3,8 @@
 # sa configuration matérielle. À lancer UNE fois par profil.
 # L'image système reste dans le SDK partagé (~/Android/Sdk).
 #
-#   ./setup.sh                    # profil par défaut (tv36)
-#   MOOVIE_AVD=mibox ./setup.sh   # Xiaomi Mi Box 3S, Android 6
-#   MOOVIE_AVD=mibox4k ./setup.sh # idem en 4K
+#   ./setup.sh                    # profil par défaut (mibox) — Mi Box 4, Android 9
+#   MOOVIE_AVD=tv36 ./setup.sh    # Android TV API 36
 set -euo pipefail
 source "$(dirname "$0")/env.sh"
 
