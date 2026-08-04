@@ -36,6 +36,10 @@ echo "$EMU_PID" > "$PIDFILE"
 echo ">> PID émulateur: $EMU_PID (enregistré dans emulator.pid)"
 
 echo ">> Attente du boot complet..."
+# D'abord identifier *quel* device viser : sans ça, un téléphone branché en USB
+# suffit à faire échouer chaque commande adb sur « more than one device ».
+moovie_await_serial || exit 1
+echo ">> Device ciblé: $ANDROID_SERIAL"
 "$ADB" wait-for-device
 until [[ "$("$ADB" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" == "1" ]]; do
   # abandon si le process est mort

@@ -86,13 +86,38 @@ export APK_PATH="$PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk"
 export APK_PACKAGE="fr.moovie.tv"
 export APK_ACTIVITY="fr.moovie.tv/.MainActivity"
 
-# Ciblage device : si plusieurs émulateurs tournent, adb refuse sans -s. On fixe
+# Ciblage device : adb refuse d'agir dès qu'il voit plus d'un appareil — un
+# second émulateur, mais aussi un simple téléphone branché en USB. On fixe donc
 # ANDROID_SERIAL sur l'émulateur dont l'AVD == $AVD_NAME (adb respecte cette var
 # nativement, donc tous les appels $ADB ciblent le bon device).
-if [ -z "${ANDROID_SERIAL:-}" ]; then
+#
+# En fonction, et non en bloc joué une fois : `start.sh` en a besoin *après*
+# avoir lancé l'émulateur, alors qu'au moment où il source ce fichier il n'y en
+# a encore aucun à trouver.
+moovie_resolve_serial() {
+  [ -n "${ANDROID_SERIAL:-}" ] && return 0
+  local _s _name
   for _s in $("$ADB" devices 2>/dev/null | awk '/emulator-/{print $1}'); do
+    # Répond dès que la console de l'émulateur écoute, bien avant la fin du boot.
     _name="$("$ADB" -s "$_s" emu avd name 2>/dev/null | head -1 | tr -d '\r')"
-    if [ "$_name" = "$AVD_NAME" ]; then export ANDROID_SERIAL="$_s"; break; fi
+    if [ "$_name" = "$AVD_NAME" ]; then
+      export ANDROID_SERIAL="$_s"
+      return 0
+    fi
   done
-  unset _s _name
-fi
+  return 1
+}
+
+# Attend que l'émulateur du profil apparaisse, puis le cible. Utilisé par
+# `start.sh` juste après le lancement.
+moovie_await_serial() {
+  local _i
+  for _i in $(seq 1 60); do
+    moovie_resolve_serial && return 0
+    sleep 2
+  done
+  echo "!! Émulateur '$AVD_NAME' introuvable après 2 min." >&2
+  return 1
+}
+
+moovie_resolve_serial || true

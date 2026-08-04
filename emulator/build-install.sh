@@ -10,6 +10,13 @@ echo ">> Build debug (gradlew assembleDebug)..."
 [[ -f "$APK_PATH" ]] || { echo "APK introuvable: $APK_PATH" >&2; exit 1; }
 
 echo ">> Attente d'un device..."
+# Sans ciblage explicite, un téléphone branché en USB reçoit l'installation à la
+# place de l'émulateur — ou adb refuse tout net s'il voit les deux.
+if [ -z "${ANDROID_SERIAL:-}" ]; then
+  echo "!! Émulateur '$AVD_NAME' non lancé. Démarre-le avec ./start.sh" >&2
+  exit 1
+fi
+echo ">> Device ciblé: $ANDROID_SERIAL"
 "$ADB" wait-for-device
 
 echo ">> Installation ($APK_PATH)..."
