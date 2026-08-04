@@ -118,6 +118,8 @@
     <string name="settings_cat_api">API &amp; Keys</string>
     <string name="settings_tmdb_key">TMDB API key</string>
     <string name="settings_tmdb_hint">Paste your TMDB key here…</string>
+    <string name="settings_key_hide">Hide the key</string>
+    <string name="settings_key_show">Show the key</string>
     <string name="settings_tmdb_help">Create a free key on themoviedb.org (API v3).</string>
     <string name="settings_cat_playback">Playback &amp; Language</string>
     <string name="settings_stream_lang">Default stream language</string>

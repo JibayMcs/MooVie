@@ -120,6 +120,8 @@
     <string name="settings_cat_api">API &amp; Clés</string>
     <string name="settings_tmdb_key">Clé API TMDB</string>
     <string name="settings_tmdb_hint">Coller la clé TMDB ici…</string>
+    <string name="settings_key_hide">Masquer la clé</string>
+    <string name="settings_key_show">Afficher la clé</string>
     <string name="settings_tmdb_help">Clé gratuite à créer sur themoviedb.org (API v3).</string>
     <string name="settings_cat_playback">Lecture &amp; Langue</string>
     <string name="settings_stream_lang">Langue du stream par défaut</string>

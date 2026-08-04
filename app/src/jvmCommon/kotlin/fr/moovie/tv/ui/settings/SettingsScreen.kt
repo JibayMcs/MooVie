@@ -20,6 +20,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.PowerSettingsNew
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -27,6 +29,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,10 +48,8 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.text.input.TransformedText
-import androidx.compose.ui.text.input.OffsetMapping
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import fr.moovie.tv.data.net.DohProvider
 import fr.moovie.tv.data.settings.ScreensaverDelay
@@ -62,6 +63,8 @@ import fr.moovie.tv.resources.screensaver_after_hours
 import fr.moovie.tv.resources.screensaver_after_minutes
 import fr.moovie.tv.resources.screensaver_never
 import fr.moovie.tv.resources.settings_autoplay
+import fr.moovie.tv.resources.settings_key_hide
+import fr.moovie.tv.resources.settings_key_show
 import fr.moovie.tv.resources.settings_autoplay_help
 import fr.moovie.tv.resources.settings_cat_api
 import fr.moovie.tv.resources.settings_cat_backup
@@ -115,6 +118,7 @@ import fr.moovie.tv.resources.update_every_hours
 import fr.moovie.tv.resources.update_every_minutes
 import fr.moovie.tv.resources.update_never
 import fr.moovie.tv.ui.backup.BackupSection
+import fr.moovie.tv.ui.adaptive.LocalUiFlavor
 import fr.moovie.tv.ui.components.MoovieButton
 import fr.moovie.tv.ui.subtitles.SubtitlesSection
 import fr.moovie.tv.ui.components.MoovieIconButton
@@ -619,65 +623,107 @@ private fun updateIntervalLabel(interval: UpdateInterval): String = when {
     else -> stringResource(Res.string.update_every_hours, interval.minutes / 60)
 }
 
+/**
+ * Champ de saisie d'une clé d'API, avec bouton œil pour la masquer.
+ *
+ * **La clé est lisible par défaut**, et c'est délibéré. Le champ masquait
+ * auparavant tous les caractères sauf les quatre derniers, en permanence. Deux
+ * raisons de l'avoir retiré :
+ *
+ * - une clé d'API n'est pas un mot de passe. On ne la ressaisit pas de mémoire,
+ *   on la colle une fois puis on veut vérifier qu'elle est juste — ce que le
+ *   masquage empêchait précisément ;
+ * - la transformation se rejouait à chaque frappe, ce qui décalait le curseur.
+ *
+ * Le masquage reste disponible, mais devient un geste : le bouton sert à cacher
+ * la clé avant une capture d'écran ou une démonstration, pas à gêner la saisie.
+ *
+ * **Le champ tient sa propre copie du texte** ([draft]), et c'est ce qui répare
+ * réellement la saisie rapide. Il était auparavant piloté directement par la
+ * valeur persistée : chaque frappe déclenchait une écriture DataStore, dont la
+ * valeur ne revenait qu'après un aller-retour asynchrone et écrasait au passage
+ * les caractères tapés entre-temps. Une clé de 32 caractères injectée par
+ * `adb shell input text` en perdait les deux tiers, sans que rien ne le
+ * signale — et le masquage, longtemps soupçonné, n'y était pour rien.
+ */
 @Composable
 private fun ApiKeyField(value: String, hint: String, onValueChange: (String) -> Unit) {
     val focusManager = LocalFocusManager.current
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(1.dp, Color(0xFF555555), MoovieShape)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-    ) {
-        if (value.isEmpty()) {
-            Text(hint, color = Color(0xFF888888))
-        }
-        BasicTextField(
-            value = value,
-            onValueChange = onValueChange,
-            singleLine = true,
-            textStyle = TextStyle(color = Color.White),
-            cursorBrush = SolidColor(Color.White),
-            visualTransformation = MaskedKey,
-            modifier = Modifier
-                .fillMaxWidth()
-                // Le champ texte avale les flèches par défaut : sans ça le D-pad
-                // ne peut plus en sortir (pas de touche Tab sur une télécommande).
-                // Gauche compte désormais aussi : c'est la sortie vers le volet
-                // de navigation.
-                .onPreviewKeyEvent { event ->
-                    if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                    val direction = when (event.key) {
-                        Key.DirectionDown -> FocusDirection.Down
-                        Key.DirectionUp -> FocusDirection.Up
-                        Key.DirectionLeft -> FocusDirection.Left
-                        else -> return@onPreviewKeyEvent false
-                    }
-                    focusManager.moveFocus(direction)
-                    true
-                },
-        )
+    // Au D-pad, l'œil se place **avant** le champ. Entrer dans un champ texte
+    // ouvre le clavier virtuel d'Android TV, qui capte alors toute la
+    // navigation : un bouton posé après le champ devient inatteignable à la
+    // télécommande, et la flèche censée l'atteindre tape une touche du clavier.
+    // Au doigt et à la souris, l'œil reste à droite, là où on l'attend.
+    val eyeFirst = LocalUiFlavor.current.isDpad
+    var hidden by rememberSaveable { mutableStateOf(false) }
+    var draft by rememberSaveable { mutableStateOf(value) }
+    var focused by remember { mutableStateOf(false) }
+    // Se réaligne sur la valeur persistée uniquement hors saisie : une
+    // restauration de sauvegarde ou une injection par intent doit se voir, mais
+    // jamais au prix de ce que l'utilisateur est en train de taper.
+    LaunchedEffect(value, focused) {
+        if (!focused && value != draft) draft = value
     }
-}
-
-
-/**
- * Masque la clé TMDB en n'en laissant lire que la fin.
- *
- * Une clé d'API n'est pas un mot de passe qu'on ressaisit : on la colle une fois
- * puis on veut seulement pouvoir vérifier que c'est la bonne. La masquer
- * entièrement rendrait ce contrôle impossible ; l'afficher en clair la met sur
- * toutes les captures d'écran, et l'écran des réglages est justement ce qu'on
- * montre dans une documentation. Les quatre derniers caractères suffisent à
- * l'identifier sans la livrer.
- */
-private object MaskedKey : VisualTransformation {
-    private const val VISIBLE_TAIL = 4
-
-    override fun filter(text: AnnotatedString): TransformedText {
-        if (text.length <= VISIBLE_TAIL) return TransformedText(text, OffsetMapping.Identity)
-        val masked = "•".repeat(text.length - VISIBLE_TAIL) + text.text.takeLast(VISIBLE_TAIL)
-        // Le masque garde la longueur d'origine : les positions du curseur et de
-        // la sélection restent donc valables telles quelles.
-        return TransformedText(AnnotatedString(masked), OffsetMapping.Identity)
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        val eyeButton = @Composable {
+            MoovieIconButton(
+                onClick = { hidden = !hidden },
+                icon = if (hidden) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                contentDescription = stringResource(
+                    if (hidden) Res.string.settings_key_show else Res.string.settings_key_hide,
+                ),
+                selected = hidden,
+            )
+        }
+        if (eyeFirst) eyeButton()
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .border(1.dp, Color(0xFF555555), MoovieShape)
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+        ) {
+            if (draft.isEmpty()) {
+                Text(hint, color = Color(0xFF888888))
+            }
+            BasicTextField(
+                value = draft,
+                onValueChange = {
+                    draft = it
+                    onValueChange(it)
+                },
+                singleLine = true,
+                textStyle = TextStyle(color = Color.White),
+                cursorBrush = SolidColor(Color.White),
+                visualTransformation = if (hidden) {
+                    PasswordVisualTransformation('•')
+                } else {
+                    VisualTransformation.None
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onFocusChanged { focused = it.isFocused }
+                    // Le champ texte avale les flèches par défaut : sans ça le D-pad
+                    // ne peut plus en sortir (pas de touche Tab sur une télécommande).
+                    // Gauche compte désormais aussi : c'est la sortie vers le volet
+                    // de navigation — au D-pad, elle passe par le bouton œil, qui
+                    // est placé juste avant le champ.
+                    .onPreviewKeyEvent { event ->
+                        if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                        val direction = when (event.key) {
+                            Key.DirectionDown -> FocusDirection.Down
+                            Key.DirectionUp -> FocusDirection.Up
+                            Key.DirectionLeft -> FocusDirection.Left
+                            else -> return@onPreviewKeyEvent false
+                        }
+                        focusManager.moveFocus(direction)
+                        true
+                    },
+            )
+        }
+        if (!eyeFirst) eyeButton()
     }
 }
