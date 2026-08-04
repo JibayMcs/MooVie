@@ -6,6 +6,7 @@ import fr.moovie.tv.data.settings.SettingsRepository
 import fr.moovie.tv.data.settings.currentTmdbLanguage
 import fr.moovie.tv.data.tmdb.TmdbRepository
 import fr.moovie.tv.data.watch.ResumeEntry
+import fr.moovie.tv.data.watch.oneCardPerSeries
 import fr.moovie.tv.data.tmdb.TmdbItem
 import fr.moovie.tv.data.watch.WatchProgressRepository
 import fr.moovie.tv.data.watch.WatchlistEntry
@@ -22,6 +23,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.getString
 
@@ -36,8 +38,14 @@ class HomeViewModel : ViewModel() {
     private val _state = MutableStateFlow<HomeState>(HomeState.Loading)
     val state: StateFlow<HomeState> = _state
 
-    /** Contenus en cours → rail « Reprendre la lecture » (au-dessus des tendances). */
+    /**
+     * Contenus en cours → rail « Reprendre la lecture » (au-dessus des tendances).
+     *
+     * Regroupé par série : le rail répond à « où j'en suis », pas à « tout ce que
+     * j'ai entamé ». L'historique, lui, garde le détail épisode par épisode.
+     */
     val resume: StateFlow<List<ResumeEntry>> = watchRepo.continueWatching
+        .map { it.oneCardPerSeries() }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     /** Clés vues → badge ✓ sur les affiches de films. */
