@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Icône adaptative (API 26+). Sans elle, le lanceur traite ic_launcher.png en
+  icône héritée : il la rétrécit à l'intérieur d'un cercle blanc, et le logo
+  n'occupe plus qu'une fraction de sa place.
+
+  ic_launcher.png reste, il sert aux API 23 à 25 que minSdk couvre encore.
+  La bannière Android TV (tv_banner) n'est pas concernée : c'est un visuel
+  16:9 distinct, que le launcher Leanback affiche tel quel.
+-->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@mipmap/ic_launcher_background" />
+    <foreground android:drawable="@mipmap/ic_launcher_foreground" />
+</adaptive-icon>
