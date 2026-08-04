@@ -58,8 +58,10 @@ import fr.moovie.tv.resources.search_loading
 import fr.moovie.tv.resources.search_needs_key
 import fr.moovie.tv.resources.watchlist_added
 import fr.moovie.tv.ui.adaptive.useBottomNav
+import fr.moovie.tv.ui.components.SkeletonGrid
 import fr.moovie.tv.ui.theme.MOOVIE_ACCENT
 import fr.moovie.tv.ui.components.MoovieButton
+import fr.moovie.tv.ui.components.MoovieAsyncImage
 import fr.moovie.tv.ui.components.MoovieCard
 import fr.moovie.tv.ui.components.MoovieIconButton
 import fr.moovie.tv.ui.components.MoovieMarqueeText
@@ -126,7 +128,12 @@ fun CatalogScreenContent(
             state is CatalogState.Idle -> Message(stringResource(Res.string.catalog_pick_genre))
             state is CatalogState.Empty -> Message(stringResource(Res.string.explore_no_results))
             items.isEmpty() && state is CatalogState.Loading ->
-                Message(stringResource(Res.string.search_loading))
+                // Grille fantôme au même nombre de colonnes que la vraie : la
+                // page ne se réorganise pas quand les affiches arrivent.
+                SkeletonGrid(
+                    columns = if (useBottomNav) COMPACT_COLUMNS else COLUMNS,
+                    modifier = Modifier.padding(horizontal = if (useBottomNav) 16.dp else 40.dp),
+                )
             else -> ResultsGrid(
                 items = items,
                 watched = watched,
@@ -370,7 +377,7 @@ private fun PosterCard(
     MoovieCard(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
         Column {
             Box {
-                AsyncImage(
+                MoovieAsyncImage(
                     model = item.posterUrl(),
                     contentDescription = item.displayTitle,
                     contentScale = ContentScale.Crop,

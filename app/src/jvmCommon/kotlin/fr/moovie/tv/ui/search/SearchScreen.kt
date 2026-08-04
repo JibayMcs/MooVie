@@ -84,10 +84,12 @@ import fr.moovie.tv.ui.adaptive.useBottomNav
 import fr.moovie.tv.ui.theme.MOOVIE_ACCENT
 import fr.moovie.tv.ui.components.MoovieButton
 import fr.moovie.tv.ui.components.LocalMoovieCardActive
+import fr.moovie.tv.ui.components.MoovieAsyncImage
 import fr.moovie.tv.ui.components.MoovieCard
 import fr.moovie.tv.ui.components.MoovieIconButton
 import fr.moovie.tv.ui.components.MoovieMarqueeText
 import fr.moovie.tv.ui.components.MoovieRail
+import fr.moovie.tv.ui.components.SkeletonGrid
 import org.jetbrains.compose.resources.stringResource
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -245,7 +247,10 @@ fun SearchScreenContent(
                 onClear = onClearHistory,
                 modifier = Modifier.padding(horizontal = searchHPad()),
             )
-            results is SearchState.Loading -> Text(stringResource(Res.string.search_loading), color = Color(0xFFBBBBBB), modifier = Modifier.padding(horizontal = searchHPad()))
+            results is SearchState.Loading -> SkeletonGrid(
+                columns = if (useBottomNav) 3 else 6,
+                modifier = Modifier.padding(horizontal = searchHPad()),
+            )
             results is SearchState.NeedsKey -> Text(
                 stringResource(Res.string.search_needs_key),
                 color = Color(0xFFE0A0A0),
@@ -526,7 +531,7 @@ private fun ResultCard(
     MoovieCard(onClick = onClick, onLongClick = onLongClick, modifier = modifier.fillMaxWidth()) {
         Column {
             Box {
-                AsyncImage(
+                MoovieAsyncImage(
                     model = item.posterUrl(),
                     contentDescription = item.displayTitle,
                     contentScale = ContentScale.Crop,

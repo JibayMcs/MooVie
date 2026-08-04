@@ -68,6 +68,7 @@ import fr.moovie.tv.ui.components.LocalMoovieFocusMemory
 import fr.moovie.tv.ui.adaptive.useBottomNav
 import fr.moovie.tv.ui.theme.MOOVIE_ACCENT
 import fr.moovie.tv.ui.components.MoovieButton
+import fr.moovie.tv.ui.components.MoovieAsyncImage
 import fr.moovie.tv.ui.components.MoovieCard
 import fr.moovie.tv.ui.components.MoovieIconButton
 import fr.moovie.tv.ui.components.MoovieMarqueeText
@@ -328,7 +329,7 @@ private fun HistoryCard(
                     .aspectRatio(16f / 9f)
                     .background(Color(0xFF222222)),
             ) {
-                AsyncImage(
+                MoovieAsyncImage(
                     model = entry.imageUrl,
                     contentDescription = entry.title,
                     contentScale = ContentScale.Crop,
@@ -441,7 +442,7 @@ private fun StatCard(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         if (imageUrl != null) {
-            AsyncImage(
+            MoovieAsyncImage(
                 model = imageUrl,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,

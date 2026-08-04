@@ -95,11 +95,13 @@ import fr.moovie.tv.resources.watchlist_row
 import fr.moovie.tv.ui.components.LocalMoovieFocusMemory
 import fr.moovie.tv.ui.theme.MOOVIE_ACCENT
 import fr.moovie.tv.ui.components.MoovieButton
+import fr.moovie.tv.ui.components.MoovieAsyncImage
 import fr.moovie.tv.ui.components.MoovieCard
 import fr.moovie.tv.ui.adaptive.useBottomNav
 import fr.moovie.tv.ui.components.MoovieIconButton
 import fr.moovie.tv.ui.components.MoovieMarqueeText
 import fr.moovie.tv.ui.components.MoovieRail
+import fr.moovie.tv.ui.components.SkeletonRail
 import fr.moovie.tv.ui.components.scrollAsWholeBlock
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
@@ -246,7 +248,15 @@ fun HomeScreenContent(
             Spacer(Modifier.height(if (state is HomeState.Ready) 12.dp else 16.dp))
 
             when (val s = state) {
-                HomeState.Loading -> Text(stringResource(Res.string.common_loading), modifier = Modifier.padding(horizontal = 32.dp))
+                // Deux rangées fantômes, à la largeur réelle des cartes : rien
+                // ne se réorganise quand les vraies affiches arrivent. C'est ce
+                // qu'un « Chargement… » centré ne peut pas faire.
+                HomeState.Loading -> Column(
+                    modifier = Modifier.padding(horizontal = if (useBottomNav) 16.dp else 32.dp),
+                    verticalArrangement = Arrangement.spacedBy(24.dp),
+                ) {
+                    repeat(2) { SkeletonRail(posterWidth = POSTER_WIDTH) }
+                }
                 is HomeState.NeedsApiKey -> Column(modifier = Modifier.padding(horizontal = 32.dp)) {
                     Text(s.reason)
                     Spacer(Modifier.height(16.dp))
@@ -700,7 +710,7 @@ private fun ResumeCard(
                     .aspectRatio(16f / 9f)
                     .background(Color(0xFF222222)),
             ) {
-                AsyncImage(
+                MoovieAsyncImage(
                     model = entry.imageUrl,
                     contentDescription = entry.title,
                     contentScale = ContentScale.Crop,
@@ -797,7 +807,7 @@ private fun PosterCard(
     ) {
         Column {
             Box {
-                AsyncImage(
+                MoovieAsyncImage(
                     model = item.posterUrl(),
                     contentDescription = item.displayTitle,
                     contentScale = ContentScale.Crop,
@@ -912,7 +922,7 @@ private fun WatchlistCard(
     MoovieCard(onClick = onClick, onLongClick = onLongClick, modifier = modifier.width(POSTER_WIDTH)) {
         Column {
             Box {
-                AsyncImage(
+                MoovieAsyncImage(
                     model = entry.imageUrl,
                     contentDescription = entry.title,
                     contentScale = ContentScale.Crop,

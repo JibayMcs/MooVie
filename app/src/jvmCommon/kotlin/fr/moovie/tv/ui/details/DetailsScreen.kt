@@ -115,11 +115,13 @@ import fr.moovie.tv.ui.components.LocalMoovieCardActive
 import fr.moovie.tv.ui.theme.MOOVIE_ACCENT
 import fr.moovie.tv.ui.adaptive.useBottomNav
 import fr.moovie.tv.ui.components.MoovieButton
+import fr.moovie.tv.ui.components.MoovieAsyncImage
 import fr.moovie.tv.ui.components.MoovieCard
 import fr.moovie.tv.ui.components.MoovieIconButton
 import fr.moovie.tv.ui.components.MoovieMarqueeText
 import fr.moovie.tv.ui.components.MoovieProgressBar
 import fr.moovie.tv.ui.components.MoovieRail
+import fr.moovie.tv.ui.components.SkeletonDetails
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.pluralStringResource
@@ -261,7 +263,7 @@ fun DetailsScreenContent(
 
     Box(modifier = Modifier.fillMaxSize()) {
         backdrop?.let { url ->
-            AsyncImage(
+            MoovieAsyncImage(
                 model = url,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
@@ -298,7 +300,7 @@ fun DetailsScreenContent(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             when (val s = state) {
-                DetailsState.Loading -> Text(stringResource(Res.string.common_loading), modifier = hPad)
+                DetailsState.Loading -> SkeletonDetails(modifier = hPad)
                 is DetailsState.Error -> {
                     Text(s.message, modifier = hPad)
                     MoovieButton(onClick = onBack, modifier = hPad) { Text(stringResource(Res.string.common_back)) }
@@ -1015,7 +1017,7 @@ private fun MovieHeader(
                 .clip(MoovieShape)
                 .background(Color(0xFF222222)),
         ) {
-            AsyncImage(
+            MoovieAsyncImage(
                 model = details.posterUrl() ?: details.backdropUrl(),
                 contentDescription = details.title,
                 contentScale = ContentScale.Crop,
@@ -1139,7 +1141,7 @@ private fun EpisodeDetail(
                 .clip(MoovieShape)
                 .background(Color(0xFF222222)),
         ) {
-            AsyncImage(
+            MoovieAsyncImage(
                 model = ep.stillUrlLarge(),
                 contentDescription = ep.name,
                 contentScale = ContentScale.Crop,
@@ -1282,7 +1284,7 @@ private fun EpisodeRow(
                     .clip(MoovieShape)
                     .background(Color(0xFF222222)),
             ) {
-                AsyncImage(
+                MoovieAsyncImage(
                     model = ep.stillUrl(),
                     contentDescription = ep.name,
                     contentScale = ContentScale.Crop,
@@ -1392,7 +1394,7 @@ private fun CastRow(cast: List<CastMember>) {
                             .clip(MoovieShape)
                             .background(Color(0xFF222222)),
                     ) {
-                        AsyncImage(
+                        MoovieAsyncImage(
                             model = member.profileUrl(),
                             contentDescription = member.name,
                             contentScale = ContentScale.Crop,
