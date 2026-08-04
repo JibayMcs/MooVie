@@ -141,6 +141,11 @@ fun HistoryScreenContent(
             }
             Spacer(Modifier.height(24.dp))
 
+            // Hors de la liste défilante, volontairement : ces tuiles résument
+            // toute la page, et un résumé qui disparaît au premier appui sur Bas
+            // ne résume plus rien. Elles coûtent une hauteur fixe, assumée.
+            stats?.let { StatsRow(it, modifier = Modifier.padding(horizontal = 32.dp)) }
+
             if (days.isEmpty()) {
                 Text(
                     stringResource(Res.string.history_empty),
@@ -158,11 +163,19 @@ fun HistoryScreenContent(
                 contentPadding = PaddingValues(horizontal = 32.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                if (stats != null) {
-                    item(key = "stats") { StatsRow(stats) }
-                }
                 days.forEachIndexed { dayIndex, day ->
-                    stickyHeader(key = "day-${day.dayStart}") { DayHeader(day) }
+                    // En-tête ordinaire, et non collant.
+                    //
+                    // Le collant a été retenté avec une bande réservée par le
+                    // `contentPadding` haut de la liste : ça ne marche pas.
+                    // En Compose ce padding fait partie du contenu défilant, pas
+                    // du cadre — il crée un trou au repos puis remonte avec le
+                    // reste, et l'en-tête épinglé recouvre à nouveau la vignette
+                    // qui passe dessous. Réserver vraiment la place demanderait
+                    // de sortir l'étiquette de la liste et de la dériver de la
+                    // position de défilement ; tant que ce n'est pas fait, mieux
+                    // vaut un en-tête qui s'en va qu'une vignette tranchée.
+                    item(key = "day-${day.dayStart}") { DayHeader(day) }
                     itemsIndexed(
                         items = day.entries.chunked(COLUMNS),
                         key = { _, row -> row.first().key },
@@ -210,14 +223,21 @@ fun HistoryScreenContent(
     }
 }
 
+/** Hauteur de la bande d'en-tête de jour. */
+private val DAY_HEADER_HEIGHT = 38.dp
+
 /** En-tête collant d'un jour : « Aujourd'hui », « Hier », ou la date en clair. */
 @Composable
 private fun DayHeader(day: HistoryDay) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color(0xFF0A0A0A))
-            .padding(vertical = 6.dp),
+            // Hauteur fixe, et non déduite du texte : c'est elle que le
+            // `contentPadding` de la liste réserve. Les deux doivent coïncider,
+            // sinon l'en-tête déborde sur les vignettes ou laisse un trou.
+            .height(DAY_HEADER_HEIGHT)
+            .background(Color(0xFF0A0A0A)),
+        contentAlignment = Alignment.CenterStart,
     ) {
         Text(dayLabel(day), style = MaterialTheme.typography.titleLarge, color = MOOVIE_ACCENT)
     }
@@ -320,10 +340,10 @@ private fun HistoryCard(
  * n'apprend rien, l'absence de carte si.
  */
 @Composable
-private fun StatsRow(stats: HistoryStats) {
+private fun StatsRow(stats: HistoryStats, modifier: Modifier = Modifier) {
     Row(
         horizontalArrangement = Arrangement.spacedBy(16.dp),
-        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+        modifier = modifier.fillMaxWidth().padding(bottom = 8.dp),
     ) {
         if (stats.monthGenre != null) {
             StatCard(
