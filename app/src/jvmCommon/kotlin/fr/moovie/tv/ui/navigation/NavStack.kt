@@ -46,6 +46,20 @@ class NavStack(root: Screen = Screen.Home) {
         return true
     }
 
+    /**
+     * Bascule vers une destination de premier niveau, sans creuser la pile.
+     *
+     * C'est le geste d'une barre d'onglets : passer de l'accueil au catalogue
+     * puis à l'historique ne doit pas laisser trois retours à remonter. On
+     * revient donc à la racine avant d'empiler la destination — et le bouton
+     * retour du système ramène toujours à l'accueil en un appui, quel que soit
+     * le nombre d'onglets visités.
+     */
+    fun switchTop(screen: Screen) {
+        popToRoot()
+        if (entries.first() != screen) push(screen)
+    }
+
     /** Retour direct à la racine (accueil). */
     fun popToRoot() {
         while (entries.size > 1) entries.removeAt(entries.lastIndex)

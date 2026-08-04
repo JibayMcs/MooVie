@@ -43,8 +43,12 @@ import fr.moovie.tv.ui.home.HomeScreen
 import fr.moovie.tv.ui.player.PlayerScreen
 import fr.moovie.tv.ui.search.SearchScreen
 import fr.moovie.tv.ui.settings.SettingsScreen
+import android.content.pm.ActivityInfo
 import fr.moovie.tv.ui.adaptive.AdaptiveRoot
+import fr.moovie.tv.ui.adaptive.MoovieBottomBar
 import fr.moovie.tv.ui.adaptive.UiFlavor
+import fr.moovie.tv.ui.adaptive.isTopLevel
+import fr.moovie.tv.ui.adaptive.useBottomNav
 import fr.moovie.tv.ui.theme.MooVieTheme
 import fr.moovie.tv.ui.theme.MooVieTvMaterialTheme
 import fr.moovie.tv.ui.update.UpdateBanner
@@ -144,6 +148,23 @@ class MainActivity : ComponentActivity() {
                         val onPlayer = nav.current is Screen.Player
                         var bannerOnPlayer by remember { mutableStateOf(false) }
                         LaunchedEffect(onPlayer) { if (!onPlayer) bannerOnPlayer = false }
+
+                        // Orientation pilotée par l'écran, sur téléphone seulement.
+                        //
+                        // On parcourt un catalogue en portrait, une main, le pouce
+                        // sur la barre basse ; on regarde une vidéo en paysage.
+                        // Faire basculer l'app elle-même évite d'avoir à tourner le
+                        // téléphone à chaque lecture — et de le retourner ensuite.
+                        //
+                        // La TV garde `UNSPECIFIED` : elle est en paysage de toute
+                        // façon, et lui imposer une orientation n'apporterait rien.
+                        LaunchedEffect(uiFlavor, onPlayer) {
+                            requestedOrientation = when {
+                                uiFlavor != UiFlavor.TOUCH -> ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                                onPlayer -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                                else -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                            }
+                        }
 
                         UpdateBanner(
                             state = if (onPlayer && !bannerOnPlayer) UpdateState.None else updateState,
@@ -267,6 +288,15 @@ class MainActivity : ComponentActivity() {
                                 },
                             )
                         }
+                        }
+
+                        // Sous le contenu, hors lecteur et hors fiche : la barre
+                        // d'onglets ne s'affiche que là où elle a un sens.
+                        if (useBottomNav && isTopLevel(nav.current)) {
+                            MoovieBottomBar(
+                                current = nav.current,
+                                onSelect = { nav.switchTop(it) },
+                            )
                         }
                     }
                     if (!splashDone && splashEnabled == true) {

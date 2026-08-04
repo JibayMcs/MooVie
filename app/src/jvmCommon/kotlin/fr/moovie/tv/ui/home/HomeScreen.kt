@@ -61,6 +61,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import coil3.compose.AsyncImage
@@ -95,6 +96,7 @@ import fr.moovie.tv.ui.components.LocalMoovieFocusMemory
 import fr.moovie.tv.ui.theme.MOOVIE_ACCENT
 import fr.moovie.tv.ui.components.MoovieButton
 import fr.moovie.tv.ui.components.MoovieCard
+import fr.moovie.tv.ui.adaptive.useBottomNav
 import fr.moovie.tv.ui.components.MoovieIconButton
 import fr.moovie.tv.ui.components.MoovieMarqueeText
 import fr.moovie.tv.ui.components.MoovieRail
@@ -201,6 +203,10 @@ fun HomeScreenContent(
                         false
                     }
                 }
+                // Sur tactile, ces quatre icônes vivent dans la barre basse : les
+                // répéter en haut du héros les mettrait hors de portée du pouce
+                // tout en volant la largeur du titre.
+                if (!useBottomNav) {
                 Row(
                     modifier = Modifier.align(Alignment.TopEnd).padding(horizontal = 32.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -234,6 +240,7 @@ fun HomeScreenContent(
                         contentDescription = stringResource(Res.string.home_settings),
                         modifier = headerDown,
                     )
+                }
                 }
             }
             Spacer(Modifier.height(if (state is HomeState.Ready) 12.dp else 16.dp))
@@ -423,6 +430,15 @@ private val POSTER_WIDTH = 138.dp
  */
 private val HERO_TITLE_END_INSET = 250.dp
 
+/**
+ * Le retrait ne vaut que là où les boutons sont réellement posés sur le héros.
+ * Sur tactile ils sont partis dans la barre basse, et réserver 250 dp sur les
+ * 448 dp d'un téléphone en portrait — plus de la moitié de l'écran — ne laissait
+ * lire que « Spider… » d'un titre pourtant court.
+ */
+private val heroTitleEndInset: Dp
+    @Composable get() = if (useBottomNav) 0.dp else HERO_TITLE_END_INSET
+
 @Composable
 private fun Hero(target: HeroTarget?, modifier: Modifier = Modifier) {
     Box(
@@ -448,7 +464,7 @@ private fun CatalogHero(item: TmdbItem) {
             style = MaterialTheme.typography.displaySmall,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(end = HERO_TITLE_END_INSET),
+            modifier = Modifier.padding(end = heroTitleEndInset),
         )
         Spacer(Modifier.height(6.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -491,7 +507,7 @@ private fun ResumeHero(entry: ResumeEntry) {
             style = MaterialTheme.typography.displaySmall,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(end = HERO_TITLE_END_INSET),
+            modifier = Modifier.padding(end = heroTitleEndInset),
         )
         Spacer(Modifier.height(6.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -538,7 +554,7 @@ private fun WatchlistHero(entry: WatchlistEntry) {
             style = MaterialTheme.typography.displaySmall,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(end = HERO_TITLE_END_INSET),
+            modifier = Modifier.padding(end = heroTitleEndInset),
         )
         Spacer(Modifier.height(6.dp))
         Text(

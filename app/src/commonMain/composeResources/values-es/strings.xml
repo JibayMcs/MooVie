@@ -13,6 +13,7 @@
 
     <!-- Inicio -->
     <string name="home_search">Buscar</string>
+    <string name="nav_home">Inicio</string>
     <string name="home_settings">Ajustes</string>
     <string name="home_row_trending_movies">Películas en tendencia</string>
     <string name="home_row_trending_tv">Series en tendencia</string>

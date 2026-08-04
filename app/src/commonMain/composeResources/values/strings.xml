@@ -15,6 +15,7 @@
 
     <!-- Accueil -->
     <string name="home_search">Rechercher</string>
+    <string name="nav_home">Accueil</string>
     <string name="home_settings">Réglages</string>
     <string name="home_row_trending_movies">Films tendances</string>
     <string name="home_row_trending_tv">Séries tendances</string>

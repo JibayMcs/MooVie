@@ -13,6 +13,7 @@
 
     <!-- Home -->
     <string name="home_search">Search</string>
+    <string name="nav_home">Home</string>
     <string name="home_settings">Settings</string>
     <string name="home_row_trending_movies">Trending movies</string>
     <string name="home_row_trending_tv">Trending shows</string>

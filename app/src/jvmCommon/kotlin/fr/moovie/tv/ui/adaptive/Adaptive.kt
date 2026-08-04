@@ -107,6 +107,18 @@ val LocalWidthClass = staticCompositionLocalOf { WidthClass.EXPANDED }
 /** Classe de hauteur de la fenêtre. Voir [HeightClass] : c'est elle qui manque en paysage. */
 val LocalHeightClass = staticCompositionLocalOf { HeightClass.MEDIUM }
 
+/**
+ * Vrai quand la navigation doit se faire au pouce, en bas de l'écran.
+ *
+ * Sur un téléphone tenu à une main, le haut de l'écran est hors de portée : les
+ * icônes de l'en-tête, parfaites en face d'une télécommande ou d'une souris, y
+ * deviennent un étirement du poignet. La barre basse est la réponse habituelle,
+ * et elle vaut pour toutes les tailles tactiles — une tablette se tient aussi
+ * par le bas.
+ */
+val useBottomNav: Boolean
+    @Composable get() = LocalUiFlavor.current == UiFlavor.TOUCH
+
 internal fun widthClassOf(width: Dp): WidthClass = when {
     width < 600.dp -> WidthClass.COMPACT
     width < 840.dp -> WidthClass.MEDIUM
