@@ -24,6 +24,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -150,11 +151,22 @@ fun SkeletonRail(
     /** 2:3 pour une affiche, 16:9 pour une vignette d'épisode. */
     aspectRatio: Float = 2f / 3f,
 ) {
+    // Hauteur calculée, jamais déduite d'un `aspectRatio`. Dans une Row dont la
+    // largeur restante est plus étroite que demandée, `aspectRatio` résout la
+    // contrainte sur la **hauteur** : la deuxième affiche fantôme sortait à
+    // 229 × 680 dp au lieu de 138 × 207, et chassait tout le reste de l'écran.
+    // Une taille explicite ne laisse pas ce choix au système.
+    val posterHeight = posterWidth / aspectRatio
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
         SkeletonLine(width = 180.dp, height = 20.dp)
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        // Rogné : six affiches font près du double de la largeur d'un téléphone,
+        // et une rangée figée ne défile pas pour rattraper le débordement.
+        Row(
+            modifier = Modifier.fillMaxWidth().height(posterHeight).clipToBounds(),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
             repeat(count) {
-                SkeletonBox(modifier = Modifier.width(posterWidth).aspectRatio(aspectRatio))
+                SkeletonBox(modifier = Modifier.width(posterWidth).height(posterHeight))
             }
         }
     }
@@ -198,7 +210,8 @@ fun SkeletonDetails(modifier: Modifier = Modifier) {
         modifier = modifier.padding(top = 8.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        SkeletonBox(modifier = Modifier.width(150.dp).aspectRatio(2f / 3f))
+        // Taille explicite, même raison que dans SkeletonRail.
+        SkeletonBox(modifier = Modifier.width(150.dp).height(225.dp))
         SkeletonLine(width = 120.dp)
         SkeletonLine(width = 260.dp, height = 24.dp)
         SkeletonLine(width = 180.dp)
