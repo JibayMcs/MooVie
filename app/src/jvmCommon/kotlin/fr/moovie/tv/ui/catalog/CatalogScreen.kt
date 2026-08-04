@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -23,10 +24,12 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -34,7 +37,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -46,6 +51,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import fr.moovie.tv.data.home.HomeLayoutEntry
+import fr.moovie.tv.data.home.pinnedGenreKey
+import fr.moovie.tv.data.tmdb.Genre
 import fr.moovie.tv.data.tmdb.TmdbItem
 import fr.moovie.tv.resources.Res
 import fr.moovie.tv.resources.catalog_pick_genre
@@ -56,8 +64,10 @@ import fr.moovie.tv.resources.explore_no_results
 import fr.moovie.tv.resources.explore_series
 import fr.moovie.tv.resources.search_loading
 import fr.moovie.tv.resources.search_needs_key
+import fr.moovie.tv.resources.pin_action
 import fr.moovie.tv.resources.watchlist_added
 import fr.moovie.tv.ui.adaptive.useBottomNav
+import fr.moovie.tv.ui.components.LocalMoovieFocusMemory
 import fr.moovie.tv.ui.components.SkeletonGrid
 import fr.moovie.tv.ui.theme.MOOVIE_ACCENT
 import fr.moovie.tv.ui.components.MoovieButton
@@ -109,16 +119,53 @@ fun CatalogScreenContent(
     onSelectGenre: (isTv: Boolean, genreId: Int) -> Unit,
     onLoadMore: () -> Unit,
     onOpenTitle: (tmdbId: Int, isTv: Boolean) -> Unit,
+    /** Disposition de l'accueil : les repères proposés par la modale d'épinglage. */
+    layout: List<HomeLayoutEntry> = emptyList(),
+    /** Clés (`movie:28`) des genres déjà épinglés — pastille et action inverse. */
+    pinnedKeys: Set<String> = emptySet(),
+    onPin: (isTv: Boolean, genre: Genre, anchorId: String?, after: Boolean) -> Unit = { _, _, _, _ -> },
+    onUnpin: (isTv: Boolean, genreId: Int) -> Unit = { _, _ -> },
     onBack: () -> Unit = {},
     // Desktop uniquement : la télécommande a sa propre touche Retour.
     showBackButton: Boolean = false,
 ) {
     val firstGenreFocus = remember { FocusRequester() }
-    // Le focus arrive sur le 1er genre, pas sur la grille : c'est le volet qui
-    // pilote la page. Les genres arrivent après la 1re composition (appel TMDB),
-    // on retente donc tant que la liste n'est pas posée.
-    LaunchedEffect(entries.isNotEmpty()) {
-        if (entries.isEmpty()) return@LaunchedEffect
+    // Genre dont la modale d'épinglage est ouverte.
+    var pinFor by remember { mutableStateOf<CatalogEntry.GenreEntry?>(null) }
+    val focusMemory = LocalMoovieFocusMemory.current
+
+    /**
+     * Genre qui prend le focus **à l'ouverture** : celui qui est sélectionné à
+     * cet instant, à défaut le premier de la liste.
+     *
+     * Viser le premier quoi qu'il arrive était un piège : le volet sélectionne
+     * *au focus*, si bien qu'arriver par « En voir plus » posait le focus sur
+     * « Action », qui réécrasait aussitôt le genre demandé. La page s'ouvrait
+     * alors sur autre chose que ce qu'on venait de cliquer.
+     *
+     * Mais c'est une cible d'**arrivée**, pas un suivi : la clé de `remember`
+     * est la liste des genres, volontairement pas la sélection. Recalculer à
+     * chaque sélection ferait sauter le volet et redemanderait le focus à chaque
+     * cran de D-pad — or la sélection *suit* le focus ici, on se battrait contre
+     * l'utilisateur en train de parcourir la liste.
+     */
+    @Suppress("ProduceStateDoesNotAssignValue")
+    val focusIndex = remember(entries) {
+        entries
+            .indexOfFirst {
+                it is CatalogEntry.GenreEntry &&
+                    it.isTv == selection?.isTv &&
+                    it.genre.id == selection.genreId
+            }
+            .takeIf { it >= 0 }
+            ?: entries.indexOfFirst { it is CatalogEntry.GenreEntry }
+    }
+
+    // Le focus arrive sur le volet, pas sur la grille : c'est lui qui pilote la
+    // page. Les genres arrivent après la 1re composition (appel TMDB), on
+    // retente donc tant que la liste n'est pas posée.
+    LaunchedEffect(focusIndex) {
+        if (entries.isEmpty() || focusIndex < 0) return@LaunchedEffect
         runCatching { firstGenreFocus.requestFocus() }
     }
 
@@ -150,15 +197,35 @@ fun CatalogScreenContent(
     // saute d'un genre à l'autre. Cacher la grille derrière une liste imposerait
     // un aller-retour à chaque essai, alors qu'une rangée de puces garde le
     // choix et son résultat visibles ensemble — et ne coûte que sa hauteur.
+    // Rendue dans les deux dispositions : c'est le même geste et la même
+    // question, que les genres soient en volet ou en puces.
+    val pinDialog = @Composable {
+        pinFor?.let { entry ->
+            val key = pinnedGenreKey(entry.isTv, entry.genre.id)
+            PinGenreDialog(
+                genreName = entry.genre.name,
+                isPinned = key in pinnedKeys,
+                layout = layout,
+                onDismiss = { pinFor = null; focusMemory.restore() },
+                onPin = { anchorId, after -> onPin(entry.isTv, entry.genre, anchorId, after) },
+                onUnpin = { onUnpin(entry.isTv, entry.genre.id) },
+            )
+        }
+    }
+
     if (useBottomNav) {
         Column(modifier = Modifier.fillMaxSize().background(Color(0xFF0A0A0A))) {
             GenreChipRow(
                 entries = entries,
                 selection = selection,
+                pinnedKeys = pinnedKeys,
+                focusIndex = focusIndex,
                 onSelectGenre = onSelectGenre,
+                onPinRequest = { pinFor = it },
             )
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) { results() }
         }
+        pinDialog()
         return
     }
 
@@ -166,8 +233,11 @@ fun CatalogScreenContent(
         GenrePane(
             entries = entries,
             selection = selection,
+            pinnedKeys = pinnedKeys,
             firstGenreFocus = firstGenreFocus,
+            focusIndex = focusIndex,
             onSelectGenre = onSelectGenre,
+            onPinRequest = { pinFor = it },
             onBack = onBack,
             showBackButton = showBackButton,
         )
@@ -176,6 +246,7 @@ fun CatalogScreenContent(
             results()
         }
     }
+    pinDialog()
 }
 
 /**
@@ -189,9 +260,23 @@ fun CatalogScreenContent(
 private fun GenreChipRow(
     entries: List<CatalogEntry>,
     selection: CatalogSelection?,
+    pinnedKeys: Set<String>,
+    focusIndex: Int,
     onSelectGenre: (isTv: Boolean, genreId: Int) -> Unit,
+    onPinRequest: (CatalogEntry.GenreEntry) -> Unit,
 ) {
+    // Sans ce recalage, une arrivée par « En voir plus » montrait la rangée de
+    // puces au début, avec le genre sélectionné hors écran : le résultat
+    // s'affichait sans qu'on voie ce qui l'avait produit.
+    val chipsState = rememberLazyListState()
+    LaunchedEffect(focusIndex, entries.size) {
+        if (focusIndex > 0 && focusIndex <= entries.lastIndex) {
+            runCatching { chipsState.scrollToItem(focusIndex) }
+        }
+    }
+
     LazyRow(
+        state = chipsState,
         modifier = Modifier.fillMaxWidth(),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -218,10 +303,12 @@ private fun GenreChipRow(
 
                 is CatalogEntry.GenreEntry -> MoovieButton(
                     onClick = { onSelectGenre(entry.isTv, entry.genre.id) },
+                    onLongClick = { onPinRequest(entry) },
                     selected = selection?.isTv == entry.isTv &&
                         selection.genreId == entry.genre.id,
                 ) {
                     Text(entry.genre.name, maxLines = 1)
+                    PinnedMark(pinnedGenreKey(entry.isTv, entry.genre.id) in pinnedKeys)
                 }
             }
         }
@@ -232,14 +319,29 @@ private fun GenreChipRow(
 private fun GenrePane(
     entries: List<CatalogEntry>,
     selection: CatalogSelection?,
+    pinnedKeys: Set<String>,
     firstGenreFocus: FocusRequester,
+    focusIndex: Int,
     onSelectGenre: (isTv: Boolean, genreId: Int) -> Unit,
+    onPinRequest: (CatalogEntry.GenreEntry) -> Unit,
     onBack: () -> Unit,
     showBackButton: Boolean,
 ) {
+    // Le volet fait une quarantaine d'entrées : le genre visé est souvent hors
+    // de la fenêtre composée, et un `FocusRequester` posé sur un nœud qui
+    // n'existe pas encore ne fait rien. On l'amène donc d'abord à l'écran.
+    // `+ 1` : l'entrée 0 de la liste est le titre du volet.
+    val paneState = rememberLazyListState()
+    LaunchedEffect(focusIndex, entries.size) {
+        if (focusIndex > 0 && focusIndex <= entries.lastIndex) {
+            runCatching { paneState.scrollToItem(focusIndex + 1) }
+        }
+    }
+
     // Volet défilant : films et séries réunis font une quarantaine d'entrées,
     // bien au-delà de ce qu'un écran affiche.
     LazyColumn(
+        state = paneState,
         modifier = Modifier
             .width(NAV_WIDTH)
             .fillMaxHeight()
@@ -290,10 +392,11 @@ private fun GenrePane(
 
                 is CatalogEntry.GenreEntry -> {
                     val isSelected = selection?.isTv == entry.isTv && selection.genreId == entry.genre.id
-                    // Premier genre de la liste : cible du focus à l'ouverture.
-                    val isFirstGenre = entries.indexOfFirst { it is CatalogEntry.GenreEntry } == index
+                    val isFirstGenre = index == focusIndex
                     MoovieButton(
                         onClick = { onSelectGenre(entry.isTv, entry.genre.id) },
+                        // Appui long OK à la télécommande, clic droit à la souris.
+                        onLongClick = { onPinRequest(entry) },
                         selected = isSelected,
                         modifier = Modifier
                             .fillMaxWidth()
@@ -313,11 +416,31 @@ private fun GenrePane(
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f),
                         )
+                        PinnedMark(pinnedGenreKey(entry.isTv, entry.genre.id) in pinnedKeys)
                     }
                 }
             }
         }
     }
+}
+
+/**
+ * Punaise sur un genre déjà épinglé.
+ *
+ * Sans elle, rien ne distingue un genre qui est sur l'accueil d'un autre, et le
+ * geste d'appui long n'a aucun état visible à annoncer — on épingle deux fois
+ * sans le savoir. Elle ne prend la place que quand elle a quelque chose à dire.
+ */
+@Composable
+private fun RowScope.PinnedMark(pinned: Boolean) {
+    if (!pinned) return
+    Spacer(Modifier.width(6.dp))
+    Icon(
+        Icons.Default.PushPin,
+        contentDescription = stringResource(Res.string.pin_action),
+        tint = MOOVIE_ACCENT,
+        modifier = Modifier.size(14.dp),
+    )
 }
 
 @Composable

@@ -23,6 +23,26 @@
     <string name="home_tmdb_error">TMDB load failed: %1$s</string>
     <string name="home_open_settings">Open Settings</string>
     <string name="home_continue_watching">Continue watching</string>
+    <string name="home_row_recommendations">Recommendations</string>
+    <string name="home_see_more">See more</string>
+    <!-- Pinning a genre to the home screen -->
+    <string name="pin_action">Pin to home</string>
+    <string name="pin_remove">Remove from home</string>
+    <string name="pin_title">Pin “%1$s”</string>
+    <string name="pin_position">Where should it go?</string>
+    <string name="pin_at_end">At the end</string>
+    <string name="pin_first">First</string>
+    <string name="pin_after">After “%1$s”</string>
+    <string name="pin_done">Pin</string>
+    <!-- Rearranging the home screen -->
+    <string name="layout_title">Arrange home</string>
+    <string name="layout_help">Move, hide or remove rows. Pinned genres are added from the catalog.</string>
+    <string name="layout_move_up">Move up</string>
+    <string name="layout_move_down">Move down</string>
+    <string name="layout_hide">Hide</string>
+    <string name="layout_show">Show</string>
+    <string name="layout_hidden">Hidden</string>
+    <string name="layout_reset">Restore the original order</string>
     <string name="home_time_left">%1$s left</string>
     <string name="home_in_progress">In progress</string>
     <string name="resume_remove">Remove from watch list</string>
@@ -208,6 +228,7 @@
     <string name="search_recent_hint">Long-press a search to remove it</string>
     <string name="home_row_because">Because you watched %1$s</string>
     <string name="settings_cat_backup">Backup</string>
+    <string name="settings_cat_home">Home</string>
     <string name="backup_intro">Copy your Moo-vie data to a USB stick to pick it up on another device: playback positions, watchlist, history and settings.</string>
     <string name="backup_export">Export my data</string>
     <string name="backup_import">Import a backup</string>

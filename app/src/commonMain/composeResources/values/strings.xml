@@ -25,6 +25,26 @@
     <string name="home_tmdb_error">Échec du chargement TMDB : %1$s</string>
     <string name="home_open_settings">Ouvrir les réglages</string>
     <string name="home_continue_watching">Reprendre la lecture</string>
+    <string name="home_row_recommendations">Recommandations</string>
+    <string name="home_see_more">En voir plus</string>
+    <!-- Épinglage d'un genre sur l'accueil -->
+    <string name="pin_action">Épingler sur l'accueil</string>
+    <string name="pin_remove">Retirer de l'accueil</string>
+    <string name="pin_title">Épingler « %1$s »</string>
+    <string name="pin_position">Où la placer ?</string>
+    <string name="pin_at_end">À la fin</string>
+    <string name="pin_first">En premier</string>
+    <string name="pin_after">Après « %1$s »</string>
+    <string name="pin_done">Épingler</string>
+    <!-- Réorganisation de l'accueil -->
+    <string name="layout_title">Organiser l'accueil</string>
+    <string name="layout_help">Déplacer, masquer ou retirer les rangées. Les genres épinglés s'ajoutent depuis le catalogue.</string>
+    <string name="layout_move_up">Monter</string>
+    <string name="layout_move_down">Descendre</string>
+    <string name="layout_hide">Masquer</string>
+    <string name="layout_show">Afficher</string>
+    <string name="layout_hidden">Masquée</string>
+    <string name="layout_reset">Rétablir l'ordre d'origine</string>
     <string name="home_time_left">%1$s restantes</string>
     <string name="home_in_progress">En cours</string>
     <string name="resume_remove">Retirer de la liste de lecture</string>
@@ -210,6 +230,7 @@
     <string name="search_recent_hint">Appui long sur une recherche pour la supprimer</string>
     <string name="home_row_because">Dans la lignée de %1$s</string>
     <string name="settings_cat_backup">Sauvegarde</string>
+    <string name="settings_cat_home">Accueil</string>
     <string name="backup_intro">Copie les données Moo-vie sur une clé USB pour les retrouver sur un autre appareil : reprises de lecture, liste à voir, historique et réglages.</string>
     <string name="backup_export">Exporter mes données</string>
     <string name="backup_import">Importer une sauvegarde</string>

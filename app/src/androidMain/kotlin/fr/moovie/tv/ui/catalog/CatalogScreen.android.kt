@@ -1,6 +1,7 @@
 package fr.moovie.tv.ui.catalog
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -14,6 +15,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 @Composable
 fun CatalogScreen(
     onOpenTitle: (tmdbId: Int, isTv: Boolean) -> Unit,
+    /** Genre à ouvrir d'emblée (voir Screen.Catalog). */
+    select: CatalogSelection? = null,
     viewModel: CatalogViewModel = viewModel(),
 ) {
     val entries by viewModel.entries.collectAsStateWithLifecycle()
@@ -22,6 +25,12 @@ fun CatalogScreen(
     val items by viewModel.items.collectAsStateWithLifecycle()
     val watched by viewModel.watched.collectAsStateWithLifecycle()
     val watchlistKeys by viewModel.watchlistKeys.collectAsStateWithLifecycle()
+    val layout by viewModel.layout.collectAsStateWithLifecycle()
+    val pinnedKeys by viewModel.pinnedKeys.collectAsStateWithLifecycle()
+
+    // Arrivée par « En voir plus » : le genre demandé prime sur le dernier
+    // parcouru, que l'init du ViewModel restaure sinon.
+    LaunchedEffect(select) { select?.let(viewModel::openAt) }
 
     CatalogScreenContent(
         entries = entries,
@@ -33,5 +42,9 @@ fun CatalogScreen(
         onSelectGenre = viewModel::select,
         onLoadMore = viewModel::loadMore,
         onOpenTitle = onOpenTitle,
+        layout = layout,
+        pinnedKeys = pinnedKeys,
+        onPin = viewModel::pin,
+        onUnpin = viewModel::unpin,
     )
 }

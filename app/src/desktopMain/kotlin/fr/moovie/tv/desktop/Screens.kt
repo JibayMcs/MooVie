@@ -13,6 +13,7 @@ import fr.moovie.tv.data.watch.ResumeEntry
 import fr.moovie.tv.ui.details.DetailsScreenContent
 import fr.moovie.tv.ui.details.DetailsState
 import fr.moovie.tv.ui.details.DetailsViewModel
+import fr.moovie.tv.ui.catalog.CatalogSelection
 import fr.moovie.tv.ui.catalog.CatalogScreenContent
 import fr.moovie.tv.ui.catalog.CatalogViewModel
 import fr.moovie.tv.ui.history.HistoryScreenContent
@@ -49,6 +50,7 @@ internal fun DesktopHomeScreen(
     onOpenSearch: () -> Unit,
     onOpenHistory: () -> Unit,
     onOpenCatalog: () -> Unit,
+    onOpenCatalogGenre: (CatalogSelection) -> Unit,
 ) {
     val vm = Vm.home
     val state by vm.state.collectAsState()
@@ -66,6 +68,7 @@ internal fun DesktopHomeScreen(
         onOpenSearch = onOpenSearch,
         onOpenHistory = onOpenHistory,
         onOpenCatalog = onOpenCatalog,
+        onOpenCatalogGenre = onOpenCatalogGenre,
         onRemoveResume = vm::removeResume,
         onMarkResumeWatched = vm::markResumeWatched,
         watchlist = watchlist,
@@ -297,6 +300,8 @@ internal fun DesktopDetailsScreen(
 @Composable
 internal fun DesktopCatalogScreen(
     onOpenTitle: (tmdbId: Int, isTv: Boolean) -> Unit,
+    /** Genre à ouvrir d'emblée (voir Screen.Catalog). */
+    select: CatalogSelection? = null,
     onBack: () -> Unit,
 ) {
     val vm = Vm.catalog
@@ -306,6 +311,12 @@ internal fun DesktopCatalogScreen(
     val items by vm.items.collectAsState()
     val watched by vm.watched.collectAsState()
     val watchlistKeys by vm.watchlistKeys.collectAsState()
+    val layout by vm.layout.collectAsState()
+    val pinnedKeys by vm.pinnedKeys.collectAsState()
+
+    // Arrivée par « En voir plus » : le genre demandé prime sur le dernier
+    // parcouru, que l'init du ViewModel restaure sinon.
+    LaunchedEffect(select) { select?.let(vm::openAt) }
 
     CatalogScreenContent(
         entries = entries,
@@ -317,6 +328,10 @@ internal fun DesktopCatalogScreen(
         onSelectGenre = vm::select,
         onLoadMore = vm::loadMore,
         onOpenTitle = onOpenTitle,
+        layout = layout,
+        pinnedKeys = pinnedKeys,
+        onPin = vm::pin,
+        onUnpin = vm::unpin,
         onBack = onBack,
         showBackButton = true,
     )

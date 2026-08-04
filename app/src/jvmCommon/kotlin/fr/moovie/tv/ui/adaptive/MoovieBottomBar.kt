@@ -50,13 +50,21 @@ import org.jetbrains.compose.resources.stringResource
 private enum class NavTab(val screen: Screen, val icon: ImageVector, val label: StringResource) {
     HOME(Screen.Home, Icons.Default.Home, Res.string.nav_home),
     SEARCH(Screen.Search, Icons.Default.Search, Res.string.home_search),
-    CATALOG(Screen.Catalog, Icons.Default.GridView, Res.string.catalog_open),
+    CATALOG(Screen.Catalog(), Icons.Default.GridView, Res.string.catalog_open),
     HISTORY(Screen.History, Icons.Default.History, Res.string.history_title),
     SETTINGS(Screen.Settings, Icons.Default.Settings, Res.string.home_settings),
 }
 
 /** Vrai si [screen] est une destination de premier niveau, donc porteuse d'onglet. */
-fun isTopLevel(screen: Screen): Boolean = NavTab.entries.any { it.screen == screen }
+fun isTopLevel(screen: Screen): Boolean = NavTab.entries.any { sameTab(it.screen, screen) }
+
+/**
+ * Deux écrans du même onglet. Comparé par **type** et non par égalité : depuis
+ * qu'il porte une famille, `Catalog(true)` et `Catalog(null)` sont deux valeurs
+ * distinctes du même onglet, et l'égalité stricte éteignait la sélection dès
+ * qu'on y arrivait par « En voir plus ».
+ */
+private fun sameTab(a: Screen, b: Screen): Boolean = a::class == b::class
 
 /**
  * Barre de navigation basse, pour la prise en main au pouce.
@@ -92,7 +100,7 @@ fun MoovieBottomBar(
         NavTab.entries.forEach { tab ->
             NavTabItem(
                 tab = tab,
-                selected = current == tab.screen,
+                selected = sameTab(current, tab.screen),
                 onClick = { onSelect(tab.screen) },
                 modifier = Modifier.weight(1f),
             )

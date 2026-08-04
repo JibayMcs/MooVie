@@ -1,5 +1,6 @@
 package fr.moovie.tv.data.backup
 
+import fr.moovie.tv.data.home.HomeLayoutEntry
 import fr.moovie.tv.data.watch.HistoryEntry
 import fr.moovie.tv.data.watch.ResumeEntry
 import fr.moovie.tv.data.watch.TitleMeta
@@ -48,6 +49,16 @@ data class MoovieBackup(
      */
     val titles: Map<String, TitleMeta> = emptyMap(),
 
+    /**
+     * Disposition de l'accueil : rangées, ordre, genres épinglés.
+     *
+     * C'est du contenu, pas un réglage — d'où sa place ici et non dans
+     * [BackupSettings]. Restaurer une sauvegarde sur une machine neuve doit
+     * rendre *son* accueil, pas celui d'origine avec les bons films dedans.
+     * Vide = le fichier n'en parle pas (sauvegarde d'avant cette version), et
+     * l'accueil de l'appareil reste alors intact.
+     */
+    val homeLayout: List<HomeLayoutEntry> = emptyList(),
 
     /**
      * Clé TMDB. **C'est un secret** : sans elle l'import ne dispenserait pas de

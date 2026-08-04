@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.ClosedCaption
 import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.ViewList
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Menu
@@ -86,6 +87,7 @@ import fr.moovie.tv.resources.settings_autoplay_help
 import fr.moovie.tv.resources.settings_cat_api
 import fr.moovie.tv.resources.settings_cat_backup
 import fr.moovie.tv.resources.settings_cat_dns
+import fr.moovie.tv.resources.settings_cat_home
 import fr.moovie.tv.resources.settings_cat_intro
 import fr.moovie.tv.resources.settings_cat_playback
 import fr.moovie.tv.resources.settings_cat_screensaver
@@ -135,6 +137,7 @@ import fr.moovie.tv.resources.update_every_hours
 import fr.moovie.tv.resources.update_every_minutes
 import fr.moovie.tv.resources.update_never
 import fr.moovie.tv.ui.backup.BackupSection
+import fr.moovie.tv.ui.home.HomeLayoutSection
 import fr.moovie.tv.ui.adaptive.LocalUiFlavor
 import fr.moovie.tv.ui.adaptive.useBottomNav
 import fr.moovie.tv.ui.components.MoovieButton
@@ -151,7 +154,7 @@ private val NAV_WIDTH = 260.dp
 
 /** Sections de l'écran, dans l'ordre d'affichage du volet gauche. */
 private enum class SettingsSection {
-    API, PLAYBACK, INTRO, SUBTITLES, HISTORY, SCREENSAVER, UPDATE, DNS, SOURCES, BACKUP,
+    API, HOME, PLAYBACK, INTRO, SUBTITLES, HISTORY, SCREENSAVER, UPDATE, DNS, SOURCES, BACKUP,
 }
 
 /**
@@ -172,6 +175,7 @@ private val RAIL_WIDTH = 68.dp
  */
 private fun sectionIcon(section: SettingsSection): ImageVector = when (section) {
     SettingsSection.API -> Icons.Default.Key
+    SettingsSection.HOME -> Icons.Default.ViewList
     SettingsSection.PLAYBACK -> Icons.Default.PlayArrow
     SettingsSection.INTRO -> Icons.Default.SkipNext
     SettingsSection.SUBTITLES -> Icons.Default.ClosedCaption
@@ -187,6 +191,7 @@ private fun sectionIcon(section: SettingsSection): ImageVector = when (section) 
 private fun sectionLabel(section: SettingsSection): String = stringResource(
     when (section) {
         SettingsSection.API -> Res.string.settings_cat_api
+        SettingsSection.HOME -> Res.string.settings_cat_home
         SettingsSection.PLAYBACK -> Res.string.settings_cat_playback
         SettingsSection.INTRO -> Res.string.settings_cat_intro
         SettingsSection.HISTORY -> Res.string.settings_cat_history
@@ -600,6 +605,10 @@ fun SettingsScreenContent(
 
                 // Seule autre section à porter son propre état : c'est un parcours en
                 // plusieurs étapes, pas un réglage. Voir [BackupSection].
+                // Comme la sauvegarde : son état est le magasin lui-même,
+                // pas un réglage hissé jusqu'ici. Voir [HomeLayoutSection].
+                SettingsSection.HOME -> HomeLayoutSection()
+
                 SettingsSection.BACKUP -> BackupSection()
             }
         }

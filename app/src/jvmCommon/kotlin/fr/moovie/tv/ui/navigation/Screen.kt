@@ -1,5 +1,7 @@
 package fr.moovie.tv.ui.navigation
 
+import fr.moovie.tv.ui.catalog.CatalogSelection
+
 /** Destinations de l'app. Étendre au fur et à mesure (recherche, catalogue…). */
 sealed interface Screen {
     data object Home : Screen
@@ -15,8 +17,16 @@ sealed interface Screen {
     data object Search : Screen
     data object History : Screen
 
-    /** Parcours du catalogue TMDB par genre (distinct de la recherche par texte). */
-    data object Catalog : Screen
+    /**
+     * Parcours du catalogue TMDB par genre (distinct de la recherche par texte).
+     *
+     * [select] est le genre à ouvrir d'emblée. C'est ce que veut dire « en voir
+     * plus » depuis une rangée épinglée : elle **vient** de ce genre, elle sait
+     * donc exactement où renvoyer. Null pour une ouverture normale, qui reprend
+     * le dernier genre parcouru — présélectionner au hasard reviendrait à
+     * inventer une intention que personne n'a exprimée.
+     */
+    data class Catalog(val select: CatalogSelection? = null) : Screen
 
     /**
      * Fiche d'un titre. Si [autoSources] est vrai (reprise depuis l'accueil),

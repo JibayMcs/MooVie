@@ -1,5 +1,7 @@
 package fr.moovie.tv.data.backup
 
+import fr.moovie.tv.data.home.HomeLayoutRepository
+import fr.moovie.tv.data.home.mergeHomeLayouts
 import fr.moovie.tv.data.net.DohProvider
 import fr.moovie.tv.data.settings.ScreensaverDelay
 import fr.moovie.tv.data.settings.SettingsRepository
@@ -20,6 +22,7 @@ import kotlinx.coroutines.flow.first
 class BackupRepository(
     private val watchRepo: WatchProgressRepository,
     private val settingsRepo: SettingsRepository,
+    private val layoutRepo: HomeLayoutRepository = HomeLayoutRepository(),
 ) {
 
     /**
@@ -40,6 +43,7 @@ class BackupRepository(
         history = watchRepo.history.first(),
         audioTracks = watchRepo.audioTracks(),
         titles = watchRepo.titles(),
+        homeLayout = layoutRepo.layout.first(),
         tmdbApiKey = settingsRepo.tmdbApiKey.first().takeIf { includeApiKey && it.isNotBlank() },
         introDbApiKey = settingsRepo.introDbApiKey.first().takeIf { includeApiKey && it.isNotBlank() },
         settings = currentSettings(),
@@ -76,6 +80,16 @@ class BackupRepository(
             // celles du fichier viennent les compléter.
             titles = backup.titles,
         )
+        // L'ordre du fichier l'emporte ; en fusion, les genres épinglés propres à
+        // cet appareil sont conservés (voir [mergeHomeLayouts]).
+        if (backup.homeLayout.isNotEmpty()) {
+            layoutRepo.replaceAll(
+                when (mode) {
+                    ImportMode.REPLACE -> backup.homeLayout
+                    ImportMode.MERGE -> mergeHomeLayouts(layoutRepo.layout.first(), backup.homeLayout)
+                },
+            )
+        }
         backup.settings?.let { applySettings(it) }
         backup.tmdbApiKey?.takeIf { it.isNotBlank() }?.let { settingsRepo.setTmdbApiKey(it) }
         backup.introDbApiKey?.takeIf { it.isNotBlank() }?.let { settingsRepo.setIntroDbApiKey(it) }

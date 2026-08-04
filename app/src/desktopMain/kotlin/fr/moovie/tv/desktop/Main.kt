@@ -32,6 +32,7 @@ import fr.moovie.tv.data.net.AppDns
 import fr.moovie.tv.data.settings.SettingsRepository
 import fr.moovie.tv.resources.Res
 import fr.moovie.tv.resources.moovie_icon
+import fr.moovie.tv.ui.catalog.CatalogSelection
 import fr.moovie.tv.ui.components.MoovieButton
 import fr.moovie.tv.ui.navigation.NavStack
 import fr.moovie.tv.ui.navigation.Screen
@@ -197,7 +198,8 @@ private fun DesktopApp(
                 onOpenSettings = { nav.push(Screen.Settings) },
                 onOpenSearch = { nav.push(Screen.Search) },
                 onOpenHistory = { nav.push(Screen.History) },
-                onOpenCatalog = { nav.push(Screen.Catalog) },
+                onOpenCatalog = { nav.push(Screen.Catalog()) },
+                onOpenCatalogGenre = { nav.push(Screen.Catalog(it)) },
             )
             Screen.Onboarding -> OnboardingScreen(
                 onOpenSettings = { nav.push(Screen.Settings) },
@@ -206,7 +208,8 @@ private fun DesktopApp(
                 onReady = { nav.replace(Screen.Home) },
             )
             Screen.Settings -> DesktopSettingsScreen(onBack = { nav.pop() })
-            Screen.Catalog -> DesktopCatalogScreen(
+            is Screen.Catalog -> DesktopCatalogScreen(
+                select = s.select,
                 onOpenTitle = { id, isTv -> nav.push(Screen.Details(id, isTv)) },
                 onBack = { nav.pop() },
             )

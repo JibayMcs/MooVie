@@ -83,6 +83,7 @@ import fr.moovie.tv.resources.home_in_progress
 import fr.moovie.tv.resources.home_time_left
 import fr.moovie.tv.resources.home_open_settings
 import fr.moovie.tv.resources.home_search
+import fr.moovie.tv.resources.home_see_more
 import fr.moovie.tv.resources.home_settings
 import fr.moovie.tv.resources.media_movie
 import fr.moovie.tv.resources.media_series
@@ -93,6 +94,7 @@ import fr.moovie.tv.resources.watchlist_open
 import fr.moovie.tv.resources.watchlist_remove
 import fr.moovie.tv.resources.watchlist_row
 import fr.moovie.tv.ui.components.LocalMoovieFocusMemory
+import fr.moovie.tv.ui.catalog.CatalogSelection
 import fr.moovie.tv.ui.theme.MOOVIE_ACCENT
 import fr.moovie.tv.ui.components.MoovieButton
 import fr.moovie.tv.ui.components.MoovieAsyncImage
@@ -121,6 +123,8 @@ fun HomeScreenContent(
     onOpenSearch: () -> Unit,
     onOpenHistory: () -> Unit,
     onOpenCatalog: () -> Unit,
+    /** « En voir plus » d'une rangée épinglée : rouvre le genre exact. */
+    onOpenCatalogGenre: (CatalogSelection) -> Unit,
     onRemoveResume: (String) -> Unit,
     onMarkResumeWatched: (String) -> Unit,
     watchlist: List<WatchlistEntry> = emptyList(),
@@ -146,13 +150,31 @@ fun HomeScreenContent(
     val rowsState = rememberLazyListState()
     val rowsScope = rememberCoroutineScope()
 
-    val rows = (state as? HomeState.Ready)?.rows
+    // Les créneaux réellement affichés, dans l'ordre voulu par l'utilisateur.
+    // « Reprendre » et « Ma liste » gardent leur place dans la disposition, mais
+    // disparaissent quand elles n'ont rien à montrer : leur contenu est ici, pas
+    // dans l'état, et une rangée vide vaut une rangée absente.
+    val slots = remember(state, resume, watchlist) {
+        (state as? HomeState.Ready)?.slots.orEmpty().filter { slot ->
+            when (slot) {
+                HomeSlot.Resume -> resume.isNotEmpty()
+                HomeSlot.Watchlist -> watchlist.isNotEmpty()
+                is HomeSlot.Catalog -> true
+            }
+        }
+    }
     // Valeur par défaut = ce qui prendra le focus en premier. Sans ça le hero
     // décrivait un film en tendance alors que le focus arrive sur « Reprendre
     // la lecture » : titre et synopsis ne correspondaient pas à la carte visée.
-    val fallback = remember(resume, rows) {
-        resume.firstOrNull()?.let { HeroTarget.Resume(it) }
-            ?: rows?.firstOrNull()?.items?.firstOrNull()?.let { HeroTarget.Catalog(it) }
+    // Il suit donc le **premier créneau**, quel qu'il soit maintenant qu'ils se
+    // réordonnent — le figer sur « Reprendre » le désaccorderait de nouveau.
+    val fallback = remember(slots, resume, watchlist) {
+        when (val first = slots.firstOrNull()) {
+            HomeSlot.Resume -> resume.firstOrNull()?.let { HeroTarget.Resume(it) }
+            HomeSlot.Watchlist -> watchlist.firstOrNull()?.let { HeroTarget.Watchlist(it) }
+            is HomeSlot.Catalog -> first.row.items.firstOrNull()?.let { HeroTarget.Catalog(it) }
+            null -> null
+        }
     }
     val featured = focused ?: fallback
 
@@ -277,54 +299,40 @@ fun HomeScreenContent(
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                     contentPadding = PaddingValues(bottom = 48.dp),
                 ) {
-                    if (resume.isNotEmpty()) {
-                        item {
-                            RowSlot(0, rowsState, rowsScope) {
-                                ResumeRow(
+                    itemsIndexed(slots, key = { _, slot -> slot.id }) { index, slot ->
+                        // La cible de descente depuis l'en-tête est toujours le
+                        // premier créneau affiché, quel qu'il soit : la 1re carte
+                        // est hors du faisceau vertical du D-pad.
+                        val entry = if (index == 0) firstContentFocus else null
+                        RowSlot(index, rowsState, rowsScope) {
+                            when (slot) {
+                                HomeSlot.Resume -> ResumeRow(
                                     entries = resume,
                                     onResume = onResume,
                                     onMenu = { resumeMenuFor = it },
                                     onFocusEntry = { focused = HeroTarget.Resume(it) },
-                                    firstFocus = firstContentFocus,
+                                    firstFocus = entry,
                                 )
-                            }
-                        }
-                    }
-                    // Juste après « Reprendre » : ce qu'on a mis de côté vient
-                    // avant le catalogue, qui est de la découverte.
-                    if (watchlist.isNotEmpty()) {
-                        item {
-                            RowSlot(if (resume.isEmpty()) 0 else 1, rowsState, rowsScope) {
-                                WatchlistRow(
+
+                                HomeSlot.Watchlist -> WatchlistRow(
                                     entries = watchlist,
                                     onOpenTitle = onOpenTitle,
                                     onMenu = { watchlistMenuFor = it },
                                     onFocusEntry = { focused = HeroTarget.Watchlist(it) },
-                                    firstFocus = if (resume.isEmpty()) firstContentFocus else null,
+                                    firstFocus = entry,
+                                )
+
+                                is HomeSlot.Catalog -> CatalogRow(
+                                    row = slot.row,
+                                    watched = watched,
+                                    onOpenTitle = onOpenTitle,
+                                    onFocusItem = { focused = HeroTarget.Catalog(it) },
+                                    watchlistKeys = watchlistKeys,
+                                    onMenu = { catalogMenuFor = it },
+                                    onSeeMore = onOpenCatalogGenre,
+                                    firstFocus = entry,
                                 )
                             }
-                        }
-                    }
-                    itemsIndexed(s.rows) { rowIndex, row ->
-                        val slot = rowIndex +
-                            (if (resume.isNotEmpty()) 1 else 0) +
-                            (if (watchlist.isNotEmpty()) 1 else 0)
-                        RowSlot(slot, rowsState, rowsScope) {
-                            CatalogRow(
-                                row = row,
-                                watched = watched,
-                                onOpenTitle = onOpenTitle,
-                                onFocusItem = { focused = HeroTarget.Catalog(it) },
-                                watchlistKeys = watchlistKeys,
-                                onMenu = { catalogMenuFor = it },
-                                // Sans rail Reprendre ni watchlist, la 1re rangée
-                                // devient la cible de descente depuis l'en-tête.
-                                firstFocus = if (resume.isEmpty() && watchlist.isEmpty() && rowIndex == 0) {
-                                    firstContentFocus
-                                } else {
-                                    null
-                                },
-                            )
                         }
                     }
                 }
@@ -759,6 +767,7 @@ private fun CatalogRow(
     onFocusItem: (TmdbItem) -> Unit,
     watchlistKeys: Set<String> = emptySet(),
     onMenu: (TmdbItem) -> Unit = {},
+    onSeeMore: (CatalogSelection) -> Unit = {},
     firstFocus: FocusRequester? = null,
 ) {
     Column(modifier = Modifier.scrollAsWholeBlock()) {
@@ -790,7 +799,48 @@ private fun CatalogRow(
                         modifier = if (index == 0) Modifier.focusRequester(entryFocus) else Modifier,
                     )
                 }
+                // Seules les rangées épinglées en ont une : elles viennent d'un
+                // genre du catalogue, donc elles savent où renvoyer. Une rangée
+                // de tendances n'a aucune page équivalente à rouvrir.
+                row.open?.let { selection ->
+                    item(key = "more") { SeeMoreCard(onClick = { onSeeMore(selection) }) }
+                }
             }
+        }
+    }
+}
+
+/**
+ * Fin d'une rangée épinglée : rouvre le genre dans le catalogue.
+ *
+ * Même gabarit que les affiches, sans image. Une carte plus étroite ou plus
+ * courte aurait cassé l'alignement de la rangée et, sur TV, désaxé le focus qui
+ * la traverse — c'est le genre de détail qui ne se voit qu'à la télécommande.
+ */
+@Composable
+private fun SeeMoreCard(onClick: () -> Unit) {
+    MoovieCard(onClick = onClick, modifier = Modifier.width(POSTER_WIDTH)) {
+        Column {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(2f / 3f)
+                    .background(Color(0xFF1C1C1C)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Default.GridView,
+                    contentDescription = null,
+                    tint = MOOVIE_ACCENT,
+                    modifier = Modifier.size(28.dp),
+                )
+            }
+            Text(
+                stringResource(Res.string.home_see_more),
+                style = MaterialTheme.typography.bodySmall,
+                maxLines = 1,
+                modifier = Modifier.padding(8.dp),
+            )
         }
     }
 }

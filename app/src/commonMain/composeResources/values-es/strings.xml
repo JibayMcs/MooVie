@@ -23,6 +23,26 @@
     <string name="home_tmdb_error">Error al cargar TMDB: %1$s</string>
     <string name="home_open_settings">Abrir Ajustes</string>
     <string name="home_continue_watching">Seguir viendo</string>
+    <string name="home_row_recommendations">Recomendaciones</string>
+    <string name="home_see_more">Ver más</string>
+    <!-- Fijar un género en la pantalla de inicio -->
+    <string name="pin_action">Fijar en el inicio</string>
+    <string name="pin_remove">Quitar del inicio</string>
+    <string name="pin_title">Fijar «%1$s»</string>
+    <string name="pin_position">¿Dónde colocarlo?</string>
+    <string name="pin_at_end">Al final</string>
+    <string name="pin_first">Primero</string>
+    <string name="pin_after">Después de «%1$s»</string>
+    <string name="pin_done">Fijar</string>
+    <!-- Reorganizar la pantalla de inicio -->
+    <string name="layout_title">Organizar el inicio</string>
+    <string name="layout_help">Mueve, oculta o quita las filas. Los géneros fijados se añaden desde el catálogo.</string>
+    <string name="layout_move_up">Subir</string>
+    <string name="layout_move_down">Bajar</string>
+    <string name="layout_hide">Ocultar</string>
+    <string name="layout_show">Mostrar</string>
+    <string name="layout_hidden">Oculta</string>
+    <string name="layout_reset">Restaurar el orden original</string>
     <string name="home_time_left">%1$s restantes</string>
     <string name="home_in_progress">En curso</string>
     <string name="resume_remove">Quitar de la lista</string>
@@ -208,6 +228,7 @@
     <string name="search_recent_hint">Mantén pulsada una búsqueda para eliminarla</string>
     <string name="home_row_because">Porque viste %1$s</string>
     <string name="settings_cat_backup">Copia de seguridad</string>
+    <string name="settings_cat_home">Inicio</string>
     <string name="backup_intro">Copia los datos de Moo-vie en una memoria USB para recuperarlos en otro dispositivo: puntos de reproducción, lista pendiente, historial y ajustes.</string>
     <string name="backup_export">Exportar mis datos</string>
     <string name="backup_import">Importar una copia</string>

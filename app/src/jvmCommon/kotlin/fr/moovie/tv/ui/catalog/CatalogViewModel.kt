@@ -2,6 +2,8 @@ package fr.moovie.tv.ui.catalog
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import fr.moovie.tv.data.home.HomeLayoutEntry
+import fr.moovie.tv.data.home.HomeLayoutRepository
 import fr.moovie.tv.data.search.ExploreChoice
 import fr.moovie.tv.data.search.SearchHistoryRepository
 import fr.moovie.tv.data.settings.SettingsRepository
@@ -46,6 +48,19 @@ class CatalogViewModel : ViewModel() {
     private val settings = SettingsRepository()
     private val watchRepo = WatchProgressRepository()
     private val historyRepo = SearchHistoryRepository()
+    private val layoutRepo = HomeLayoutRepository()
+
+    /**
+     * Disposition de l'accueil : la modale d'épinglage y prend les rangées
+     * qu'elle propose comme repères (« avant Tendances », « après Ma liste »).
+     */
+    val layout: StateFlow<List<HomeLayoutEntry>> = layoutRepo.layout
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /** Clés des genres déjà épinglés — épingler ou retirer, sur le même geste. */
+    val pinnedKeys: StateFlow<Set<String>> = layoutRepo.pinnedGenres
+        .map { genres -> genres.map { it.key }.toSet() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
 
     private val _entries = MutableStateFlow<List<CatalogEntry>>(emptyList())
     val entries: StateFlow<List<CatalogEntry>> = _entries
@@ -112,9 +127,24 @@ class CatalogViewModel : ViewModel() {
             // jusqu'au sien à chaque session est pénible à la télécommande.
             // (Comportement hérité de l'ancienne page « explorer » de la
             // recherche — il aurait été perdu en la démontant.)
-            historyRepo.lastExplore.first()?.let { select(it.isTv, it.genreId) }
+            //
+            // Sauf si un genre a déjà été demandé : une arrivée par « En voir
+            // plus » désigne une destination précise, que l'habitude ne doit pas
+            // écraser au retour tardif de cette lecture.
+            if (_selection.value == null) {
+                historyRepo.lastExplore.first()?.let { select(it.isTv, it.genreId) }
+            }
         }
     }
+
+    /**
+     * Ouvre directement sur un genre — l'arrivée depuis « En voir plus ».
+     *
+     * Distinct de [select] par l'intention seulement, mais il faut la nommer :
+     * sur desktop le ViewModel est partagé, et rouvrir le catalogue sur le même
+     * genre qu'à la fermeture ne doit rien recharger.
+     */
+    fun openAt(target: CatalogSelection) = select(target.isTv, target.genreId)
 
     /** Appelé quand le focus atteint un genre du volet gauche. */
     fun select(isTv: Boolean, genreId: Int) {
@@ -191,6 +221,20 @@ class CatalogViewModel : ViewModel() {
 
     fun removeFromWatchlist(key: String) {
         viewModelScope.launch { watchRepo.removeFromWatchlist(key) }
+    }
+
+    /**
+     * Épingle un genre sur l'accueil, à la place demandée.
+     *
+     * @param anchorId rangée de référence, null pour la fin de l'accueil.
+     * @param after après cette rangée plutôt qu'avant.
+     */
+    fun pin(isTv: Boolean, genre: Genre, anchorId: String?, after: Boolean) {
+        viewModelScope.launch { layoutRepo.pin(isTv, genre.id, genre.name, anchorId, after) }
+    }
+
+    fun unpin(isTv: Boolean, genreId: Int) {
+        viewModelScope.launch { layoutRepo.unpin(isTv, genreId) }
     }
 }
 

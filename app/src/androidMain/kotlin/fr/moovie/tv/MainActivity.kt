@@ -260,7 +260,8 @@ class MainActivity : ComponentActivity() {
                                 onOpenSettings = { nav.push(Screen.Settings) },
                                 onOpenSearch = { nav.push(Screen.Search) },
                                 onOpenHistory = { nav.push(Screen.History) },
-                                onOpenCatalog = { nav.push(Screen.Catalog) },
+                                onOpenCatalog = { nav.push(Screen.Catalog()) },
+                                onOpenCatalogGenre = { nav.push(Screen.Catalog(it)) },
                             )
                             Screen.Onboarding -> OnboardingScreen(
                                 onOpenSettings = { nav.push(Screen.Settings) },
@@ -272,7 +273,8 @@ class MainActivity : ComponentActivity() {
                             Screen.Settings -> SettingsScreen(
                                 onBack = { nav.pop() },
                             )
-                            Screen.Catalog -> CatalogScreen(
+                            is Screen.Catalog -> CatalogScreen(
+                                select = s.select,
                                 onOpenTitle = { id, isTv -> nav.push(Screen.Details(id, isTv)) },
                             )
                             Screen.History -> HistoryScreen(
