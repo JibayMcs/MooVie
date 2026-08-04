@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
@@ -55,6 +57,7 @@ import fr.moovie.tv.resources.explore_series
 import fr.moovie.tv.resources.search_loading
 import fr.moovie.tv.resources.search_needs_key
 import fr.moovie.tv.resources.watchlist_added
+import fr.moovie.tv.ui.adaptive.useBottomNav
 import fr.moovie.tv.ui.theme.MOOVIE_ACCENT
 import fr.moovie.tv.ui.components.MoovieButton
 import fr.moovie.tv.ui.components.MoovieCard
@@ -70,6 +73,9 @@ private val NAV_WIDTH = 260.dp
 
 /** Colonnes de la grille. Cinq, et non six comme la recherche : le volet mange 260 dp. */
 private const val COLUMNS = 5
+
+/** Colonnes en portrait sur téléphone : trois affiches d'environ 140 dp. */
+private const val COMPACT_COLUMNS = 3
 
 /**
  * Nombre de titres restants sous le dernier visible en dessous duquel on demande
@@ -114,6 +120,41 @@ fun CatalogScreenContent(
         runCatching { firstGenreFocus.requestFocus() }
     }
 
+    val results = @Composable {
+        when {
+            state is CatalogState.NeedsKey -> Message(stringResource(Res.string.search_needs_key))
+            state is CatalogState.Idle -> Message(stringResource(Res.string.catalog_pick_genre))
+            state is CatalogState.Empty -> Message(stringResource(Res.string.explore_no_results))
+            items.isEmpty() && state is CatalogState.Loading ->
+                Message(stringResource(Res.string.search_loading))
+            else -> ResultsGrid(
+                items = items,
+                watched = watched,
+                watchlistKeys = watchlistKeys,
+                onLoadMore = onLoadMore,
+                onOpenTitle = onOpenTitle,
+            )
+        }
+    }
+
+    // Sur téléphone, le volet vertical devient une rangée de puces horizontale.
+    //
+    // Pas un maître-détail comme les réglages : ici on compare, on hésite, on
+    // saute d'un genre à l'autre. Cacher la grille derrière une liste imposerait
+    // un aller-retour à chaque essai, alors qu'une rangée de puces garde le
+    // choix et son résultat visibles ensemble — et ne coûte que sa hauteur.
+    if (useBottomNav) {
+        Column(modifier = Modifier.fillMaxSize().background(Color(0xFF0A0A0A))) {
+            GenreChipRow(
+                entries = entries,
+                selection = selection,
+                onSelectGenre = onSelectGenre,
+            )
+            Box(modifier = Modifier.weight(1f).fillMaxWidth()) { results() }
+        }
+        return
+    }
+
     Row(modifier = Modifier.fillMaxSize().background(Color(0xFF0A0A0A))) {
         GenrePane(
             entries = entries,
@@ -125,19 +166,56 @@ fun CatalogScreenContent(
         )
 
         Column(modifier = Modifier.weight(1f).fillMaxHeight().padding(vertical = 40.dp)) {
-            when {
-                state is CatalogState.NeedsKey -> Message(stringResource(Res.string.search_needs_key))
-                state is CatalogState.Idle -> Message(stringResource(Res.string.catalog_pick_genre))
-                state is CatalogState.Empty -> Message(stringResource(Res.string.explore_no_results))
-                items.isEmpty() && state is CatalogState.Loading ->
-                    Message(stringResource(Res.string.search_loading))
-                else -> ResultsGrid(
-                    items = items,
-                    watched = watched,
-                    watchlistKeys = watchlistKeys,
-                    onLoadMore = onLoadMore,
-                    onOpenTitle = onOpenTitle,
+            results()
+        }
+    }
+}
+
+/**
+ * Genres en rangée horizontale, pour le portrait.
+ *
+ * Les intitulés « Films » / « Séries » restent, mais deviennent des séparateurs
+ * dans le fil : sans eux, « Action » de film et « Action » de série se
+ * suivraient sans qu'on puisse les distinguer.
+ */
+@Composable
+private fun GenreChipRow(
+    entries: List<CatalogEntry>,
+    selection: CatalogSelection?,
+    onSelectGenre: (isTv: Boolean, genreId: Int) -> Unit,
+) {
+    LazyRow(
+        modifier = Modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        items(
+            items = entries,
+            key = { entry ->
+                when (entry) {
+                    is CatalogEntry.Header -> "h-${entry.isTv}"
+                    is CatalogEntry.GenreEntry -> "g-${entry.isTv}-${entry.genre.id}"
+                }
+            },
+        ) { entry ->
+            when (entry) {
+                is CatalogEntry.Header -> Text(
+                    stringResource(
+                        if (entry.isTv) Res.string.explore_series else Res.string.explore_movies,
+                    ),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MOOVIE_ACCENT,
+                    modifier = Modifier.padding(horizontal = 8.dp),
                 )
+
+                is CatalogEntry.GenreEntry -> MoovieButton(
+                    onClick = { onSelectGenre(entry.isTv, entry.genre.id) },
+                    selected = selection?.isTv == entry.isTv &&
+                        selection.genreId == entry.genre.id,
+                ) {
+                    Text(entry.genre.name, maxLines = 1)
+                }
             }
         }
     }
@@ -260,7 +338,10 @@ private fun ResultsGrid(
 
     LazyVerticalGrid(
         state = gridState,
-        columns = GridCells.Fixed(COLUMNS),
+        // 5 colonnes tiennent sur les 960 dp d'un 1080p, pas sur les 448 dp d'un
+        // téléphone en portrait : les affiches y feraient 80 dp de large, soit
+        // moins qu'une vignette de contact.
+        columns = GridCells.Fixed(if (useBottomNav) COMPACT_COLUMNS else COLUMNS),
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
         // Marges intérieures : la grille clippe à ses bords, et les cartes

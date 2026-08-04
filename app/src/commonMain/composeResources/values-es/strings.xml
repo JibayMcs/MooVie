@@ -197,7 +197,7 @@
         <item quantity="other">%1$d catálogos</item>
     </plurals>
     <string name="catalog_title">Catálogo</string>
-    <string name="catalog_pick_genre">Elegir un género a la izquierda para explorar el catálogo.</string>
+    <string name="catalog_pick_genre">Elegir un género para explorar el catálogo.</string>
     <string name="catalog_open">Catálogo</string>
     <string name="media_movie">Película</string>
     <string name="media_series">Serie</string>
