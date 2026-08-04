@@ -50,6 +50,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -58,6 +59,7 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
@@ -116,6 +118,7 @@ import fr.moovie.tv.ui.components.MoovieMarqueeText
 import fr.moovie.tv.ui.components.MoovieProgressBar
 import fr.moovie.tv.ui.components.MoovieRail
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 
@@ -216,8 +219,12 @@ fun DetailsScreenContent(
         // Marge haute agrandie sur desktop pour que le titre passe sous le
         // bouton retour en overlay (sinon ils se chevauchent).
         val topPad = if (showBackButton) 96.dp else 48.dp
+        // État nommé : la rangée des saisons doit pouvoir ramener la page en
+        // haut, faute de quoi l'en-tête reste hors cadre (voir plus bas).
+        val pageScroll = rememberScrollState()
+        val pageScope = rememberCoroutineScope()
         Column(
-            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+            modifier = Modifier.fillMaxSize().verticalScroll(pageScroll)
                 .padding(top = topPad, bottom = 48.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
@@ -332,7 +339,31 @@ fun DetailsScreenContent(
                             s.episodes.all { episodeKey(s.season, it.episodeNumber) in watched }
                         Text(stringResource(Res.string.details_seasons), style = MaterialTheme.typography.titleMedium, modifier = hPad)
                         val seasonsState = rememberLazyListState()
-                        MoovieRail(seasonsState) {
+                        // La rangée des saisons est le premier élément
+                        // focalisable de la page : rien au-dessus ne peut
+                        // prendre le focus, donc remonter s'arrêtait sur elle
+                        // et le titre de la série restait coupé par le bord.
+                        //
+                        // On intercepte le Haut plutôt que de réagir au focus :
+                        // un défilement déclenché à la prise de focus se faisait
+                        // aussitôt écraser par le `bringIntoView` du système,
+                        // qui s'exécute après. Ici l'appui est sans ambiguïté —
+                        // il n'y a rien au-dessus à atteindre — et un second
+                        // Haut découvre l'en-tête.
+                        MoovieRail(
+                            seasonsState,
+                            modifier = Modifier.onPreviewKeyEvent { event ->
+                                if (event.type == KeyEventType.KeyDown &&
+                                    event.key == Key.DirectionUp &&
+                                    pageScroll.value > 0
+                                ) {
+                                    pageScope.launch { pageScroll.animateScrollTo(0) }
+                                    true
+                                } else {
+                                    false
+                                }
+                            },
+                        ) {
                             LazyRow(
                                 state = seasonsState,
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
