@@ -58,7 +58,12 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.onPointerEvent
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
+import java.awt.Point
+import java.awt.Toolkit
+import java.awt.image.BufferedImage
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -226,6 +231,27 @@ private class ComposeVideoSurface {
  * Les flèches ne font que réveiller : on regarde où on en est avant de reprendre.
  */
 private val RESUME_KEYS = setOf(Key.Spacebar, Key.Enter, Key.NumPadEnter, Key.DirectionCenter)
+
+/**
+ * Curseur invisible, posé sur le lecteur quand les contrôles se replient.
+ *
+ * AWT n'expose aucun « masquer le curseur » : la seule voie portable est de lui
+ * donner une image vide. Un pixel entièrement transparent suffit, et le système
+ * s'en accommode aussi bien en fenêtré qu'en plein écran.
+ *
+ * Construit une seule fois : `createCustomCursor` passe par le serveur
+ * graphique, et le refaire à chaque repli des contrôles serait payé à chaque
+ * lecture.
+ */
+private val BLANK_CURSOR: PointerIcon by lazy {
+    PointerIcon(
+        Toolkit.getDefaultToolkit().createCustomCursor(
+            BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB),
+            Point(0, 0),
+            "moovie-blank",
+        ),
+    )
+}
 
 /**
  * Lecteur desktop via libVLC (VLC doit être installé sur la machine).
@@ -664,7 +690,18 @@ internal fun DesktopPlayerScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
-            // Tout mouvement de souris réaffiche les contrôles.
+            // Le curseur suit les contrôles : replier la barre sans lui laissait
+            // une flèche posée en plein milieu de l'image, et il fallait sortir
+            // la souris de la fenêtre pour s'en débarrasser.
+            //
+            // `overrideDescendants` seulement quand il est masqué : contrôles
+            // affichés, les boutons doivent garder la main qu'ils demandent.
+            .pointerHoverIcon(
+                if (controlsVisible) PointerIcon.Default else BLANK_CURSOR,
+                overrideDescendants = !controlsVisible,
+            )
+            // Tout mouvement de souris réaffiche les contrôles — et rend donc
+            // aussi le curseur.
             .onPointerEvent(PointerEventType.Move) { showControls() }
             .pointerInput(Unit) {
                 detectTapGestures(
