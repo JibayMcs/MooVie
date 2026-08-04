@@ -38,6 +38,8 @@ import fr.moovie.tv.ui.navigation.Screen
 import fr.moovie.tv.ui.navigation.rememberNavStack
 import fr.moovie.tv.ui.onboarding.OnboardingScreen
 import fr.moovie.tv.ui.onboarding.rememberStartScreen
+import fr.moovie.tv.ui.adaptive.AdaptiveRoot
+import fr.moovie.tv.ui.adaptive.UiFlavor
 import fr.moovie.tv.ui.theme.MooVieTheme
 import fr.moovie.tv.ui.update.UpdateBanner
 import fr.moovie.tv.ui.update.UpdateState
@@ -125,6 +127,10 @@ fun main() {
                 val splashEnabled by remember { SettingsRepository().splashAnimation }
                     .collectAsState(initial = null)
                 LaunchedEffect(splashEnabled) { if (splashEnabled == false) splashDone = true }
+                // Souris et clavier, et une fenêtre librement redimensionnable :
+                // les classes de taille sont donc recalculées à chaque
+                // redimensionnement, pas seulement à la rotation.
+                AdaptiveRoot(flavor = UiFlavor.POINTER, modifier = Modifier.fillMaxSize()) {
                 Box(modifier = Modifier.fillMaxSize()) {
                     if (start != null) {
                     DesktopApp(
@@ -140,6 +146,7 @@ fun main() {
                     if (!splashDone && splashEnabled == true) {
                         DesktopSplash(onFinished = { splashDone = true })
                     }
+                }
                 }
             }
         }

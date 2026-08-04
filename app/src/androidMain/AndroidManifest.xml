@@ -8,8 +8,14 @@
     <!-- Auto-updater : installation des APK de mise à jour téléchargés -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
-    <!-- Android TV : app utilisable sans écran tactile, visible sur le launcher Leanback -->
-    <uses-feature android:name="android.software.leanback" android:required="true" />
+    <!--
+      Android TV : app utilisable sans écran tactile, visible sur le launcher
+      Leanback. `required="false"` sur leanback n'enlève rien à la TV (elle
+      expose toujours la fonctionnalité) mais laisse l'app s'installer sur un
+      téléphone, qui ne l'a pas. Sans ça, l'installation est purement et
+      simplement refusée.
+    -->
+    <uses-feature android:name="android.software.leanback" android:required="false" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
 
 
@@ -42,11 +48,20 @@
             android:name=".MainActivity"
             android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenLayout|screenSize|smallestScreenSize|uiMode"
             android:exported="true"
-            android:screenOrientation="landscape"
             android:theme="@style/Theme.MooVie.Splash">
+            <!--
+              Deux catégories, deux lanceurs : LEANBACK_LAUNCHER pour l'accueil
+              Android TV, LAUNCHER pour le tiroir d'applications d'un téléphone.
+              Sans la seconde, l'app s'installe sur téléphone mais son icône
+              n'apparaît nulle part.
+
+              `screenOrientation` a été retiré : il valait "landscape" et
+              verrouillait le paysage. La TV est de toute façon en paysage.
+            -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+                <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
         <!-- Expose l'APK de mise à jour téléchargé à l'installateur système -->

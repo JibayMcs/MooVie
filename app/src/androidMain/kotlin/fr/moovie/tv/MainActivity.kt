@@ -1,7 +1,10 @@
 package fr.moovie.tv
 
+import android.app.UiModeManager
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -40,6 +43,8 @@ import fr.moovie.tv.ui.home.HomeScreen
 import fr.moovie.tv.ui.player.PlayerScreen
 import fr.moovie.tv.ui.search.SearchScreen
 import fr.moovie.tv.ui.settings.SettingsScreen
+import fr.moovie.tv.ui.adaptive.AdaptiveRoot
+import fr.moovie.tv.ui.adaptive.UiFlavor
 import fr.moovie.tv.ui.theme.MooVieTheme
 import fr.moovie.tv.ui.theme.MooVieTvMaterialTheme
 import fr.moovie.tv.ui.update.UpdateBanner
@@ -56,6 +61,24 @@ class MainActivity : ComponentActivity() {
     // Applique la langue choisie (SYSTEM = locale système) avant toute UI.
     override fun attachBaseContext(newBase: Context) {
         super.attachBaseContext(LocaleManager.wrap(newBase))
+    }
+
+    /**
+     * TV ou téléphone ? La question se pose **à l'exécution** : les deux
+     * tournent sur le même APK, donc aucun `expect`/`actual` ni aucune variante
+     * de build ne peut trancher.
+     *
+     * Deux signaux plutôt qu'un, parce qu'ils ratent chacun des cas : le mode
+     * d'interface décrit ce que l'appareil est *en train* de faire (une TV
+     * branchée en dock, une tablette sur un écran externe), alors que la
+     * fonctionnalité `leanback` décrit ce qu'il *est*. Une box qui répond mal à
+     * l'un répond en général correctement à l'autre.
+     */
+    private val uiFlavor: UiFlavor by lazy {
+        val onTv = (getSystemService(Context.UI_MODE_SERVICE) as? UiModeManager)
+            ?.currentModeType == Configuration.UI_MODE_TYPE_TELEVISION ||
+            packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
+        if (onTv) UiFlavor.TV else UiFlavor.TOUCH
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -82,6 +105,7 @@ class MainActivity : ComponentActivity() {
                 // Fixe la couleur de contenu par défaut (sinon les Text libres
                 // héritent d'une couleur sombre sans Surface parent → invisibles).
                 CompositionLocalProvider(LocalContentColor provides Color.White) {
+                    AdaptiveRoot(flavor = uiFlavor, modifier = Modifier.fillMaxSize()) {
                     Column(modifier = Modifier.fillMaxSize().background(Color(0xFF0A0A0A))) {
                         val updateViewModel: UpdateViewModel = viewModel()
                         // Même instance que celle de DetailsScreen (scope
@@ -247,6 +271,7 @@ class MainActivity : ComponentActivity() {
                     }
                     if (!splashDone && splashEnabled == true) {
                         MoovieSplash(onFinished = { splashDone = true })
+                    }
                     }
                 }
             }
