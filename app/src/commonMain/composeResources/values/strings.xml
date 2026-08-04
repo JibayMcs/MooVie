@@ -117,6 +117,8 @@
     <string name="settings_cat_playback">Lecture &amp; Langue</string>
     <string name="settings_stream_lang">Langue du stream par défaut</string>
     <string name="settings_language">Langue de l'application</string>
+    <string name="settings_splash">Animation de lancement</string>
+    <string name="settings_splash_help">Le logo animé au démarrage de l'application. Il se joue pendant que l'accueil charge et ne retarde donc rien — mais on peut préférer aller droit au but.</string>
     <string name="settings_cat_intro">Intro &amp; générique</string>
     <string name="settings_skip_intro">Boutons « Passer l'intro / le générique »</string>
     <string name="settings_autoplay">Lecture automatique de l'épisode suivant</string>

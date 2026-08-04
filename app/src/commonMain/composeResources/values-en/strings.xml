@@ -115,6 +115,8 @@
     <string name="settings_cat_playback">Playback &amp; Language</string>
     <string name="settings_stream_lang">Default stream language</string>
     <string name="settings_language">App language</string>
+    <string name="settings_splash">Launch animation</string>
+    <string name="settings_splash_help">The animated logo on startup. It plays while the home screen loads, so it delays nothing — but you may prefer to go straight in.</string>
     <string name="settings_cat_intro">Intro &amp; credits</string>
     <string name="settings_skip_intro">“Skip intro / credits” buttons</string>
     <string name="settings_autoplay">Auto-play next episode</string>

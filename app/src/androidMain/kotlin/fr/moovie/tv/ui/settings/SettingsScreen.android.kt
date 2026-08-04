@@ -58,6 +58,7 @@ fun SettingsScreen(
     val autoPlayNext by viewModel.autoPlayNext.collectAsStateWithLifecycle()
     val playerClock by viewModel.playerClock.collectAsStateWithLifecycle()
     val hideHistoryWidgets by viewModel.hideHistoryWidgets.collectAsStateWithLifecycle()
+    val splashAnimation by viewModel.splashAnimation.collectAsStateWithLifecycle()
     val updateInterval by viewModel.updateInterval.collectAsStateWithLifecycle()
     val screensaverDelay by viewModel.screensaverDelay.collectAsStateWithLifecycle()
 
@@ -69,6 +70,7 @@ fun SettingsScreen(
         autoPlayNext = autoPlayNext,
         playerClock = playerClock,
         hideHistoryWidgets = hideHistoryWidgets,
+        splashAnimation = splashAnimation,
         updateInterval = updateInterval,
         screensaverDelay = screensaverDelay,
         dohEnabled = dohEnabled,
@@ -81,6 +83,7 @@ fun SettingsScreen(
         onSetAutoPlayNext = viewModel::setAutoPlayNext,
         onSetPlayerClock = viewModel::setPlayerClock,
         onSetHideHistoryWidgets = viewModel::setHideHistoryWidgets,
+        onSetSplashAnimation = viewModel::setSplashAnimation,
         onSetUpdateInterval = viewModel::setUpdateInterval,
         onSetScreensaverDelay = viewModel::setScreensaverDelay,
         onSetDohEnabled = viewModel::setDohEnabled,

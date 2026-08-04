@@ -86,6 +86,8 @@ import fr.moovie.tv.resources.settings_introdb_hint
 import fr.moovie.tv.resources.settings_introdb_key
 import fr.moovie.tv.resources.settings_intro_help
 import fr.moovie.tv.resources.settings_language
+import fr.moovie.tv.resources.settings_splash
+import fr.moovie.tv.resources.settings_splash_help
 import fr.moovie.tv.resources.settings_move_down
 import fr.moovie.tv.resources.settings_move_up
 import fr.moovie.tv.resources.settings_player_clock
@@ -159,6 +161,7 @@ fun SettingsScreenContent(
     autoPlayNext: Boolean,
     playerClock: Boolean,
     hideHistoryWidgets: Boolean,
+    splashAnimation: Boolean,
     updateInterval: UpdateInterval,
     screensaverDelay: ScreensaverDelay,
     dohEnabled: Boolean,
@@ -171,6 +174,7 @@ fun SettingsScreenContent(
     onSetAutoPlayNext: (Boolean) -> Unit,
     onSetPlayerClock: (Boolean) -> Unit,
     onSetHideHistoryWidgets: (Boolean) -> Unit,
+    onSetSplashAnimation: (Boolean) -> Unit,
     onSetUpdateInterval: (UpdateInterval) -> Unit,
     onSetScreensaverDelay: (ScreensaverDelay) -> Unit,
     onSetDohEnabled: (Boolean) -> Unit,
@@ -306,6 +310,12 @@ fun SettingsScreenContent(
                     }
                     SettingRow(label = stringResource(Res.string.settings_language)) {
                         languageSelector()
+                    }
+                    SettingRow(
+                        label = stringResource(Res.string.settings_splash),
+                        help = stringResource(Res.string.settings_splash_help),
+                    ) {
+                        OnOff(value = splashAnimation, onChange = onSetSplashAnimation)
                     }
                     SettingRow(
                         label = stringResource(Res.string.settings_player_clock),

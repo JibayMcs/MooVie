@@ -121,6 +121,10 @@ fun main() {
                 // l'accueil charge derrière et le temps d'animation est du temps
                 // de chargement gagné.
                 var splashDone by remember { mutableStateOf(false) }
+                // Voir MainActivity : `null` tant que le réglage est inconnu.
+                val splashEnabled by remember { SettingsRepository().splashAnimation }
+                    .collectAsState(initial = null)
+                LaunchedEffect(splashEnabled) { if (splashEnabled == false) splashDone = true }
                 Box(modifier = Modifier.fillMaxSize()) {
                     if (start != null) {
                     DesktopApp(
@@ -133,7 +137,7 @@ fun main() {
                         },
                     )
                     }
-                    if (!splashDone) {
+                    if (!splashDone && splashEnabled == true) {
                         DesktopSplash(onFinished = { splashDone = true })
                     }
                 }

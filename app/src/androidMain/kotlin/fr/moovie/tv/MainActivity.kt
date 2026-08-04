@@ -69,6 +69,12 @@ class MainActivity : ComponentActivity() {
             // devant : l'accueil charge TMDB derrière, et le temps d'animation
             // devient du temps de chargement gagné.
             var splashDone by rememberSaveable { mutableStateOf(false) }
+            // `null` tant que le réglage n'est pas lu : on préfère un départ
+            // d'animation retardé de quelques millisecondes à un éclair de
+            // logo chez quelqu'un qui l'a justement désactivée.
+            val splashEnabled by remember { SettingsRepository().splashAnimation }
+                .collectAsStateWithLifecycle(initialValue = null)
+            LaunchedEffect(splashEnabled) { if (splashEnabled == false) splashDone = true }
 
             // Thème tv-material (PlayerScreen) autour du thème material3 partagé.
             MooVieTvMaterialTheme {
@@ -233,7 +239,7 @@ class MainActivity : ComponentActivity() {
                         }
                         }
                     }
-                    if (!splashDone) {
+                    if (!splashDone && splashEnabled == true) {
                         MoovieSplash(onFinished = { splashDone = true })
                     }
                 }

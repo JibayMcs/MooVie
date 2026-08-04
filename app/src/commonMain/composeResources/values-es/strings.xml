@@ -115,6 +115,8 @@
     <string name="settings_cat_playback">Reproducción e idioma</string>
     <string name="settings_stream_lang">Idioma de stream por defecto</string>
     <string name="settings_language">Idioma de la aplicación</string>
+    <string name="settings_splash">Animación de inicio</string>
+    <string name="settings_splash_help">El logo animado al arrancar. Se reproduce mientras carga la pantalla de inicio, así que no retrasa nada — pero puedes preferir ir directo.</string>
     <string name="settings_cat_intro">Intro y créditos</string>
     <string name="settings_skip_intro">Botones «Saltar intro / créditos»</string>
     <string name="settings_autoplay">Reproducción automática del siguiente episodio</string>

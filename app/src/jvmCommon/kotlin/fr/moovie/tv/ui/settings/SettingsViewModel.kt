@@ -64,6 +64,13 @@ class SettingsViewModel : ViewModel() {
         viewModelScope.launch { repo.setHideHistoryWidgets(value) }
     }
 
+    val splashAnimation: StateFlow<Boolean> =
+        repo.splashAnimation.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+
+    fun setSplashAnimation(value: Boolean) {
+        viewModelScope.launch { repo.setSplashAnimation(value) }
+    }
+
     val updateInterval: StateFlow<UpdateInterval> =
         repo.updateInterval.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), UpdateInterval.M30)
 

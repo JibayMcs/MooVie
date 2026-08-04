@@ -71,6 +71,19 @@ class SettingsRepository {
     suspend fun setHideHistoryWidgets(value: Boolean) =
         store.edit { it[HIDE_HISTORY_WIDGETS] = value }
 
+    /**
+     * Animation de lancement — active par défaut.
+     *
+     * Elle se pose *au-dessus* de l'app pendant que l'accueil charge, elle ne
+     * retarde donc rien. Reste qu'on la revoit à chaque ouverture : au bout de
+     * la centième, certains préfèrent aller droit au but.
+     */
+    val splashAnimation: Flow<Boolean> =
+        store.data.map { it[SPLASH_ANIMATION] ?: true }
+
+    suspend fun setSplashAnimation(value: Boolean) =
+        store.edit { it[SPLASH_ANIMATION] = value }
+
     /** Fréquence de vérification des mises à jour (30 min par défaut). */
     val updateInterval: Flow<UpdateInterval> =
         store.data.map {
@@ -224,6 +237,7 @@ class SettingsRepository {
         val DOH_PROVIDER = stringPreferencesKey("doh_provider")
         val SKIP_INTRO_OUTRO = booleanPreferencesKey("skip_intro_outro")
         val HIDE_HISTORY_WIDGETS = booleanPreferencesKey("hide_history_widgets")
+        val SPLASH_ANIMATION = booleanPreferencesKey("splash_animation")
         val AUTO_PLAY_NEXT = booleanPreferencesKey("auto_play_next")
         val PLAYER_CLOCK = booleanPreferencesKey("player_clock")
         val UPDATE_INTERVAL = stringPreferencesKey("update_interval")
