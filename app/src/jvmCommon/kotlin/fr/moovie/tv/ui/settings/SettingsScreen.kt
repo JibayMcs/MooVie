@@ -322,7 +322,14 @@ fun SettingsScreenContent(
                     modifier = Modifier.padding(start = 8.dp, bottom = 20.dp),
                 )
             }
-            SettingsSection.entries.forEachIndexed { index, entry ->
+            // L'écran de veille n'a pas de sens sur un téléphone : le système y
+            // éteint déjà l'écran tout seul, et personne ne laisse un film en
+            // pause sur un appareil qu'il tient en main. La section disparaît
+            // plutôt que de rester là, inutile.
+            val sections = SettingsSection.entries.filterNot {
+                compact && it == SettingsSection.SCREENSAVER
+            }
+            sections.forEachIndexed { index, entry ->
                 MoovieButton(
                     onClick = {
                         section = entry

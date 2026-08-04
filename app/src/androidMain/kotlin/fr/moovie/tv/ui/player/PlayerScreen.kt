@@ -10,6 +10,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -48,6 +49,7 @@ import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.MediaSession
+import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import fr.moovie.tv.ui.adaptive.isTouchUi
 import fr.moovie.tv.ui.format.formatNowDateTime
@@ -150,6 +152,9 @@ fun PlayerScreen(
     onPlaybackFailed: () -> Unit = onBack,
 ) {
     val context = LocalContext.current
+    // Lu une fois : `isTouchUi` est un CompositionLocal, illisible depuis un
+    // LaunchedEffect.
+    val touchUi = isTouchUi
     val progress = remember { WatchProgressRepository() }
     val introRepo = remember { IntroDbRepository() }
     val settings = remember { SettingsRepository() }
@@ -220,6 +225,23 @@ fun PlayerScreen(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT,
             )
+        }
+    }
+
+    /**
+     * Vidéo agrandie pour remplir l'écran, au prix d'un rognage.
+     *
+     * Le ratio de la source ne se négocie pas : un 16:9 sur un écran en 2,23:1
+     * laisse forcément des bandes. Les faire disparaître, c'est déborder de la
+     * hauteur et perdre un quart de l'image, haut et bas. Un choix, donc, pas un
+     * défaut à corriger d'office — et il se fait au pincement, comme partout.
+     */
+    var zoomToFill by remember { mutableStateOf(false) }
+    LaunchedEffect(zoomToFill) {
+        playerView.resizeMode = if (zoomToFill) {
+            AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+        } else {
+            AspectRatioFrameLayout.RESIZE_MODE_FIT
         }
     }
 
@@ -544,6 +566,10 @@ fun PlayerScreen(
     // (activityTick est incrémenté par le gestionnaire de touches racine).
     LaunchedEffect(isPlaying, screensaverDelay, activityTick) {
         screensaverOn = false
+        // Jamais sur téléphone : le système y éteint l'écran de lui-même, et
+        // l'affiche rebondissante n'a de sens que devant une télé qu'on a
+        // laissée allumée.
+        if (touchUi) return@LaunchedEffect
         if (isPlaying || screensaverDelay == ScreensaverDelay.NEVER) return@LaunchedEffect
         delay(screensaverDelay.minutes * 60_000L)
         screensaverOn = true
@@ -670,6 +696,23 @@ fun PlayerScreen(
                                 wake()
                             },
                         )
+                    }
+                },
+            )
+            // Pincement : écarter remplit l'écran, resserrer rend l'image
+            // entière. Bloc séparé du précédent — deux détecteurs de gestes ne
+            // cohabitent pas dans un même `pointerInput`.
+            .then(
+                if (!isTouchUi) {
+                    Modifier
+                } else {
+                    Modifier.pointerInput(Unit) {
+                        detectTransformGestures { _, _, zoom, _ ->
+                            // Seuil large : sous 5 %, c'est le tremblement de
+                            // deux doigts posés, pas une intention.
+                            if (zoom > 1.05f) zoomToFill = true
+                            if (zoom < 0.95f) zoomToFill = false
+                        }
                     }
                 },
             )
@@ -917,6 +960,19 @@ fun PlayerScreen(
                     null
                 },
                 onActivity = { activityTick++ },
+                // Au doigt, la barre se manipule directement : toucher place la
+                // lecture, glisser la déplace. Le mode « scrub » de la
+                // télécommande — OK pour entrer, flèches pour viser, OK pour
+                // valider — n'a pas d'équivalent tactile et laissait la barre
+                // inerte. Null hors tactile : sur TV il rendrait la barre
+                // sensible à un pointeur qui n'existe pas.
+                onSeekToFraction = if (!isTouchUi) {
+                    null
+                } else {
+                    { fraction ->
+                        if (durationMs > 0) controller.seekTo((fraction * durationMs).toLong())
+                    }
+                },
             )
         }
 
