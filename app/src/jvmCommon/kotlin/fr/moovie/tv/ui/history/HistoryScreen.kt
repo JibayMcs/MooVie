@@ -42,6 +42,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import coil3.compose.AsyncImage
@@ -64,6 +65,7 @@ import fr.moovie.tv.resources.history_yesterday
 import fr.moovie.tv.resources.mark_unwatched
 import fr.moovie.tv.resources.watchlist_open
 import fr.moovie.tv.ui.components.LocalMoovieFocusMemory
+import fr.moovie.tv.ui.adaptive.useBottomNav
 import fr.moovie.tv.ui.theme.MOOVIE_ACCENT
 import fr.moovie.tv.ui.components.MoovieButton
 import fr.moovie.tv.ui.components.MoovieCard
@@ -79,6 +81,18 @@ import org.jetbrains.compose.resources.stringResource
 
 /** Colonnes de la grille. Six tient en 1080p sans réduire les vignettes à rien. */
 private const val COLUMNS = 6
+
+/**
+ * Colonnes de la grille. Six tiennent sur les 960 dp d'un 1080p ; sur les
+ * 448 dp d'un téléphone, chaque vignette tombait à une centaine de dp et son
+ * titre à « Hou… ».
+ */
+@Composable
+private fun historyColumns(): Int = if (useBottomNav) 3 else COLUMNS
+
+/** Marge horizontale : 32 dp est un recul de salon, trop sur un téléphone. */
+@Composable
+private fun historyHPad(): Dp = if (useBottomNav) 16.dp else 32.dp
 
 /**
  * Page d'historique, partagée TV + desktop : une grille groupée par jour, et
@@ -111,6 +125,8 @@ fun HistoryScreenContent(
     // n'est pas encore posée, sinon la demande tombe dans le vide.
     val firstCard = remember { FocusRequester() }
     val listState = rememberLazyListState()
+    // Lu ici : le lambda d'une LazyColumn n'est pas un contexte @Composable.
+    val columns = historyColumns()
     val scope = rememberCoroutineScope()
     LaunchedEffect(days.isNotEmpty()) {
         if (days.isEmpty()) return@LaunchedEffect
@@ -123,7 +139,7 @@ fun HistoryScreenContent(
     Box(modifier = Modifier.fillMaxSize().background(Color(0xFF0A0A0A))) {
         Column(modifier = Modifier.fillMaxSize().padding(vertical = 32.dp)) {
             Row(
-                modifier = Modifier.padding(horizontal = 32.dp),
+                modifier = Modifier.padding(horizontal = historyHPad()),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
@@ -144,14 +160,14 @@ fun HistoryScreenContent(
             // Hors de la liste défilante, volontairement : ces tuiles résument
             // toute la page, et un résumé qui disparaît au premier appui sur Bas
             // ne résume plus rien. Elles coûtent une hauteur fixe, assumée.
-            stats?.let { StatsRow(it, modifier = Modifier.padding(horizontal = 32.dp)) }
+            stats?.let { StatsRow(it, modifier = Modifier.padding(horizontal = historyHPad())) }
 
             if (days.isEmpty()) {
                 Text(
                     stringResource(Res.string.history_empty),
                     style = MaterialTheme.typography.bodyLarge,
                     color = Color(0xFF9A9A9A),
-                    modifier = Modifier.padding(horizontal = 32.dp),
+                    modifier = Modifier.padding(horizontal = historyHPad()),
                 )
                 return@Column
             }
@@ -177,7 +193,7 @@ fun HistoryScreenContent(
                     // vaut un en-tête qui s'en va qu'une vignette tranchée.
                     item(key = "day-${day.dayStart}") { DayHeader(day) }
                     itemsIndexed(
-                        items = day.entries.chunked(COLUMNS),
+                        items = day.entries.chunked(columns),
                         key = { _, row -> row.first().key },
                     ) { rowIndex, row ->
                         val isFirstRow = dayIndex == 0 && rowIndex == 0
@@ -288,7 +304,7 @@ private fun HistoryGridRow(
                     ),
             )
         }
-        repeat(COLUMNS - entries.size) { Spacer(Modifier.weight(1f)) }
+        repeat(historyColumns() - entries.size) { Spacer(Modifier.weight(1f)) }
     }
 }
 
@@ -341,10 +357,30 @@ private fun HistoryCard(
  */
 @Composable
 private fun StatsRow(stats: HistoryStats, modifier: Modifier = Modifier) {
+    // Trois cartes côte à côte, c'est 150 dp chacune sur un téléphone : la
+    // troisième s'y repliait à une lettre par ligne (« S é r i e   d u … »).
+    // Empilées, chacune reprend la largeur — elles ne coûtent que de la hauteur,
+    // et la page en a.
+    if (useBottomNav) {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = modifier.fillMaxWidth().padding(bottom = 8.dp),
+        ) {
+            StatCards(stats, Modifier.fillMaxWidth())
+        }
+        return
+    }
     Row(
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         modifier = modifier.fillMaxWidth().padding(bottom = 8.dp),
     ) {
+        StatCards(stats, Modifier.weight(1f))
+    }
+}
+
+/** Les trois tuiles, posées telles quelles dans une Row ou une Column. */
+@Composable
+private fun StatCards(stats: HistoryStats, cardModifier: Modifier) {
         if (stats.monthGenre != null) {
             StatCard(
                 title = stringResource(Res.string.history_stat_month_genre),
@@ -354,7 +390,7 @@ private fun StatsRow(stats: HistoryStats, modifier: Modifier = Modifier) {
                     stats.monthGenreCount,
                     stats.monthGenreCount,
                 ),
-                modifier = Modifier.weight(1f),
+                modifier = cardModifier,
             )
         }
         if (stats.yearEpisodes > 0 || stats.yearMovies > 0) {
@@ -370,7 +406,7 @@ private fun StatsRow(stats: HistoryStats, modifier: Modifier = Modifier) {
                     stats.yearMovies,
                 ),
                 detail = stats.yearGenre,
-                modifier = Modifier.weight(1f),
+                modifier = cardModifier,
             )
         }
         if (stats.topSeriesTitle != null) {
@@ -383,9 +419,8 @@ private fun StatsRow(stats: HistoryStats, modifier: Modifier = Modifier) {
                     stats.topSeriesEpisodes,
                 ),
                 imageUrl = stats.topSeriesImageUrl,
-                modifier = Modifier.weight(1f),
+                modifier = cardModifier,
             )
-        }
     }
 }
 
