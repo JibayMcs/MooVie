@@ -45,6 +45,10 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.isSecondaryPressed
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -134,6 +138,7 @@ fun MoovieButton(
                 glowAlpha = glow,
             )
             .then(longPressKeys(onLongClick))
+            .secondaryClick(onLongClick)
             .combinedClickable(
                 interactionSource = interaction,
                 indication = null,
@@ -177,21 +182,47 @@ private fun longPressKeys(onLongClick: (() -> Unit)?): Modifier {
         if (event.key !in CONFIRM_KEYS) return@onPreviewKeyEvent false
         when (event.type) {
             KeyEventType.KeyDown -> {
-                confirm.downs++
+                confirm.press()
                 confirm.watchdog?.cancel()
                 confirm.watchdog = scope.launch {
                     delay(CONFIRM_RELEASE_MS)
-                    confirm.downs = 0
+                    confirm.reset()
                 }
-                confirm.downs >= LONG_PRESS_DOWNS
+                confirm.isLong()
             }
             KeyEventType.KeyUp -> {
-                val long = confirm.downs >= LONG_PRESS_DOWNS
+                val long = confirm.isLong()
                 confirm.reset()
                 if (long) onLongClick()
                 long
             }
             else -> false
+        }
+    }
+}
+
+/**
+ * Clic droit → la même action que l'appui long.
+ *
+ * `combinedClickable` ne connaît que le bouton principal : à la souris, ouvrir un
+ * menu contextuel demandait de *maintenir* le clic gauche, ce que personne ne
+ * fait sur un ordinateur. Le geste attendu y est le clic droit, comme l'appui
+ * long l'est sur une télécommande et sous le doigt.
+ *
+ * Pris à la passe `Main` et consommé : sans ça, le clic droit continue sa route
+ * et peut déclencher un clic simple sur un parent.
+ */
+private fun Modifier.secondaryClick(onTrigger: (() -> Unit)?): Modifier {
+    if (onTrigger == null) return this
+    return pointerInput(onTrigger) {
+        awaitPointerEventScope {
+            while (true) {
+                val event = awaitPointerEvent(PointerEventPass.Main)
+                if (event.type == PointerEventType.Press && event.buttons.isSecondaryPressed) {
+                    event.changes.forEach { it.consume() }
+                    onTrigger()
+                }
+            }
         }
     }
 }
@@ -241,12 +272,34 @@ private val CONFIRM_KEYS = setOf(Key.DirectionCenter, Key.Enter, Key.NumPadEnter
  */
 private class ConfirmKeyPress {
     var downs = 0
+    var startedAt = 0L
     var watchdog: Job? = null
+
+    fun press() {
+        if (downs == 0) startedAt = System.currentTimeMillis()
+        downs++
+    }
+
+    /**
+     * Deux déclencheurs, et il suffit d'un.
+     *
+     * Compter les répétitions supposait qu'Android en envoie : c'est le cas sur
+     * la plupart des télécommandes, pas sur toutes, et une box qui n'en envoie
+     * aucune n'avait alors **aucun** appui long — la touche restait simplement
+     * enfoncée sans rien produire. La durée, elle, ne dépend d'aucun firmware.
+     *
+     * Le seuil de temps est plus généreux que le seuil de répétitions : il n'est
+     * là que comme filet, et un appui franc doit rester un clic simple.
+     */
+    fun isLong(): Boolean =
+        downs >= LONG_PRESS_DOWNS ||
+            (startedAt > 0L && System.currentTimeMillis() - startedAt >= LONG_PRESS_MS)
 
     fun reset() {
         watchdog?.cancel()
         watchdog = null
         downs = 0
+        startedAt = 0L
     }
 }
 
@@ -255,6 +308,13 @@ private class ConfirmKeyPress {
  * duquel l'appui est considéré long. Deux = une répétition, soit ~400 ms.
  */
 private const val LONG_PRESS_DOWNS = 2
+
+/**
+ * Durée de maintien qui vaut appui long, quand la télécommande ne répète pas.
+ * Au-delà du délai avant la 1re répétition d'Android (~400 ms), pour que les
+ * deux mesures s'accordent sur les appareils qui répètent bien.
+ */
+private const val LONG_PRESS_MS = 500L
 
 /**
  * Silence au-delà duquel la touche est considérée relâchée. Doit rester
@@ -315,19 +375,19 @@ fun MoovieCard(
             if (event.key !in CONFIRM_KEYS) return@onPreviewKeyEvent false
             when (event.type) {
                 KeyEventType.KeyDown -> {
-                    confirm.downs++
+                    confirm.press()
                     // Chaque répétition repousse le relâchement présumé.
                     confirm.watchdog?.cancel()
                     confirm.watchdog = scope.launch {
                         delay(CONFIRM_RELEASE_MS)
-                        confirm.downs = 0
+                        confirm.reset()
                     }
                     // Les répétitions au-delà du seuil sont avalées : le clic
                     // simple ne doit pas partir en plus de l'appui long.
-                    confirm.downs >= LONG_PRESS_DOWNS
+                    confirm.isLong()
                 }
                 KeyEventType.KeyUp -> {
-                    val long = confirm.downs >= LONG_PRESS_DOWNS
+                    val long = confirm.isLong()
                     confirm.reset()
                     if (long) openMenu()
                     long
@@ -355,6 +415,7 @@ fun MoovieCard(
                 },
             )
             .then(longPressKeys)
+            .secondaryClick(openMenu)
             .focusRequester(selfFocus)
             .combinedClickable(
                 interactionSource = interaction,
