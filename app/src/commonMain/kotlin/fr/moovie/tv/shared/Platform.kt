@@ -5,14 +5,6 @@ package fr.moovie.tv.shared
 expect val platformName: String
 
 /**
- * Vrai quand l'UI est pilotée au pointeur (desktop), faux au D-pad (Android TV).
- * Sert à n'activer que côté desktop les affordances souris/clavier qui
- * perturberaient la télécommande : flèches de défilement des rangées et
- * capture des touches gauche/droite.
- */
-expect val isPointerUi: Boolean
-
-/**
  * Version de l'app telle qu'affichée à l'utilisateur (« 1.10.0 »).
  *
  * Elle vient du `versionName` sur Android et de la propriété système

@@ -16,9 +16,9 @@ import androidx.compose.ui.unit.dp
  * compilation, il ne peut donc pas les distinguer — il faut interroger le
  * système au démarrage et injecter le résultat dans l'arbre Compose.
  *
- * `isPointerUi` reste en place le temps de la migration : il vaut toujours faux
- * sur Android, ce qui était juste tant que seule la TV existait, et le devient
- * de moins en moins. Les nouveaux usages passent par [LocalUiFlavor].
+ * L'ancien `expect val isPointerUi` a été retiré : il valait faux sur Android,
+ * donc pour la TV **comme** pour le téléphone. Juste tant que seule la TV
+ * existait, faux dès qu'un second appareil est arrivé.
  */
 enum class UiFlavor {
     /** Android TV : navigation à la télécommande, focus visible, recul de 3 m. */
@@ -110,6 +110,14 @@ val LocalHeightClass = staticCompositionLocalOf { HeightClass.MEDIUM }
 /** Vrai sur un appareil piloté au doigt — téléphone ou tablette. */
 val isTouchUi: Boolean
     @Composable get() = LocalUiFlavor.current == UiFlavor.TOUCH
+
+/**
+ * Vrai au pointeur — desktop. Remplace l'ancien `expect val isPointerUi`, qui
+ * disait la même chose mais à la compilation, donc sans pouvoir distinguer un
+ * téléphone d'une TV.
+ */
+val isPointerUi: Boolean
+    @Composable get() = LocalUiFlavor.current == UiFlavor.POINTER
 
 /**
  * Vrai quand la navigation doit se faire au pouce, en bas de l'écran.

@@ -6,7 +6,6 @@ import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.hoverable
-import fr.moovie.tv.shared.isPointerUi
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.border
@@ -79,6 +78,8 @@ import fr.moovie.tv.resources.search_recent_hint
 import fr.moovie.tv.resources.search_remove_query
 import fr.moovie.tv.resources.search_title
 import fr.moovie.tv.resources.search_voice
+import fr.moovie.tv.ui.adaptive.LocalUiFlavor
+import fr.moovie.tv.ui.adaptive.isPointerUi
 import fr.moovie.tv.ui.adaptive.isTouchUi
 import fr.moovie.tv.ui.adaptive.useBottomNav
 import fr.moovie.tv.ui.theme.MOOVIE_ACCENT
@@ -348,7 +349,7 @@ private fun HistorySection(
     // — souris ou doigt. Elle n'apparaissait qu'au *focus*, ce qui n'existe pas
     // au tactile : sur téléphone, retirer une recherche ne passait plus que par
     // l'appui long, un geste que rien ne montre.
-    val directRemove = isPointerUi || isTouchUi
+    val directRemove = LocalUiFlavor.current.isDirect
     Column(modifier = modifier) {
         if (isTouchUi) {
             // Le vidage remonte sur la ligne du titre, réduit à son icône : il
@@ -447,6 +448,8 @@ private fun HistorySection(
  */
 @Composable
 private fun RemoveQueryCross(query: String, onRemove: () -> Unit) {
+    val pointer = isPointerUi
+    val direct = LocalUiFlavor.current.isDirect
     val hoverSource = remember { MutableInteractionSource() }
     val hovered by hoverSource.collectIsHoveredAsState()
     val label = stringResource(Res.string.search_remove_query, query)
@@ -458,13 +461,24 @@ private fun RemoveQueryCross(query: String, onRemove: () -> Unit) {
         modifier = Modifier
             .size(24.dp)
             .then(
-                if (isPointerUi) {
+                // Le survol n'existe qu'à la souris, mais **la croix doit être
+                // cliquable au doigt aussi** : elle y était affichée sans
+                // gestionnaire, si bien que la toucher relançait la recherche
+                // au lieu de la supprimer — le geste du bouton parent.
+                if (direct) {
                     Modifier
-                        .hoverable(hoverSource)
-                        .pointerHoverIcon(PointerIcon.Hand)
-                        .background(
-                            if (hovered) Color(0x33FFFFFF) else Color.Transparent,
-                            MoovieShape,
+                        .then(
+                            if (pointer) {
+                                Modifier
+                                    .hoverable(hoverSource)
+                                    .pointerHoverIcon(PointerIcon.Hand)
+                                    .background(
+                                        if (hovered) Color(0x33FFFFFF) else Color.Transparent,
+                                        MoovieShape,
+                                    )
+                            } else {
+                                Modifier
+                            },
                         )
                         .pointerInput(query) { detectTapGestures { onRemove() } }
                 } else {
@@ -472,7 +486,7 @@ private fun RemoveQueryCross(query: String, onRemove: () -> Unit) {
                 },
             ),
     ) {
-        if (isPointerUi) {
+        if (direct) {
             Icon(
                 Icons.Default.Close,
                 contentDescription = label,
