@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
@@ -695,7 +696,10 @@ fun PlayerOptionsDialog(sections: List<PlayerOptionSection>, onDismiss: () -> Un
     Dialog(onDismissRequest = onDismiss) {
         Column(
             modifier = Modifier
-                .width(380.dp)
+                // Voir le panneau des sources : un plafond, pour ne pas déborder
+                // d'un écran plus étroit que celui sur lequel on a mesuré.
+                .widthIn(max = 380.dp)
+                .fillMaxWidth()
                 .clip(MoovieShape)
                 .background(Color(0xF5161616))
                 .padding(24.dp),

@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -733,7 +734,11 @@ private fun SourcesSlideOver(
     Column(
         modifier = Modifier
             .fillMaxHeight()
-            .width(380.dp)
+            // Plafond, pas largeur fixe : 380 dp tiennent sur les 448 dp d'un
+            // Pixel, mais un téléphone plus étroit — 360 dp de large, ce qui
+            // court encore — verrait le panneau déborder de l'écran.
+            .widthIn(max = 380.dp)
+            .fillMaxWidth()
             .background(Color(0xF2121212))
             // Avale les clics : cliquer dans le panneau ne doit pas atteindre
             // le scrim de fermeture situé derrière.
@@ -1121,14 +1126,15 @@ private fun EpisodeDetail(
     onOpenSources: () -> Unit,
     onToggleWatched: () -> Unit,
 ) {
-    val hPad = Modifier.padding(horizontal = 48.dp)
-    Row(
-        modifier = hPad.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(28.dp),
-    ) {
+    val compact = useBottomNav
+    val hPad = Modifier.padding(horizontal = if (compact) 16.dp else 48.dp)
+    // La vignette fait 420 dp de large. Sur les 448 dp d'un téléphone en
+    // portrait il ne restait que 28 dp à la colonne de texte : titre, synopsis
+    // et boutons étaient bien composés, mais écrasés à néant — d'où une page qui
+    // semblait ne contenir qu'une image.
+    val still = @Composable { modifier: Modifier ->
         Box(
-            modifier = Modifier
-                .width(420.dp)
+            modifier = modifier
                 .aspectRatio(16f / 9f)
                 .clip(MoovieShape)
                 .background(Color(0xFF222222)),
@@ -1140,7 +1146,9 @@ private fun EpisodeDetail(
                 modifier = Modifier.fillMaxSize(),
             )
         }
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    }
+    val meta = @Composable {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
                 stringResource(Res.string.details_episode_header, showName, season),
                 style = MaterialTheme.typography.labelLarge,
@@ -1175,11 +1183,32 @@ private fun EpisodeDetail(
                     )
                 }
             }
-            if (ep.overview.isNotBlank()) {
+            // Sur téléphone le synopsis passe après les boutons, comme sur la
+            // fiche d'un film : sinon « Lire » se retrouve sous le résumé.
+            if (!compact && ep.overview.isNotBlank()) {
                 Text(ep.overview, style = MaterialTheme.typography.bodyMedium, color = Color(0xFFDDDDDD))
             }
         }
     }
+
+    if (compact) {
+        Column(
+            modifier = hPad.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            still(Modifier.fillMaxWidth())
+            meta()
+        }
+    } else {
+        Row(
+            modifier = hPad.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(28.dp),
+        ) {
+            still(Modifier.width(420.dp))
+            Box(modifier = Modifier.weight(1f)) { meta() }
+        }
+    }
+
     Row(
         modifier = hPad,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -1204,6 +1233,14 @@ private fun EpisodeDetail(
             icon = if (isWatched) Icons.Default.VisibilityOff else Icons.Default.Visibility,
             contentDescription = if (isWatched) stringResource(Res.string.mark_unwatched) else stringResource(Res.string.mark_watched),
             selected = isWatched,
+        )
+    }
+    if (compact && ep.overview.isNotBlank()) {
+        Text(
+            ep.overview,
+            style = MaterialTheme.typography.bodyMedium,
+            color = Color(0xFFDDDDDD),
+            modifier = hPad,
         )
     }
 }
