@@ -13,6 +13,7 @@ import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.padding
@@ -48,6 +49,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import fr.moovie.tv.ui.theme.MoovieGradient
+import fr.moovie.tv.ui.adaptive.isTouchUi
 import fr.moovie.tv.ui.theme.MoovieShape
 import fr.moovie.tv.ui.theme.moovieSurface
 import fr.moovie.tv.ui.theme.rememberGlow
@@ -111,6 +113,19 @@ fun MoovieButton(
                 scaleX = scale
                 scaleY = scale
             }
+            // Cible d'au moins 48 dp au doigt. Les marges du bouton donnent
+            // 44 × 40 dp — confortable en face d'un focus de télécommande, qui
+            // vise pour vous, mais sous le seuil en dessous duquel un pouce
+            // rate sa cible sans regarder. `defaultMinSize` n'agrandit que ce
+            // qui est plus petit : les boutons à libellé, déjà plus larges, ne
+            // bougent pas.
+            .then(
+                if (isTouchUi) {
+                    Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                } else {
+                    Modifier
+                },
+            )
             .clip(MoovieShape)
             .moovieSurface(
                 active = active,
