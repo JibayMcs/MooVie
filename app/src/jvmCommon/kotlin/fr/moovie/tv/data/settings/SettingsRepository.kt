@@ -180,6 +180,17 @@ class SettingsRepository {
             if (remember) it[OS_PASSWORD] = password else it.remove(OS_PASSWORD)
         }
 
+    /**
+     * Rétablit le compte depuis une sauvegarde : le nom et la préférence, **pas
+     * le mot de passe** — il n'a jamais quitté l'appareil d'origine. On ne passe
+     * donc pas par [setOsCredentials], qui écrirait un mot de passe vide et
+     * laisserait croire à une session réouvrable.
+     */
+    suspend fun restoreOsAccount(username: String, remember: Boolean) = store.edit {
+        it[OS_USERNAME] = username
+        it[OS_REMEMBER] = remember
+    }
+
     suspend fun setOsSession(token: String, atMs: Long) = store.edit {
         it[OS_TOKEN] = token
         it[OS_TOKEN_AT] = atMs

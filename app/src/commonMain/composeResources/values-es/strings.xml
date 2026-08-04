@@ -216,8 +216,8 @@
     <string name="backup_target_removable">Soporte extraíble</string>
     <string name="backup_target_internal">Almacenamiento interno</string>
     <string name="backup_target_app_folder">El archivo irá a la carpeta reservada a Moo-vie en este soporte.</string>
-    <string name="backup_include_key">Incluir la clave TMDB</string>
-    <string name="backup_key_warning">La clave se escribirá en texto plano. Práctico para reinstalar sin volver a teclearla, pero no publiques esta copia (repositorio Git, nube compartida…).</string>
+    <string name="backup_include_key">Incluir las claves de API (TMDB, TheIntroDB)</string>
+    <string name="backup_key_warning">Las claves se escribirán en texto plano. Práctico para reinstalar sin volver a teclearlas, pero no publiques esta copia (repositorio Git, nube compartida…).</string>
     <string name="backup_contents">Contenido de la copia</string>
     <string name="backup_writing">Escribiendo…</string>
     <string name="backup_written">Copia escrita</string>

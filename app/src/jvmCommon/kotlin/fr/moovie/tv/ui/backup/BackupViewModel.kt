@@ -86,11 +86,12 @@ class BackupViewModel : ViewModel() {
         // n'aura lieu qu'à la confirmation.
         val backup = repo.export(includeApiKey = true, now = System.currentTimeMillis())
         pending = backup
+        val contents = backup.summary()
         _step.value = BackupStep.ConfirmExport(
             target = target,
-            contents = backup.summary(),
+            contents = contents,
             includeApiKey = true,
-            hasApiKey = !backup.tmdbApiKey.isNullOrBlank(),
+            hasApiKey = contents.hasApiKey,
         )
     }
 
@@ -105,7 +106,11 @@ class BackupViewModel : ViewModel() {
         _step.value = BackupStep.Working(importing = false)
         val written = repo.write(
             target = step.target,
-            backup = if (step.includeApiKey) backup else backup.copy(tmdbApiKey = null),
+            backup = if (step.includeApiKey) {
+                backup
+            } else {
+                backup.copy(tmdbApiKey = null, introDbApiKey = null)
+            },
             fileName = fileName(now),
         )
         _step.value = written?.let { BackupStep.Exported(it) }

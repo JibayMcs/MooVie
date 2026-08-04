@@ -216,8 +216,8 @@
     <string name="backup_target_removable">Removable storage</string>
     <string name="backup_target_internal">Internal storage</string>
     <string name="backup_target_app_folder">The file will go to the folder reserved for Moo-vie on this storage.</string>
-    <string name="backup_include_key">Include the TMDB key</string>
-    <string name="backup_key_warning">The key will be written in plain text. Handy to reinstall without typing it again, but do not publish this backup (Git repo, shared cloud…).</string>
+    <string name="backup_include_key">Include the API keys (TMDB, TheIntroDB)</string>
+    <string name="backup_key_warning">The keys will be written in plain text. Handy to reinstall without typing them again, but do not publish this backup (Git repo, shared cloud…).</string>
     <string name="backup_contents">Backup contents</string>
     <string name="backup_writing">Writing…</string>
     <string name="backup_written">Backup written</string>

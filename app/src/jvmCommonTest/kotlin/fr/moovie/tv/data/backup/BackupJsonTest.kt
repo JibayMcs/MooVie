@@ -24,7 +24,15 @@ class BackupJsonTest {
         audioTracks = mapOf("tv:1396" to "French"),
         titles = mapOf("tv:1396" to TitleMeta(title = "Breaking Bad", genres = listOf("Drame"))),
         tmdbApiKey = "cle",
-        settings = BackupSettings(streamLanguage = "VF", dohEnabled = true),
+        introDbApiKey = "cle-introdb",
+        settings = BackupSettings(
+            streamLanguage = "VF",
+            dohEnabled = true,
+            splashAnimation = false,
+            subtitleLanguages = listOf("fr", "en"),
+            osUsername = "jb",
+            osRemember = true,
+        ),
     )
 
     @Test
@@ -67,13 +75,34 @@ class BackupJsonTest {
         assertEquals("1.10.0", BackupJson.decode(extra)?.appVersion)
     }
 
-    /** Sans clé TMDB, le fichier ne contient rien de secret. */
+    /**
+     * Sans les clés, le fichier ne contient rien de secret. Les **deux** doivent
+     * partir : l'interrupteur d'export est unique, en oublier une reviendrait à
+     * publier un secret que l'utilisateur a cru retenir.
+     */
     @Test
     fun `une sauvegarde sans cle ne la mentionne pas`() {
-        val raw = BackupJson.encode(full.copy(tmdbApiKey = null))
+        val raw = BackupJson.encode(full.copy(tmdbApiKey = null, introDbApiKey = null))
 
         assertTrue(!raw.contains("\"cle\""), raw)
+        assertTrue(!raw.contains("cle-introdb"), raw)
         assertNull(BackupJson.decode(raw)?.tmdbApiKey)
+        assertNull(BackupJson.decode(raw)?.introDbApiKey)
+    }
+
+    /**
+     * Le mot de passe OpenSubtitles ne doit jamais atteindre le fichier : le
+     * format ne lui offre aucun champ, et c'est délibéré. Ce test échoue le jour
+     * où quelqu'un en ajoute un « pour être complet ».
+     */
+    @Test
+    fun `le format ne transporte pas de mot de passe`() {
+        val fields = BackupSettings.serializer().descriptor.let { d ->
+            (0 until d.elementsCount).map { d.getElementName(it) }
+        }
+
+        assertTrue(fields.none { it.contains("password", ignoreCase = true) }, "$fields")
+        assertTrue(fields.none { it.contains("Token", ignoreCase = false) }, "$fields")
     }
 
     @Test

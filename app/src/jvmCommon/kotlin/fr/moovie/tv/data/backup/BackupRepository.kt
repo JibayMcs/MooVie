@@ -41,6 +41,7 @@ class BackupRepository(
         audioTracks = watchRepo.audioTracks(),
         titles = watchRepo.titles(),
         tmdbApiKey = settingsRepo.tmdbApiKey.first().takeIf { includeApiKey && it.isNotBlank() },
+        introDbApiKey = settingsRepo.introDbApiKey.first().takeIf { includeApiKey && it.isNotBlank() },
         settings = currentSettings(),
     )
 
@@ -77,6 +78,7 @@ class BackupRepository(
         )
         backup.settings?.let { applySettings(it) }
         backup.tmdbApiKey?.takeIf { it.isNotBlank() }?.let { settingsRepo.setTmdbApiKey(it) }
+        backup.introDbApiKey?.takeIf { it.isNotBlank() }?.let { settingsRepo.setIntroDbApiKey(it) }
         return report
     }
 
@@ -92,6 +94,10 @@ class BackupRepository(
         hideHistoryWidgets = settingsRepo.hideHistoryWidgets.first(),
         updateInterval = settingsRepo.updateInterval.first().name,
         screensaverDelay = settingsRepo.screensaverDelay.first().name,
+        splashAnimation = settingsRepo.splashAnimation.first(),
+        subtitleLanguages = settingsRepo.subtitleLanguages.first(),
+        osUsername = settingsRepo.osUsername.first().takeIf { it.isNotBlank() },
+        osRemember = settingsRepo.osRemember.first(),
     )
 
     /**
@@ -122,6 +128,13 @@ class BackupRepository(
         s.autoPlayNext?.let { settingsRepo.setAutoPlayNext(it) }
         s.playerClock?.let { settingsRepo.setPlayerClock(it) }
         s.hideHistoryWidgets?.let { settingsRepo.setHideHistoryWidgets(it) }
+        s.splashAnimation?.let { settingsRepo.setSplashAnimation(it) }
+        // Vide = le fichier n'en parle pas. Écraser les langues de l'appareil par
+        // une liste vide le laisserait sans aucun sous-titre à chercher.
+        if (s.subtitleLanguages.isNotEmpty()) settingsRepo.setSubtitleLanguages(s.subtitleLanguages)
+        s.osUsername?.takeIf { it.isNotBlank() }?.let {
+            settingsRepo.restoreOsAccount(it, remember = s.osRemember ?: false)
+        }
         if (s.providerOrder.isNotEmpty()) settingsRepo.setProviderOrder(s.providerOrder)
         s.disabledProviders.forEach { settingsRepo.setProviderEnabled(it, enabled = false) }
     }

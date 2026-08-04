@@ -48,12 +48,21 @@ data class MoovieBackup(
      */
     val titles: Map<String, TitleMeta> = emptyMap(),
 
+
     /**
      * Clé TMDB. **C'est un secret** : sans elle l'import ne dispenserait pas de
      * la saisir au clavier virtuel, ce qui vide de son sens le parcours de
      * premier lancement. L'utilisateur est prévenu au moment de l'export.
      */
     val tmdbApiKey: String? = null,
+
+    /**
+     * Clé TheIntroDB. Secret elle aussi, et **la plus coûteuse à perdre** : elle
+     * s'obtient sur un compte, pas en deux clics comme celle de TMDB. Elle suit
+     * donc le même interrupteur à l'export — l'utilisateur choisit une fois si
+     * ses clés partent, pas une fois par service.
+     */
+    val introDbApiKey: String? = null,
     val settings: BackupSettings? = null,
 ) {
     companion object {
@@ -76,6 +85,25 @@ data class BackupSettings(
     val hideHistoryWidgets: Boolean? = null,
     val updateInterval: String? = null,
     val screensaverDelay: String? = null,
+    val splashAnimation: Boolean? = null,
+
+    /**
+     * Langues de sous-titres, **l'ordre compte** : c'est le premier critère de
+     * classement des candidats. Une liste vide veut dire « le fichier n'en
+     * parle pas », et laisse alors celles de l'appareil tranquilles.
+     */
+    val subtitleLanguages: List<String> = emptyList(),
+
+    /**
+     * Compte OpenSubtitles, **sans le mot de passe**.
+     *
+     * Une clé d'API se révoque et ne vaut que pour un service ; un mot de passe
+     * se réessaie ailleurs. Le nom d'utilisateur épargne la saisie au clavier
+     * virtuel, et [osRemember] est une préférence — la case retrouvée cochée
+     * quand l'utilisateur ressaisit son mot de passe.
+     */
+    val osUsername: String? = null,
+    val osRemember: Boolean? = null,
 )
 
 /**
@@ -115,6 +143,7 @@ data class BackupSummary(
     val exportedAt: Long,
     val appVersion: String,
     val platform: String,
+    /** Vrai dès qu'**une** clé est du voyage : elles partent ou restent ensemble. */
     val hasApiKey: Boolean,
     val hasSettings: Boolean,
 )
@@ -127,6 +156,6 @@ fun MoovieBackup.summary() = BackupSummary(
     exportedAt = exportedAt,
     appVersion = appVersion,
     platform = platform,
-    hasApiKey = !tmdbApiKey.isNullOrBlank(),
+    hasApiKey = !tmdbApiKey.isNullOrBlank() || !introDbApiKey.isNullOrBlank(),
     hasSettings = settings != null,
 )
