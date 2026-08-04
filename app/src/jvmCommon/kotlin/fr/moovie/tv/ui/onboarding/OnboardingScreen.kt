@@ -3,6 +3,7 @@ package fr.moovie.tv.ui.onboarding
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
@@ -22,6 +23,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import fr.moovie.tv.ui.theme.MoovieShape
 import fr.moovie.tv.data.settings.SettingsRepository
 import fr.moovie.tv.resources.Res
 import fr.moovie.tv.resources.onboarding_fresh
@@ -128,9 +130,19 @@ private fun Choice(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // Ces deux-là portent leur propre surface, contrairement au reste de l'app.
+    // Un MoovieButton au repos n'est que son libellé : son habillage vient du
+    // focus, ce qui va en face d'une télécommande mais ne donne rien au doigt.
+    // Ailleurs le contexte suffit à dire qu'on peut toucher — une affiche, une
+    // ligne de réglage. Ici il n'y a que deux paragraphes sur du noir, et c'est
+    // le tout premier écran de l'app : il ne peut pas se permettre d'être
+    // ambigu.
     MoovieButton(
         onClick = onClick,
-        modifier = modifier.fillMaxWidth().widthIn(max = 900.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .widthIn(max = 900.dp)
+            .border(1.dp, Color(0x33FFFFFF), MoovieShape),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(
             horizontal = 20.dp,
             vertical = 16.dp,
