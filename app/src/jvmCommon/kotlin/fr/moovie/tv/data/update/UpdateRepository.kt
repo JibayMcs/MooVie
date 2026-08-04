@@ -47,19 +47,32 @@ class UpdateRepository {
         }.getOrNull()
     }
 
-    /** Compare deux versions « semver » (tag `v1.2.3` vs `1.2.0`). */
+    /**
+     * Compare deux versions « semver » (tag `v1.2.3` vs `1.2.0`).
+     *
+     * À numéros égaux, une **préversion vaut moins que sa version finale** :
+     * `1.15.0-rc.1` est antérieure à `1.15.0`. Sans cette règle, celui qui a
+     * installé une release candidate à la main resterait dessus pour toujours —
+     * l'app comparait les seuls numéros, les trouvait identiques, et ne lui
+     * proposait jamais la version définitive qu'il avait aidé à éprouver.
+     *
+     * Deux préversions ne se départagent pas : elles sont de toute façon
+     * exclues de `releases/latest`, donc jamais comparées ici.
+     */
     fun isNewer(tag: String, current: String): Boolean {
-        fun parse(v: String) = v.removePrefix("v").split('-').first()
+        fun core(v: String) = v.removePrefix("v").substringBefore('-')
             .split('.').mapNotNull { it.toIntOrNull() }
-        val a = parse(tag)
-        val b = parse(current)
+        fun suffix(v: String) = v.removePrefix("v").substringAfter('-', "")
+
+        val a = core(tag)
+        val b = core(current)
         if (a.isEmpty() || b.isEmpty()) return false
         for (i in 0 until maxOf(a.size, b.size)) {
             val x = a.getOrElse(i) { 0 }
             val y = b.getOrElse(i) { 0 }
             if (x != y) return x > y
         }
-        return false
+        return suffix(tag).isEmpty() && suffix(current).isNotEmpty()
     }
 
     /**
