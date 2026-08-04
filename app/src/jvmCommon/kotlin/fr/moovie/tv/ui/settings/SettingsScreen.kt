@@ -12,16 +12,31 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.MenuOpen
+import androidx.compose.material.icons.filled.Bedtime
+import androidx.compose.material.icons.filled.ClosedCaption
+import androidx.compose.material.icons.filled.Dns
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Layers
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -41,6 +56,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -51,6 +67,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import fr.moovie.tv.data.net.DohProvider
 import fr.moovie.tv.data.settings.ScreensaverDelay
 import fr.moovie.tv.data.settings.StreamLanguage
@@ -119,6 +136,7 @@ import fr.moovie.tv.resources.update_every_minutes
 import fr.moovie.tv.resources.update_never
 import fr.moovie.tv.ui.backup.BackupSection
 import fr.moovie.tv.ui.adaptive.LocalUiFlavor
+import fr.moovie.tv.ui.adaptive.useBottomNav
 import fr.moovie.tv.ui.components.MoovieButton
 import fr.moovie.tv.ui.subtitles.SubtitlesSection
 import fr.moovie.tv.ui.components.MoovieIconButton
@@ -134,6 +152,35 @@ private val NAV_WIDTH = 260.dp
 /** Sections de l'écran, dans l'ordre d'affichage du volet gauche. */
 private enum class SettingsSection {
     API, PLAYBACK, INTRO, SUBTITLES, HISTORY, SCREENSAVER, UPDATE, DNS, SOURCES, BACKUP,
+}
+
+/**
+ * Largeur de la barre repliée : une icône de 20 dp dans une cible de 48 dp,
+ * marges comprises. C'est ce qu'elle coûte au contenu sur un téléphone — 68 dp
+ * sur 448, contre 260 pour le volet déplié.
+ */
+private val RAIL_WIDTH = 68.dp
+
+/**
+ * Icône de chaque section, pour la barre repliée.
+ *
+ * Une barre d'icônes ne vaut que si chaque icône se devine sans son libellé :
+ * une clé pour les clés d'API, un triangle de lecture pour la lecture, un
+ * sous-titre pour les sous-titres. Là où aucun symbole ne s'impose (les
+ * sources), on prend celui du domaine plutôt qu'une abstraction — et le libellé
+ * reste à un appui, en dépliant.
+ */
+private fun sectionIcon(section: SettingsSection): ImageVector = when (section) {
+    SettingsSection.API -> Icons.Default.Key
+    SettingsSection.PLAYBACK -> Icons.Default.PlayArrow
+    SettingsSection.INTRO -> Icons.Default.SkipNext
+    SettingsSection.SUBTITLES -> Icons.Default.ClosedCaption
+    SettingsSection.HISTORY -> Icons.Default.History
+    SettingsSection.SCREENSAVER -> Icons.Default.Bedtime
+    SettingsSection.UPDATE -> Icons.Default.SystemUpdate
+    SettingsSection.DNS -> Icons.Default.Dns
+    SettingsSection.SOURCES -> Icons.Default.Layers
+    SettingsSection.BACKUP -> Icons.Default.Save
 }
 
 @Composable
@@ -200,6 +247,15 @@ fun SettingsScreenContent(
     languageSelector: @Composable () -> Unit,
 ) {
     var section by remember { mutableStateOf(SettingsSection.API) }
+    // Sur téléphone, le volet de navigation se replie en barre d'icônes : 260 dp
+    // sur 448 ne laissaient que 190 dp au contenu, qui cassait les libellés mot
+    // par mot. Replié il n'en coûte que 68, et le contenu reste visible à côté —
+    // ce qu'un écran de liste séparé ne permettait pas.
+    val compact = useBottomNav
+    // Déplié en permanence hors tactile : la télécommande n'a pas de quoi
+    // déplier commodément, et la place ne manque pas sur un 1080p.
+    var railExpanded by remember { mutableStateOf(false) }
+    val expanded = !compact || railExpanded
     // La section ne suit le focus que si celui-ci vient d'un appui haut/bas dans
     // le volet. Compose replie le focus sur le premier élément focalisable quand
     // celui qui le portait disparaît : sans ce garde-fou, un contrôle du volet
@@ -211,11 +267,16 @@ fun SettingsScreenContent(
     val firstSectionFocus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { firstSectionFocus.requestFocus() } }
 
-    Row(modifier = Modifier.fillMaxSize()) {
+    // Superposition plutôt que côte à côte : dépliée, la barre se pose **par
+    // dessus** le contenu au lieu de le comprimer. Le pousser à 190 dp le
+    // recassait mot par mot — le défaut même qu'on est en train de corriger.
+    // Le contenu ne réserve donc que la largeur repliée, et ne bouge plus.
+    Box(modifier = Modifier.fillMaxSize()) {
         // ── Volet gauche : navigation ────────────────────────────────────────
         Column(
             modifier = Modifier
-                .width(NAV_WIDTH)
+                .zIndex(1f)
+                .width(if (expanded) NAV_WIDTH else RAIL_WIDTH)
                 .fillMaxHeight()
                 .background(Color(0xFF141414))
                 // Défilant : à neuf sections, la liste dépasse la hauteur d'un
@@ -236,17 +297,40 @@ fun SettingsScreenContent(
                     }
                     false
                 }
-                .padding(vertical = 40.dp, horizontal = 20.dp),
+                .padding(
+                    vertical = if (compact) 24.dp else 40.dp,
+                    horizontal = if (expanded) 20.dp else 10.dp,
+                ),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Text(
-                stringResource(Res.string.settings_title),
-                style = MaterialTheme.typography.headlineSmall,
-                modifier = Modifier.padding(start = 8.dp, bottom = 20.dp),
-            )
+            if (compact) {
+                // Déplier / replier. Le titre « Réglages » ne tient pas dans une
+                // barre de 68 dp, ce bouton en tient lieu — et l'onglet du bas
+                // dit déjà où l'on est.
+                MoovieIconButton(
+                    onClick = { railExpanded = !railExpanded },
+                    icon = if (expanded) Icons.AutoMirrored.Filled.MenuOpen else Icons.Default.Menu,
+                    contentDescription = stringResource(
+                        if (expanded) Res.string.common_hide else Res.string.common_show,
+                    ),
+                )
+                Spacer(Modifier.height(8.dp))
+            } else {
+                Text(
+                    stringResource(Res.string.settings_title),
+                    style = MaterialTheme.typography.headlineSmall,
+                    modifier = Modifier.padding(start = 8.dp, bottom = 20.dp),
+                )
+            }
             SettingsSection.entries.forEachIndexed { index, entry ->
                 MoovieButton(
-                    onClick = { section = entry },
+                    onClick = {
+                        section = entry
+                        // Replié après le choix : la barre dépliée mange la
+                        // moitié d'un écran de téléphone, et on l'a ouverte pour
+                        // choisir, pas pour rester dedans.
+                        if (compact) railExpanded = false
+                    },
                     selected = entry == section,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -257,25 +341,48 @@ fun SettingsScreenContent(
                         .onFocusChanged { if (it.isFocused && navKeyDriven) section = entry }
                         .then(if (index == 0) Modifier.focusRequester(firstSectionFocus) else Modifier),
                 ) {
-                    // weight : le libellé occupe la ligne, donc reste aligné à gauche.
-                    Text(sectionLabel(entry), modifier = Modifier.weight(1f))
+                    Icon(
+                        imageVector = sectionIcon(entry),
+                        // Le libellé le dit déjà quand il est là ; replié, c'est
+                        // l'icône qui doit parler aux lecteurs d'écran.
+                        contentDescription = if (expanded) null else sectionLabel(entry),
+                        modifier = Modifier.size(20.dp),
+                    )
+                    if (expanded) {
+                        Spacer(Modifier.width(12.dp))
+                        // weight : le libellé occupe la ligne, donc reste aligné à gauche.
+                        Text(sectionLabel(entry), modifier = Modifier.weight(1f))
+                    }
                 }
             }
             // Écart fixe, plus un poids : dans une colonne défilante, `weight`
             // ne repousse plus rien vers le bas et le bouton disparaissait.
             Spacer(Modifier.height(20.dp))
             MoovieButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(Res.string.common_back), modifier = Modifier.weight(1f))
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = if (expanded) null else stringResource(Res.string.common_back),
+                    modifier = Modifier.size(20.dp),
+                )
+                if (expanded) {
+                    Spacer(Modifier.width(12.dp))
+                    Text(stringResource(Res.string.common_back), modifier = Modifier.weight(1f))
+                }
             }
         }
 
         // ── Volet droit : contenu de la section ──────────────────────────────
         Column(
             modifier = Modifier
-                .weight(1f)
-                .fillMaxHeight()
+                .fillMaxSize()
+                // Largeur repliée seulement : déplier ne doit pas redistribuer
+                // la place, sinon le texte se recompose à chaque ouverture.
+                .padding(start = if (compact) RAIL_WIDTH else NAV_WIDTH)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 40.dp, vertical = 40.dp),
+                .padding(
+                    horizontal = if (compact) 20.dp else 40.dp,
+                    vertical = if (compact) 24.dp else 40.dp,
+                ),
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
             Text(
@@ -493,8 +600,13 @@ fun SettingsScreenContent(
 }
 
 /**
- * Ligne de réglage : libellé (et aide) à gauche, contrôle à droite. Le contrôle
- * est borné en largeur pour que tous les réglages s'alignent verticalement.
+ * Ligne de réglage : libellé (et aide) à gauche, contrôle à droite.
+ *
+ * **Sur téléphone, tout passe en une seule colonne** : libellé, aide, puis le
+ * contrôle en dessous. Se partager la largeur à deux suppose une largeur à
+ * partager — sur les 380 dp restants d'un portrait, chaque moitié tombait sous
+ * 190 dp et libellés comme aides se cassaient mot par mot. Empilé, le texte
+ * reprend toute la ligne et le contrôle aussi.
  */
 @Composable
 private fun SettingRow(
@@ -502,6 +614,30 @@ private fun SettingRow(
     help: String? = null,
     control: @Composable () -> Unit,
 ) {
+    val texts = @Composable {
+        Text(label, style = MaterialTheme.typography.titleMedium)
+        if (help != null) {
+            Text(
+                help,
+                style = MaterialTheme.typography.bodySmall,
+                color = Color(0xFF9A9A9A),
+            )
+        }
+    }
+
+    if (useBottomNav) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            texts()
+            // Aligné à gauche, dans le fil du libellé qu'il complète : renvoyé
+            // à droite il flotterait seul au bout d'une ligne vide.
+            Box(modifier = Modifier.fillMaxWidth()) { control() }
+        }
+        return
+    }
+
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -511,14 +647,7 @@ private fun SettingRow(
             modifier = Modifier.weight(1f).padding(end = 32.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            Text(label, style = MaterialTheme.typography.titleMedium)
-            if (help != null) {
-                Text(
-                    help,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color(0xFF9A9A9A),
-                )
-            }
+            texts()
         }
         // Moitié/moitié plutôt qu'une largeur fixe : l'écran est étroit en dp et
         // un contrôle figé écrasait la colonne des libellés, qui se cassait
