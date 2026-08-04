@@ -390,31 +390,31 @@ fun DetailsScreenContent(
                                         Text("S${season.seasonNumber}")
                                     }
                                 }
-                                // En fin de rangée (atteignable au D-pad) : œil = marquer la
-                                // saison vue / non vue (outline verte quand tout est vu).
-                                item {
-                                    MoovieIconButton(
-                                        onClick = onToggleSeasonWatched,
-                                        icon = if (seasonAllWatched) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                                        contentDescription = if (seasonAllWatched) stringResource(Res.string.mark_season_unwatched) else stringResource(Res.string.mark_season_watched),
-                                        selected = seasonAllWatched,
-                                    )
-                                }
-                                // Signet de la série. La fiche série n'a pas de
-                                // rangée d'actions comme celle d'un film : la
-                                // rangée des saisons est le seul endroit à
-                                // portée du D-pad pour une action de titre.
-                                item {
-                                    MoovieIconButton(
-                                        onClick = onToggleWatchlist,
-                                        icon = if (inWatchlist) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
-                                        contentDescription = stringResource(
-                                            if (inWatchlist) Res.string.watchlist_remove else Res.string.watchlist_add,
-                                        ),
-                                        selected = inWatchlist,
-                                    )
-                                }
                             }
+                        }
+                        // Actions de titre sur leur propre ligne, et non en fin
+                        // de rangée des saisons : sur une série de vingt-deux
+                        // saisons elles se retrouvaient à vingt-deux boutons du
+                        // bord, donc introuvables. Ici elles sont toujours au
+                        // même endroit, à un appui vers le bas.
+                        Row(
+                            modifier = hPad,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            MoovieIconButton(
+                                onClick = onToggleSeasonWatched,
+                                icon = if (seasonAllWatched) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                contentDescription = if (seasonAllWatched) stringResource(Res.string.mark_season_unwatched) else stringResource(Res.string.mark_season_watched),
+                                selected = seasonAllWatched,
+                            )
+                            MoovieIconButton(
+                                onClick = onToggleWatchlist,
+                                icon = if (inWatchlist) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                                contentDescription = stringResource(
+                                    if (inWatchlist) Res.string.watchlist_remove else Res.string.watchlist_add,
+                                ),
+                                selected = inWatchlist,
+                            )
                         }
                         Text(stringResource(Res.string.details_episodes_season, s.season), style = MaterialTheme.typography.titleMedium, modifier = hPad)
                         val firstEpisode = s.episodes.firstOrNull()?.episodeNumber
