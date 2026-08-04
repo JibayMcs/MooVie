@@ -17,8 +17,8 @@
     <string name="home_row_trending_movies">Películas en tendencia</string>
     <string name="home_row_trending_tv">Series en tendencia</string>
     <string name="home_row_top_movies">Películas mejor valoradas</string>
-    <string name="home_needs_key">Introduce tu clave API de TMDB en Ajustes.</string>
-    <string name="home_no_results_key">Sin resultados — comprueba tu clave TMDB.</string>
+    <string name="home_needs_key">Clave API de TMDB pendiente de introducir en Ajustes.</string>
+    <string name="home_no_results_key">Sin resultados — comprobar la clave TMDB.</string>
     <string name="home_tmdb_error">Error al cargar TMDB: %1$s</string>
     <string name="home_open_settings">Abrir Ajustes</string>
     <string name="home_continue_watching">Seguir viendo</string>
@@ -33,7 +33,7 @@
     <string name="search_needs_key">Falta la clave TMDB — configúrala en Ajustes.</string>
     <string name="search_no_results">Sin resultados para «%1$s».</string>
     <string name="search_recent">Búsquedas recientes</string>
-    <string name="search_empty_hint">Escribe para buscar. Tu historial aparecerá aquí.</string>
+    <string name="search_empty_hint">Escribir para buscar. El historial aparecerá aquí.</string>
     <string name="search_clear_history">Borrar historial</string>
     <string name="search_remove_query">Eliminar «%1$s»</string>
 
@@ -55,7 +55,7 @@
     <string name="details_no_sources">No hay fuente disponible para este título.</string>
     <string name="details_trying_source">Reproduciendo desde %1$s…</string>
     <string name="details_searching_source">Buscando una fuente… %1$s</string>
-    <string name="details_resolve_error">No se puede reproducir «%1$s». Prueba otro reproductor.</string>
+    <string name="details_resolve_error">No se puede reproducir «%1$s». Probar otro reproductor.</string>
     <string name="details_needs_key">Falta la clave TMDB (Ajustes).</string>
     <string name="details_tmdb_error">Error de TMDB: %1$s</string>
 
@@ -83,7 +83,7 @@
     <string name="player_fullscreen_exit">Salir de pantalla completa</string>
     <string name="player_error">No se pudo reproducir — prueba otro reproductor desde el panel Fuentes.</string>
     <string name="player_vlc_missing">VLC no encontrado</string>
-    <string name="player_vlc_help">El reproductor de escritorio usa libVLC. Instala VLC y reinicia — Linux: sudo apt install vlc, Windows/macOS: videolan.org</string>
+    <string name="player_vlc_help">El reproductor de escritorio usa libVLC. Instalar VLC y reiniciar — Linux: sudo apt install vlc, Windows/macOS: videolan.org</string>
 
     <!-- Actualización -->
     <string name="settings_cat_update">Actualizaciones</string>
@@ -102,7 +102,7 @@
     <string name="update_install">Instalar</string>
     <string name="update_later">Más tarde</string>
     <string name="update_downloading">Descargando v%1$s…  %2$d %</string>
-    <string name="update_error">Descarga fallida. Inténtalo de nuevo.</string>
+    <string name="update_error">Descarga fallida. Intentar de nuevo.</string>
     <string name="update_retry">Reintentar</string>
 
     <!-- Salvapantallas -->
@@ -117,13 +117,13 @@
     <string name="settings_title">Ajustes</string>
     <string name="settings_cat_api">API y Claves</string>
     <string name="settings_tmdb_key">Clave API de TMDB</string>
-    <string name="settings_tmdb_hint">Pega tu clave TMDB aquí…</string>
-    <string name="settings_tmdb_help">Crea una clave gratis en themoviedb.org (API v3).</string>
+    <string name="settings_tmdb_hint">Pegar la clave TMDB aquí…</string>
+    <string name="settings_tmdb_help">Clave gratuita, pendiente de crear en themoviedb.org (API v3).</string>
     <string name="settings_cat_playback">Reproducción e idioma</string>
     <string name="settings_stream_lang">Idioma de stream por defecto</string>
     <string name="settings_language">Idioma de la aplicación</string>
     <string name="settings_splash">Animación de inicio</string>
-    <string name="settings_splash_help">El logo animado al arrancar. Se reproduce mientras carga la pantalla de inicio, así que no retrasa nada — pero puedes preferir ir directo.</string>
+    <string name="settings_splash_help">El logo animado al arrancar. Se reproduce mientras carga la pantalla de inicio, así que no retrasa nada — pero se puede preferir ir directo.</string>
     <string name="settings_cat_intro">Intro y créditos</string>
     <string name="settings_skip_intro">Botones «Saltar intro / créditos»</string>
     <string name="settings_autoplay">Reproducción automática del siguiente episodio</string>
@@ -194,7 +194,7 @@
         <item quantity="other">%1$d catálogos</item>
     </plurals>
     <string name="catalog_title">Catálogo</string>
-    <string name="catalog_pick_genre">Elige un género a la izquierda para explorar el catálogo.</string>
+    <string name="catalog_pick_genre">Elegir un género a la izquierda para explorar el catálogo.</string>
     <string name="catalog_open">Catálogo</string>
     <string name="media_movie">Película</string>
     <string name="media_series">Serie</string>
@@ -204,11 +204,11 @@
     <string name="search_recent_hint">Mantén pulsada una búsqueda para eliminarla</string>
     <string name="home_row_because">Porque viste %1$s</string>
     <string name="settings_cat_backup">Copia de seguridad</string>
-    <string name="backup_intro">Copia tus datos de Moo-vie en una memoria USB para recuperarlos en otro dispositivo: puntos de reproducción, lista pendiente, historial y ajustes.</string>
+    <string name="backup_intro">Copia los datos de Moo-vie en una memoria USB para recuperarlos en otro dispositivo: puntos de reproducción, lista pendiente, historial y ajustes.</string>
     <string name="backup_export">Exportar mis datos</string>
     <string name="backup_import">Importar una copia</string>
     <string name="backup_choose_target">¿Dónde guardar la copia?</string>
-    <string name="backup_no_target">Ningún soporte disponible. Conecta una memoria USB y vuelve a esta pantalla.</string>
+    <string name="backup_no_target">Ningún soporte disponible. Conectar una memoria USB y volver a esta pantalla.</string>
     <string name="backup_target_removable">Soporte extraíble</string>
     <string name="backup_target_internal">Almacenamiento interno</string>
     <string name="backup_target_app_folder">El archivo irá a la carpeta reservada a Moo-vie en este soporte.</string>
@@ -217,9 +217,9 @@
     <string name="backup_contents">Contenido de la copia</string>
     <string name="backup_writing">Escribiendo…</string>
     <string name="backup_written">Copia escrita</string>
-    <string name="backup_write_failed">No se pudo escribir en este soporte. Comprueba que está conectado y sin protección de escritura.</string>
+    <string name="backup_write_failed">No se pudo escribir en este soporte. Comprobar que está conectado y sin protección de escritura.</string>
     <string name="backup_scanning">Buscando copias…</string>
-    <string name="backup_none_found">No se encontró ninguna copia. Conecta la memoria con tu archivo %1$s y busca de nuevo.</string>
+    <string name="backup_none_found">No se encontró ninguna copia. Conectar la memoria que contiene el archivo %1$s y buscar de nuevo.</string>
     <string name="backup_rescan">Buscar de nuevo</string>
     <string name="backup_choose_file">¿Qué copia quieres importar?</string>
     <string name="backup_unreadable">Este archivo no es una copia de Moo-vie legible por esta versión.</string>
@@ -246,27 +246,27 @@
     <string name="onboarding_title">Bienvenido a Moo-vie</string>
     <string name="onboarding_intro">Dos formas de empezar, según si vienes de otro dispositivo o instalas Moo-vie por primera vez.</string>
     <string name="onboarding_restore">Ya he usado Moo-vie</string>
-    <string name="onboarding_restore_help">Restaura tus puntos de reproducción, tu lista, tu historial y tu clave TMDB desde una copia en memoria USB.</string>
+    <string name="onboarding_restore_help">Restaura los puntos de reproducción, la lista, el historial y la clave TMDB desde una copia en memoria USB.</string>
     <string name="onboarding_fresh">Primera instalación</string>
-    <string name="onboarding_fresh_help">Introduce tu clave TMDB, gratuita en themoviedb.org. Es la que alimenta el catálogo, los carteles y las fichas.</string>
+    <string name="onboarding_fresh_help">Introducción de la clave TMDB, gratuita en themoviedb.org. Es la que alimenta el catálogo, los carteles y las fichas.</string>
     <string name="onboarding_no_key">La copia importada no contenía una clave TMDB. Introdúcela en los ajustes para terminar la instalación.</string>
     <string name="settings_cat_subtitles">Subtítulos</string>
-    <string name="subtitles_intro">Los subtítulos vienen de OpenSubtitles. Funcionan sin cuenta, pero el número de descargas diarias es entonces muy limitado y tu cuota restante queda invisible.</string>
+    <string name="subtitles_intro">Los subtítulos vienen de OpenSubtitles. Funcionan sin cuenta, pero el número de descargas diarias es entonces muy limitado y la cuota restante queda invisible.</string>
     <string name="subtitles_account">Cuenta de OpenSubtitles</string>
-    <string name="subtitles_account_help">Opcional. Conectar tu cuenta eleva el límite diario y permite mostrar lo que te queda.</string>
+    <string name="subtitles_account_help">Opcional. Conectar una cuenta eleva el límite diario y permite mostrar la cuota restante.</string>
     <string name="subtitles_username">Usuario</string>
     <string name="subtitles_password">Contraseña</string>
     <string name="subtitles_remember">Mantener la sesión</string>
-    <string name="subtitles_remember_help">OpenSubtitles no puede prolongar una sesión: caduca a las 24 h. Mantener la sesión implica por tanto guardar tu contraseña en este dispositivo, para reabrirla sin volver a pedírtela. Nunca se incluye en una copia de seguridad.</string>
+    <string name="subtitles_remember_help">OpenSubtitles no puede prolongar una sesión: caduca a las 24 h. Mantener la sesión implica por tanto guardar la contraseña en este dispositivo, para reabrirla sin volver a pedirla. Nunca se incluye en una copia de seguridad.</string>
     <string name="subtitles_login">Iniciar sesión</string>
     <string name="subtitles_logout">Cerrar sesión</string>
     <string name="subtitles_connecting">Conectando…</string>
     <string name="subtitles_connected_as">Conectado como %1$s</string>
     <string name="subtitles_error_credentials">Usuario o contraseña incorrectos.</string>
     <string name="subtitles_error_rate">Demasiados intentos. Espera un minuto antes de reintentar.</string>
-    <string name="subtitles_error_network">OpenSubtitles no responde. Comprueba tu conexión.</string>
+    <string name="subtitles_error_network">OpenSubtitles no responde. Comprobar la conexión.</string>
     <string name="subtitles_quota_known">Te quedan %1$d descargas de %2$d para hoy</string>
-    <string name="subtitles_quota_unknown">Cuota desconocida — solo aparece tras una descarga, o conectando tu cuenta.</string>
+    <string name="subtitles_quota_unknown">Cuota desconocida — solo aparece tras una descarga, o conectando una cuenta.</string>
     <string name="subtitles_languages">Idiomas buscados</string>
     <string name="subtitles_languages_help">En orden: el primero prevalece sobre los demás al clasificar los subtítulos ofrecidos. Al menos un idioma debe permanecer activo.</string>
     <string name="subtitles_no_key">Esta versión se compiló sin clave de OpenSubtitles: los subtítulos están desactivados.</string>
@@ -285,17 +285,17 @@
     <string name="player_subtitles_quota_left">%1$d restantes hoy</string>
     <string name="player_subtitles_downloaded">Descargado</string>
     <string name="settings_introdb_key">Clave de TheIntroDB</string>
-    <string name="settings_introdb_hint">Pega tu clave de TheIntroDB aquí…</string>
-    <string name="settings_introdb_help">Opcional. Sirve para informar de intros y créditos que faltan desde el reproductor — y tus propios informes surten efecto de inmediato. Clave gratuita en theintrodb.org.</string>
+    <string name="settings_introdb_hint">Pegar la clave de TheIntroDB aquí…</string>
+    <string name="settings_introdb_help">Opcional. Sirve para informar de intros y créditos que faltan desde el reproductor — y los informes enviados surten efecto de inmediato en este dispositivo. Clave gratuita en theintrodb.org.</string>
     <string name="report_segment">Informar de un segmento</string>
     <string name="report_intro">Informar de la intro</string>
     <string name="report_credits">Informar de los créditos</string>
     <string name="report_no_intro">Este episodio no tiene intro</string>
     <string name="report_no_credits">Este episodio no tiene créditos</string>
-    <string name="report_mark_intro_end">Pulsa OK cuando termine la intro</string>
-    <string name="report_mark_intro_start">Pulsa OK cuando empiece la intro</string>
+    <string name="report_mark_intro_end">Validar cuando termine la intro</string>
+    <string name="report_mark_intro_start">Validar cuando empiece la intro</string>
     <string name="report_marked_start">Inicio marcado: %1$s</string>
-    <string name="report_mark_credits_start">Pulsa OK cuando empiecen los créditos</string>
+    <string name="report_mark_credits_start">Validar cuando empiecen los créditos</string>
     <string name="report_cancel_hint">Atrás para cancelar</string>
     <string name="report_confirm_intro_range">Intro de %1$s a %2$s</string>
     <string name="report_confirm_credits">Créditos desde %1$s</string>
@@ -303,11 +303,11 @@
     <string name="report_send">Enviar</string>
     <string name="report_redo">Empezar de nuevo</string>
     <string name="report_sending">Enviando…</string>
-    <string name="report_sent">Gracias — registrado, y ya activo para ti</string>
+    <string name="report_sent">Gracias — registrado, y ya activo en este dispositivo</string>
     <string name="report_error_key">Hace falta una clave de TheIntroDB. Ajustes → API y claves.</string>
     <string name="report_error_auth">TheIntroDB rechazó la clave. Compruébala en los ajustes.</string>
     <string name="report_error_already">Ya informaste de este segmento para este episodio.</string>
-    <string name="report_error_rate">Demasiados envíos seguidos. Inténtalo en un momento.</string>
+    <string name="report_error_rate">Demasiados envíos seguidos. Intentar en un momento.</string>
     <string name="report_error_rejected">TheIntroDB rechazó el informe.</string>
     <string name="report_error_network">TheIntroDB no responde.</string>
     <string name="report_problem_short">Menos de 5 segundos: no es un segmento.</string>
