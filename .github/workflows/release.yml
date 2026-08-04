@@ -3,6 +3,13 @@ name: Release
 # Publie à chaque tag vX.Y.Z : APK Android signé + paquets desktop natifs
 # (deb Linux, msi Windows, dmg macOS) sur la même GitHub Release.
 # L'auto-updater in-app (Android et desktop) lit releases/latest.
+#
+# Un tag qui porte un suffixe semver de préversion — `v1.15.0-rc.1` — sort en
+# **pré-release**. C'est ce qui met une version à l'épreuve sans l'imposer :
+# l'API GitHub définit `releases/latest` comme la dernière release *non*
+# préversion, donc l'updater intégré ne la voit pas et aucune bannière ne
+# s'affiche chez les utilisateurs installés. Les testeurs, eux, l'installent à
+# la main depuis la page des releases.
 on:
   push:
     tags: ['v*']
@@ -65,6 +72,15 @@ jobs:
           files: moovie-*.apk
           body: ${{ needs.changelog.outputs.notes }}
           generate_release_notes: true
+          # Les quatre publications visent la *même* release : elles doivent
+          # s'accorder sur ce marquage, sinon la dernière arrivée déclasse les
+          # précédentes. D'où l'expression, identique partout, plutôt qu'une
+          # valeur saisie à la main.
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          # Une préversion ne peut pas être « latest ». On le dit explicitement
+          # au lieu de compter sur le refus de l'API : c'est ce drapeau, et lui
+          # seul, qui protège les utilisateurs installés d'une bannière.
+          make_latest: ${{ !contains(github.ref_name, '-') }}
 
   desktop:
     needs: changelog
@@ -105,6 +121,15 @@ jobs:
           files: moovie-*.${{ matrix.ext }}
           body: ${{ needs.changelog.outputs.notes }}
           generate_release_notes: true
+          # Les quatre publications visent la *même* release : elles doivent
+          # s'accorder sur ce marquage, sinon la dernière arrivée déclasse les
+          # précédentes. D'où l'expression, identique partout, plutôt qu'une
+          # valeur saisie à la main.
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          # Une préversion ne peut pas être « latest ». On le dit explicitement
+          # au lieu de compter sur le refus de l'API : c'est ce drapeau, et lui
+          # seul, qui protège les utilisateurs installés d'une bannière.
+          make_latest: ${{ !contains(github.ref_name, '-') }}
 
   # Linux passe par un AppImage : il embarque ses bibliothèques, tourne sur
   # n'importe quelle distribution et, étant un fichier unique chez
@@ -259,3 +284,12 @@ jobs:
           files: moovie-*.AppImage
           body: ${{ needs.changelog.outputs.notes }}
           generate_release_notes: true
+          # Les quatre publications visent la *même* release : elles doivent
+          # s'accorder sur ce marquage, sinon la dernière arrivée déclasse les
+          # précédentes. D'où l'expression, identique partout, plutôt qu'une
+          # valeur saisie à la main.
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          # Une préversion ne peut pas être « latest ». On le dit explicitement
+          # au lieu de compter sur le refus de l'API : c'est ce drapeau, et lui
+          # seul, qui protège les utilisateurs installés d'une bannière.
+          make_latest: ${{ !contains(github.ref_name, '-') }}
