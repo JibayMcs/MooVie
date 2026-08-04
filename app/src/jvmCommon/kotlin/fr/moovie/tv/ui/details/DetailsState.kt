@@ -19,6 +19,13 @@ sealed interface DetailsState {
         val season: Int,
         val episodes: List<Episode>,
         val resumeEpisode: Int = 0,
+        /**
+         * Résumé et année **de la saison affichée**, quand TMDB les donne. Le
+         * héros s'en sert et retombe sur ceux de la série sinon : mieux vaut le
+         * synopsis de la série qu'un cadre vide.
+         */
+        val seasonOverview: String = "",
+        val seasonYear: String? = null,
     ) : DetailsState
     data class Error(val message: String) : DetailsState
 }

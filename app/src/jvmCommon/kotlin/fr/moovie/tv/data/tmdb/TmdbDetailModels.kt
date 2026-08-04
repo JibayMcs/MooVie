@@ -53,7 +53,18 @@ data class SeasonSummary(
 data class SeasonDetails(
     @SerialName("season_number") val seasonNumber: Int = 0,
     val episodes: List<Episode> = emptyList(),
-)
+    /**
+     * Résumé et date **de la saison**, que l'API renvoie depuis toujours mais
+     * qu'on ne lisait pas : la fiche affichait donc le synopsis de la série
+     * quelle que soit la saison choisie. Souvent vides sur les séries peu
+     * documentées, d'où le repli sur ceux de la série côté écran.
+     */
+    val overview: String = "",
+    @SerialName("air_date") val airDate: String? = null,
+) {
+    /** Année de diffusion de la saison, ou null si l'API ne la donne pas. */
+    val year: String? get() = airDate?.take(4)?.takeIf { it.length == 4 }
+}
 
 @Serializable
 data class Episode(

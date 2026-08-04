@@ -313,20 +313,28 @@ class DetailsViewModel : ViewModel() {
                     // connaît la longueur réelle des saisons pour basculer sur
                     // la suivante.
                     var season = if (target.season in seasons) target.season else firstSeason
-                    var eps = repo.season(apiKey, tmdbId, season).episodes
-                    if (target.episode > eps.size) {
+                    var seasonDetails = repo.season(apiKey, tmdbId, season)
+                    if (target.episode > seasonDetails.episodes.size) {
                         val next = seasons.firstOrNull { it > season }
                         if (next != null) {
                             season = next
-                            eps = repo.season(apiKey, tmdbId, season).episodes
+                            seasonDetails = repo.season(apiKey, tmdbId, season)
                         }
                     }
+                    val eps = seasonDetails.episodes
                     // Si la saison a changé en route, l'épisode visé redevient le
                     // premier de la nouvelle saison.
                     val focusEpisode =
                         if (season == target.season) target.episode.coerceAtMost(eps.size) else 1
                     resumeTarget = EpisodeRef(season, focusEpisode)
-                    DetailsState.Tv(d, season, eps, resumeEpisode = focusEpisode)
+                    DetailsState.Tv(
+                        d,
+                        season,
+                        eps,
+                        resumeEpisode = focusEpisode,
+                        seasonOverview = seasonDetails.overview,
+                        seasonYear = seasonDetails.year,
+                    )
                 } else {
                     DetailsState.Movie(repo.movieDetails(apiKey, tmdbId))
                 }
@@ -372,15 +380,17 @@ class DetailsViewModel : ViewModel() {
         viewModelScope.launch {
             val apiKey = settings.tmdbApiKey.first()
             val repo = TmdbRepository(currentTmdbLanguage())
-            runCatching { repo.season(apiKey, tmdbId, season).episodes }
-                .onSuccess {
+            runCatching { repo.season(apiKey, tmdbId, season) }
+                .onSuccess { details ->
                     // Le repère ne vaut que pour la saison où l'on s'était
                     // arrêté : ailleurs, il désignerait un épisode au hasard.
                     val target = resumeTarget
                     _state.value = tv.copy(
                         season = season,
-                        episodes = it,
+                        episodes = details.episodes,
                         resumeEpisode = if (target?.season == season) target.episode else 0,
+                        seasonOverview = details.overview,
+                        seasonYear = details.year,
                     )
                 }
         }
