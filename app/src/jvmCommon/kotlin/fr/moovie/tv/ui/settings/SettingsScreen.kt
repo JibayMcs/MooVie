@@ -79,7 +79,6 @@ import fr.moovie.tv.resources.settings_doh_on
 import fr.moovie.tv.resources.settings_doh_resolver
 import fr.moovie.tv.resources.settings_cat_history
 import fr.moovie.tv.resources.settings_enable
-import fr.moovie.tv.resources.settings_hide_history_widgets
 import fr.moovie.tv.resources.settings_history_help
 import fr.moovie.tv.resources.settings_introdb_help
 import fr.moovie.tv.resources.settings_introdb_hint
@@ -88,6 +87,9 @@ import fr.moovie.tv.resources.settings_intro_help
 import fr.moovie.tv.resources.settings_language
 import fr.moovie.tv.resources.settings_splash
 import fr.moovie.tv.resources.settings_splash_help
+import fr.moovie.tv.resources.common_show
+import fr.moovie.tv.resources.common_hide
+import fr.moovie.tv.resources.settings_history_widgets
 import fr.moovie.tv.resources.settings_move_down
 import fr.moovie.tv.resources.settings_move_up
 import fr.moovie.tv.resources.settings_player_clock
@@ -341,10 +343,18 @@ fun SettingsScreenContent(
                 }
 
                 SettingsSection.HISTORY -> SettingRow(
-                    label = stringResource(Res.string.settings_hide_history_widgets),
+                    label = stringResource(Res.string.settings_history_widgets),
                     help = stringResource(Res.string.settings_history_help),
                 ) {
-                    OnOff(value = hideHistoryWidgets, onChange = onSetHideHistoryWidgets)
+                    // Le réglage stocké dit « masquer » ; les boutons disent ce
+                    // qu'ils font. D'où l'inversion, faite ici plutôt que dans
+                    // le dépôt : les sauvegardes déjà écrites gardent leur sens.
+                    OnOff(
+                        value = !hideHistoryWidgets,
+                        onChange = { onSetHideHistoryWidgets(!it) },
+                        onLabel = stringResource(Res.string.common_show),
+                        offLabel = stringResource(Res.string.common_hide),
+                    )
                 }
 
                 SettingsSection.SCREENSAVER -> SettingRow(
@@ -476,14 +486,22 @@ private fun SettingRow(
 
 /** Couple de boutons Activé / Désactivé. */
 @Composable
-private fun OnOff(value: Boolean, onChange: (Boolean) -> Unit) {
+private fun OnOff(
+    value: Boolean,
+    onChange: (Boolean) -> Unit,
+    /**
+     * Libellés des deux boutons. « Activé / Désactivé » convient à un réglage
+     * dont l'intitulé est une **capacité** ; il devient illisible dès que
+     * l'intitulé décrit une *action*, où l'on obtient un « Masquer : Désactivé »
+     * qu'il faut relire deux fois. Dans ce cas on nomme l'objet dans l'intitulé
+     * et les deux actions ici.
+     */
+    onLabel: String = stringResource(Res.string.common_enabled),
+    offLabel: String = stringResource(Res.string.common_disabled),
+) {
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        MoovieButton(onClick = { onChange(true) }, selected = value) {
-            Text(stringResource(Res.string.common_enabled))
-        }
-        MoovieButton(onClick = { onChange(false) }, selected = !value) {
-            Text(stringResource(Res.string.common_disabled))
-        }
+        MoovieButton(onClick = { onChange(true) }, selected = value) { Text(onLabel) }
+        MoovieButton(onClick = { onChange(false) }, selected = !value) { Text(offLabel) }
     }
 }
 

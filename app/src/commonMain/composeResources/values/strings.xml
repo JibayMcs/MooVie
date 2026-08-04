@@ -8,6 +8,8 @@
     <string name="common_cancel">Annuler</string>
     <string name="common_enabled">Activé</string>
     <string name="common_disabled">Désactivé</string>
+    <string name="common_show">Afficher</string>
+    <string name="common_hide">Masquer</string>
     <string name="mark_watched">Marquer comme vu</string>
     <string name="mark_unwatched">Marquer non vu</string>
 
@@ -171,8 +173,8 @@
     <string name="history_stat_year">Cette année</string>
     <string name="history_stat_top_series">Série du moment</string>
     <string name="settings_cat_history">Historique</string>
-    <string name="settings_hide_history_widgets">Masquer les widgets</string>
-    <string name="settings_history_help">Ouvre la page d'historique sur la grille pleine hauteur. Désactive pour afficher les cartes de statistiques au-dessus.</string>
+    <string name="settings_history_widgets">Cartes de statistiques</string>
+    <string name="settings_history_help">Trois cartes de résumé au-dessus de la grille : genre du mois, total de l'année, série du moment.</string>
 
     <!-- Explorer (page de recherche) -->
     <string name="explore_movies">Films</string>

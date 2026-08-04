@@ -6,6 +6,8 @@
     <string name="common_cancel">Cancel</string>
     <string name="common_enabled">On</string>
     <string name="common_disabled">Off</string>
+    <string name="common_show">Show</string>
+    <string name="common_hide">Hide</string>
     <string name="mark_watched">Mark as watched</string>
     <string name="mark_unwatched">Mark as unwatched</string>
 
@@ -169,8 +171,8 @@
     <string name="history_stat_year">This year</string>
     <string name="history_stat_top_series">Show of the moment</string>
     <string name="settings_cat_history">History</string>
-    <string name="settings_hide_history_widgets">Hide widgets</string>
-    <string name="settings_history_help">Opens the history page on the full-height grid. Turn off to show the stat cards above it.</string>
+    <string name="settings_history_widgets">Statistics cards</string>
+    <string name="settings_history_help">Three summary cards above the grid: genre of the month, yearly total, series of the moment.</string>
 
     <!-- Explore (search page) -->
     <string name="explore_movies">Movies</string>

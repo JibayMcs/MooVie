@@ -6,6 +6,8 @@
     <string name="common_cancel">Cancelar</string>
     <string name="common_enabled">Activado</string>
     <string name="common_disabled">Desactivado</string>
+    <string name="common_show">Mostrar</string>
+    <string name="common_hide">Ocultar</string>
     <string name="mark_watched">Marcar como visto</string>
     <string name="mark_unwatched">Marcar como no visto</string>
 
@@ -169,8 +171,8 @@
     <string name="history_stat_year">Este año</string>
     <string name="history_stat_top_series">Serie del momento</string>
     <string name="settings_cat_history">Historial</string>
-    <string name="settings_hide_history_widgets">Ocultar los widgets</string>
-    <string name="settings_history_help">Abre la página del historial con la cuadrícula a pantalla completa. Desactívalo para mostrar las tarjetas de estadísticas encima.</string>
+    <string name="settings_history_widgets">Tarjetas de estadísticas</string>
+    <string name="settings_history_help">Tres tarjetas de resumen sobre la cuadrícula: género del mes, total del año, serie del momento.</string>
 
     <!-- Explorar (página de búsqueda) -->
     <string name="explore_movies">Películas</string>
