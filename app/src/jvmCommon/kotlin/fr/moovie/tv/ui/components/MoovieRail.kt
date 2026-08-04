@@ -20,6 +20,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -80,6 +82,29 @@ fun Modifier.scrollAsWholeBlock(): Modifier {
     return onSizeChanged { size = it }.bringIntoViewResponder(responder)
 }
 
+/**
+ * Ramène le focus sur la première carte quand la rangée est atteinte depuis
+ * l'extérieur — et seulement à ce moment-là.
+ *
+ * La bascule se fait sur la **transition** « la rangée n'avait pas le focus →
+ * elle l'a » : se déplacer de carte en carte à l'intérieur ne la déclenche donc
+ * jamais, sans quoi on serait cloué sur la première.
+ */
+@Composable
+private fun rememberRailEntryFocus(firstFocus: FocusRequester?): Modifier {
+    if (firstFocus == null) return Modifier
+    var hadFocus by remember { mutableStateOf(false) }
+    return Modifier.onFocusChanged { state ->
+        if (state.hasFocus && !hadFocus) {
+            // Peut échouer si la première carte n'est pas encore attachée
+            // (rangée recyclée par la liste) : dans ce cas on laisse le focus
+            // où le système l'a mis plutôt que de le perdre.
+            runCatching { firstFocus.requestFocus() }
+        }
+        hadFocus = state.hasFocus
+    }
+}
+
 /** Fraction de la largeur visible parcourue par un « coup » de défilement. */
 private const val PAGE_FRACTION = 0.8f
 
@@ -102,10 +127,22 @@ private const val WHEEL_STEP = 80f
 fun MoovieRail(
     state: LazyListState,
     modifier: Modifier = Modifier,
+    /**
+     * Première carte de la rangée. Fournie, le focus y est ramené **chaque fois
+     * que la rangée est atteinte depuis l'extérieur**.
+     *
+     * Sans ça, descendre d'une rangée à l'autre conservait la colonne : parti de
+     * la 3ᵉ affiche, on arrivait sur la 3ᵉ de la rangée suivante, en ayant sauté
+     * les deux premières sans les voir. Or les rangées sont ordonnées par
+     * pertinence — leur début est ce qu'on a de mieux à montrer, et c'est aussi
+     * ce que l'œil cherche en arrivant.
+     */
+    firstFocus: FocusRequester? = null,
     row: @Composable () -> Unit,
 ) {
+    val focusFirst = rememberRailEntryFocus(firstFocus)
     if (!isPointerUi) {
-        Box(modifier = modifier.scrollAsWholeBlock()) { row() }
+        Box(modifier = modifier.scrollAsWholeBlock().then(focusFirst)) { row() }
         return
     }
 

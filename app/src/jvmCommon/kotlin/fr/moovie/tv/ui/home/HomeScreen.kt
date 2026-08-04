@@ -573,7 +573,10 @@ private fun ResumeRow(
         )
         Spacer(Modifier.height(8.dp))
         val listState = rememberLazyListState()
-        MoovieRail(listState) {
+        // Repli local : même sans cible fournie par l'appelant, la rangée doit
+        // pouvoir ramener le focus sur sa première carte quand on l'atteint.
+        val entryFocus = firstFocus ?: remember { FocusRequester() }
+        MoovieRail(listState, firstFocus = entryFocus) {
         LazyRow(
             state = listState,
             horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -585,7 +588,7 @@ private fun ResumeRow(
                     onClick = { onResume(entry) },
                     onLongClick = { onMenu(entry) },
                     onFocusEntry = onFocusEntry,
-                    modifier = if (index == 0 && firstFocus != null) Modifier.focusRequester(firstFocus) else Modifier,
+                    modifier = if (index == 0) Modifier.focusRequester(entryFocus) else Modifier,
                 )
             }
         }
@@ -733,7 +736,10 @@ private fun CatalogRow(
         )
         Spacer(Modifier.height(8.dp))
         val listState = rememberLazyListState()
-        MoovieRail(listState) {
+        // Repli local : même sans cible fournie par l'appelant, la rangée doit
+        // pouvoir ramener le focus sur sa première carte quand on l'atteint.
+        val entryFocus = firstFocus ?: remember { FocusRequester() }
+        MoovieRail(listState, firstFocus = entryFocus) {
             LazyRow(
                 state = listState,
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -748,7 +754,7 @@ private fun CatalogRow(
                         onClick = { onOpenTitle(item.id, item.isTv) },
                         onLongClick = { onMenu(item) },
                         onFocusItem = onFocusItem,
-                        modifier = if (index == 0 && firstFocus != null) Modifier.focusRequester(firstFocus) else Modifier,
+                        modifier = if (index == 0) Modifier.focusRequester(entryFocus) else Modifier,
                     )
                 }
             }
@@ -846,7 +852,10 @@ private fun WatchlistRow(
         )
         Spacer(Modifier.height(8.dp))
         val listState = rememberLazyListState()
-        MoovieRail(listState) {
+        // Repli local : même sans cible fournie par l'appelant, la rangée doit
+        // pouvoir ramener le focus sur sa première carte quand on l'atteint.
+        val entryFocus = firstFocus ?: remember { FocusRequester() }
+        MoovieRail(listState, firstFocus = entryFocus) {
             LazyRow(
                 state = listState,
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -863,8 +872,8 @@ private fun WatchlistRow(
                             // dernière carte de la rangée précédente.
                             .heroSubject { onFocusEntry(entry) }
                             .then(
-                                if (index == 0 && firstFocus != null) {
-                                    Modifier.focusRequester(firstFocus)
+                                if (index == 0) {
+                                    Modifier.focusRequester(entryFocus)
                                 } else {
                                     Modifier
                                 },
