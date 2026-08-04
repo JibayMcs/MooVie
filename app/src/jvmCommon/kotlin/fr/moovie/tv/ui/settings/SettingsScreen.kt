@@ -105,6 +105,12 @@ import fr.moovie.tv.resources.settings_tmdb_hint
 import fr.moovie.tv.resources.settings_tmdb_key
 import fr.moovie.tv.resources.settings_update_help
 import fr.moovie.tv.resources.settings_update_interval
+import fr.moovie.tv.resources.settings_check_now
+import fr.moovie.tv.resources.settings_check_now_help
+import fr.moovie.tv.resources.settings_check_running
+import fr.moovie.tv.resources.settings_check_uptodate
+import fr.moovie.tv.resources.settings_check_failed
+import fr.moovie.tv.ui.update.UpdateCheck
 import fr.moovie.tv.resources.update_every_hours
 import fr.moovie.tv.resources.update_every_minutes
 import fr.moovie.tv.resources.update_never
@@ -165,6 +171,7 @@ fun SettingsScreenContent(
     hideHistoryWidgets: Boolean,
     splashAnimation: Boolean,
     updateInterval: UpdateInterval,
+    updateCheck: UpdateCheck,
     screensaverDelay: ScreensaverDelay,
     dohEnabled: Boolean,
     dohProvider: DohProvider,
@@ -178,6 +185,7 @@ fun SettingsScreenContent(
     onSetHideHistoryWidgets: (Boolean) -> Unit,
     onSetSplashAnimation: (Boolean) -> Unit,
     onSetUpdateInterval: (UpdateInterval) -> Unit,
+    onCheckUpdates: () -> Unit,
     onSetScreensaverDelay: (ScreensaverDelay) -> Unit,
     onSetDohEnabled: (Boolean) -> Unit,
     onSetDohProvider: (DohProvider) -> Unit,
@@ -370,17 +378,53 @@ fun SettingsScreenContent(
                     )
                 }
 
-                SettingsSection.UPDATE -> SettingRow(
-                    label = stringResource(Res.string.settings_update_interval),
-                    help = stringResource(Res.string.settings_update_help),
-                ) {
-                    MoovieSelect(
-                        title = stringResource(Res.string.settings_update_interval),
-                        options = UpdateInterval.entries.toList(),
-                        selected = updateInterval,
-                        label = { updateIntervalLabel(it) },
-                        onSelect = onSetUpdateInterval,
-                    )
+                SettingsSection.UPDATE -> {
+                    SettingRow(
+                        label = stringResource(Res.string.settings_update_interval),
+                        help = stringResource(Res.string.settings_update_help),
+                    ) {
+                        MoovieSelect(
+                            title = stringResource(Res.string.settings_update_interval),
+                            options = UpdateInterval.entries.toList(),
+                            selected = updateInterval,
+                            label = { updateIntervalLabel(it) },
+                            onSelect = onSetUpdateInterval,
+                        )
+                    }
+                    // Vérification immédiate : sans elle, installer une version
+                    // tout juste publiée imposait d'attendre le prochain tour de
+                    // la minuterie — jusqu'à deux heures — ou de relancer l'app.
+                    SettingRow(
+                        label = stringResource(Res.string.settings_check_now),
+                        help = stringResource(Res.string.settings_check_now_help),
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        ) {
+                            // Le cas « rien de neuf » est le plus fréquent, et
+                            // c'est le seul que la bannière ne sait pas dire :
+                            // sans ce retour le bouton paraîtrait inerte.
+                            when (updateCheck) {
+                                UpdateCheck.CHECKING ->
+                                    Text(stringResource(Res.string.settings_check_running), color = Color(0xFF9A9A9A))
+                                UpdateCheck.UP_TO_DATE ->
+                                    Text(stringResource(Res.string.settings_check_uptodate), color = Color(0xFF9A9A9A))
+                                UpdateCheck.FAILED ->
+                                    Text(stringResource(Res.string.settings_check_failed), color = Color(0xFFE0A0A0))
+                                UpdateCheck.IDLE -> Unit
+                            }
+                            // Toujours `enabled` : le passer à false pendant la
+                            // vérification faisait perdre le focus au bouton —
+                            // Compose le retire d'un nœud désactivé et ne le
+                            // rend pas — et la télécommande se retrouvait
+                            // renvoyée dans le volet des sections. Les appuis
+                            // répétés sont absorbés par checkNow() lui-même.
+                            MoovieButton(onClick = onCheckUpdates) {
+                                Text(stringResource(Res.string.settings_check_now))
+                            }
+                        }
+                    }
                 }
 
                 SettingsSection.DNS -> {

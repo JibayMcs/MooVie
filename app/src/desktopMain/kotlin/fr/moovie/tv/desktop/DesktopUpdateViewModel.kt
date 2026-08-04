@@ -7,6 +7,7 @@ import fr.moovie.tv.data.settings.UpdateInterval
 import fr.moovie.tv.data.update.UpdateRepository
 import fr.moovie.tv.resources.Res
 import fr.moovie.tv.resources.update_error
+import fr.moovie.tv.ui.update.UpdateCheck
 import fr.moovie.tv.ui.update.UpdateState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -56,6 +57,10 @@ class DesktopUpdateViewModel : ViewModel() {
 
     /** Version écartée par « Plus tard », à ne plus proposer d'ici la fin de session. */
     private var dismissedVersion: String? = null
+
+    /** Issue de la dernière vérification lancée depuis les réglages. */
+    private val _checkStatus = MutableStateFlow(UpdateCheck.IDLE)
+    val checkStatus: StateFlow<UpdateCheck> = _checkStatus
 
     /** Asset .AppImage de la release courante, si elle en propose un. */
     private var appImageAssetUrl: String? = null
@@ -107,12 +112,16 @@ class DesktopUpdateViewModel : ViewModel() {
         }
     }
 
-    private suspend fun check() {
-        val release = repo.latestRelease() ?: return
-        if (release.draft || release.prerelease) return
-        if (!repo.isNewer(release.tagName, currentVersion)) return
+    /**
+     * Interroge GitHub une fois. Rend [UpdateCheck.IDLE] quand une version a été
+     * trouvée : c'est la bannière qui le dit.
+     */
+    private suspend fun check(): UpdateCheck {
+        val release = repo.latestRelease() ?: return UpdateCheck.FAILED
+        if (release.draft || release.prerelease) return UpdateCheck.UP_TO_DATE
+        if (!repo.isNewer(release.tagName, currentVersion)) return UpdateCheck.UP_TO_DATE
         val version = release.tagName.removePrefix("v")
-        if (version == dismissedVersion) return
+        if (version == dismissedVersion) return UpdateCheck.UP_TO_DATE
         appImageAssetUrl = release.assets
             .firstOrNull { it.name.endsWith(".AppImage", ignoreCase = true) }
             ?.downloadUrl
@@ -121,6 +130,22 @@ class DesktopUpdateViewModel : ViewModel() {
             ?.downloadUrl
         // apkUrl transporte ici l'URL de la page de release (repli navigateur).
         _state.value = UpdateState.Available(version, release.htmlUrl)
+        return UpdateCheck.IDLE
+    }
+
+    /**
+     * Vérification immédiate, déclenchée depuis les réglages.
+     *
+     * Voir UpdateViewModel (Android) : le « Plus tard » est effacé, aller
+     * chercher soi-même une mise à jour repoussée valant changement d'avis.
+     */
+    fun checkNow() {
+        if (_checkStatus.value == UpdateCheck.CHECKING) return
+        viewModelScope.launch {
+            _checkStatus.value = UpdateCheck.CHECKING
+            dismissedVersion = null
+            _checkStatus.value = runCatching { check() }.getOrDefault(UpdateCheck.FAILED)
+        }
     }
 
     /** « Plus tard » : masque cette version jusqu'au prochain démarrage. */

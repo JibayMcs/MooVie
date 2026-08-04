@@ -40,6 +40,10 @@ class UpdateViewModel(app: Application) : AndroidViewModel(app) {
     /** Version écartée par « Plus tard », à ne plus proposer d'ici la fin de session. */
     private var dismissedVersion: String? = null
 
+    /** Issue de la dernière vérification lancée depuis les réglages. */
+    private val _checkStatus = MutableStateFlow(UpdateCheck.IDLE)
+    val checkStatus: StateFlow<UpdateCheck> = _checkStatus
+
     init {
         viewModelScope.launch {
             // collectLatest : changer l'intervalle dans les réglages relance
@@ -57,18 +61,42 @@ class UpdateViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private suspend fun check() {
+    /**
+     * Interroge GitHub une fois. Rend [UpdateCheck.IDLE] quand une version a été
+     * trouvée : c'est la bannière qui le dit, les réglages n'ont rien à ajouter.
+     */
+    private suspend fun check(): UpdateCheck {
         // Ne pas écraser un téléchargement en cours ni une erreur affichée.
-        if (_state.value is UpdateState.Downloading || _state.value is UpdateState.Error) return
-        val release = repo.latestRelease() ?: return
-        if (release.draft || release.prerelease) return
-        val apk = release.assets.firstOrNull { it.name.endsWith(".apk") } ?: return
-        if (!repo.isNewer(release.tagName, BuildConfig.VERSION_NAME)) return
+        if (_state.value is UpdateState.Downloading || _state.value is UpdateState.Error) {
+            return UpdateCheck.IDLE
+        }
+        val release = repo.latestRelease() ?: return UpdateCheck.FAILED
+        if (release.draft || release.prerelease) return UpdateCheck.UP_TO_DATE
+        val apk = release.assets.firstOrNull { it.name.endsWith(".apk") }
+            ?: return UpdateCheck.UP_TO_DATE
+        if (!repo.isNewer(release.tagName, BuildConfig.VERSION_NAME)) return UpdateCheck.UP_TO_DATE
         val version = release.tagName.removePrefix("v")
-        if (version == dismissedVersion) return
+        if (version == dismissedVersion) return UpdateCheck.UP_TO_DATE
         val found = UpdateState.Available(version, apk.downloadUrl)
         available = found
         _state.value = found
+        return UpdateCheck.IDLE
+    }
+
+    /**
+     * Vérification immédiate, déclenchée depuis les réglages.
+     *
+     * Efface le « Plus tard » au passage : aller chercher soi-même une mise à
+     * jour qu'on avait repoussée, c'est avoir changé d'avis. Sans ça le bouton
+     * répondrait « à jour » sur une version qu'on vient d'écarter.
+     */
+    fun checkNow() {
+        if (_checkStatus.value == UpdateCheck.CHECKING) return
+        viewModelScope.launch {
+            _checkStatus.value = UpdateCheck.CHECKING
+            dismissedVersion = null
+            _checkStatus.value = runCatching { check() }.getOrDefault(UpdateCheck.FAILED)
+        }
     }
 
     /** « Plus tard » : masque cette version jusqu'au prochain démarrage. */

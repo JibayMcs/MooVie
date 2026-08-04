@@ -36,6 +36,9 @@ internal object Vm {
     val settings by lazy { SettingsViewModel() }
     val details by lazy { DetailsViewModel() }
     val catalog by lazy { CatalogViewModel() }
+
+    /** Partagé entre la bannière et le bouton « Vérifier maintenant ». */
+    val update by lazy { DesktopUpdateViewModel() }
 }
 
 @Composable
@@ -135,6 +138,7 @@ internal fun DesktopSettingsScreen(onBack: () -> Unit) {
     val playerClock by vm.playerClock.collectAsState()
     val hideHistoryWidgets by vm.hideHistoryWidgets.collectAsState()
     val splashAnimation by vm.splashAnimation.collectAsState()
+    val updateCheck by Vm.update.checkStatus.collectAsState()
     val updateInterval by vm.updateInterval.collectAsState()
     val screensaverDelay by vm.screensaverDelay.collectAsState()
 
@@ -147,6 +151,7 @@ internal fun DesktopSettingsScreen(onBack: () -> Unit) {
         playerClock = playerClock,
         hideHistoryWidgets = hideHistoryWidgets,
         splashAnimation = splashAnimation,
+        updateCheck = updateCheck,
         updateInterval = updateInterval,
         screensaverDelay = screensaverDelay,
         dohEnabled = dohEnabled,
@@ -160,6 +165,7 @@ internal fun DesktopSettingsScreen(onBack: () -> Unit) {
         onSetPlayerClock = vm::setPlayerClock,
         onSetHideHistoryWidgets = vm::setHideHistoryWidgets,
         onSetSplashAnimation = vm::setSplashAnimation,
+        onCheckUpdates = Vm.update::checkNow,
         onSetUpdateInterval = vm::setUpdateInterval,
         onSetScreensaverDelay = vm::setScreensaverDelay,
         onSetDohEnabled = vm::setDohEnabled,

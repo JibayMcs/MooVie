@@ -91,6 +91,11 @@
     <string name="settings_cat_update">Mises à jour</string>
     <string name="settings_update_interval">Fréquence de vérification</string>
     <string name="settings_update_help">Vérifie si une nouvelle version est disponible, à intervalle régulier. Pendant la lecture, l'information s'affiche en pastille discrète plutôt qu'en bandeau. « Jamais » désactive complètement la vérification.</string>
+    <string name="settings_check_now">Vérifier maintenant</string>
+    <string name="settings_check_now_help">Interroge GitHub tout de suite, sans attendre le prochain tour de la vérification automatique. Une version trouvée s'affiche en bandeau, même si elle avait été repoussée d'un « Plus tard ».</string>
+    <string name="settings_check_running">Vérification…</string>
+    <string name="settings_check_uptodate">À jour</string>
+    <string name="settings_check_failed">Vérification impossible</string>
     <string name="update_never">Jamais</string>
     <string name="update_every_minutes">Toutes les %1$d min</string>
     <string name="update_every_hours">Toutes les %1$d h</string>

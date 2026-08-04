@@ -1,5 +1,6 @@
 package fr.moovie.tv.ui.settings
 
+import fr.moovie.tv.ui.update.UpdateViewModel
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -59,6 +60,10 @@ fun SettingsScreen(
     val playerClock by viewModel.playerClock.collectAsStateWithLifecycle()
     val hideHistoryWidgets by viewModel.hideHistoryWidgets.collectAsStateWithLifecycle()
     val splashAnimation by viewModel.splashAnimation.collectAsStateWithLifecycle()
+    // Même instance que MainActivity (scope Activity) : une version trouvée ici
+    // remonte donc directement dans la bannière.
+    val updateViewModel: UpdateViewModel = viewModel()
+    val updateCheck by updateViewModel.checkStatus.collectAsStateWithLifecycle()
     val updateInterval by viewModel.updateInterval.collectAsStateWithLifecycle()
     val screensaverDelay by viewModel.screensaverDelay.collectAsStateWithLifecycle()
 
@@ -71,6 +76,7 @@ fun SettingsScreen(
         playerClock = playerClock,
         hideHistoryWidgets = hideHistoryWidgets,
         splashAnimation = splashAnimation,
+        updateCheck = updateCheck,
         updateInterval = updateInterval,
         screensaverDelay = screensaverDelay,
         dohEnabled = dohEnabled,
@@ -84,6 +90,7 @@ fun SettingsScreen(
         onSetPlayerClock = viewModel::setPlayerClock,
         onSetHideHistoryWidgets = viewModel::setHideHistoryWidgets,
         onSetSplashAnimation = viewModel::setSplashAnimation,
+        onCheckUpdates = updateViewModel::checkNow,
         onSetUpdateInterval = viewModel::setUpdateInterval,
         onSetScreensaverDelay = viewModel::setScreensaverDelay,
         onSetDohEnabled = viewModel::setDohEnabled,

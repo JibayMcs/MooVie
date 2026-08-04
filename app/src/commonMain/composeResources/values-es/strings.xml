@@ -89,6 +89,11 @@
     <string name="settings_cat_update">Actualizaciones</string>
     <string name="settings_update_interval">Frecuencia de comprobación</string>
     <string name="settings_update_help">Comprueba si hay una nueva versión a intervalos regulares. Durante la reproducción el aviso aparece como una pastilla discreta en vez de un banner. «Nunca» desactiva la comprobación por completo.</string>
+    <string name="settings_check_now">Comprobar ahora</string>
+    <string name="settings_check_now_help">Consulta GitHub de inmediato, sin esperar a la siguiente comprobación automática. Si encuentra una versión, aparece en un banner, incluso si se había pospuesto con «Más tarde».</string>
+    <string name="settings_check_running">Comprobando…</string>
+    <string name="settings_check_uptodate">Al día</string>
+    <string name="settings_check_failed">No se pudo comprobar</string>
     <string name="update_never">Nunca</string>
     <string name="update_every_minutes">Cada %1$d min</string>
     <string name="update_every_hours">Cada %1$d h</string>

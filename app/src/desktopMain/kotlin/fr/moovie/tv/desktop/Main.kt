@@ -154,7 +154,7 @@ private fun DesktopApp(
     onToggleFullscreen: () -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxSize().background(Color(0xFF0A0A0A))) {
-        val updateViewModel = remember { DesktopUpdateViewModel() }
+        val updateViewModel = Vm.update
         val updateState by updateViewModel.state.collectAsState()
         // Pendant la lecture, la bannière rétrécirait la vidéo : le lecteur
         // affiche une pastille discrète, et la bannière n'apparaît qu'une fois
