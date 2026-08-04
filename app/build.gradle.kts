@@ -13,7 +13,21 @@ plugins {
 
 // Version unique Android + desktop (l'updater compare les tags GitHub à cette
 // valeur ; côté desktop elle est injectée en propriété système moovie.version).
-val appVersion = "1.14.0"
+//
+// Un suffixe semver — « -rc.1 » — désigne une préversion : le tag correspondant
+// sort en pré-release GitHub et reste invisible pour les updaters intégrés.
+val appVersion = "1.15.0-rc.1"
+
+/**
+ * La même version, telle que **jpackage** l'accepte : purement numérique.
+ *
+ * Le MSI et le DMG refusent tout suffixe — un `-rc.1` fait échouer l'emballage,
+ * et la release ne sortirait alors que l'APK, en laissant les utilisateurs
+ * desktop sur la version précédente avec une bannière qui ne pointe sur rien.
+ * L'APK, l'AppImage et la version affichée dans l'app gardent, eux, le suffixe :
+ * eux seuls savent dire ce qu'ils sont.
+ */
+val jpackageVersion = appVersion.substringBefore('-')
 
 // Signature release : keystore.properties en local (gitignoré), variables
 // d'environnement en CI (KEYSTORE_FILE / KEYSTORE_PASSWORD / KEY_ALIAS).
@@ -161,7 +175,7 @@ android {
         applicationId = "fr.moovie.tv"
         minSdk = 23
         targetSdk = 34
-        versionCode = 28
+        versionCode = 29
         versionName = appVersion
         buildConfigField("String", "OPENSUBTITLES_API_KEY", "\"$openSubtitlesApiKey\"")
     }
@@ -246,7 +260,7 @@ compose.desktop {
             // in-app faute de pouvoir s'installer sans root.
             targetFormats(TargetFormat.Msi, TargetFormat.Dmg)
             packageName = "Moo-vie"
-            packageVersion = appVersion
+            packageVersion = jpackageVersion
             description = "Moo-vie — streaming, extraction de sources on-device"
             // Sans vendor, jpackage écrit « Unknown » dans le champ Maintainer.
             vendor = "JibayMcs"
