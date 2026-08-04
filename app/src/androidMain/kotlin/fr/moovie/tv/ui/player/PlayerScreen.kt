@@ -9,6 +9,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -31,6 +32,7 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -47,6 +49,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.MediaSession
 import androidx.media3.ui.PlayerView
+import fr.moovie.tv.ui.adaptive.isTouchUi
 import fr.moovie.tv.ui.format.formatNowDateTime
 import fr.moovie.tv.core.player.matchAudioTrack
 import fr.moovie.tv.data.intro.IntroDbRepository
@@ -629,6 +632,47 @@ fun PlayerScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
+            // ── Pilotage au doigt ────────────────────────────────────────────
+            //
+            // Toute la chrome de ce lecteur se réveille sur un appui *touche* :
+            // sur un téléphone, où il n'y en a aucune, elle était donc
+            // inatteignable — ni pause, ni recherche, ni retour. Un simple
+            // écouteur tactile suffit à la rendre accessible, et il ne gêne pas
+            // la télécommande, qui n'émet pas d'événement de pointeur.
+            .then(
+                if (!isTouchUi) {
+                    Modifier
+                } else {
+                    Modifier.pointerInput(Unit) {
+                        detectTapGestures(
+                            // Appui simple : montre la chrome, ou la range si
+                            // elle est déjà là. C'est le geste attendu partout.
+                            onTap = {
+                                if (screensaverOn) {
+                                    screensaverOn = false
+                                    activityTick++
+                                } else if (autoNextSeconds != null) {
+                                    cancelAutoNext()
+                                } else if (controlsVisible) {
+                                    controlsVisible = false
+                                } else {
+                                    wake()
+                                }
+                            },
+                            // Double appui : recule ou avance de 15 s selon la
+                            // moitié touchée, sans passer par la barre — c'est
+                            // le geste que tout lecteur mobile propose.
+                            onDoubleTap = { offset ->
+                                val backwards = offset.x < size.width / 2f
+                                controller.seekBy(
+                                    if (backwards) -PLAYER_SEEK_STEP_MS else PLAYER_SEEK_STEP_MS,
+                                )
+                                wake()
+                            },
+                        )
+                    }
+                },
+            )
             .onPreviewKeyEvent { event ->
                 // Écran de veille : la touche ne sert qu'à en sortir. OK et les
                 // touches de lecture relancent en plus le film — revenir devant

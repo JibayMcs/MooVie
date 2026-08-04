@@ -5,11 +5,16 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Configuration
+import android.os.Build
 import android.os.Bundle
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -163,6 +168,56 @@ class MainActivity : ComponentActivity() {
                                 uiFlavor != UiFlavor.TOUCH -> ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
                                 onPlayer -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
                                 else -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                            }
+
+                            // Plein écran immersif pendant la lecture : l'heure
+                            // et la batterie n'ont rien à faire au-dessus d'un
+                            // film, et la barre de gestes rognait l'image. Un
+                            // balayage depuis le bord les rappelle au besoin.
+                            //
+                            // Sur TV il n'y a pas de barres système à cacher —
+                            // d'où la condition sur le tactile plutôt que sur le
+                            // seul écran courant.
+                            val bars = WindowInsetsControllerCompat(window, window.decorView)
+                            if (uiFlavor == UiFlavor.TOUCH && onPlayer) {
+                                bars.systemBarsBehavior =
+                                    WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                                bars.hide(WindowInsetsCompat.Type.systemBars())
+                            } else {
+                                bars.show(WindowInsetsCompat.Type.systemBars())
+                            }
+
+                            // Étendre la fenêtre ne suffit pas : le décor continue
+                            // d'appliquer l'inset de la découpe en marge, et la
+                            // vidéo se retrouvait décalée de sa largeur exacte —
+                            // 282 px de bande à gauche contre 170 à droite,
+                            // mesurés. Il faut aussi lui dire de ne plus rien
+                            // insérer. On ne le fait que pour le lecteur : ailleurs
+                            // cet inset est ce qui garde le contenu sous la barre
+                            // d'état.
+                            WindowCompat.setDecorFitsSystemWindows(
+                                window,
+                                !(uiFlavor == UiFlavor.TOUCH && onPlayer),
+                            )
+
+                            // Dessiner jusque dans la découpe de la caméra.
+                            //
+                            // `ALWAYS` et non `SHORT_EDGES` : ce dernier n'ouvre
+                            // que les bords courts *en portrait*. En paysage, où
+                            // la découpe passe sur un côté, il ne s'applique plus
+                            // — d'où la bande noire à gauche pendant la lecture,
+                            // alors que l'écran continue tout autour de l'objectif.
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                                window.attributes = window.attributes.apply {
+                                    layoutInDisplayCutoutMode = when {
+                                        uiFlavor != UiFlavor.TOUCH || !onPlayer ->
+                                            WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_DEFAULT
+                                        Build.VERSION.SDK_INT >= Build.VERSION_CODES.R ->
+                                            WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+                                        else ->
+                                            WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                                    }
+                                }
                             }
                         }
 
