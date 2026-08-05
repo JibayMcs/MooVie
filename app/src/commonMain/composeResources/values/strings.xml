@@ -63,6 +63,8 @@
 
     <!-- Fiche -->
     <string name="details_cast">Casting</string>
+    <string name="person_credits_empty">Aucun rôle référencé pour cette personne.</string>
+    <string name="person_credits_error">Filmographie indisponible — vérifier la clé TMDB et la connexion.</string>
     <string name="details_sources">Sources</string>
     <string name="details_play">▶  Lire</string>
     <string name="details_resume">▶  Reprendre</string>

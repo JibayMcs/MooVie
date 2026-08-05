@@ -137,6 +137,15 @@ import org.jetbrains.compose.resources.stringResource
 private val SERIES_PANE_WIDTH = 380.dp
 
 /**
+ * Largeur d'une vignette du casting.
+ *
+ * Une seule constante pour la carte *et* le portrait qu'elle contient : c'est ce
+ * qui garantit qu'aucun liseré de fond ne réapparaisse entre les deux. Deux
+ * valeurs, et l'écart se rejoue au premier changement.
+ */
+private val CAST_CARD_WIDTH = 96.dp
+
+/**
  * Dispose les deux volets d'une série : description à gauche, épisodes à droite
  * sur grand écran — l'un au-dessus de l'autre sur téléphone.
  *
@@ -185,6 +194,8 @@ fun DetailsScreenContent(
     resolveError: String?,
     /** URL de la source en cours de résolution (voir DetailsViewModel.resolving). */
     resolvingUrl: String?,
+    /** Ouvre la filmographie d'une personne du casting. */
+    onOpenPerson: (CastMember) -> Unit = {},
     streamLang: StreamLanguage,
     watched: Set<String>,
     resume: Map<String, ResumeEntry>,
@@ -397,7 +408,7 @@ fun DetailsScreenContent(
                     // Casting sous les boutons, comme sur la fiche d'épisode : la
                     // descente au D-pad atteint d'abord Lire, pas une vignette
                     // d'acteur.
-                    CastRow(s.details.credits?.cast.orEmpty())
+                    CastRow(s.details.credits?.cast.orEmpty(), onOpenPerson)
                 }
                 is DetailsState.Tv -> {
                     val selected = selectedEpisode
@@ -895,9 +906,8 @@ private fun SourceRow(
         // servi. Sans ce témoin, l'appui semblait n'avoir rien fait et le
         // lecteur s'ouvrait « tout seul » plus tard.
         //
-        // Il vient après la variante plutôt qu'à sa place : la ligne est déjà
-        // pleine, et un élément qui apparaît en déplaçant les autres se
-        // remarque moins bien qu'un qui s'ajoute au bout.
+        // Il remplace la variante plutôt que de s'ajouter à côté : la ligne est
+        // déjà pleine, et sur un portrait un élément de plus la ferait déborder.
         if (resolving) {
             Spacer(Modifier.width(10.dp))
             CircularProgressIndicator(
@@ -1392,8 +1402,83 @@ private fun ScrollingSynopsis(
     }
 }
 
+/**
+ * Une personne du casting : portrait, nom, rôle.
+ *
+ * Cliquable dès qu'elle a un identifiant TMDB — c'est ce qui rend la rangée
+ * traversable au D-pad, là où elle n'était qu'un décor. Sans identifiant, la
+ * carte garde **exactement les mêmes dimensions** mais ne réagit pas : une
+ * rangée dont les vignettes changent de taille selon qu'on peut les ouvrir
+ * serait plus déroutante que le manque lui-même.
+ *
+ * Le portrait occupe toute la largeur de la carte, et les textes ont la même
+ * marge de tous les côtés. Un premier jet gardait un portrait de 80 dp au
+ * milieu d'une carte de 96 : les 8 dp de fond de part et d'autre passaient
+ * inaperçus tant qu'il n'y avait ni fond ni bordure, et sautaient aux yeux dès
+ * que la carte en a eu — avec un texte qui, lui, touchait les bords.
+ */
 @Composable
-private fun CastRow(cast: List<CastMember>) {
+private fun CastCard(member: CastMember, onClick: () -> Unit) {
+    val body = @Composable {
+        Column {
+            MoovieAsyncImage(
+                model = member.profileUrl(),
+                contentDescription = member.name,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    // Carré : un portrait TMDB est en 2:3, le rogner au carré
+                    // cadre sur le visage plutôt que sur le buste.
+                    .aspectRatio(1f)
+                    .background(Color(0xFF222222)),
+            )
+            // Hauteurs **réservées**, pas subies : un nom sur deux lignes
+                // (« Tramell Tillman ») rendait sa carte plus haute que ses
+                // voisines et décalait la ligne du rôle d'une vignette à
+                // l'autre. Deux lignes pour le nom, une pour le rôle — même
+                // vide — et la rangée s'aligne.
+            Column(modifier = Modifier.padding(8.dp)) {
+                Text(
+                    member.name,
+                    minLines = 2,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Text(
+                    member.character,
+                    minLines = 1,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = Color(0xFF9A9A9A),
+                    style = MaterialTheme.typography.labelSmall,
+                )
+            }
+        }
+    }
+
+    // Sans identifiant, TMDB ne saura pas ouvrir sa filmographie : la carte
+    // reste inerte plutôt que de prendre le focus pour ne rien faire.
+    if (member.id <= 0) {
+        Box(
+            modifier = Modifier
+                .width(CAST_CARD_WIDTH)
+                .clip(MoovieShape)
+                .background(Color(0xFF141414)),
+        ) { body() }
+        return
+    }
+    // Agrandissement discret : la rangée est faite de vignettes, le zoom des
+    // affiches y serait disproportionné.
+    MoovieCard(
+        onClick = onClick,
+        focusedScale = 1.06f,
+        modifier = Modifier.width(CAST_CARD_WIDTH),
+    ) { body() }
+}
+
+@Composable
+private fun CastRow(cast: List<CastMember>, onOpenPerson: (CastMember) -> Unit) {
     val members = cast.take(15)
     if (members.isEmpty()) return
     Column {
@@ -1407,40 +1492,7 @@ private fun CastRow(cast: List<CastMember>) {
             contentPadding = PaddingValues(horizontal = 48.dp),
         ) {
             items(members) { member ->
-                Column(
-                    modifier = Modifier.width(96.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(80.dp)
-                            .clip(MoovieShape)
-                            .background(Color(0xFF222222)),
-                    ) {
-                        MoovieAsyncImage(
-                            model = member.profileUrl(),
-                            contentDescription = member.name,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                    }
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        member.name,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                    if (member.character.isNotBlank()) {
-                        Text(
-                            member.character,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            color = Color(0xFF9A9A9A),
-                            style = MaterialTheme.typography.labelSmall,
-                        )
-                    }
-                }
+                CastCard(member = member, onClick = { onOpenPerson(member) })
             }
         }
         }

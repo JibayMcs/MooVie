@@ -36,6 +36,7 @@ import fr.moovie.tv.data.settings.LocaleManager
 import fr.moovie.tv.data.settings.SettingsRepository
 import fr.moovie.tv.ui.details.DetailsViewModel
 import fr.moovie.tv.ui.catalog.CatalogScreen
+import fr.moovie.tv.ui.person.PersonScreen
 import androidx.compose.runtime.saveable.rememberSaveable
 import fr.moovie.tv.ui.splash.MoovieSplash
 import fr.moovie.tv.ui.navigation.Screen
@@ -284,9 +285,15 @@ class MainActivity : ComponentActivity() {
                                 onOpenTitle = { id, isTv -> nav.push(Screen.Details(id, isTv)) },
                                 onBack = { nav.pop() },
                             )
+                            is Screen.Person -> PersonScreen(
+                                personId = s.personId,
+                                name = s.name,
+                                onOpenTitle = { id, isTv -> nav.push(Screen.Details(id, isTv)) },
+                            )
                             is Screen.Details -> DetailsScreen(
                                 tmdbId = s.tmdbId,
                                 isTv = s.isTv,
+                                onOpenPerson = { id, name -> nav.push(Screen.Person(id, name)) },
                                 onPlay = { player ->
                                     // Neutralise l'auto-lecture sur l'entrée de la
                                     // fiche : sinon en revenir du lecteur relancerait

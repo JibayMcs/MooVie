@@ -90,6 +90,12 @@ data class Credits(val cast: List<CastMember> = emptyList())
 
 @Serializable
 data class CastMember(
+    /**
+     * Identifiant TMDB de la **personne**, pas du rôle : c'est lui qui ouvre sa
+     * filmographie. Zéro si TMDB ne le donne pas — la carte n'est alors pas
+     * cliquable plutôt que de mener à une page vide.
+     */
+    val id: Int = 0,
     val name: String = "",
     val character: String = "",
     @SerialName("profile_path") val profilePath: String? = null,

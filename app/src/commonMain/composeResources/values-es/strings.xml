@@ -61,6 +61,8 @@
 
     <!-- Ficha -->
     <string name="details_cast">Reparto</string>
+    <string name="person_credits_empty">Ningún papel acreditado para esta persona.</string>
+    <string name="person_credits_error">Filmografía no disponible — comprobar la clave TMDB y la conexión.</string>
     <string name="details_sources">Fuentes</string>
     <string name="details_play">▶  Reproducir</string>
     <string name="details_resume">▶  Reanudar</string>

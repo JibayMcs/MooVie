@@ -20,11 +20,17 @@ import fr.moovie.tv.ui.history.HistoryScreenContent
 import fr.moovie.tv.ui.history.HistoryViewModel
 import fr.moovie.tv.ui.home.HomeScreenContent
 import fr.moovie.tv.ui.home.HomeViewModel
+import fr.moovie.tv.ui.person.PersonScreenContent
+import fr.moovie.tv.ui.person.PersonViewModel
 import fr.moovie.tv.ui.navigation.Screen
 import fr.moovie.tv.ui.search.SearchScreenContent
 import fr.moovie.tv.ui.search.SearchViewModel
 import fr.moovie.tv.ui.settings.SettingsScreenContent
 import fr.moovie.tv.ui.settings.SettingsViewModel
+import fr.moovie.tv.resources.Res
+import fr.moovie.tv.resources.person_credits_empty
+import fr.moovie.tv.resources.person_credits_error
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * ViewModels à l'échelle de la fenêtre (équivalent du scope Activity sur
@@ -37,6 +43,7 @@ internal object Vm {
     val settings by lazy { SettingsViewModel() }
     val details by lazy { DetailsViewModel() }
     val catalog by lazy { CatalogViewModel() }
+    val person by lazy { PersonViewModel() }
 
     /** Partagé entre la bannière et le bouton « Vérifier maintenant ». */
     val update by lazy { DesktopUpdateViewModel() }
@@ -189,6 +196,7 @@ internal fun DesktopDetailsScreen(
     params: Screen.Details,
     onPlay: (Screen.Player) -> Unit,
     onBack: () -> Unit,
+    onOpenPerson: (personId: Int, name: String) -> Unit,
     onRegisterBack: ((() -> Unit)?) -> Unit,
 ) {
     val vm = Vm.details
@@ -271,6 +279,7 @@ internal fun DesktopDetailsScreen(
         sources = sources,
         resolveError = resolveError,
         resolvingUrl = resolvingUrl,
+        onOpenPerson = { onOpenPerson(it.id, it.name) },
         streamLang = streamLang,
         watched = watched,
         resume = resume,
@@ -334,6 +343,33 @@ internal fun DesktopCatalogScreen(
         pinnedKeys = pinnedKeys,
         onPin = vm::pin,
         onUnpin = vm::unpin,
+        onBack = onBack,
+        showBackButton = true,
+    )
+}
+
+@Composable
+internal fun DesktopPersonScreen(
+    params: Screen.Person,
+    onOpenTitle: (tmdbId: Int, isTv: Boolean) -> Unit,
+    onBack: () -> Unit,
+) {
+    val vm = Vm.person
+    val state by vm.state.collectAsState()
+    val watched by vm.watched.collectAsState()
+    val watchlistKeys by vm.watchlistKeys.collectAsState()
+
+    // Résolus ici : le ViewModel n'a pas de contexte de composition.
+    val empty = stringResource(Res.string.person_credits_empty)
+    val error = stringResource(Res.string.person_credits_error)
+    LaunchedEffect(params.personId) { vm.load(params.personId, empty, error) }
+
+    PersonScreenContent(
+        name = params.name,
+        state = state,
+        watched = watched,
+        watchlistKeys = watchlistKeys,
+        onOpenTitle = onOpenTitle,
         onBack = onBack,
         showBackButton = true,
     )

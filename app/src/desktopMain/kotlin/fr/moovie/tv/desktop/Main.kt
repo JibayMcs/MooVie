@@ -208,6 +208,11 @@ private fun DesktopApp(
                 onReady = { nav.replace(Screen.Home) },
             )
             Screen.Settings -> DesktopSettingsScreen(onBack = { nav.pop() })
+            is Screen.Person -> DesktopPersonScreen(
+                params = s,
+                onOpenTitle = { id, isTv -> nav.push(Screen.Details(id, isTv)) },
+                onBack = { nav.pop() },
+            )
             is Screen.Catalog -> DesktopCatalogScreen(
                 select = s.select,
                 onOpenTitle = { id, isTv -> nav.push(Screen.Details(id, isTv)) },
@@ -223,6 +228,7 @@ private fun DesktopApp(
             )
             is Screen.Details -> DesktopDetailsScreen(
                 params = s,
+                onOpenPerson = { id, name -> nav.push(Screen.Person(id, name)) },
                 onPlay = { player ->
                     // Neutralise l'auto-lecture sur l'entrée de la fiche avant
                     // d'empiler le lecteur : sinon en revenir relancerait la

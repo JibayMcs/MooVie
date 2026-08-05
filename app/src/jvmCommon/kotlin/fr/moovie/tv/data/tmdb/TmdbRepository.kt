@@ -119,6 +119,25 @@ class TmdbRepository(
             page = page,
         ).results
 
+    /**
+     * Ce qu'une personne a joué, du plus récent au plus ancien.
+     *
+     * Trois nettoyages, tous nécessaires sur des réponses réelles :
+     *
+     * - **dédoublonnage** sur (id, type) : un acteur crédité dans plusieurs
+     *   épisodes d'une série y apparaît une fois par épisode ;
+     * - **sans affiche, écarté** : la grille est faite d'affiches, une entrée
+     *   vide n'y est qu'un trou qu'on ne sait pas nommer ;
+     * - **tri par date décroissante**, les sans-date en fin. TMDB rend l'ordre
+     *   de sa base, qui n'a aucun sens à l'écran ; ce qu'on cherche en ouvrant
+     *   une filmographie, c'est « qu'a-t-il fait récemment ».
+     */
+    suspend fun personCredits(apiKey: String, personId: Int): List<TmdbItem> =
+        api.personCredits(personId, apiKey, language).cast
+            .filter { it.posterPath != null }
+            .distinctBy { it.id to it.isTv }
+            .sortedByDescending { it.year ?: "" }
+
     suspend fun movieDetails(apiKey: String, id: Int): MovieDetails =
         api.movieDetails(id, apiKey, language)
 

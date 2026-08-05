@@ -61,6 +61,8 @@
 
     <!-- Details -->
     <string name="details_cast">Cast</string>
+    <string name="person_credits_empty">No credited role for this person.</string>
+    <string name="person_credits_error">Filmography unavailable — check the TMDB key and the connection.</string>
     <string name="details_sources">Sources</string>
     <string name="details_play">▶  Play</string>
     <string name="details_resume">▶  Resume</string>

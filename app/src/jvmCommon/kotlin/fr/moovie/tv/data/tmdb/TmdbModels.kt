@@ -14,6 +14,18 @@ data class TmdbPageResult(
     @SerialName("total_pages") val totalPages: Int = 1,
 )
 
+/**
+ * Réponse de `/person/{id}/combined_credits`.
+ *
+ * `cast` seul : `crew` y figure aussi, mais on ouvre la fiche depuis le
+ * **casting** — quelqu'un qui clique sur un acteur cherche ce qu'il a joué, pas
+ * ce qu'il a produit.
+ */
+@Serializable
+data class PersonCredits(
+    val cast: List<TmdbItem> = emptyList(),
+)
+
 /** Réponse de `/genre/{media}/list` : les genres du catalogue, traduits. */
 @Serializable
 data class GenreListResult(

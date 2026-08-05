@@ -75,6 +75,22 @@ interface TmdbApi {
         @Query("append_to_response") append: String = "credits",
     ): TvDetails
 
+    /**
+     * Filmographie d'une personne, films **et** séries en une requête.
+     *
+     * `combined_credits` plutôt que `movie_credits` + `tv_credits` : un acteur
+     * partage rarement sa carrière entre les deux de façon nette, et deux appels
+     * auraient obligé à fusionner et retrier deux listes pour un résultat
+     * identique. Les entrées portent déjà `media_type`, ce dont [TmdbItem] sait
+     * déduire film ou série.
+     */
+    @GET("person/{id}/combined_credits")
+    suspend fun personCredits(
+        @Path("id") id: Int,
+        @Query("api_key") apiKey: String,
+        @Query("language") language: String,
+    ): PersonCredits
+
     @GET("tv/{id}/season/{season}")
     suspend fun season(
         @Path("id") id: Int,

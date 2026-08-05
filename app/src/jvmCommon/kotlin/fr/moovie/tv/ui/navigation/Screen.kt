@@ -29,6 +29,16 @@ sealed interface Screen {
     data class Catalog(val select: CatalogSelection? = null) : Screen
 
     /**
+     * Filmographie d'une personne, ouverte depuis le casting d'une fiche.
+     *
+     * [name] voyage avec l'identifiant plutôt que d'être rechargé : il est déjà
+     * connu de la fiche d'où l'on vient, et l'écran peut donc afficher son titre
+     * avant même la réponse de TMDB — plutôt qu'un en-tête vide le temps d'un
+     * aller-retour réseau.
+     */
+    data class Person(val personId: Int, val name: String) : Screen
+
+    /**
      * Fiche d'un titre. Si [autoSources] est vrai (reprise depuis l'accueil),
      * le panneau des sources s'ouvre directement — sur [resumeSeason]/[resumeEpisode]
      * pour une série.
