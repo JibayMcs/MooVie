@@ -55,6 +55,17 @@ export MOOVIE_AVD="${MOOVIE_AVD:-mibox}"
 # 4,9 Go utiles sur les 8 Go annoncés — les cœurs du quad-core Amlogic.
 AVD_RAM=2048; AVD_CORES=4; AVD_HEAP=256; AVD_DATA_SIZE="8G"
 
+# Volume **amovible**, sur tous les profils.
+#
+# C'est le seul moyen d'éprouver le chemin USB de la sauvegarde : sans lui,
+# l'émulateur n'expose aucun support amovible et cette moitié de la
+# fonctionnalité — celle qui sert justement à migrer d'un appareil à l'autre —
+# ne se testait nulle part. Une carte SD et une clé USB se présentent
+# identiquement à Android : un volume public monté sous /storage/<UUID>.
+#
+# 512 Mo suffisent : une sauvegarde pèse quelques kilo-octets, et l'image est
+# créée une fois pour toutes à côté de l'AVD (dossier gitignoré).
+
 # `tv` ou `phone` : décide de l'orientation de départ, de l'écran tactile, du
 # D-pad et des capteurs. Un boîtier TV et un téléphone ne se prêtent pas le
 # même matériel, et c'est précisément ce que ces bancs doivent reproduire.
@@ -107,6 +118,7 @@ SYSTEM_IMAGE_DIR="$ANDROID_SDK_ROOT/$(echo "$SYSTEM_IMAGE" | tr ';' '/')"
 
 export AVD_NAME SYSTEM_IMAGE SYSTEM_IMAGE_DIR AVD_DEVICE AVD_FAMILY
 export AVD_WIDTH AVD_HEIGHT AVD_DENSITY AVD_RAM AVD_CORES AVD_HEAP AVD_DATA_SIZE
+export AVD_SDCARD_SIZE="${AVD_SDCARD_SIZE:-512M}"
 
 # App Moo-vie
 export APK_PATH="$PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk"

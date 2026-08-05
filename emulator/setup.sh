@@ -76,7 +76,17 @@ set_cfg "disk.dataPartition.size"   "$AVD_DATA_SIZE"
 set_cfg "hw.keyboard"               "yes"
 set_cfg "hw.gpu.enabled"            "yes"
 set_cfg "hw.gpu.mode"               "auto"
-set_cfg "hw.sdCard"                 "no"
+# Carte SD = support amovible. Voir env.sh : c'est le seul moyen d'éprouver
+# le chemin USB de la sauvegarde, aussi bien sur la box que sur le téléphone.
+# `mksdcard` ne s'exécute qu'une fois — recréer l'image effacerait ce qu'elle
+# contient, y compris une sauvegarde qu'on vient d'y écrire.
+SDCARD_IMG="$ANDROID_AVD_HOME/$AVD_NAME.avd/sdcard.img"
+if [[ ! -f "$SDCARD_IMG" ]]; then
+  echo ">> Création du support amovible ($AVD_SDCARD_SIZE)..."
+  "$ANDROID_SDK_ROOT/emulator/mksdcard" "$AVD_SDCARD_SIZE" "$SDCARD_IMG"
+fi
+set_cfg "hw.sdCard"                 "yes"
+set_cfg "sdcard.size"               "$AVD_SDCARD_SIZE"
 set_cfg "runtime.network.latency"   "none"
 set_cfg "runtime.network.speed"     "full"
 
