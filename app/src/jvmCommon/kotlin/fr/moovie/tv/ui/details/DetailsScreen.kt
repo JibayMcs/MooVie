@@ -618,24 +618,38 @@ fun DetailsScreenContent(
                                 )
                             }
                         }
-                        }
-                        }
-                        // Casting sous les volets — **seulement quand ils sont
-                        // empilés**, c'est-à-dire sur téléphone.
+                        // Casting **dans** le défilement, en queue de liste, et
+                        // seulement sur téléphone. Posé sous les volets, c'était
+                        // un bloc fixe d'environ 190 dp pris à une liste qui n'a
+                        // déjà que ce qui reste sous l'en-tête : il restait une
+                        // fenêtre d'un épisode et demi pour parcourir la saison.
                         //
-                        // Mesuré sur les 540 dp d'une TV : l'en-tête (titre,
-                        // résumé, saisons, actions) en prend ~350, il en reste
-                        // ~145 quand la rangée en demande ~190. Ajoutée quand
-                        // même, elle ne rognait pas la liste : elle **effaçait
-                        // le sélecteur de saisons** hors de l'écran. Une page
-                        // qui perd sa navigation pour gagner une illustration
-                        // est un mauvais échange.
+                        // En dernier élément il ne coûte plus rien tant qu'on ne
+                        // descend pas le chercher, et la liste récupère toute la
+                        // hauteur.
                         //
-                        // Sur une série en écran large, le casting reste à un
-                        // appui : la fiche d'un épisode, elle, a la place.
+                        // hPad nul : la marge de 16 dp vient déjà du
+                        // contentPadding de la liste. La cumuler décalerait la
+                        // rangée par rapport aux épisodes qu'elle suit.
                         if (compact) {
-                            CastRow(s.details.credits?.cast.orEmpty(), hPadDp, onOpenPerson)
+                            item {
+                                CastRow(s.details.credits?.cast.orEmpty(), 0.dp, onOpenPerson)
+                            }
                         }
+                        }
+                        }
+                        // Le casting d'une série est en queue de la liste des
+                        // épisodes (voir plus haut), pas ici : sous les volets il
+                        // aurait été un bloc fixe pris à la liste.
+                        //
+                        // Rien sur écran large non plus. Mesuré sur les 540 dp
+                        // d'une TV : l'en-tête (titre, résumé, saisons, actions)
+                        // en prend ~350, il en reste ~145 quand la rangée en
+                        // demande ~190. Ajoutée quand même, elle **effaçait le
+                        // sélecteur de saisons** hors de l'écran — une page qui
+                        // perd sa navigation pour gagner une illustration est un
+                        // mauvais échange. Le casting y reste à un appui : la
+                        // fiche d'un épisode, elle, a la place.
                     }
                 }
             }
