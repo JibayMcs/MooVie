@@ -26,6 +26,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.Delete
@@ -60,6 +61,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -833,15 +835,39 @@ private fun SeeMoreCard(onClick: () -> Unit) {
                     .background(Color(0xFF1C1C1C)),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(
-                    Icons.Default.GridView,
-                    contentDescription = null,
-                    tint = MOOVIE_ACCENT,
-                    modifier = Modifier.size(28.dp),
-                )
+                // Icône **et** libellé au centre, l'un sur l'autre.
+                //
+                // Le libellé était posé en bas, à la place où toutes les autres
+                // cartes portent leur titre : « En voir plus » se lisait alors
+                // comme le nom d'un film. Au centre, il ne peut plus être pris
+                // pour autre chose qu'une action.
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    // Une flèche, et non la grille du catalogue : celle-ci dit
+                    // où l'on arrive, pas ce que fait la carte. Ce qu'on promet
+                    // ici, c'est d'aller voir la suite.
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowForward,
+                        contentDescription = null,
+                        tint = MOOVIE_ACCENT,
+                        modifier = Modifier.size(32.dp),
+                    )
+                    Text(
+                        stringResource(Res.string.home_see_more),
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 8.dp),
+                    )
+                }
             }
+            // Bande de titre vide, de la hauteur exacte de celle des affiches
+            // voisines : sans elle, la carte serait plus courte et le bas de la
+            // rangée se déchirerait. Un `Text` vide plutôt qu'une hauteur en dur
+            // — il suit le style, une valeur figée en divergerait.
             Text(
-                stringResource(Res.string.home_see_more),
+                "",
                 style = MaterialTheme.typography.bodySmall,
                 maxLines = 1,
                 modifier = Modifier.padding(8.dp),
