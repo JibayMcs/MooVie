@@ -34,8 +34,12 @@ no account, no ads.
 
 ## Features
 
-- **Home** — contextual hero, *Continue watching* rail with per-episode progress,
-  trending and top-rated rails (TMDB), watched badges.
+- **Home, arranged by you** — rows are a layout you own, not a fixed list. Pin any
+  catalogue genre (long-press on TV and phone, right-click on desktop) and choose
+  where it lands; move, hide or remove any row, built-in ones included, from
+  *Settings → Home*. A pinned row ends with a **See more** card that reopens its
+  exact genre. Contextual hero, *Continue watching* with per-episode progress,
+  trending and top-rated (TMDB), watched badges.
 - **Search** — result grid, persistent history, D-pad flow from keyboard to results.
 - **Movies & shows** — cast, seasons and episodes with stills, per-episode details page,
   watched/unwatched marking (episode, whole season or movie).
@@ -63,16 +67,19 @@ no account, no ads.
   stick, and pick them up on another device. The import previews the file before acting
   (counts, export date, source device) and lets you **merge** — most recent progress wins,
   nothing is lost — or **replace**. A first-launch screen offers the restore instead of
-  dropping you on an empty home.
+  dropping you on an empty home. On Android, grant *All files access* when the screen
+  asks: without it the file can only go in the app's own folder, which uninstalling
+  erases — so a backup would survive a move to another device, but not a reinstall.
 - **Offline-friendly** — TMDB responses and resolved source links are cached on disk.
 - **In-app updates** — periodic check against GitHub Releases; a banner on the home
   screen, a discreet chip during playback.
 
 ## Roadmap
 
-- **Android phones & tablets** — work in progress. The UI is built for a 10-foot
-  screen and a D-pad today; the port is about touch layouts and portrait, not a
-  second codebase.
+- **Android phones & tablets** — shipped as a pre-release, under test. Same APK
+  as the TV: touch layouts and portrait, not a second codebase. Pre-releases are
+  excluded from `releases/latest`, so the in-app updater ignores them — grab one
+  from the releases page if you want to help test.
 - **Light profiles** — separate progress, watchlist and watched state per profile
   ("Living room" / "Kids"), picked at launch. Backups will carry them.
 - **No iOS support planned.** The constraints are heavy — sideloading, App Store

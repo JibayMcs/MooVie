@@ -35,8 +35,13 @@ depuis une seule base de code Kotlin Multiplatform. L'extraction des sources se 
 
 ## Fonctionnalités
 
-- **Accueil** — hero contextuel, rail *Reprendre la lecture* avec progression par épisode,
-  rangées tendances et mieux notés (TMDB), badges vus.
+- **Accueil, rangé par toi** — les rangées sont une disposition qui t'appartient, pas
+  une liste figée. Épingle n'importe quel genre du catalogue (appui long sur TV et
+  téléphone, clic droit sur desktop) en choisissant où il atterrit ; déplace, masque
+  ou retire n'importe quelle rangée, y compris celles d'origine, depuis
+  *Réglages → Accueil*. Une rangée épinglée se termine par une carte **En voir plus**
+  qui rouvre son genre exact. Hero contextuel, *Reprendre la lecture* avec progression
+  par épisode, tendances et mieux notés (TMDB), badges vus.
 - **Recherche** — résultats en grille, historique persistant, descente au D-pad du clavier
   vers les résultats.
 - **Films & séries** — casting, saisons et épisodes avec vignettes, page de détail par
@@ -69,16 +74,20 @@ depuis une seule base de code Kotlin Multiplatform. L'extraction des sources se 
   contenu du fichier avant d'agir (compteurs, date d'export, appareil d'origine) et laisse
   choisir entre **fusionner** — la progression la plus récente gagne, rien n'est perdu — et
   **remplacer**. Un écran de premier lancement propose la restauration plutôt que de
-  déposer l'utilisateur sur un accueil vide.
+  déposer l'utilisateur sur un accueil vide. Sur Android, accorde l'*accès à tous les
+  fichiers* quand l'écran le demande : sans lui le fichier ne peut aller que dans le
+  dossier de l'app, que la désinstallation efface — la sauvegarde passerait alors d'un
+  appareil à l'autre, mais pas d'une réinstallation à la suivante.
 - **Cache disque** — réponses TMDB et liens de sources résolus mis en cache.
 - **Mises à jour intégrées** — vérification périodique des releases GitHub : bandeau sur
   l'accueil, pastille discrète pendant la lecture.
 
 ## Feuille de route
 
-- **Smartphones et tablettes Android** — en cours. L'interface est aujourd'hui
-  pensée pour un écran de salon et une télécommande ; le portage porte sur les
-  gabarits tactiles et le mode portrait, pas sur une seconde base de code.
+- **Smartphones et tablettes Android** — publié en préversion, à l'épreuve. Le
+  même APK que la TV : gabarits tactiles et mode portrait, pas une seconde base
+  de code. Les préversions sont exclues de `releases/latest`, l'updater intégré
+  les ignore donc — à récupérer sur la page des releases pour aider à tester.
 - **Profils légers** — progression, liste et vu/non vu séparés par profil
   (« Salon » / « Enfants »), choisi au lancement. Les sauvegardes les
   transporteront.
