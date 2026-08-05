@@ -122,6 +122,20 @@ class DetailsViewModel : ViewModel() {
     private val _resolveError = MutableStateFlow<String?>(null)
     val resolveError: StateFlow<String?> = _resolveError
 
+    /**
+     * URL de la source en cours de résolution, ou null.
+     *
+     * Extraire un lien d'embed prend une à trois secondes — on interroge
+     * l'hébergeur, on désobfusque, puis on vérifie que le flux est réellement
+     * servi. Sans rien à l'écran pendant ce temps, l'appui semblait n'avoir rien
+     * fait, et le lecteur s'ouvrait « tout seul » quelques secondes plus tard.
+     *
+     * On retient **l'URL** plutôt qu'un simple booléen : le panneau doit poser
+     * l'indicateur sur la ligne effectivement choisie, pas sur toutes.
+     */
+    private val _resolving = MutableStateFlow<String?>(null)
+    val resolving: StateFlow<String?> = _resolving
+
     /** Visibilité du panneau des sources (découplée du chargement, qui est en fond). */
     private val _panelVisible = MutableStateFlow(false)
     val panelVisible: StateFlow<Boolean> = _panelVisible
@@ -273,6 +287,11 @@ class DetailsViewModel : ViewModel() {
         _panelVisible.value = false
         _sources.value = SourcesState.Idle
         _resolveError.value = null
+        // Sans ça, une résolution laissée en vol sur la fiche précédente
+        // rendrait la main sans jamais effacer son témoin (elle sort par le
+        // garde-fou de génération) : la fiche suivante s'ouvrirait avec une
+        // source qui tourne indéfiniment.
+        _resolving.value = null
         _resolved.value = null
         _selectedEpisode.value = null
         pendingMeta = null
@@ -937,6 +956,7 @@ class DetailsViewModel : ViewModel() {
     /** Résout un lien d'embed en flux jouable via les extracteurs. */
     fun play(link: EmbedLink) {
         _resolveError.value = null
+        _resolving.value = link.url
         val gen = ++resolveGen
         viewModelScope.launch {
             val stream = runCatching { ExtractorRegistry.resolve(link) }.getOrNull()
@@ -947,8 +967,11 @@ class DetailsViewModel : ViewModel() {
                 // cette vérification, le choix manuel non — d'où un comportement
                 // différent selon le chemin emprunté pour la même source.
                 ?.takeIf { runCatching { isStreamPlayable(it, playbackMinutes) }.getOrDefault(false) }
-            // Titre changé pendant la résolution : ne pas écraser la lecture courante.
+            // Titre changé pendant la résolution, ou autre source choisie entre
+            // temps : ni le flux ni l'indicateur ne concernent plus l'écran —
+            // c'est la résolution la plus récente qui les porte.
             if (gen != resolveGen) return@launch
+            _resolving.value = null
             if (stream != null) {
                 // La lecture va démarrer : persiste les métadonnées pour le
                 // rail « Reprendre » (la position suivra depuis le lecteur).

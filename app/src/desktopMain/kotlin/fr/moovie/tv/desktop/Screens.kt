@@ -197,6 +197,7 @@ internal fun DesktopDetailsScreen(
     val resolved by vm.resolved.collectAsState()
     val inWatchlist by vm.inWatchlist.collectAsState()
     val resolveError by vm.resolveError.collectAsState()
+    val resolvingUrl by vm.resolving.collectAsState()
     val sourceQualities by vm.qualities.collectAsState()
     val streamLang by vm.streamLanguage.collectAsState()
     val watched by vm.watched.collectAsState()
@@ -269,6 +270,7 @@ internal fun DesktopDetailsScreen(
         state = state,
         sources = sources,
         resolveError = resolveError,
+        resolvingUrl = resolvingUrl,
         streamLang = streamLang,
         watched = watched,
         resume = resume,

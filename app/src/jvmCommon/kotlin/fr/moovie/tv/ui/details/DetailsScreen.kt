@@ -183,6 +183,8 @@ fun DetailsScreenContent(
     state: DetailsState,
     sources: SourcesState,
     resolveError: String?,
+    /** URL de la source en cours de résolution (voir DetailsViewModel.resolving). */
+    resolvingUrl: String?,
     streamLang: StreamLanguage,
     watched: Set<String>,
     resume: Map<String, ResumeEntry>,
@@ -640,6 +642,7 @@ fun DetailsScreenContent(
                     state = active,
                     preferred = streamLang,
                     resolveError = resolveError,
+                    resolvingUrl = resolvingUrl,
                     onPick = onPickSource,
                     qualities = sourceQualities,
                     onRequestQuality = onRequestQuality,
@@ -708,6 +711,7 @@ private fun SourcesSlideOver(
     state: SourcesState.Active,
     preferred: StreamLanguage,
     resolveError: String?,
+    resolvingUrl: String?,
     onPick: (EmbedLink) -> Unit,
     /** Qualité mesurée par URL d'embed, remplie au fil de l'eau. */
     qualities: Map<String, String>,
@@ -813,6 +817,7 @@ private fun SourcesSlideOver(
                             link = link,
                             rank = if ((ranks[id] ?: 1) > 1) rank else null,
                             quality = qualities[link.url],
+                            resolving = link.url == resolvingUrl,
                             onClick = { onPick(link) },
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -850,6 +855,8 @@ private fun SourceRow(
     link: EmbedLink,
     rank: Int?,
     quality: String?,
+    /** Cette source est celle qu'on est en train d'ouvrir. */
+    resolving: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -881,6 +888,22 @@ private fun SourceRow(
                 it,
                 style = MaterialTheme.typography.labelMedium,
                 color = Color.White.copy(alpha = 0.85f),
+            )
+        }
+        // Ouvrir une source prend une à trois secondes : on interroge
+        // l'hébergeur, on désobfusque, puis on vérifie que le flux est bien
+        // servi. Sans ce témoin, l'appui semblait n'avoir rien fait et le
+        // lecteur s'ouvrait « tout seul » plus tard.
+        //
+        // Il vient après la variante plutôt qu'à sa place : la ligne est déjà
+        // pleine, et un élément qui apparaît en déplaçant les autres se
+        // remarque moins bien qu'un qui s'ajoute au bout.
+        if (resolving) {
+            Spacer(Modifier.width(10.dp))
+            CircularProgressIndicator(
+                color = Color.White,
+                strokeWidth = 2.dp,
+                modifier = Modifier.size(16.dp),
             )
         }
     }

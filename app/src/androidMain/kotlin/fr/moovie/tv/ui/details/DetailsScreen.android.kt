@@ -32,6 +32,7 @@ fun DetailsScreen(
     val resolved by viewModel.resolved.collectAsStateWithLifecycle()
     val inWatchlist by viewModel.inWatchlist.collectAsStateWithLifecycle()
     val resolveError by viewModel.resolveError.collectAsStateWithLifecycle()
+    val resolvingUrl by viewModel.resolving.collectAsStateWithLifecycle()
     val sourceQualities by viewModel.qualities.collectAsStateWithLifecycle()
     val streamLang by viewModel.streamLanguage.collectAsStateWithLifecycle()
     val watched by viewModel.watched.collectAsStateWithLifecycle()
@@ -94,6 +95,7 @@ fun DetailsScreen(
         state = state,
         sources = sources,
         resolveError = resolveError,
+        resolvingUrl = resolvingUrl,
         streamLang = streamLang,
         watched = watched,
         resume = resume,
