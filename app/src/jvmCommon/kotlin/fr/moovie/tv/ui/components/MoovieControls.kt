@@ -457,7 +457,12 @@ fun MoovieMarqueeText(
     style: TextStyle = LocalTextStyle.current,
     color: Color = Color.Unspecified,
 ) {
-    val active = LocalMoovieCardActive.current
+    // Le défilement était réservé à la carte focalisée ou survolée. **Au doigt,
+    // rien n'est jamais actif** : un titre trop long y restait tronqué pour
+    // toujours, sans aucun moyen de le lire en entier. Il défile donc en
+    // permanence sur écran tactile — `basicMarquee` ne s'anime que si le texte
+    // déborde réellement, une carte au titre court ne coûte rien.
+    val active = LocalMoovieCardActive.current || isTouchUi
     Text(
         text = text,
         style = style,
