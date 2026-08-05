@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# Prépare un émulateur : installe l'image système si absente, crée l'AVD, écrit
-# sa configuration matérielle. À lancer UNE fois par profil.
+# Prépare un émulateur (TV ou téléphone) : installe l'image système si absente,
+# crée l'AVD, écrit sa configuration matérielle. À lancer UNE fois par profil.
 # L'image système reste dans le SDK partagé (~/Android/Sdk).
 #
-#   ./setup.sh                    # profil par défaut (mibox) — Mi Box 4, Android 9
-#   MOOVIE_AVD=tv36 ./setup.sh    # Android TV API 36
+#   ./setup.sh                     # profil par défaut (mibox) — Mi Box 4, Android 9
+#   MOOVIE_AVD=tv36 ./setup.sh     # Android TV API 36
+#   MOOVIE_AVD=nord3 ./setup.sh    # OnePlus Nord 3 — téléphone de référence
 set -euo pipefail
 source "$(dirname "$0")/env.sh"
 
@@ -64,34 +65,59 @@ set_cfg "avd.ini.displayname"       "$AVD_NAME"
 set_cfg "hw.lcd.width"              "$AVD_WIDTH"
 set_cfg "hw.lcd.height"             "$AVD_HEIGHT"
 set_cfg "hw.lcd.density"            "$AVD_DENSITY"
-set_cfg "hw.initialOrientation"     "landscape"
 set_cfg "hw.ramSize"                "$AVD_RAM"
 set_cfg "hw.cpu.ncore"              "$AVD_CORES"
 set_cfg "vm.heapSize"               "$AVD_HEAP"
 set_cfg "disk.dataPartition.size"   "$AVD_DATA_SIZE"
 # Clavier hôte transmis à l'émulateur (flèches = D-pad, Entrée = sélection,
 # saisie de texte possible). Sans lui, le clavier physique peut ne pas piloter
-# la navigation TV selon l'environnement.
+# la navigation TV selon l'environnement — et sur un téléphone il évite le
+# clavier virtuel pour saisir une clé d'API.
 set_cfg "hw.keyboard"               "yes"
-set_cfg "hw.dPad"                   "yes"
-set_cfg "hw.mainKeys"               "yes"
-set_cfg "hw.screen"                 "no-touch"
 set_cfg "hw.gpu.enabled"            "yes"
 set_cfg "hw.gpu.mode"               "auto"
-# Capteurs et périphériques qu'un boîtier TV n'a pas : les laisser actifs
-# n'apporte rien et alourdit le démarrage.
-set_cfg "hw.camera.back"            "none"
-set_cfg "hw.camera.front"           "none"
-set_cfg "hw.audioInput"             "no"
-set_cfg "hw.gps"                    "no"
-set_cfg "hw.accelerometer"          "no"
-set_cfg "hw.gyroscope"              "no"
-set_cfg "hw.sensors.proximity"      "no"
-set_cfg "hw.sensors.magnetic_field" "no"
-set_cfg "hw.sensors.orientation"    "no"
-set_cfg "hw.battery"                "no"
 set_cfg "hw.sdCard"                 "no"
 set_cfg "runtime.network.latency"   "none"
 set_cfg "runtime.network.speed"     "full"
+
+# Ce qui distingue vraiment les deux bancs. Un téléphone qui démarrerait en
+# paysage, sans écran tactile et sans accéléromètre ne prouverait rien de ce
+# qu'on lui demande — l'app y verrait un boîtier TV, et `LocalUiFlavor`
+# trancherait TV au lieu de TOUCH.
+if [[ "$AVD_FAMILY" == "phone" ]]; then
+  set_cfg "hw.initialOrientation"     "portrait"
+  set_cfg "hw.screen"                 "multi-touch"
+  set_cfg "hw.dPad"                   "no"
+  set_cfg "hw.mainKeys"               "no"
+  # L'accéléromètre n'est pas décoratif : le lecteur bascule seul en paysage,
+  # et sans capteur la rotation ne se teste pas.
+  set_cfg "hw.accelerometer"          "yes"
+  set_cfg "hw.gyroscope"              "yes"
+  set_cfg "hw.sensors.orientation"    "yes"
+  set_cfg "hw.sensors.proximity"      "yes"
+  set_cfg "hw.sensors.magnetic_field" "yes"
+  set_cfg "hw.battery"                "yes"
+  set_cfg "hw.gps"                    "yes"
+  set_cfg "hw.audioInput"             "yes"
+  set_cfg "hw.camera.back"            "virtualscene"
+  set_cfg "hw.camera.front"           "emulated"
+else
+  set_cfg "hw.initialOrientation"     "landscape"
+  set_cfg "hw.screen"                 "no-touch"
+  set_cfg "hw.dPad"                   "yes"
+  set_cfg "hw.mainKeys"               "yes"
+  # Capteurs et périphériques qu'un boîtier TV n'a pas : les laisser actifs
+  # n'apporte rien et alourdit le démarrage.
+  set_cfg "hw.camera.back"            "none"
+  set_cfg "hw.camera.front"           "none"
+  set_cfg "hw.audioInput"             "no"
+  set_cfg "hw.gps"                    "no"
+  set_cfg "hw.accelerometer"          "no"
+  set_cfg "hw.gyroscope"              "no"
+  set_cfg "hw.sensors.proximity"      "no"
+  set_cfg "hw.sensors.magnetic_field" "no"
+  set_cfg "hw.sensors.orientation"    "no"
+  set_cfg "hw.battery"                "no"
+fi
 
 echo ">> Prêt. Lance MOOVIE_AVD=$MOOVIE_AVD ./start.sh puis ./build-install.sh"

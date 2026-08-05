@@ -28,6 +28,7 @@ export ADB="$(command -v adb || echo "$ANDROID_SDK_ROOT/platform-tools/adb")"
 #
 #   ./start.sh                       # la box de référence
 #   MOOVIE_AVD=tv36 ./start.sh       # Android TV récent (API 36), démarre plus vite
+#   MOOVIE_AVD=nord3 ./start.sh      # OnePlus Nord 3 — téléphone de référence
 #
 # `mibox` reproduit la **Xiaomi Mi Box 4** (nom de code « oneday »), relevée sur
 # l'appareil lui-même le 4 août 2026 :
@@ -49,6 +50,16 @@ export ADB="$(command -v adb || echo "$ANDROID_SDK_ROOT/platform-tools/adb")"
 # les DRM. Pour tout ça, seule la box physique fait foi.
 export MOOVIE_AVD="${MOOVIE_AVD:-mibox}"
 
+# Valeurs communes, qu'un profil surcharge s'il en a besoin. Elles décrivent la
+# box : RAM et stockage viennent de sa fiche produit — `df /data` a bien montré
+# 4,9 Go utiles sur les 8 Go annoncés — les cœurs du quad-core Amlogic.
+AVD_RAM=2048; AVD_CORES=4; AVD_HEAP=256; AVD_DATA_SIZE="8G"
+
+# `tv` ou `phone` : décide de l'orientation de départ, de l'écran tactile, du
+# D-pad et des capteurs. Un boîtier TV et un téléphone ne se prêtent pas le
+# même matériel, et c'est précisément ce que ces bancs doivent reproduire.
+AVD_FAMILY=tv
+
 case "$MOOVIE_AVD" in
   tv36)
     AVD_NAME="moovie_androidtv_36"
@@ -62,23 +73,39 @@ case "$MOOVIE_AVD" in
     AVD_DEVICE="tv_1080p"
     AVD_WIDTH=1920; AVD_HEIGHT=1080; AVD_DENSITY=320
     ;;
+  # OnePlus Nord 3 5G (CPH2493), le téléphone d'un testeur. Relevé de sa fiche
+  # produit, pas mesuré sur l'appareil — contrairement à `mibox`.
+  #
+  # **1240 px à 450 dpi font 441 dp de large**, contre 448 dp au Pixel 8 Pro :
+  # sept points d'écart, et la même classe de taille (COMPACT, seuil à 600 dp).
+  # Ce banc ne sert donc pas à éprouver une largeur inédite — il sert à éprouver
+  # une largeur *serrée* sur un second appareil, là où une mise en page calculée
+  # au dp près sur un seul téléphone finit par ne tenir que sur celui-là.
+  nord3)
+    AVD_FAMILY=phone
+    AVD_NAME="OnePlus_Nord_3_CPH2493_API_36"
+    SYSTEM_IMAGE="system-images;android-36;google_apis;x86_64"
+    # Base téléphone quelconque : la géométrie est réécrite juste après, seule
+    # la famille d'appareil compte ici.
+    AVD_DEVICE="pixel_7"
+    AVD_WIDTH=1240; AVD_HEIGHT=2772; AVD_DENSITY=450
+    # RAM et stockage **ne suivent pas la fiche** (16 Go / 256 Go) : ils ne
+    # changent rien à ce qu'on vient vérifier — la mise en page — et une VM de
+    # 16 Go affamerait la machine hôte pour rien. La géométrie et la version
+    # d'Android, elles, sont fidèles, et ce sont elles qui décident du rendu.
+    AVD_RAM=4096; AVD_CORES=8; AVD_HEAP=512; AVD_DATA_SIZE="16G"
+    ;;
   *)
-    echo "!! Profil AVD inconnu : '$MOOVIE_AVD' (attendu : tv36, mibox)" >&2
+    echo "!! Profil AVD inconnu : '$MOOVIE_AVD' (attendu : mibox, tv36, nord3)" >&2
     return 1 2>/dev/null || exit 1
     ;;
 esac
-
-# Communs aux profils : ce sont les caractéristiques de la box, et le profil
-# tv36 s'en accommode très bien. RAM et stockage viennent de la fiche produit —
-# `df /data` a bien montré 4,9 Go utiles sur les 8 Go annoncés — les cœurs du
-# quad-core Amlogic.
-AVD_RAM=2048; AVD_CORES=4; AVD_HEAP=256; AVD_DATA_SIZE="8G"
 
 # Chemin d'installation de l'image, déduit de son identifiant SDK — qui porte
 # déjà le segment `system-images`, d'où l'absence de préfixe ici.
 SYSTEM_IMAGE_DIR="$ANDROID_SDK_ROOT/$(echo "$SYSTEM_IMAGE" | tr ';' '/')"
 
-export AVD_NAME SYSTEM_IMAGE SYSTEM_IMAGE_DIR AVD_DEVICE
+export AVD_NAME SYSTEM_IMAGE SYSTEM_IMAGE_DIR AVD_DEVICE AVD_FAMILY
 export AVD_WIDTH AVD_HEIGHT AVD_DENSITY AVD_RAM AVD_CORES AVD_HEAP AVD_DATA_SIZE
 
 # App Moo-vie

@@ -46,5 +46,5 @@ until [[ "$("$ADB" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" =
   kill -0 "$EMU_PID" 2>/dev/null || { echo "!! L'émulateur s'est arrêté. Voir $LOG"; exit 1; }
   sleep 2
 done
-echo ">> Android TV démarré et prêt. L'émulateur continue de tourner après ce script."
+echo ">> $AVD_NAME démarré et prêt. L'émulateur continue de tourner après ce script."
 "$ADB" devices
