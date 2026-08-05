@@ -273,7 +273,22 @@ class DetailsViewModel : ViewModel() {
      * À zéro, on retombe sur la déduction.
      */
     fun start(tmdbId: Int, isTv: Boolean, resumeSeason: Int = 0, resumeEpisode: Int = 0) {
-        if (this.tmdbId == tmdbId && _state.value !is DetailsState.Loading) return
+        if (this.tmdbId == tmdbId && _state.value !is DetailsState.Loading) {
+            // Même titre : on ne recharge pas TMDB pour rien, mais on **revient
+            // à la vue d'ensemble**.
+            //
+            // La fiche d'épisode et le panneau des sources sont des sous-vues,
+            // pas l'état de la fiche. Ce ViewModel vivant à l'échelle de la
+            // fenêtre, elles survivaient à la sortie de l'écran : rouvrir la
+            // série depuis la recherche rendait la fiche du dernier épisode
+            // regardé, jamais la liste des épisodes qu'on venait chercher.
+            _selectedEpisode.value = null
+            _panelVisible.value = false
+            // Un épisode explicitement demandé (carte « Reprendre ») désigne
+            // aussi sa saison : sans ça on rouvrait sur celle qui était affichée.
+            if (resumeSeason > 0) selectSeason(resumeSeason)
+            return
+        }
         requestedResume = if (resumeSeason > 0 && resumeEpisode > 0) {
             EpisodeRef(resumeSeason, resumeEpisode)
         } else {
