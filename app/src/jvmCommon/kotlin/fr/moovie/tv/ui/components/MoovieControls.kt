@@ -19,7 +19,12 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.PlainTooltip
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.rememberTooltipState
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
@@ -54,6 +59,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import fr.moovie.tv.ui.theme.MoovieGradient
+import fr.moovie.tv.ui.adaptive.isPointerUi
 import fr.moovie.tv.ui.adaptive.isTouchUi
 import fr.moovie.tv.ui.theme.MoovieShape
 import fr.moovie.tv.ui.theme.moovieSurface
@@ -232,6 +238,7 @@ private fun Modifier.secondaryClick(onTrigger: (() -> Unit)?): Modifier {
  * Bouton icône compact (actions secondaires : réglages, tri, vu/non vu…).
  * Même langage visuel que [MoovieButton] : au repos, seule l'icône est visible.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MoovieIconButton(
     onClick: () -> Unit,
@@ -252,20 +259,45 @@ fun MoovieIconButton(
      */
     mirrored: Boolean = false,
 ) {
-    MoovieButton(
-        onClick = onClick,
-        modifier = modifier,
-        selected = selected,
-        enabled = enabled,
-        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = contentDescription,
-            modifier = Modifier
-                .size(20.dp)
-                .then(if (mirrored) Modifier.scale(scaleX = -1f, scaleY = 1f) else Modifier),
-        )
+    val button = @Composable {
+        MoovieButton(
+            onClick = onClick,
+            modifier = modifier,
+            selected = selected,
+            enabled = enabled,
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = contentDescription,
+                modifier = Modifier
+                    .size(20.dp)
+                    .then(if (mirrored) Modifier.scale(scaleX = -1f, scaleY = 1f) else Modifier),
+            )
+        }
+    }
+
+    // Infobulle au survol, **au pointeur seulement**.
+    //
+    // Une icône seule se devine tant qu'on en a trois ; le lecteur en aligne
+    // neuf, et là on cherche. À la télécommande le focus se déplace d'un bouton
+    // à l'autre et le libellé n'aurait rien à survoler ; au doigt il n'y a pas
+    // de survol du tout. C'est donc un manque propre au bureau, et lui seul.
+    //
+    // Le texte est le `contentDescription` déjà fourni : il décrit précisément
+    // ce que fait le bouton, et le doubler d'un libellé séparé garantirait que
+    // les deux finissent par se contredire.
+    if (isPointerUi && !contentDescription.isNullOrBlank()) {
+        TooltipBox(
+            positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+            tooltip = { PlainTooltip { Text(contentDescription) } },
+            state = rememberTooltipState(),
+            // Non focalisable : l'infobulle ne doit pas s'intercaler dans le
+            // parcours au clavier entre deux boutons.
+            focusable = false,
+        ) { button() }
+    } else {
+        button()
     }
 }
 
