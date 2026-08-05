@@ -122,11 +122,11 @@
     <string name="update_every_minutes">Toutes les %1$d min</string>
     <string name="update_every_hours">Toutes les %1$d h</string>
     <string name="player_update_chip">Mise à jour v%1$s</string>
-    <string name="update_available">Mise à jour v%1$s disponible</string>
+    <string name="update_available">v%1$s disponible</string>
     <string name="update_install">Installer</string>
     <string name="update_later">Plus tard</string>
     <string name="update_downloading">Téléchargement de v%1$s…  %2$d %</string>
-    <string name="update_error">Téléchargement impossible. Réessayer.</string>
+    <string name="update_error">Téléchargement impossible</string>
     <string name="update_retry">Réessayer</string>
 
     <!-- Écran de veille -->

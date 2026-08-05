@@ -1,5 +1,8 @@
 package fr.moovie.tv.ui.update
 
+import fr.moovie.tv.resources.Res
+import fr.moovie.tv.resources.update_error
+import org.jetbrains.compose.resources.getString
 import android.app.Application
 import android.content.Intent
 import androidx.core.content.FileProvider
@@ -123,7 +126,11 @@ class UpdateViewModel(app: Application) : AndroidViewModel(app) {
                 // retombe sur « disponible » plutôt que de masquer.
                 _state.value = target
             } else {
-                _state.value = UpdateState.Error(getApplication<Application>().getString(R.string.update_error))
+                // Ressource **partagée**, pas `R.string` : le bandeau lit déjà
+                // toutes ses autres chaînes dans `Res.string`, et le doublon
+                // Android historique avait silencieusement divergé — le message
+                // affiché n'était plus celui qu'on croyait modifier.
+                _state.value = UpdateState.Error(getString(Res.string.update_error))
             }
         }
     }
