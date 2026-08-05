@@ -175,9 +175,15 @@ fun HistoryScreenContent(
 
             // Marges horizontales dans le contentPadding : sinon le zoom au
             // focus des vignettes de bord est rogné par le conteneur.
+            //
+            // Et la **même** valeur que le reste de la page : elle était figée à
+            // 32 dp pendant que l'en-tête suivait `historyHPad()`, si bien que
+            // la grille ne s'alignait pas sur son propre titre sur téléphone.
+            // Même oubli que les grilles du catalogue et de la recherche — la
+            // réserve du focus n'a de sens que là où il y a un focus.
             LazyColumn(
                 state = listState,
-                contentPadding = PaddingValues(horizontal = 32.dp, vertical = 12.dp),
+                contentPadding = PaddingValues(horizontal = historyHPad(), vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 days.forEachIndexed { dayIndex, day ->
