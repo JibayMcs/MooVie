@@ -54,7 +54,7 @@
     <string name="search_hint">Rechercher un film, une série, un anime…</string>
     <string name="search_hint_short">Rechercher…</string>
     <string name="search_loading">Recherche…</string>
-    <string name="search_needs_key">Clé TMDB manquante — renseigne-la dans les réglages.</string>
+    <string name="search_needs_key">Clé TMDB manquante — à renseigner dans les réglages.</string>
     <string name="search_no_results">Aucun résultat pour « %1$s ».</string>
     <string name="search_recent">Recherches récentes</string>
     <string name="search_empty_hint">Saisir une recherche. L'historique apparaîtra ici.</string>
@@ -156,7 +156,7 @@
     <string name="settings_autoplay_help">À la fin d'un épisode, enchaîne le suivant après un décompte de 10 s (annulable avec n'importe quelle touche). Passe à la saison suivante en fin de saison.</string>
     <string name="settings_intro_help">Affiche des boutons « Passer l'intro / le générique » pendant la lecture (données TheIntroDB). Passer le générique enchaîne l'épisode suivant (série) ou revient à l'accueil (film).</string>
     <string name="settings_cat_dns">Réseau (DNS)</string>
-    <string name="settings_dns_help">Les domaines des sources sont souvent bloqués par DNS chez les FAI. Le DNS-over-HTTPS (DoH) contourne ce blocage. Laisse activé si les sources restent introuvables.</string>
+    <string name="settings_dns_help">Les domaines des sources sont souvent bloqués par DNS chez les FAI. Le DNS-over-HTTPS (DoH) contourne ce blocage. À laisser activé si les sources restent introuvables.</string>
     <string name="settings_doh_on">DoH activé</string>
     <string name="settings_doh_off">DNS système</string>
     <string name="settings_doh_resolver">Résolveur</string>
@@ -231,7 +231,7 @@
     <string name="home_row_because">Dans la lignée de %1$s</string>
     <string name="settings_cat_backup">Sauvegarde</string>
     <string name="settings_cat_home">Accueil</string>
-    <string name="backup_intro">Copie les données Moo-vie sur une clé USB pour les retrouver sur un autre appareil : reprises de lecture, liste à voir, historique et réglages.</string>
+    <string name="backup_intro">Copie des données Moo-vie sur une clé USB, pour les retrouver sur un autre appareil : reprises de lecture, liste à voir, historique et réglages.</string>
     <string name="backup_export">Exporter mes données</string>
     <string name="backup_import">Importer une sauvegarde</string>
     <string name="backup_choose_target">Où écrire la sauvegarde ?</string>
@@ -243,7 +243,7 @@
     <string name="backup_root_unreadable">Sans l'accès à tous les fichiers, Moo-vie ne peut pas lire la racine d'une clé ni du stockage : une sauvegarde qui s'y trouve reste invisible.</string>
     <string name="backup_root_grant">Autoriser l'accès aux fichiers</string>
     <string name="backup_include_key">Inclure les clés d'API (TMDB, TheIntroDB)</string>
-    <string name="backup_key_warning">Les clés seront écrites en clair dans le fichier. Pratique pour réinstaller sans les retaper, mais ne publie pas cette sauvegarde (dépôt Git, cloud partagé…).</string>
+    <string name="backup_key_warning">Les clés seront écrites en clair dans le fichier. Pratique pour réinstaller sans les retaper, mais mieux vaut ne pas la publier (dépôt Git, cloud partagé…).</string>
     <string name="backup_contents">Contenu de la sauvegarde</string>
     <string name="backup_writing">Écriture en cours…</string>
     <string name="backup_written">Sauvegarde écrite</string>
@@ -279,7 +279,7 @@
     <string name="onboarding_restore_help">Restaure les reprises de lecture, la liste, l'historique et la clé TMDB depuis une sauvegarde sur clé USB.</string>
     <string name="onboarding_fresh">Première installation</string>
     <string name="onboarding_fresh_help">Saisie de la clé TMDB, gratuite sur themoviedb.org. C'est elle qui alimente le catalogue, les affiches et les fiches.</string>
-    <string name="onboarding_no_key">La sauvegarde importée ne contenait pas de clé TMDB. Saisis-la dans les réglages pour terminer l'installation.</string>
+    <string name="onboarding_no_key">La sauvegarde importée ne contenait pas de clé TMDB. À saisir dans les réglages pour terminer l'installation.</string>
     <string name="settings_cat_subtitles">Sous-titres</string>
     <string name="subtitles_intro">Les sous-titres viennent d'OpenSubtitles. Ils fonctionnent sans compte, mais le nombre de téléchargements par jour est alors très limité, et le quota restant reste invisible.</string>
     <string name="subtitles_account">Compte OpenSubtitles</string>
