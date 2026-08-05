@@ -73,6 +73,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
@@ -293,7 +294,12 @@ fun DetailsScreenContent(
         // agrandis au focus débordent dans la marge au lieu d'être rognés.
         // 48 dp de marge, c'est le recul d'un salon. Sur 448 dp de large elles
         // mangent un cinquième de l'écran à elles seules.
-        val hPad = Modifier.padding(horizontal = if (compact) 16.dp else 48.dp)
+        // Une seule source pour la marge de la page : le Modifier pour les
+        // blocs ordinaires, la valeur pour ce qui a besoin d'un `contentPadding`
+        // (les rangées défilantes). Deux constantes séparées finiraient par
+        // diverger, et c'est exactement ce qui avait décalé le casting.
+        val hPadDp = if (compact) 16.dp else 48.dp
+        val hPad = Modifier.padding(horizontal = hPadDp)
         // Marge haute agrandie sur desktop pour que le titre passe sous le
         // bouton retour en overlay (sinon ils se chevauchent).
         val topPad = if (showBackButton) 96.dp else 48.dp
@@ -408,7 +414,7 @@ fun DetailsScreenContent(
                     // Casting sous les boutons, comme sur la fiche d'épisode : la
                     // descente au D-pad atteint d'abord Lire, pas une vignette
                     // d'acteur.
-                    CastRow(s.details.credits?.cast.orEmpty(), onOpenPerson)
+                    CastRow(s.details.credits?.cast.orEmpty(), hPadDp, onOpenPerson)
                 }
                 is DetailsState.Tv -> {
                     val selected = selectedEpisode
@@ -429,6 +435,8 @@ fun DetailsScreenContent(
                             onPlay = { onQuickPlayEpisode(selected.season, ep.episodeNumber) },
                             onOpenSources = { onOpenEpisodePanel(selected.season, ep.episodeNumber) },
                             onToggleWatched = { onToggleWatched(key) },
+                            cast = s.details.credits?.cast.orEmpty(),
+                            onOpenPerson = onOpenPerson,
                         )
                     } else {
                         // Deux volets plutôt qu'un empilement : l'écran fait
@@ -611,6 +619,22 @@ fun DetailsScreenContent(
                             }
                         }
                         }
+                        }
+                        // Casting sous les volets — **seulement quand ils sont
+                        // empilés**, c'est-à-dire sur téléphone.
+                        //
+                        // Mesuré sur les 540 dp d'une TV : l'en-tête (titre,
+                        // résumé, saisons, actions) en prend ~350, il en reste
+                        // ~145 quand la rangée en demande ~190. Ajoutée quand
+                        // même, elle ne rognait pas la liste : elle **effaçait
+                        // le sélecteur de saisons** hors de l'écran. Une page
+                        // qui perd sa navigation pour gagner une illustration
+                        // est un mauvais échange.
+                        //
+                        // Sur une série en écran large, le casting reste à un
+                        // appui : la fiche d'un épisode, elle, a la place.
+                        if (compact) {
+                            CastRow(s.details.credits?.cast.orEmpty(), hPadDp, onOpenPerson)
                         }
                     }
                 }
@@ -1160,9 +1184,17 @@ private fun EpisodeDetail(
     onPlay: () -> Unit,
     onOpenSources: () -> Unit,
     onToggleWatched: () -> Unit,
+    /**
+     * Casting **de la série**, pas de l'épisode : TMDB ne donne les invités
+     * qu'épisode par épisode, au prix d'un appel de plus, alors que ce qu'on
+     * cherche en reconnaissant un visage est le rôle principal.
+     */
+    cast: List<CastMember> = emptyList(),
+    onOpenPerson: (CastMember) -> Unit = {},
 ) {
     val compact = useBottomNav
-    val hPad = Modifier.padding(horizontal = if (compact) 16.dp else 48.dp)
+    val hPadDp = if (compact) 16.dp else 48.dp
+    val hPad = Modifier.padding(horizontal = hPadDp)
     // La vignette fait 420 dp de large. Sur les 448 dp d'un téléphone en
     // portrait il ne restait que 28 dp à la colonne de texte : titre, synopsis
     // et boutons étaient bien composés, mais écrasés à néant — d'où une page qui
@@ -1278,6 +1310,9 @@ private fun EpisodeDetail(
             modifier = hPad,
         )
     }
+    // Sous les boutons, comme sur un film : la descente au D-pad atteint
+    // d'abord Lire, pas une vignette d'acteur.
+    CastRow(cast, hPadDp, onOpenPerson)
 }
 
 @Composable
@@ -1477,19 +1512,32 @@ private fun CastCard(member: CastMember, onClick: () -> Unit) {
     ) { body() }
 }
 
+/**
+ * Rangée du casting.
+ *
+ * @param hPad marge horizontale, **imposée par la page** et non figée ici. Elle
+ *   valait 48 dp en dur : sur un téléphone, dont le reste du contenu est à
+ *   16 dp, la rangée partait donc trente-deux points plus loin que tout ce qui
+ *   la surplombe. La marge d'une rangée dépend de la page qui l'accueille, pas
+ *   de la rangée.
+ *
+ *   Elle va dans le `contentPadding` de la LazyRow et non dans un `padding`
+ *   externe : c'est ce qui laisse les cartes agrandies au focus déborder dans la
+ *   marge au lieu d'être rognées par le conteneur.
+ */
 @Composable
-private fun CastRow(cast: List<CastMember>, onOpenPerson: (CastMember) -> Unit) {
+private fun CastRow(cast: List<CastMember>, hPad: Dp, onOpenPerson: (CastMember) -> Unit) {
     val members = cast.take(15)
     if (members.isEmpty()) return
     Column {
-        Text(stringResource(Res.string.details_cast), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 48.dp))
+        Text(stringResource(Res.string.details_cast), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = hPad))
         Spacer(Modifier.height(8.dp))
         val castState = rememberLazyListState()
         MoovieRail(castState) {
         LazyRow(
             state = castState,
             horizontalArrangement = Arrangement.spacedBy(16.dp),
-            contentPadding = PaddingValues(horizontal = 48.dp),
+            contentPadding = PaddingValues(horizontal = hPad),
         ) {
             items(members) { member ->
                 CastCard(member = member, onClick = { onOpenPerson(member) })
