@@ -1,96 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Traducciones de los recursos Android **históricos** — ver `values/strings.xml`.
+
+  Solo queda aquí el selector de idioma, único superviviente de ese sistema: el
+  resto de la app lee sus textos en `commonMain/composeResources`. `app_name` no
+  está: no se traduce.
+
+  Estos archivos deben mantenerse **alineados con la configuración regional por
+  defecto**. Una cadena traducida aquí sin equivalente allí es un error *fatal*
+  de lint (`ExtraTranslation`): no rompe la compilación de depuración, solo
+  `assembleRelease` — es decir, la CI de publicación, y únicamente ella.
+-->
 <resources>
-    <!-- Común -->
-    <string name="common_loading">Cargando…</string>
-    <string name="common_back">Atrás</string>
-    <string name="common_enabled">Activado</string>
-    <string name="common_disabled">Desactivado</string>
-    <string name="mark_watched">Marcar como visto</string>
-    <string name="mark_unwatched">Marcar como no visto</string>
-
-    <!-- Inicio -->
-    <string name="home_search">Buscar</string>
-    <string name="home_settings">Ajustes</string>
-    <string name="home_row_trending_movies">Películas en tendencia</string>
-    <string name="home_row_trending_tv">Series en tendencia</string>
-    <string name="home_row_top_movies">Películas mejor valoradas</string>
-    <string name="home_needs_key">Introduce tu clave API de TMDB en Ajustes.</string>
-    <string name="home_no_results_key">Sin resultados — comprueba tu clave TMDB.</string>
-    <string name="home_tmdb_error">Error al cargar TMDB: %1$s</string>
-    <string name="home_open_settings">Abrir Ajustes</string>
-    <string name="home_continue_watching">Seguir viendo</string>
-    <string name="home_minutes_left">%1$d min restantes</string>
-    <string name="home_in_progress">En curso</string>
-    <string name="resume_remove">Quitar de la lista</string>
-
-    <!-- Búsqueda -->
-    <string name="search_title">Búsqueda</string>
-    <string name="search_hint">Busca una película, una serie, un anime…</string>
-    <string name="search_loading">Buscando…</string>
-    <string name="search_needs_key">Falta la clave TMDB — configúrala en Ajustes.</string>
-    <string name="search_no_results">Sin resultados para «%1$s».</string>
-    <string name="search_recent">Búsquedas recientes</string>
-    <string name="search_empty_hint">Escribe para buscar. Tu historial aparecerá aquí.</string>
-    <string name="search_clear_history">Borrar historial</string>
-    <string name="search_remove_query">Eliminar «%1$s»</string>
-
-    <!-- Ficha -->
-    <string name="details_runtime">%1$s • %2$s min</string>
-    <string name="details_cast">Reparto</string>
-    <string name="details_sources">Fuentes</string>
-    <string name="details_play">▶  Reproducir</string>
-    <string name="details_resume">▶  Reanudar</string>
-    <string name="details_searching">Buscando %1$s…</string>
-    <string name="details_playing">Reproduciendo…</string>
-    <string name="details_lang_unavailable">%1$s no disponible</string>
-    <string name="details_seasons">Temporadas</string>
-    <string name="mark_season_watched">Marcar temporada vista</string>
-    <string name="mark_season_unwatched">Marcar temporada no vista</string>
-    <string name="details_episodes_season">Episodios (temporada %1$d)</string>
-    <string name="details_no_player">Ningún reproductor %1$s funcionó.</string>
-    <string name="details_lang_missing">Sin fuente en %1$s — otros idiomas disponibles.</string>
-    <string name="details_no_sources">No hay fuente disponible para este título.</string>
-    <string name="details_searching_source">Buscando una fuente… %1$s</string>
-    <string name="details_resolve_error">No se puede reproducir «%1$s». Prueba otro reproductor.</string>
-    <string name="details_needs_key">Falta la clave TMDB (Ajustes).</string>
-    <string name="details_tmdb_error">Error de TMDB: %1$s</string>
-
-    <!-- Reproductor -->
-    <string name="player_skip_intro">Saltar intro</string>
-    <string name="player_skip_outro">Saltar créditos</string>
-
-    <!-- Actualización -->
-    <string name="update_available">Actualización v%1$s disponible</string>
-    <string name="update_install">Instalar</string>
-    <string name="update_later">Más tarde</string>
-    <string name="update_downloading">Descargando v%1$s…  %2$d %%</string>
-    <string name="update_error">Descarga fallida. Inténtalo de nuevo.</string>
-    <string name="update_retry">Reintentar</string>
-
-    <!-- Ajustes -->
-    <string name="settings_title">Ajustes</string>
-    <string name="settings_cat_api">API y Claves</string>
-    <string name="settings_tmdb_key">Clave API de TMDB</string>
-    <string name="settings_tmdb_hint">Pega tu clave TMDB aquí…</string>
-    <string name="settings_tmdb_help">Crea una clave gratis en themoviedb.org (API v3).</string>
-    <string name="settings_cat_playback">Reproducción e idioma</string>
-    <string name="settings_stream_lang">Idioma de stream por defecto</string>
     <string name="settings_language">Idioma de la aplicación</string>
-    <string name="settings_cat_intro">Intro y créditos</string>
-    <string name="settings_intro_help">Muestra botones «Saltar intro / créditos» durante la reproducción (datos de TheIntroDB). Saltar los créditos reproduce el siguiente episodio (serie) o vuelve al inicio (película).</string>
-    <string name="settings_cat_dns">Red (DNS)</string>
-    <string name="settings_dns_help">Los dominios de las fuentes suelen estar bloqueados por DNS por los ISP. DNS-over-HTTPS (DoH) evita ese bloqueo. Déjalo activado si las fuentes no aparecen.</string>
-    <string name="settings_doh_on">DoH activado</string>
-    <string name="settings_doh_off">DNS del sistema</string>
-    <string name="settings_doh_resolver">Resolutor</string>
-    <string name="settings_cat_sources">Fuentes y hosts</string>
-    <string name="settings_sources_help">Orden = prioridad de reproducción (el primero se prueba antes).</string>
-    <string name="settings_move_up">Subir %1$s</string>
-    <string name="settings_move_down">Bajar %1$s</string>
-    <string name="settings_enable">Activar %1$s</string>
-    <string name="settings_disable">Desactivar %1$s</string>
-
-    <!-- Idiomas -->
     <string name="language_system">Idioma del sistema</string>
     <string name="language_fr">Francés</string>
     <string name="language_en">Inglés</string>
