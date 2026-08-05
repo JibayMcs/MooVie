@@ -90,37 +90,29 @@ private fun LayoutRow(
     onRemove: (() -> Unit)?,
 ) {
     val label = homeRowLabel(entry)
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(MoovieShape)
-            .background(if (index % 2 == 0) Color(0xFF161616) else Color.Transparent)
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
+
+    val texts = @Composable {
+        Text(
+            "${index + 1}. $label",
+            style = MaterialTheme.typography.titleMedium,
+            // Grisé quand la rangée est masquée : sur un téléphone, la mention
+            // « Masquée » passe à la ligne suivante et se lit après coup — la
+            // couleur, elle, se voit du premier coup d'œil.
+            color = if (entry.visible) Color.White else Color(0xFF777777),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        if (!entry.visible) {
             Text(
-                "${index + 1}. $label",
-                style = MaterialTheme.typography.titleMedium,
-                // Grisé quand la rangée est masquée : sur un téléphone, la
-                // mention « Masquée » passe à la ligne suivante et se lit après
-                // coup — la couleur, elle, se voit du premier coup d'œil.
-                color = if (entry.visible) Color.White else Color(0xFF777777),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+                stringResource(Res.string.layout_hidden),
+                style = MaterialTheme.typography.bodySmall,
+                color = Color(0xFF777777),
             )
-            if (!entry.visible) {
-                Text(
-                    stringResource(Res.string.layout_hidden),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color(0xFF777777),
-                )
-            }
         }
-        // Sur téléphone les quatre icônes tiennent encore : 4 × 48 dp sur 448,
-        // le libellé garde plus de la moitié de la ligne. Rien à replier ici.
-        Row(horizontalArrangement = Arrangement.spacedBy(if (useBottomNav) 4.dp else 8.dp)) {
+    }
+
+    val controls = @Composable {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             if (index > 0) {
                 MoovieIconButton(
                     onClick = onMoveUp,
@@ -153,5 +145,38 @@ private fun LayoutRow(
                 )
             }
         }
+    }
+
+    val surface = Modifier
+        .fillMaxWidth()
+        .clip(MoovieShape)
+        .background(if (index % 2 == 0) Color(0xFF161616) else Color.Transparent)
+
+    // Sur téléphone, le libellé prend la ligne et les boutons celle d'en
+    // dessous, comme les autres lignes de réglage.
+    //
+    // Se les partager ne tenait pas : les réglages posent déjà une barre
+    // d'icônes de 68 dp à gauche, et sur les ~440 dp d'un portrait il reste
+    // ~330 dp à la ligne. Quatre cibles tactiles de 48 dp en mangent la moitié,
+    // et « 1. Reprendre la lecture » se retrouvait tronqué à « 1. Reprendre… ».
+    // Le calcul d'origine avait oublié la barre.
+    if (useBottomNav) {
+        Column(
+            modifier = surface.padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            texts()
+            controls()
+        }
+        return
+    }
+
+    Row(
+        modifier = surface.padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Column(modifier = Modifier.weight(1f)) { texts() }
+        controls()
     }
 }
