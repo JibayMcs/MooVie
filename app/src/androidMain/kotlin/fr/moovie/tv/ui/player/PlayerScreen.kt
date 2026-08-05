@@ -60,6 +60,7 @@ import fr.moovie.tv.data.intro.IntroMedia
 import fr.moovie.tv.data.settings.ScreensaverDelay
 import fr.moovie.tv.data.settings.SettingsRepository
 import fr.moovie.tv.data.watch.WatchProgressRepository
+import fr.moovie.tv.data.watch.nextUpEntry
 import fr.moovie.tv.ui.components.MoovieScreensaver
 import fr.moovie.tv.ui.intro.ReportMarkingBanner
 import fr.moovie.tv.ui.intro.ReportSegmentViewModel
@@ -368,6 +369,14 @@ fun PlayerScreen(
         val duration = controller.durationMs()
         if (mediaKey.isNotBlank() && duration > 0) {
             exitScope.launch { progress.save(mediaKey, duration, duration) }
+        }
+        // La série doit rester dans « Reprendre la lecture » : l'entrée qu'on
+        // vient de terminer en sort, et celle de l'épisode suivant n'existe pas
+        // encore. Sans ce repère, finir un épisode faisait disparaître la série
+        // du seul rail où l'on va voir où l'on en est.
+        if (nextSeason > 0 && nextEpisode > 0) {
+            nextUpEntry(mediaKey, title, posterUrl.takeIf { it.isNotBlank() }, nextSeason, nextEpisode)
+                ?.let { next -> exitScope.launch { progress.queueNext(next) } }
         }
     }
 

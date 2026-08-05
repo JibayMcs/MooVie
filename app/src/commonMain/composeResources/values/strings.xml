@@ -47,6 +47,7 @@
     <string name="layout_reset">Rétablir l'ordre d'origine</string>
     <string name="home_time_left">%1$s restantes</string>
     <string name="home_in_progress">En cours</string>
+    <string name="home_next_up">À suivre</string>
     <string name="resume_remove">Retirer de la liste de lecture</string>
 
     <!-- Recherche -->

@@ -34,7 +34,10 @@ class WatchProgressRepository {
             if (!k.name.startsWith(RESUME_PREFIX)) return@mapNotNull null
             runCatching { json.decodeFromString<ResumeEntry>(v as String) }.getOrNull()
         }
-            .filter { it.positionMs > 0 }
+            // `queued` : un épisode jamais commencé, posé là parce qu'on vient
+            // de finir le précédent. Sans lui, la série quittait le rail au
+            // moment même où l'on venait d'avancer dedans.
+            .filter { it.positionMs > 0 || it.queued }
             .sortedByDescending { it.updatedAt }
     }
 
@@ -165,6 +168,34 @@ class WatchProgressRepository {
      * contenu est considéré terminé : sortie de la reprise + marqué vu.
      * Les positions < 5 s sont ignorées (générique, zapping).
      */
+    /**
+     * Pose l'épisode suivant en « à suivre », pour que la série reste dans
+     * « Reprendre la lecture » une fois le précédent terminé.
+     *
+     * Deux refus, et ils comptent autant que l'écriture :
+     *
+     * - **déjà vu** : on ne remet pas en attente un épisode que l'utilisateur a
+     *   regardé — typiquement quand il revoit une saison ;
+     * - **déjà entamé** : sa position réelle vaut mieux que ce simple repère, et
+     *   l'écraser reculerait la lecture à zéro.
+     */
+    suspend fun queueNext(meta: ResumeEntry) {
+        store.edit { prefs ->
+            if (prefs[booleanPreferencesKey(SEEN_PREFIX + meta.key)] == true) return@edit
+            val k = stringPreferencesKey(RESUME_PREFIX + meta.key)
+            val existing = prefs[k]?.let { decode(it) }
+            if (existing != null && existing.positionMs > 0) return@edit
+            prefs[k] = json.encodeToString(
+                meta.copy(
+                    queued = true,
+                    positionMs = 0,
+                    durationMs = 0,
+                    updatedAt = System.currentTimeMillis(),
+                ),
+            )
+        }
+    }
+
     suspend fun save(key: String, positionMs: Long, durationMs: Long) {
         store.edit { prefs ->
             val k = stringPreferencesKey(RESUME_PREFIX + key)

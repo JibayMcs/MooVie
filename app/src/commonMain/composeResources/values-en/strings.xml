@@ -45,6 +45,7 @@
     <string name="layout_reset">Restore the original order</string>
     <string name="home_time_left">%1$s left</string>
     <string name="home_in_progress">In progress</string>
+    <string name="home_next_up">Next up</string>
     <string name="resume_remove">Remove from watch list</string>
 
     <!-- Search -->

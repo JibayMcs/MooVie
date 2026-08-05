@@ -80,6 +80,7 @@ import fr.moovie.tv.resources.home_continue_watching
 import fr.moovie.tv.core.format.formatDuration
 import fr.moovie.tv.ui.components.MoovieProgressBar
 import fr.moovie.tv.resources.home_in_progress
+import fr.moovie.tv.resources.home_next_up
 import fr.moovie.tv.resources.home_time_left
 import fr.moovie.tv.resources.home_open_settings
 import fr.moovie.tv.resources.home_search
@@ -540,10 +541,14 @@ private fun ResumeHero(entry: ResumeEntry) {
                 Text(it, style = MaterialTheme.typography.titleMedium, color = Color(0xFFCCCCCC))
             }
             Text(
-                if (entry.durationMs > 0 && remaining != null) {
-                    stringResource(Res.string.home_time_left, remaining)
-                } else {
-                    stringResource(Res.string.home_in_progress)
+                when {
+                    entry.durationMs > 0 && remaining != null ->
+                        stringResource(Res.string.home_time_left, remaining)
+                    // Épisode posé là parce qu'on vient de finir le précédent :
+                    // annoncer « En cours » sur ce qu'on n'a pas commencé
+                    // laisserait croire à une position perdue.
+                    entry.queued -> stringResource(Res.string.home_next_up)
+                    else -> stringResource(Res.string.home_in_progress)
                 },
                 style = MaterialTheme.typography.titleMedium,
                 color = Color(0xFFCCCCCC),

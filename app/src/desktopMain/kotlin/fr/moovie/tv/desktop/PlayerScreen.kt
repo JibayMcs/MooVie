@@ -72,6 +72,7 @@ import fr.moovie.tv.data.intro.IntroMedia
 import fr.moovie.tv.data.settings.ScreensaverDelay
 import fr.moovie.tv.data.settings.SettingsRepository
 import fr.moovie.tv.data.watch.WatchProgressRepository
+import fr.moovie.tv.data.watch.nextUpEntry
 import fr.moovie.tv.resources.Res
 import fr.moovie.tv.resources.common_cancel
 import fr.moovie.tv.resources.player_buffering
@@ -592,6 +593,14 @@ internal fun DesktopPlayerScreen(
     fun markFinished() {
         if (mediaKey.isNotBlank() && lengthMs > 0) {
             saveScope.launch { progress.save(mediaKey, lengthMs, lengthMs) }
+        }
+        // La série doit rester dans « Reprendre la lecture » : l'entrée qu'on
+        // vient de terminer en sort, et celle de l'épisode suivant n'existe pas
+        // encore. Sans ce repère, finir un épisode faisait disparaître la série
+        // du seul rail où l'on va voir où l'on en est.
+        if (nextSeason > 0 && nextEpisode > 0) {
+            nextUpEntry(mediaKey, title, posterUrl.takeIf { it.isNotBlank() }, nextSeason, nextEpisode)
+                ?.let { next -> saveScope.launch { progress.queueNext(next) } }
         }
     }
 
