@@ -1031,7 +1031,6 @@ fun PlayerScreen(
                             dialog = null
                             controlsVisible = false
                         },
-                        onAbsent = reportViewModel::declareAbsent,
                         onSend = reportViewModel::send,
                         onRedo = {
                             reportViewModel.open(introMissing, creditsMissing)

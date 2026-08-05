@@ -108,10 +108,6 @@ fun validateSubmission(submission: SegmentSubmission): SubmissionProblem? {
 
 private fun checkDuration(durationMs: Long, maxMs: Long): SubmissionProblem? = when {
     durationMs < 0 -> SubmissionProblem.REVERSED
-    // Une durée nulle n'est pas un segment trop court : c'est la façon dont
-    // l'API permet de déclarer « cet épisode n'a pas d'intro ». Information
-    // utile, et qui évite à tout le monde de la chercher.
-    durationMs == 0L -> null
     durationMs < MIN_SEGMENT_MS -> SubmissionProblem.TOO_SHORT
     durationMs > maxMs -> SubmissionProblem.TOO_LONG
     else -> null

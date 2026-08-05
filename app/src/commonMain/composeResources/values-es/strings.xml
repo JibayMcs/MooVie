@@ -320,9 +320,7 @@
     <string name="settings_introdb_help">Opcional. Sirve para informar de intros y créditos que faltan desde el reproductor — y los informes enviados surten efecto de inmediato en este dispositivo. Clave gratuita en theintrodb.org.</string>
     <string name="report_segment">Informar de un segmento</string>
     <string name="report_intro">Informar de la intro</string>
-    <string name="report_credits">Informar de los créditos</string>
-    <string name="report_no_intro">Este episodio no tiene intro</string>
-    <string name="report_no_credits">Este episodio no tiene créditos</string>
+    <string name="report_credits">Informar de los créditos finales</string>
     <string name="report_mark_intro_end">Validar cuando termine la intro</string>
     <string name="report_mark_intro_start">Validar cuando empiece la intro</string>
     <string name="report_marked_start">Inicio marcado: %1$s</string>
@@ -330,7 +328,6 @@
     <string name="report_cancel_hint">Atrás para cancelar</string>
     <string name="report_confirm_intro_range">Intro de %1$s a %2$s</string>
     <string name="report_confirm_credits">Créditos desde %1$s</string>
-    <string name="report_confirm_absent">Ningún segmento de este tipo en este episodio</string>
     <string name="report_send">Enviar</string>
     <string name="report_redo">Empezar de nuevo</string>
     <string name="report_sending">Enviando…</string>

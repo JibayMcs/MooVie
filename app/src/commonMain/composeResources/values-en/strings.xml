@@ -320,9 +320,7 @@
     <string name="settings_introdb_help">Optional. It lets you report missing intros and credits from the player — and your own reports take effect for you straight away. Free key on theintrodb.org.</string>
     <string name="report_segment">Report a segment</string>
     <string name="report_intro">Report the intro</string>
-    <string name="report_credits">Report the credits</string>
-    <string name="report_no_intro">This episode has no intro</string>
-    <string name="report_no_credits">This episode has no credits</string>
+    <string name="report_credits">Report the end credits</string>
     <string name="report_mark_intro_end">Press OK when the intro ends</string>
     <string name="report_mark_intro_start">Press OK when the intro begins</string>
     <string name="report_marked_start">Start marked: %1$s</string>
@@ -330,7 +328,6 @@
     <string name="report_cancel_hint">Back to cancel</string>
     <string name="report_confirm_intro_range">Intro from %1$s to %2$s</string>
     <string name="report_confirm_credits">Credits from %1$s</string>
-    <string name="report_confirm_absent">No segment of this kind in this episode</string>
     <string name="report_send">Send</string>
     <string name="report_redo">Start over</string>
     <string name="report_sending">Sending…</string>

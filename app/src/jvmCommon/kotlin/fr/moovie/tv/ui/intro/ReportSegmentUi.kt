@@ -20,7 +20,6 @@ import fr.moovie.tv.core.intro.SubmissionProblem
 import fr.moovie.tv.data.intro.SubmitError
 import fr.moovie.tv.resources.Res
 import fr.moovie.tv.resources.report_cancel_hint
-import fr.moovie.tv.resources.report_confirm_absent
 import fr.moovie.tv.resources.report_confirm_credits
 import fr.moovie.tv.resources.report_confirm_intro_range
 import fr.moovie.tv.resources.report_credits
@@ -36,8 +35,6 @@ import fr.moovie.tv.resources.report_mark_now
 import fr.moovie.tv.resources.report_mark_intro_end
 import fr.moovie.tv.resources.report_mark_intro_start
 import fr.moovie.tv.resources.report_marked_start
-import fr.moovie.tv.resources.report_no_credits
-import fr.moovie.tv.resources.report_no_intro
 import fr.moovie.tv.resources.report_problem_generic
 import fr.moovie.tv.resources.report_problem_long
 import fr.moovie.tv.resources.report_problem_range
@@ -65,7 +62,6 @@ import org.jetbrains.compose.resources.stringResource
 fun reportSegmentSection(
     step: ReportStep,
     onMark: (SegmentKind) -> Unit,
-    onAbsent: (SegmentKind) -> Unit,
     onSend: () -> Unit,
     onRedo: () -> Unit,
 ): PlayerOptionSection = when (step) {
@@ -81,18 +77,6 @@ fun reportSegmentSection(
             if (step.creditsMissing) {
                 add(PlayerOption(stringResource(Res.string.report_credits), false) {
                     onMark(SegmentKind.CREDITS)
-                })
-            }
-            // Déclarer une absence est une contribution comme une autre, et la
-            // moins coûteuse : un appui, aucune attente.
-            if (step.introMissing) {
-                add(PlayerOption(stringResource(Res.string.report_no_intro), false) {
-                    onAbsent(SegmentKind.INTRO)
-                })
-            }
-            if (step.creditsMissing) {
-                add(PlayerOption(stringResource(Res.string.report_no_credits), false) {
-                    onAbsent(SegmentKind.CREDITS)
                 })
             }
         },
@@ -204,9 +188,7 @@ fun ReportMarkingBanner(
 /** « Intro jusqu'à 1:25 » — l'utilisateur voit ce qu'il envoie avant d'envoyer. */
 @Composable
 private fun fr.moovie.tv.core.intro.SegmentSubmission.describe(): String {
-    val absent = (startMs ?: 0L) == 0L && (endMs ?: 0L) == 0L
     return when {
-        absent -> stringResource(Res.string.report_confirm_absent)
         kind == SegmentKind.CREDITS ->
             stringResource(Res.string.report_confirm_credits, clock(startMs ?: 0))
         // Une intro porte toujours ses deux bornes : elle se marque en deux

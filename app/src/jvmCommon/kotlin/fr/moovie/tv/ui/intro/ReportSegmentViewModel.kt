@@ -104,15 +104,6 @@ class ReportSegmentViewModel : ViewModel() {
     }
 
     /**
-     * Déclare l'absence de segment — une contribution à part entière : elle
-     * évite à tout le monde d'en chercher un qui n'existe pas.
-     */
-    fun declareAbsent(kind: SegmentKind) {
-        val submission = build(kind, startMs = 0, endMs = 0)
-        _step.value = submission?.let { ReportStep.Confirming(it) } ?: ReportStep.Idle
-    }
-
-    /**
      * Enregistre la position courante.
      *
      * Le générique se referme sur un seul appui — sa fin, c'est la fin du média,

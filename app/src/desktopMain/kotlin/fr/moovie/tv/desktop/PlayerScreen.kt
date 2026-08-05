@@ -1017,7 +1017,6 @@ val subsViewModel = remember { PlayerSubtitlesViewModel() }
                             reportViewModel.startMarking(kind)
                             dialog = null
                         },
-                        onAbsent = reportViewModel::declareAbsent,
                         onSend = reportViewModel::send,
                         onRedo = { reportViewModel.open(introMissing, creditsMissing) },
                     ),

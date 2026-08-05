@@ -39,14 +39,17 @@ class SegmentSubmissionTest {
     }
 
     /**
-     * Déclarer une absence est une contribution à part entière : l'API l'accepte
-     * sous forme de segment de longueur nulle, et ça évite à tout le monde de
-     * chercher une intro qui n'existe pas.
+     * Un segment de longueur nulle servait à déclarer « pas d'intro ici ». Ce
+     * n'est plus proposé, donc deux bornes confondues ne sont plus qu'une
+     * maladresse de marquage — et se refusent comme telle.
      */
     @Test
-    fun `une duree nulle declare l absence de segment`() {
-        assertNull(validateSubmission(intro(endMs = 0)))
-        assertNull(validateSubmission(credits(startMs = 0, endMs = 0)))
+    fun `une duree nulle n est plus un signalement valide`() {
+        assertEquals(SubmissionProblem.TOO_SHORT, validateSubmission(intro(endMs = 0)))
+        assertEquals(
+            SubmissionProblem.TOO_SHORT,
+            validateSubmission(credits(startMs = 0, endMs = 0)),
+        )
     }
 
     @Test
