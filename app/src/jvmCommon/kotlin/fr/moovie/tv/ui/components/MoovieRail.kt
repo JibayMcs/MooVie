@@ -30,6 +30,14 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.isShiftPressed
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.Icon
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import fr.moovie.tv.ui.adaptive.isPointerUi
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -195,25 +203,70 @@ fun MoovieRail(
             visible = hovered && canScrollBack,
             enter = fadeIn(),
             exit = fadeOut(),
-            modifier = Modifier.align(Alignment.CenterStart).padding(start = 8.dp),
+            modifier = Modifier.align(Alignment.CenterStart),
         ) {
-            MoovieIconButton(
-                onClick = { page(-1) },
-                icon = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                contentDescription = null,
-            )
+            RailArrow(toStart = true, onClick = { page(-1) })
         }
         AnimatedVisibility(
             visible = hovered && canScrollForward,
             enter = fadeIn(),
             exit = fadeOut(),
-            modifier = Modifier.align(Alignment.CenterEnd).padding(end = 8.dp),
+            modifier = Modifier.align(Alignment.CenterEnd),
         ) {
-            MoovieIconButton(
-                onClick = { page(1) },
-                icon = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = null,
-            )
+            RailArrow(toStart = false, onClick = { page(1) })
         }
+    }
+}
+
+/** Largeur de la bande de défilement. Assez pour viser sans regarder. */
+private val ARROW_WIDTH = 56.dp
+
+/**
+ * Bande de défilement d'une rangée, au bord et sur toute sa hauteur.
+ *
+ * C'était un bouton icône de la taille des autres, posé au milieu de la hauteur
+ * à 8 dp du bord : sur une rangée d'affiches il se confondait avec le fond et il
+ * fallait le chercher. Une bande **aussi haute que les cartes**, fondue en noir
+ * vers le bord, se voit sans être lue — et la zone cliquable devient grande
+ * comme une carte au lieu d'un carré de 40 dp.
+ *
+ * Le dégradé va du bord vers l'intérieur : il assombrit les affiches qu'il
+ * recouvre, ce qui dit visuellement que la rangée continue par là.
+ *
+ * `detectTapGestures` et non `clickable` : ce dernier rendrait la bande
+ * focalisable, et elle s'intercalerait dans le parcours au clavier entre deux
+ * cartes — pour une commande qui n'existe qu'au pointeur.
+ */
+@Composable
+private fun RailArrow(toStart: Boolean, onClick: () -> Unit) {
+    val interaction = remember { MutableInteractionSource() }
+    val hovered by interaction.collectIsHoveredAsState()
+    val edge = Color(0xF20A0A0A)
+    Box(
+        modifier = Modifier
+            .fillMaxHeight()
+            .width(ARROW_WIDTH)
+            .background(
+                Brush.horizontalGradient(
+                    if (toStart) listOf(edge, Color.Transparent) else listOf(Color.Transparent, edge),
+                ),
+            )
+            .hoverable(interaction)
+            .pointerInput(onClick) { detectTapGestures { onClick() } },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            if (toStart) {
+                Icons.AutoMirrored.Filled.KeyboardArrowLeft
+            } else {
+                Icons.AutoMirrored.Filled.KeyboardArrowRight
+            },
+            contentDescription = null,
+            // Le survol de la bande elle-même éclaircit le chevron : la rangée
+            // entière est déjà survolée quand elle apparaît, il faut donc un
+            // second niveau pour dire « c'est bien ceci que tu vises ».
+            tint = if (hovered) Color.White else Color.White.copy(alpha = 0.75f),
+            modifier = Modifier.size(32.dp),
+        )
     }
 }
