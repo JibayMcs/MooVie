@@ -520,7 +520,13 @@ private fun ResultsGrid(
         verticalArrangement = Arrangement.spacedBy(16.dp),
         // Marges intérieures : la grille clippe à ses bords, les cartes
         // agrandies au focus ont besoin de cette réserve pour ne pas être rognées.
-        contentPadding = PaddingValues(horizontal = 40.dp, vertical = 12.dp),
+        // Même raison que le catalogue : la réserve de 40 dp protège les cartes
+        // agrandies au focus, et il n'y a pas de focus au doigt. Sur un portrait
+        // elle ne faisait que rétrécir les affiches et tronquer les titres.
+        contentPadding = PaddingValues(
+            horizontal = if (useBottomNav) 16.dp else 40.dp,
+            vertical = 12.dp,
+        ),
     ) {
         itemsIndexed(items, key = { _, it -> "${it.id}_${it.isTv}" }) { index, item ->
             ResultCard(

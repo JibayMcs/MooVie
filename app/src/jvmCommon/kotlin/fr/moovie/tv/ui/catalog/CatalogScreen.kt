@@ -476,7 +476,17 @@ private fun ResultsGrid(
         verticalArrangement = Arrangement.spacedBy(16.dp),
         // Marges intérieures : la grille clippe à ses bords, et les cartes
         // agrandies au focus ont besoin de cette réserve pour ne pas être rognées.
-        contentPadding = PaddingValues(horizontal = 40.dp, vertical = 12.dp),
+        //
+        // **Rien à réserver au doigt** : il n'y a pas de focus, donc aucune carte
+        // ne déborde. Les 40 dp de la TV — proportionnés sur 960 dp — prenaient
+        // 18 % de la largeur d'un portrait de 441 dp et rognaient les titres.
+        // La grille fantôme, elle, faisait déjà la distinction : les deux se
+        // contredisaient à l'écran, l'une chassant l'autre à l'arrivée des
+        // affiches.
+        contentPadding = PaddingValues(
+            horizontal = if (useBottomNav) 16.dp else 40.dp,
+            vertical = 12.dp,
+        ),
     ) {
         itemsIndexed(items, key = { _, it -> "${it.id}_${it.isTv}" }) { _, item ->
             val key = if (item.isTv) "tv:${item.id}" else "movie:${item.id}"
