@@ -4,9 +4,9 @@
 
 # Moo-Vie
 
-Application de streaming pour **Android TV** et **desktop** (Linux, Windows, macOS),
-depuis une seule base de code Kotlin Multiplatform. L'extraction des sources se fait
-**on-device** : pas de backend, pas de compte, pas de pub.
+Application de streaming pour **Android TV**, **Android mobile**, **desktop**
+(Linux, Windows, macOS) et ~~iOS~~, depuis une seule base de code Kotlin Multiplatform.
+L'extraction des sources se fait **on-device** : pas de backend, pas de compte, pas de pub.
 
 🇬🇧 [English version](README.md)
 
@@ -114,7 +114,7 @@ depuis une seule base de code Kotlin Multiplatform. L'extraction des sources se 
 Récupérer le dernier build depuis les
 [Releases](https://github.com/JibayMcs/MooVie/releases) :
 
-- **Android TV** — sideload de `moovie-vX.Y.Z.apk`
+- **Android TV et mobile** — sideload de `moovie-vX.Y.Z.apk` (un seul APK pour les deux)
 - **Linux** — `moovie-vX.Y.Z-x86_64.AppImage` (`chmod +x` puis lancer — ni installation ni root)
 - **Windows** — `moovie-vX.Y.Z.msi`
 - **macOS** — `moovie-vX.Y.Z.dmg`
