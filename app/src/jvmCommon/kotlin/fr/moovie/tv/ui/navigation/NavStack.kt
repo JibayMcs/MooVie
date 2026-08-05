@@ -22,6 +22,16 @@ class NavStack(root: Screen = Screen.Home) {
     /** Écran affiché. */
     val current: Screen get() = entries.last()
 
+    /**
+     * Écran **sous** celui affiché, null à la racine.
+     *
+     * Le lecteur est toujours empilé sur la fiche dont il joue une source : c'est
+     * par là que l'enchaînement d'épisodes retrouve de quelle série il s'agit.
+     * Le lire dans [current] renvoyait le lecteur lui-même, et l'enchaînement
+     * retombait alors sur son cas par défaut — l'accueil.
+     */
+    val previous: Screen? get() = entries.getOrNull(entries.lastIndex - 1)
+
     /** Vrai s'il reste un écran en dessous (le retour a quelque chose à faire). */
     val canGoBack: Boolean get() = entries.size > 1
 

@@ -273,7 +273,12 @@ private fun DesktopApp(
                     // de la fenêtre, il connaît donc encore la série.
                     onPrefetchNext = { Vm.details.prefetchEpisodeSources(s.nextSeason, s.nextEpisode) },
                     onNextEpisode = { season, episode ->
-                        val details = nav.current as? Screen.Details
+                        // `previous`, et non `current` : `current` **est** le
+                        // lecteur, le transtypage échouait donc toujours et
+                        // l'enchaînement retombait sur l'accueil. Passer le
+                        // générique renvoyait ainsi à la maison au lieu de
+                        // lancer l'épisode suivant.
+                        val details = nav.previous as? Screen.Details
                         nav.replace(
                             details?.copy(
                                 autoSources = true,
