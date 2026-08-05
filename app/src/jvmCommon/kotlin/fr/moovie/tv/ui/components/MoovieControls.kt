@@ -35,6 +35,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -239,6 +240,17 @@ fun MoovieIconButton(
     modifier: Modifier = Modifier,
     selected: Boolean = false,
     enabled: Boolean = true,
+    /**
+     * Retourne l'icône horizontalement.
+     *
+     * Material fournit `Replay` (flèche circulaire antihoraire) sans son
+     * symétrique horaire. Plutôt que d'attraper une icône d'une autre famille
+     * pour l'avance — qui n'aurait ni le même trait ni le même poids —, on
+     * retourne celle-ci. Le miroir porte sur l'icône seule et non sur le
+     * bouton : son liseré dégradé s'inverserait, et deux boutons voisins
+     * n'auraient plus le même dégradé.
+     */
+    mirrored: Boolean = false,
 ) {
     MoovieButton(
         onClick = onClick,
@@ -250,7 +262,9 @@ fun MoovieIconButton(
         Icon(
             imageVector = icon,
             contentDescription = contentDescription,
-            modifier = Modifier.size(20.dp),
+            modifier = Modifier
+                .size(20.dp)
+                .then(if (mirrored) Modifier.scale(scaleX = -1f, scaleY = 1f) else Modifier),
         )
     }
 }

@@ -28,10 +28,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ClosedCaption
-import androidx.compose.material.icons.filled.FastForward
-import androidx.compose.material.icons.filled.FastRewind
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.MoreTime
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SkipNext
@@ -186,15 +185,25 @@ fun PlayerControlBar(
                 },
                 modifier = Modifier.focusRequester(playFocus),
             )
+            // Flèches **circulaires**, pas les doubles triangles de `FastRewind` /
+            // `FastForward` : ceux-ci ne se distinguaient plus des triangles-barre
+            // de l'épisode précédent/suivant, posés juste à côté. Deux gestes très
+            // différents — reculer de 15 s, changer d'épisode — se ressemblaient
+            // au point qu'on se trompait de bouton.
+            //
+            // Sans chiffre : Material ne propose que 5, 10 et 30 s, et le pas est
+            // de 15 (PLAYER_SEEK_STEP_MS). Une icône « 10 » sur un saut de 15
+            // aurait été pire que pas de chiffre du tout.
             MoovieIconButton(
                 onClick = onSeekBack,
-                icon = Icons.Default.FastRewind,
+                icon = Icons.Default.Replay,
                 contentDescription = stringResource(Res.string.player_seek_back),
             )
             MoovieIconButton(
                 onClick = onSeekForward,
-                icon = Icons.Default.FastForward,
+                icon = Icons.Default.Replay,
                 contentDescription = stringResource(Res.string.player_seek_forward),
+                mirrored = true,
             )
             if (showEpisodeButtons) {
                 MoovieIconButton(
