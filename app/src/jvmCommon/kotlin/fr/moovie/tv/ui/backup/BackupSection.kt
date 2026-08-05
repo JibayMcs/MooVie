@@ -14,6 +14,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -25,6 +26,8 @@ import androidx.compose.ui.unit.dp
 import fr.moovie.tv.data.backup.BackupFile
 import fr.moovie.tv.data.backup.BackupSummary
 import fr.moovie.tv.data.backup.BackupTarget
+import fr.moovie.tv.data.backup.canWriteBackupRoot
+import fr.moovie.tv.data.backup.requestBackupRootAccess
 import fr.moovie.tv.data.backup.ImportMode
 import fr.moovie.tv.data.backup.ImportReport
 import fr.moovie.tv.resources.Res
@@ -47,6 +50,9 @@ import fr.moovie.tv.resources.backup_merge
 import fr.moovie.tv.resources.backup_merge_help
 import fr.moovie.tv.resources.backup_mode_question
 import fr.moovie.tv.resources.backup_no_target
+import fr.moovie.tv.resources.backup_root_grant
+import fr.moovie.tv.resources.backup_root_missing
+import fr.moovie.tv.resources.backup_root_unreadable
 import fr.moovie.tv.resources.backup_none_found
 import fr.moovie.tv.resources.backup_replace
 import fr.moovie.tv.resources.backup_replace_help
@@ -71,6 +77,7 @@ import fr.moovie.tv.resources.common_enabled
 import fr.moovie.tv.ui.components.MoovieButton
 import fr.moovie.tv.ui.format.formatBackupDate
 import fr.moovie.tv.ui.theme.MoovieShape
+import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.stringResource
 
 private val DIM = Color(0xFF9A9A9A)
@@ -143,6 +150,15 @@ fun BackupSection(
                         )
                     }
                 }
+                // Après la liste : la mise en garde explique ce qu'on vient de
+                // lire sur les supports, elle ne barre pas la route. Une
+                // sauvegarde dans le dossier de l'app reste utile — elle migre
+                // d'un appareil à l'autre — elle ne survit pas à une
+                // désinstallation, c'est tout.
+                RootAccess(
+                    message = stringResource(Res.string.backup_root_missing),
+                    onGranted = viewModel::startExport,
+                )
                 Back(leave)
             }
 
@@ -204,6 +220,16 @@ fun BackupSection(
                     MoovieButton(onClick = viewModel::startImport, modifier = focusFirst) {
                         Text(stringResource(Res.string.backup_rescan))
                     }
+                    // **C'est ici que ça compte le plus.** Après une
+                    // réinstallation la permission est révoquée, et sans elle
+                    // l'app ne peut pas même *lister* la racine : la sauvegarde
+                    // est là, sur le support, et l'écran annonce « aucune
+                    // trouvée ». Sans cette mise en garde, on croit le fichier
+                    // perdu — au moment exact où on comptait dessus.
+                    RootAccess(
+                        message = stringResource(Res.string.backup_root_unreadable),
+                        onGranted = viewModel::startImport,
+                    )
                 } else {
                     current.files.forEachIndexed { index, file ->
                         FileRow(
@@ -274,6 +300,53 @@ private fun Step(text: String) =
 @Composable
 private fun Help(text: String) =
     Text(text, style = MaterialTheme.typography.bodySmall, color = DIM)
+
+/**
+ * Mise en garde « Accès à tous les fichiers », et le bouton qui l'accorde.
+ *
+ * Ne s'affiche que là où la permission manque *et* change quelque chose. Sur
+ * desktop, sur Android antérieur à 11, ou dès qu'elle est accordée, ce composant
+ * ne dessine rien du tout.
+ *
+ * L'état se relit **par sondage** tant qu'elle manque. L'utilisateur part dans
+ * un écran système et revient sans que rien, côté Compose, ne le signale : le
+ * socle `lifecycle` n'existe que côté Android, pas dans ce code partagé. Une
+ * lecture d'un booléen par seconde, bornée à cet écran et à ce seul cas, coûte
+ * moins qu'un écran qui continue d'affirmer le contraire de ce que
+ * l'utilisateur vient de faire.
+ *
+ * @param message ce que la permission change **ici** : elle décide de l'endroit
+ *   où l'on écrit à l'export, et de ce que l'on arrive à lire à l'import. Deux
+ *   conséquences différentes, donc deux phrases — une seule aurait décrit
+ *   l'autre écran.
+ * @param onGranted rejoué à l'octroi : la liste des supports ou des fichiers a
+ *   été calculée sans la permission, elle est à refaire.
+ */
+@Composable
+private fun RootAccess(message: String, onGranted: () -> Unit) {
+    val grantedAtEntry = remember { canWriteBackupRoot() }
+    if (grantedAtEntry) return
+
+    val granted by produceState(false) {
+        while (!value) {
+            delay(1_000)
+            value = canWriteBackupRoot()
+        }
+    }
+    LaunchedEffect(granted) { if (granted) onGranted() }
+    if (granted) return
+
+    Warning(message)
+    // Seulement si un écran système répond : sur une ROM de boîtier TV qui n'en
+    // a pas, le bouton mènerait dans le vide. On l'apprend en essayant, et on le
+    // retire alors plutôt que de laisser l'utilisateur appuyer sans effet.
+    var askable by remember { mutableStateOf(true) }
+    if (askable) {
+        MoovieButton(onClick = { askable = requestBackupRootAccess() }) {
+            Text(stringResource(Res.string.backup_root_grant))
+        }
+    }
+}
 
 /** Message qui doit être lu avant d'agir : encadré, pas seulement grisé. */
 @Composable

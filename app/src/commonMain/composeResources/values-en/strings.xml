@@ -237,6 +237,9 @@
     <string name="backup_target_removable">Removable storage</string>
     <string name="backup_target_internal">Internal storage</string>
     <string name="backup_target_app_folder">The file will go to the folder reserved for Moo-vie on this storage.</string>
+    <string name="backup_root_missing">Without all-files access, the backup stays in Moo-vie's own folder — which uninstalling erases. It still moves from one device to another, but it does not survive a reinstall.</string>
+    <string name="backup_root_unreadable">Without all-files access, Moo-vie cannot read the root of a stick or of internal storage: a backup sitting there stays invisible.</string>
+    <string name="backup_root_grant">Grant file access</string>
     <string name="backup_include_key">Include the API keys (TMDB, TheIntroDB)</string>
     <string name="backup_key_warning">The keys will be written in plain text. Handy to reinstall without typing them again, but do not publish this backup (Git repo, shared cloud…).</string>
     <string name="backup_contents">Backup contents</string>

@@ -49,6 +49,18 @@ expect fun backupTargets(): List<BackupTarget>
  */
 expect fun canWriteBackupRoot(): Boolean
 
+/**
+ * Ouvre l'écran système qui accorde cette permission. Rend **faux** si la
+ * plateforme n'a rien à ouvrir — desktop, Android antérieur à 11, ou un boîtier
+ * TV dont la ROM ne fournit pas l'écran.
+ *
+ * Rend faux plutôt que d'échouer en silence : l'appelant peut alors ne pas
+ * proposer un bouton qui ne mènerait nulle part. Il n'y a pas de résultat à
+ * attendre — l'utilisateur revient par la touche Retour, et [canWriteBackupRoot]
+ * est relu à ce moment-là.
+ */
+expect fun requestBackupRootAccess(): Boolean
+
 /** Écrit la sauvegarde et rend son chemin complet, ou null en cas d'échec. */
 expect fun writeBackup(targetId: String, fileName: String, content: String): String?
 

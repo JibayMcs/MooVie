@@ -237,6 +237,9 @@
     <string name="backup_target_removable">Soporte extraíble</string>
     <string name="backup_target_internal">Almacenamiento interno</string>
     <string name="backup_target_app_folder">El archivo irá a la carpeta reservada a Moo-vie en este soporte.</string>
+    <string name="backup_root_missing">Sin acceso a todos los archivos, la copia se queda en la carpeta de Moo-vie, que se borra al desinstalar. Pasa de un dispositivo a otro, pero no sobrevive a una reinstalación.</string>
+    <string name="backup_root_unreadable">Sin acceso a todos los archivos, Moo-vie no puede leer la raíz de una memoria ni del almacenamiento: una copia que esté ahí permanece invisible.</string>
+    <string name="backup_root_grant">Permitir el acceso a los archivos</string>
     <string name="backup_include_key">Incluir las claves de API (TMDB, TheIntroDB)</string>
     <string name="backup_key_warning">Las claves se escribirán en texto plano. Práctico para reinstalar sin volver a teclearlas, pero no publiques esta copia (repositorio Git, nube compartida…).</string>
     <string name="backup_contents">Contenido de la copia</string>

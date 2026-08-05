@@ -39,6 +39,13 @@ actual fun backupTargets(): List<BackupTarget> {
 /** Un bureau écrit où l'utilisateur a le droit d'écrire : rien à demander. */
 actual fun canWriteBackupRoot(): Boolean = true
 
+/**
+ * Rien à demander : un utilisateur de bureau écrit déjà où il veut. Ce
+ * `false` n'est pas un échec, c'est l'absence de question à poser — et il
+ * suffit à ce que l'écran de sauvegarde n'affiche aucun bouton ici.
+ */
+actual fun requestBackupRootAccess(): Boolean = false
+
 actual fun writeBackup(targetId: String, fileName: String, content: String): String? = runCatching {
     val dir = File(targetId).apply { mkdirs() }
     File(dir, fileName).also { it.writeText(content) }.absolutePath

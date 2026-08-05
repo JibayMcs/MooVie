@@ -1,8 +1,11 @@
 package fr.moovie.tv.data.backup
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.os.storage.StorageManager
+import android.provider.Settings
 import fr.moovie.tv.data.store.appContext
 import java.io.File
 
@@ -57,6 +60,30 @@ actual fun backupTargets(): List<BackupTarget> {
 
 actual fun canWriteBackupRoot(): Boolean =
     Build.VERSION.SDK_INT < Build.VERSION_CODES.R || Environment.isExternalStorageManager()
+
+/**
+ * Écran système « Accès à tous les fichiers », ouvert sur **notre** fiche.
+ *
+ * `ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION` avec l'URI du paquet mène
+ * directement à l'interrupteur de Moo-vie ; la variante sans URI ouvre la liste
+ * de toutes les applications, où il faut ensuite se chercher soi-même — pénible
+ * au doigt, décourageant à la télécommande.
+ *
+ * `NEW_TASK` est obligatoire : on part du contexte d'application, pas d'une
+ * activité. Et l'on vérifie que quelque chose répond avant de lancer — toutes
+ * les ROM de boîtier TV ne fournissent pas cet écran, et une exception ici
+ * ferait tomber l'app au moment précis où elle prétend aider.
+ */
+actual fun requestBackupRootAccess(): Boolean {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return false
+    val intent = Intent(
+        Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+        Uri.fromParts("package", appContext.packageName, null),
+    ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+    if (intent.resolveActivity(appContext.packageManager) == null) return false
+    return runCatching { appContext.startActivity(intent); true }.getOrDefault(false)
+}
 
 actual fun writeBackup(targetId: String, fileName: String, content: String): String? = runCatching {
     val dir = File(targetId)

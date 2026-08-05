@@ -9,6 +9,23 @@
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <!--
+      Sauvegarde : écrire à la racine d'une clé USB ou du stockage interne.
+
+      Sans elle, l'app n'écrit que dans son propre dossier — que la
+      désinstallation efface avec le reste. « Je réinstalle et je restaure »
+      était donc impossible, ce qui vide la sauvegarde de son objet premier.
+      La migration d'un appareil à l'autre, elle, marchait déjà.
+
+      Elle n'est **pas** demandée au lancement : elle ne sert qu'à la
+      sauvegarde, et l'écran de sauvegarde l'explique avant de l'ouvrir.
+      Refusée, tout continue de fonctionner dans le dossier de l'app.
+
+      Play Store restreint fortement cette permission ; Moo-vie se distribue par
+      ses GitHub Releases, la question ne se pose pas.
+    -->
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+
+    <!--
       Android TV : app utilisable sans écran tactile, visible sur le launcher
       Leanback. `required="false"` sur leanback n'enlève rien à la TV (elle
       expose toujours la fonctionnalité) mais laisse l'app s'installer sur un

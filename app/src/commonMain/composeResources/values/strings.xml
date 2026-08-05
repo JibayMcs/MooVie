@@ -239,6 +239,9 @@
     <string name="backup_target_removable">Support amovible</string>
     <string name="backup_target_internal">Stockage interne</string>
     <string name="backup_target_app_folder">Le fichier ira dans le dossier réservé à Moo-vie sur ce support.</string>
+    <string name="backup_root_missing">Sans l'accès à tous les fichiers, la sauvegarde reste dans le dossier de Moo-vie — que la désinstallation efface. Elle passe d'un appareil à l'autre, mais ne survit pas à une réinstallation.</string>
+    <string name="backup_root_unreadable">Sans l'accès à tous les fichiers, Moo-vie ne peut pas lire la racine d'une clé ni du stockage : une sauvegarde qui s'y trouve reste invisible.</string>
+    <string name="backup_root_grant">Autoriser l'accès aux fichiers</string>
     <string name="backup_include_key">Inclure les clés d'API (TMDB, TheIntroDB)</string>
     <string name="backup_key_warning">Les clés seront écrites en clair dans le fichier. Pratique pour réinstaller sans les retaper, mais ne publie pas cette sauvegarde (dépôt Git, cloud partagé…).</string>
     <string name="backup_contents">Contenu de la sauvegarde</string>
