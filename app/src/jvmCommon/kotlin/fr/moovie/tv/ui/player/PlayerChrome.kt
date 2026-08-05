@@ -2,6 +2,7 @@ package fr.moovie.tv.ui.player
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -575,10 +576,33 @@ fun PlayerTitleOverlay(
     }
 }
 
-/** Bouton « Passer l'intro / le générique ». */
+/**
+ * Bouton « Passer l'intro / le générique ».
+ *
+ * **Fond opaque, contrairement au reste de l'app.** Un [MoovieButton] n'est que
+ * son libellé au repos et ne s'habille qu'au focus : posé sur une image claire —
+ * un générique sur fond de tapisserie, une plage — le texte blanc disparaissait
+ * purement et simplement. Et il n'y a pas de focus au doigt, donc rien ne venait
+ * jamais le rattraper.
+ *
+ * Ce n'est pas une exception gratuite : c'est le seul bouton **posé sur la
+ * vidéo**, dont on ne maîtrise pas le fond. Les autres vivent sur les panneaux
+ * sombres de l'app. Même parti que Netflix ou Prime Video, pour la même raison.
+ *
+ * Le liseré clair fait le reste du travail sur les fonds sombres, où un
+ * rectangle noir se fondrait dans l'image.
+ */
 @Composable
 fun PlayerSkipButton(kind: SkipKind, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    MoovieButton(onClick = onClick, modifier = modifier) {
+    MoovieButton(
+        onClick = onClick,
+        // Découpé **avant** le fond : sans ça le rectangle déborde des coins
+        // arrondis que MoovieButton applique ensuite.
+        modifier = modifier
+            .clip(MoovieShape)
+            .background(Color(0xD90E0E0E))
+            .border(1.dp, Color(0x4DFFFFFF), MoovieShape),
+    ) {
         Text(
             if (kind == SkipKind.INTRO) {
                 stringResource(Res.string.player_skip_intro)
