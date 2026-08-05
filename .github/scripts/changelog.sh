@@ -16,7 +16,15 @@ set -euo pipefail
 tag="${GITHUB_REF_NAME:-$(git describe --tags --abbrev=0)}"
 # Tag précédent *atteignable depuis le parent* : robuste aux tags posés sur des
 # branches parallèles. Absent (toute première release) → tout l'historique.
-prev="$(git describe --tags --abbrev=0 "${tag}^" 2>/dev/null || true)"
+#
+# Une version finale saute les pre-releases : personne ne les a reçues, les
+# updaters ne servent que `releases/latest`. S'arrêter à la dernière rc ne
+# raconterait donc à l'utilisateur que la fin de l'histoire. Une rc, elle, se
+# compare bien à la précédente — ses notes s'adressent aux testeurs.
+case "$tag" in
+  *-*) prev="$(git describe --tags --abbrev=0 "${tag}^" 2>/dev/null || true)" ;;
+  *)   prev="$(git describe --tags --abbrev=0 --exclude='*-*' "${tag}^" 2>/dev/null || true)" ;;
+esac
 range="${prev:+${prev}..}${tag}"
 repo_url="${GITHUB_SERVER_URL:-https://github.com}/${GITHUB_REPOSITORY:-JibayMcs/MooVie}"
 
