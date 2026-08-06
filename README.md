@@ -12,7 +12,7 @@ and ~~iOS~~, built from a single Kotlin Multiplatform codebase. Source extractio
 
 > [!IMPORTANT]
 > Moo-vie is under active development. Things move between releases, and some rough
-> edges are expected — [issues](https://github.com/JibayMcs/MooVie/issues) are welcome.
+> edges are expected - [issues](https://github.com/JibayMcs/MooVie/issues) are welcome.
 
 ## Screenshots
 
@@ -34,56 +34,65 @@ and ~~iOS~~, built from a single Kotlin Multiplatform codebase. Source extractio
 
 ## Features
 
-- **Home, arranged by you** — rows are a layout you own, not a fixed list. Pin any
+- **Phones & tablets** - the same APK as the TV, laid out for a thumb: bottom
+  navigation, portrait everywhere except the player, which turns by itself. Tap,
+  double-tap and pinch drive playback; a long press opens the context menus the
+  remote reaches by holding OK. Not a second codebase - one Kotlin Multiplatform
+  source, TV or touch decided at runtime.
+- **Home, arranged by you** - rows are a layout you own, not a fixed list. Pin any
   catalogue genre (long-press on TV and phone, right-click on desktop) and choose
   where it lands; move, hide or remove any row, built-in ones included, from
   *Settings → Home*. A pinned row ends with a **See more** card that reopens its
   exact genre. Contextual hero, *Continue watching* with per-episode progress,
   trending and top-rated (TMDB), watched badges.
-- **Search** — result grid, persistent history, D-pad flow from keyboard to results.
-- **Movies & shows** — cast, seasons and episodes with stills, per-episode details page,
+- **Search** - result grid, persistent history, D-pad flow from keyboard to results.
+- **Movies & shows** - cast, seasons and episodes with stills, per-episode details page,
   watched/unwatched marking (episode, whole season or movie).
-- **One-press playback** — sources load as soon as a title opens; a single
+- **One-press playback** - sources load as soon as a title opens; a single
   **Play / Resume** picks the best source in your language (VF / VOSTFR / VO). A sources
   panel is there for manual host selection. Most catalogues are French-speaking, so
   **original-language playback has its own catalogue**, keyed on the TMDB id. Languages
-  are never substituted for one another — VOSTFR carries burnt-in French subtitles you
+  are never substituted for one another - VOSTFR carries burnt-in French subtitles you
   cannot turn off, so it is not a stand-in for VO.
-- **Player** — resume at timecode, subtitle and audio track selection, playback speed,
+- **Player** - resume at timecode, subtitle and audio track selection, playback speed,
   15 s seek, scrub mode on the progress bar, remote media keys.
-- **Subtitles** (OpenSubtitles) — searched from the player, ranked by language, frame
+- **Subtitles** (OpenSubtitles) - searched from the player, ranked by language, frame
   rate and release, and downloaded only on an explicit press since the daily allowance is
   small. Already-downloaded ones are marked so you never spend twice. Comes with an offset
   *and* a frame-rate correction: exact matching relies on hashing the video file, which
   segmented streams make impossible, so drift is the normal case rather than an accident.
-- **Skip intro & credits** (TheIntroDB) — skipping credits rolls into the next episode.
+- **Skip intro & credits** (TheIntroDB) - skipping credits rolls into the next episode.
   When a segment is missing, an icon in the control bar lets you **report it from the
   player**: mark the start, mark the end, confirm. Coverage is per episode, so the gaps
   are common and everyone's report fills them in. Needs a free TheIntroDB key.
-- **Auto-play next episode** — 10 s countdown at the end of an episode, cancellable,
+- **Auto-play next episode** - 10 s countdown at the end of an episode, cancellable,
   rolling over to the next season.
-- **Screensaver** — the poster bounces around the screen while playback stays paused.
-- **Backup & restore** — export your progress, watchlist, history and settings to a USB
+- **Screensaver** - the poster bounces around the screen while playback stays paused.
+- **Backup & restore** - export your progress, watchlist, history and settings to a USB
   stick, and pick them up on another device. The import previews the file before acting
-  (counts, export date, source device) and lets you **merge** — most recent progress wins,
-  nothing is lost — or **replace**. A first-launch screen offers the restore instead of
+  (counts, export date, source device) and lets you **merge** - most recent progress wins,
+  nothing is lost - or **replace**. A first-launch screen offers the restore instead of
   dropping you on an empty home. On Android, grant *All files access* when the screen
   asks: without it the file can only go in the app's own folder, which uninstalling
-  erases — so a backup would survive a move to another device, but not a reinstall.
-- **Offline-friendly** — TMDB responses and resolved source links are cached on disk.
-- **In-app updates** — periodic check against GitHub Releases; a banner on the home
+  erases - so a backup would survive a move to another device, but not a reinstall.
+- **Offline-friendly** - TMDB responses and resolved source links are cached on disk.
+- **In-app updates** - periodic check against GitHub Releases; a banner on the home
   screen, a discreet chip during playback.
 
 ## Roadmap
 
-- **Android phones & tablets** — shipped as a pre-release, under test. Same APK
-  as the TV: touch layouts and portrait, not a second codebase. Pre-releases are
-  excluded from `releases/latest`, so the in-app updater ignores them — grab one
-  from the releases page if you want to help test.
-- **Light profiles** — separate progress, watchlist and watched state per profile
+- **Light profiles** - separate progress, watchlist and watched state per profile
   ("Living room" / "Kids"), picked at launch. Backups will carry them.
-- **No iOS support planned.** The constraints are heavy — sideloading, App Store
-  policy, a separate player stack — and I have no Apple device to test on.
+- **Cast to a TV (Google Cast)** - under study, for phone users who own no
+  Android TV. Not a matter of dropping in the SDK: a Chromecast fetches the
+  stream itself, and nearly every source only answers with a `Referer` and a
+  `User-Agent` the receiver has no way to send. The workable shape is a small
+  HTTP proxy on the phone that re-attaches them - which conveniently keeps
+  DNS-over-HTTPS in the loop, where a Chromecast would use the router's resolver
+  and hit the very blocking the app exists to route around. One question decides
+  whether any of it stands, and it is untested, so there is no date on this.
+- **No iOS support planned.** The constraints are heavy - sideloading, App Store
+  policy, a separate player stack - and I have no Apple device to test on.
   Shipping something I cannot run myself would be worse than not shipping it.
 
 ## Stack
@@ -103,15 +112,15 @@ and ~~iOS~~, built from a single Kotlin Multiplatform codebase. Source extractio
 
 Grab the latest build from [Releases](https://github.com/JibayMcs/MooVie/releases):
 
-- **Android TV and phone** — sideload `moovie-vX.Y.Z.apk` (one APK for both)
-- **Linux** — `moovie-vX.Y.Z-x86_64.AppImage` (`chmod +x`, then run — no install, no root)
-- **Windows** — `moovie-vX.Y.Z.msi`
-- **macOS** — `moovie-vX.Y.Z.dmg`
+- **Android TV and phone** - sideload `moovie-vX.Y.Z.apk` (one APK for both)
+- **Linux** - `moovie-vX.Y.Z-x86_64.AppImage` (`chmod +x`, then run - no install, no root)
+- **Windows** - `moovie-vX.Y.Z.msi`
+- **macOS** - `moovie-vX.Y.Z.dmg`
 
 The Linux AppImage bundles its own Java runtime **and libVLC**, so it runs on any
 distribution with nothing to install (tested on Ubuntu 22.04/24.04, Debian 12 and
 Arch), and updates itself from inside the app. On **Windows**, the `.msi` installs
-per user — no admin rights — and adds Start-menu and desktop shortcuts; the in-app
+per user - no admin rights - and adds Start-menu and desktop shortcuts; the in-app
 banner then updates it in place. On **macOS**, the banner opens the release page
 (the `.dmg` is installed by hand). Windows and macOS still need **VLC** installed
 on the machine.
@@ -132,7 +141,7 @@ Layout: `app/src/commonMain` (resources), `app/src/jvmCommon` (ViewModels, repos
 shared UI), `app/src/androidMain`, `app/src/desktopMain`. A preconfigured Android TV
 emulator and its test scripts live in `emulator/`.
 
-**Subtitles work out of the box in the published builds** — the APK, AppImage, MSI and
+**Subtitles work out of the box in the published builds** - the APK, AppImage, MSI and
 DMG from [Releases](https://github.com/JibayMcs/MooVie/releases) all ship with what they
 need. Nothing to create, nothing to paste. Optionally, connecting an OpenSubtitles
 account in the settings raises the daily download limit and shows the quota left.
@@ -141,7 +150,7 @@ The rest of this paragraph only concerns people **building from source**. Subtit
 on an OpenSubtitles *consumer key*, which identifies the application; OpenSubtitles
 mandates one key per app and bans accounts that ask their users to supply their own. That
 key is injected at build time and is deliberately absent from this repository, so a build
-from source simply turns subtitles off — everything else works. To enable them while
+from source simply turns subtitles off - everything else works. To enable them while
 developing, create your own consumer on
 [opensubtitles.com](https://www.opensubtitles.com/consumers) and drop the key in a
 gitignored `opensubtitles.properties` at the root:
@@ -159,8 +168,8 @@ eyes most: they are produced by CI for Linux, Windows and macOS, but each of tho
 lands on hardware, drivers and a libVLC install that nobody here can reproduce.
 Testing one of them on your own machine is genuinely useful work.
 
-If anything misbehaves — a build that won't start, a stream that plays on Android TV
-but not on desktop, a control the remote can't reach — please
+If anything misbehaves - a build that won't start, a stream that plays on Android TV
+but not on desktop, a control the remote can't reach - please
 [open an issue](https://github.com/JibayMcs/MooVie/issues). What helps most:
 
 - your platform and version (distribution, Windows/macOS build, TV box model)
@@ -168,7 +177,7 @@ but not on desktop, a control the remote can't reach — please
 - what you expected, and what happened instead
 - for a playback problem: the title, and which source you picked in the panel
 
-Pull requests are welcome too — a new source provider or host extractor is the most
+Pull requests are welcome too - a new source provider or host extractor is the most
 valuable kind, since every dead link costs someone a title. `.claude/skills/add-source/`
 documents how one is written and, more importantly, how to *measure* whether it earns
 its place.
@@ -179,15 +188,15 @@ Moo-vie stands on work done by others.
 
 **Data & services**
 
-- **[TMDB](https://www.themoviedb.org)** — every title, synopsis, poster, backdrop,
+- **[TMDB](https://www.themoviedb.org)** - every title, synopsis, poster, backdrop,
   cast and rating in the app comes from The Movie Database. It is what makes the
   catalogue a catalogue rather than a list of file names, and the app is useless
   without an API key of your own.
   *This product uses the TMDB API but is not endorsed or certified by TMDB.*
-- **[TheIntroDB](https://theintrodb.org)** — community-sourced intro and credits
+- **[TheIntroDB](https://theintrodb.org)** - community-sourced intro and credits
   timestamps, behind the *Skip intro* / *Skip credits* buttons and the roll into
   the next episode.
-- **[Cloudflare](https://1.1.1.1) and [Quad9](https://quad9.net)** — the DNS-over-HTTPS
+- **[Cloudflare](https://1.1.1.1) and [Quad9](https://quad9.net)** - the DNS-over-HTTPS
   resolvers you can pick from, which is what keeps source lookups working on
   networks where those domains are blocked at the DNS level.
 
@@ -195,15 +204,15 @@ Moo-vie stands on work done by others.
 
 - [Kotlin](https://kotlinlang.org), [Kotlin Multiplatform](https://kotlinlang.org/docs/multiplatform.html),
   [Compose Multiplatform](https://www.jetbrains.com/lp/compose-multiplatform/) and
-  [kotlinx.serialization](https://github.com/Kotlin/kotlinx.serialization) — JetBrains
+  [kotlinx.serialization](https://github.com/Kotlin/kotlinx.serialization) - JetBrains
 - [Media3 / ExoPlayer](https://developer.android.com/media/media3) and
-  [DataStore](https://developer.android.com/topic/libraries/architecture/datastore) — Google / AndroidX
-- [VLC / libVLC](https://www.videolan.org) — VideoLAN, via
+  [DataStore](https://developer.android.com/topic/libraries/architecture/datastore) - Google / AndroidX
+- [VLC / libVLC](https://www.videolan.org) - VideoLAN, via
   [vlcj](https://github.com/caprica/vlcj) by Caprica Software, which is what plays
   video on the desktop builds
-- [OkHttp and Retrofit](https://square.github.io/okhttp/) — Square
-- [jsoup](https://jsoup.org) — parses the pages sources are extracted from
-- [Coil](https://coil-kt.github.io/coil/) — image loading and disk cache
+- [OkHttp and Retrofit](https://square.github.io/okhttp/) - Square
+- [jsoup](https://jsoup.org) - parses the pages sources are extracted from
+- [Coil](https://coil-kt.github.io/coil/) - image loading and disk cache
 
 ## License
 

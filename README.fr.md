@@ -12,7 +12,7 @@ L'extraction des sources se fait **on-device** : pas de backend, pas de compte, 
 
 > [!IMPORTANT]
 > Moo-vie est en développement actif. Les choses bougent d'une version à l'autre, et
-> quelques aspérités sont à prévoir — les [issues](https://github.com/JibayMcs/MooVie/issues)
+> quelques aspérités sont à prévoir - les [issues](https://github.com/JibayMcs/MooVie/issues)
 > sont les bienvenues.
 
 ## Captures
@@ -35,64 +35,75 @@ L'extraction des sources se fait **on-device** : pas de backend, pas de compte, 
 
 ## Fonctionnalités
 
-- **Accueil, rangé par toi** — les rangées sont une disposition qui t'appartient, pas
+- **Téléphones & tablettes** - le même APK que la TV, mis en page pour le pouce :
+  navigation basse, portrait partout sauf dans le lecteur, qui bascule tout seul.
+  Appui, double appui et pincement pilotent la lecture ; un appui long ouvre les
+  menus contextuels que la télécommande atteint en maintenant OK. Pas une seconde
+  base de code : une seule source Kotlin Multiplatform, TV ou tactile tranché à
+  l'exécution.
+- **Accueil, rangé par toi** - les rangées sont une disposition qui t'appartient, pas
   une liste figée. Épingle n'importe quel genre du catalogue (appui long sur TV et
   téléphone, clic droit sur desktop) en choisissant où il atterrit ; déplace, masque
   ou retire n'importe quelle rangée, y compris celles d'origine, depuis
   *Réglages → Accueil*. Une rangée épinglée se termine par une carte **En voir plus**
   qui rouvre son genre exact. Hero contextuel, *Reprendre la lecture* avec progression
   par épisode, tendances et mieux notés (TMDB), badges vus.
-- **Recherche** — résultats en grille, historique persistant, descente au D-pad du clavier
+- **Recherche** - résultats en grille, historique persistant, descente au D-pad du clavier
   vers les résultats.
-- **Films & séries** — casting, saisons et épisodes avec vignettes, page de détail par
+- **Films & séries** - casting, saisons et épisodes avec vignettes, page de détail par
   épisode, marquage vu/non vu (épisode, saison entière ou film).
-- **Lecture en un appui** — les sources chargent dès l'ouverture d'une fiche ; un seul
+- **Lecture en un appui** - les sources chargent dès l'ouverture d'une fiche ; un seul
   bouton **Lire / Reprendre** joue la meilleure source dans ta langue (VF / VOSTFR / VO).
   Le panneau de sources reste là pour choisir un hébergeur à la main. Les catalogues
   étant francophones pour la plupart, la **version originale a son propre catalogue**,
   indexé sur l'identifiant TMDB. Aucune langue ne se substitue à une autre : le VOSTFR
   porte des sous-titres français incrustés qu'on ne peut pas retirer, ce n'est donc pas
   un remplaçant de la VO.
-- **Lecteur** — reprise au timecode, choix des sous-titres et de la piste audio, vitesse de
+- **Lecteur** - reprise au timecode, choix des sous-titres et de la piste audio, vitesse de
   lecture, seek 15 s, mode scrub sur la barre de progression, touches média de la télécommande.
-- **Sous-titres** (OpenSubtitles) — cherchés depuis le lecteur, classés par langue,
+- **Sous-titres** (OpenSubtitles) - cherchés depuis le lecteur, classés par langue,
   cadence et release, et téléchargés uniquement sur un appui explicite, le quota
   quotidien étant serré. Ceux déjà téléchargés sont marqués, pour ne jamais payer deux
   fois. Avec un réglage de décalage **et** une correction de cadence : l'appariement
   exact repose sur une empreinte du fichier vidéo, impossible sur des flux segmentés, si
   bien que le décalage est le cas normal et non un accident.
-- **Passer intro & générique** (TheIntroDB) — passer le générique enchaîne l'épisode suivant.
+- **Passer intro & générique** (TheIntroDB) - passer le générique enchaîne l'épisode suivant.
   Quand un segment manque, une icône de la barre de contrôle permet de le **signaler depuis
   le lecteur** : marquer le début, marquer la fin, confirmer. La couverture se fait épisode
   par épisode, les trous sont donc fréquents et chaque signalement les comble. Nécessite une
   clé TheIntroDB gratuite.
-- **Lecture auto de l'épisode suivant** — décompte de 10 s en fin d'épisode, annulable, qui
+- **Lecture auto de l'épisode suivant** - décompte de 10 s en fin d'épisode, annulable, qui
   bascule sur la saison suivante en fin de saison.
-- **Écran de veille** — l'affiche rebondit à l'écran quand la lecture reste en pause.
-- **Sauvegarde & restauration** — exporte ta progression, ta liste, ton historique et tes
+- **Écran de veille** - l'affiche rebondit à l'écran quand la lecture reste en pause.
+- **Sauvegarde & restauration** - exporte ta progression, ta liste, ton historique et tes
   réglages sur une clé USB, et retrouve-les sur un autre appareil. L'import montre le
   contenu du fichier avant d'agir (compteurs, date d'export, appareil d'origine) et laisse
-  choisir entre **fusionner** — la progression la plus récente gagne, rien n'est perdu — et
+  choisir entre **fusionner** - la progression la plus récente gagne, rien n'est perdu - et
   **remplacer**. Un écran de premier lancement propose la restauration plutôt que de
   déposer l'utilisateur sur un accueil vide. Sur Android, accorde l'*accès à tous les
   fichiers* quand l'écran le demande : sans lui le fichier ne peut aller que dans le
-  dossier de l'app, que la désinstallation efface — la sauvegarde passerait alors d'un
+  dossier de l'app, que la désinstallation efface - la sauvegarde passerait alors d'un
   appareil à l'autre, mais pas d'une réinstallation à la suivante.
-- **Cache disque** — réponses TMDB et liens de sources résolus mis en cache.
-- **Mises à jour intégrées** — vérification périodique des releases GitHub : bandeau sur
+- **Cache disque** - réponses TMDB et liens de sources résolus mis en cache.
+- **Mises à jour intégrées** - vérification périodique des releases GitHub : bandeau sur
   l'accueil, pastille discrète pendant la lecture.
 
 ## Feuille de route
 
-- **Smartphones et tablettes Android** — publié en préversion, à l'épreuve. Le
-  même APK que la TV : gabarits tactiles et mode portrait, pas une seconde base
-  de code. Les préversions sont exclues de `releases/latest`, l'updater intégré
-  les ignore donc — à récupérer sur la page des releases pour aider à tester.
-- **Profils légers** — progression, liste et vu/non vu séparés par profil
+- **Profils légers** - progression, liste et vu/non vu séparés par profil
   (« Salon » / « Enfants »), choisi au lancement. Les sauvegardes les
   transporteront.
-- **Pas de support iOS prévu.** Les contraintes sont lourdes — installation hors
-  store, règles de l'App Store, pile de lecture à refaire — et je n'ai aucun
+- **Cast vers une télé (Google Cast)** - à l'étude, pour les utilisateurs mobiles
+  qui n'ont pas d'Android TV. Ce n'est pas qu'une affaire de SDK : un Chromecast
+  va chercher le flux lui-même, or presque aucune source ne répond sans un
+  `Referer` et un `User-Agent` que le récepteur ne sait pas envoyer. La forme
+  viable est un petit proxy HTTP sur le téléphone qui les réattache - ce qui
+  garde au passage le DNS-over-HTTPS dans la boucle, là où un Chromecast
+  passerait par le résolveur de la box et se heurterait au blocage même que
+  l'app existe pour contourner. Une question décide si tout cela tient debout,
+  et elle n'est pas tranchée : donc pas de date.
+- **Pas de support iOS prévu.** Les contraintes sont lourdes - installation hors
+  store, règles de l'App Store, pile de lecture à refaire - et je n'ai aucun
   appareil Apple pour tester. Publier quelque chose que je ne peux pas faire
   tourner moi-même serait pire que de ne pas le publier.
 
@@ -114,15 +125,15 @@ L'extraction des sources se fait **on-device** : pas de backend, pas de compte, 
 Récupérer le dernier build depuis les
 [Releases](https://github.com/JibayMcs/MooVie/releases) :
 
-- **Android TV et mobile** — sideload de `moovie-vX.Y.Z.apk` (un seul APK pour les deux)
-- **Linux** — `moovie-vX.Y.Z-x86_64.AppImage` (`chmod +x` puis lancer — ni installation ni root)
-- **Windows** — `moovie-vX.Y.Z.msi`
-- **macOS** — `moovie-vX.Y.Z.dmg`
+- **Android TV et mobile** - sideload de `moovie-vX.Y.Z.apk` (un seul APK pour les deux)
+- **Linux** - `moovie-vX.Y.Z-x86_64.AppImage` (`chmod +x` puis lancer - ni installation ni root)
+- **Windows** - `moovie-vX.Y.Z.msi`
+- **macOS** - `moovie-vX.Y.Z.dmg`
 
 L'AppImage Linux embarque son runtime Java **et libVLC** : elle tourne sur
 n'importe quelle distribution sans rien installer (vérifié sur Ubuntu 22.04/24.04,
 Debian 12 et Arch) et se met à jour depuis l'app. Sous **Windows**, le `.msi`
-s'installe par utilisateur — sans droits administrateur — et ajoute des raccourcis
+s'installe par utilisateur - sans droits administrateur - et ajoute des raccourcis
 au menu Démarrer et au bureau ; le bandeau intégré le met alors à jour en place.
 Sous **macOS**, le bandeau ouvre la page de release (le `.dmg` s'installe à la
 main). Windows et macOS nécessitent toujours **VLC** installé sur la machine.
@@ -143,7 +154,7 @@ Découpage : `app/src/commonMain` (ressources), `app/src/jvmCommon` (ViewModels,
 UI partagée), `app/src/androidMain`, `app/src/desktopMain`. Un émulateur Android TV
 préconfiguré et ses scripts de test sont dans `emulator/`.
 
-**Les sous-titres fonctionnent tels quels dans les versions publiées** — l'APK,
+**Les sous-titres fonctionnent tels quels dans les versions publiées** - l'APK,
 l'AppImage, le MSI et le DMG des [Releases](https://github.com/JibayMcs/MooVie/releases)
 embarquent ce qu'il faut. Rien à créer, rien à coller. En option, connecter un compte
 OpenSubtitles dans les réglages relève la limite quotidienne de téléchargements et
@@ -154,7 +165,7 @@ sous-titres reposent sur une *clé de consumer* OpenSubtitles, qui identifie
 l'application ; OpenSubtitles impose une clé unique par application et bannit les comptes
 qui demandent la leur à leurs utilisateurs. Cette clé est injectée à la compilation et
 volontairement absente de ce dépôt : une compilation depuis les sources désactive donc
-simplement les sous-titres — le reste fonctionne. Pour les activer en développement, crée
+simplement les sous-titres - le reste fonctionne. Pour les activer en développement, crée
 ton propre consumer sur [opensubtitles.com](https://www.opensubtitles.com/consumers) et
 dépose la clé dans un fichier `opensubtitles.properties` gitignoré, à la racine :
 
@@ -171,8 +182,8 @@ le plus besoin de regards : la CI les produit pour Linux, Windows et macOS, mais
 chacune atterrit sur un matériel, des pilotes et une installation libVLC que personne
 ici ne peut reproduire. Tester l'une d'elles sur ta machine est un vrai coup de main.
 
-Si quoi que ce soit se passe mal — une version qui ne démarre pas, un flux qui passe
-sur Android TV mais pas sur desktop, un contrôle que la télécommande n'atteint pas —
+Si quoi que ce soit se passe mal - une version qui ne démarre pas, un flux qui passe
+sur Android TV mais pas sur desktop, un contrôle que la télécommande n'atteint pas -
 [ouvre une issue](https://github.com/JibayMcs/MooVie/issues). Ce qui aide le plus :
 
 - ta plateforme et sa version (distribution, build Windows/macOS, modèle de box TV)
@@ -180,7 +191,7 @@ sur Android TV mais pas sur desktop, un contrôle que la télécommande n'attein
 - ce que tu attendais, et ce qui s'est produit à la place
 - pour un problème de lecture : le titre, et la source choisie dans le panneau
 
-Les pull requests sont bienvenues aussi — un nouveau catalogue de sources ou un
+Les pull requests sont bienvenues aussi - un nouveau catalogue de sources ou un
 extracteur d'hébergeur est le plus utile, chaque lien mort coûtant un titre à
 quelqu'un. `.claude/skills/add-source/` explique comment on en écrit un et, surtout,
 comment *mesurer* s'il mérite sa place.
@@ -191,15 +202,15 @@ Moo-vie repose sur le travail d'autres personnes.
 
 **Données & services**
 
-- **[TMDB](https://www.themoviedb.org)** — tous les titres, synopsis, affiches,
+- **[TMDB](https://www.themoviedb.org)** - tous les titres, synopsis, affiches,
   images de fond, castings et notes de l'app viennent de The Movie Database. C'est
   ce qui fait du catalogue un catalogue plutôt qu'une liste de noms de fichiers, et
   l'app ne sert à rien sans ta propre clé d'API.
   *This product uses the TMDB API but is not endorsed or certified by TMDB.*
-- **[TheIntroDB](https://theintrodb.org)** — horodatages d'intro et de générique
+- **[TheIntroDB](https://theintrodb.org)** - horodatages d'intro et de générique
   alimentés par la communauté, derrière les boutons *Passer l'intro* / *Passer le
   générique* et l'enchaînement de l'épisode suivant.
-- **[Cloudflare](https://1.1.1.1) et [Quad9](https://quad9.net)** — les résolveurs
+- **[Cloudflare](https://1.1.1.1) et [Quad9](https://quad9.net)** - les résolveurs
   DNS-over-HTTPS proposés au choix, ce qui permet aux sources de rester joignables
   sur les réseaux où ces domaines sont bloqués au niveau DNS.
 
@@ -207,15 +218,15 @@ Moo-vie repose sur le travail d'autres personnes.
 
 - [Kotlin](https://kotlinlang.org), [Kotlin Multiplatform](https://kotlinlang.org/docs/multiplatform.html),
   [Compose Multiplatform](https://www.jetbrains.com/lp/compose-multiplatform/) et
-  [kotlinx.serialization](https://github.com/Kotlin/kotlinx.serialization) — JetBrains
+  [kotlinx.serialization](https://github.com/Kotlin/kotlinx.serialization) - JetBrains
 - [Media3 / ExoPlayer](https://developer.android.com/media/media3) et
-  [DataStore](https://developer.android.com/topic/libraries/architecture/datastore) — Google / AndroidX
-- [VLC / libVLC](https://www.videolan.org) — VideoLAN, via
+  [DataStore](https://developer.android.com/topic/libraries/architecture/datastore) - Google / AndroidX
+- [VLC / libVLC](https://www.videolan.org) - VideoLAN, via
   [vlcj](https://github.com/caprica/vlcj) de Caprica Software, qui assure la lecture
   vidéo sur les versions desktop
-- [OkHttp et Retrofit](https://square.github.io/okhttp/) — Square
-- [jsoup](https://jsoup.org) — analyse les pages dont les sources sont extraites
-- [Coil](https://coil-kt.github.io/coil/) — chargement des images et cache disque
+- [OkHttp et Retrofit](https://square.github.io/okhttp/) - Square
+- [jsoup](https://jsoup.org) - analyse les pages dont les sources sont extraites
+- [Coil](https://coil-kt.github.io/coil/) - chargement des images et cache disque
 
 ## Licence
 
