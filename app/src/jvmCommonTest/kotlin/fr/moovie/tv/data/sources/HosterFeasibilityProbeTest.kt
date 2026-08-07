@@ -5,8 +5,15 @@ import fr.moovie.tv.core.sources.port.HttpRequest
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 
-/** Hébergeurs proposés par les catalogues mais jamais résolus. */
-private val HOSTERS = setOf("netu", "waaw", "filmoon", "savefiles", "serix", "flemmix")
+/**
+ * Hébergeurs proposés par les catalogues mais jamais résolus.
+ *
+ * `filmoon` en est sorti : la question est tranchée, on ne l'écrira pas (page
+ * devenue une coquille SPA, rien à décoder sans exécuter son JavaScript), et
+ * `FstreamProvider` ne le propose plus. Le sonder reviendrait à réinstruire un
+ * dossier clos.
+ */
+private val HOSTERS = setOf("netu", "waaw", "savefiles", "serix", "flemmix")
 
 /**
  * Retire les commentaires JS avant d'y chercher des indices d'extraction.
