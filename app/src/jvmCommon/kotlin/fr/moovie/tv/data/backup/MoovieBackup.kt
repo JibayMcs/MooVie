@@ -131,6 +131,15 @@ data class BackupProfile(
      * d'un fichier incapable de décrire ses suppressions.
      */
     val watchedAt: Map<String, Long> = emptyMap(),
+    /**
+     * Dates de retrait d'une reprise et de la liste « à voir ».
+     *
+     * La reprise et la liste portent déjà leur date de présence
+     * (`updatedAt`, `addedAt`) : seul le retrait manquait. Vides sur un fichier
+     * d'avant, et la fusion retombe alors sur l'union.
+     */
+    val resumeRemovedAt: Map<String, Long> = emptyMap(),
+    val watchlistRemovedAt: Map<String, Long> = emptyMap(),
     val history: List<HistoryEntry> = emptyList(),
     val audioTracks: Map<String, String> = emptyMap(),
     val titles: Map<String, TitleMeta> = emptyMap(),

@@ -25,7 +25,41 @@ data class WatchState(
     val watchedAt: Map<String, Long> = emptyMap(),
     val history: List<HistoryEntry> = emptyList(),
     val audioTracks: Map<String, String> = emptyMap(),
+    /** Dates de retrait d'une reprise. Une clé ici et dans [resume] est impossible. */
+    val resumeRemovedAt: Map<String, Long> = emptyMap(),
+    /** Dates de retrait de la liste « à voir ». */
+    val watchlistRemovedAt: Map<String, Long> = emptyMap(),
 )
+
+/**
+ * Tranche entre les deux versions d'une même clé : **la décision la plus récente
+ * gagne**, un retrait comptant comme une décision à part entière.
+ *
+ * À égalité — typiquement deux zéros, c'est-à-dire deux données d'avant les
+ * pierres tombales — la présence l'emporte. C'est l'union d'autrefois, et le
+ * seul choix tenable quand ni l'un ni l'autre ne sait dater ses suppressions.
+ *
+ * Écrit une fois pour la reprise et la liste : la règle est la même, seul le
+ * type de ce qu'on garde change.
+ */
+private fun <T> latest(
+    mine: T?,
+    minePresentAt: Long,
+    mineRemovedAt: Long,
+    theirs: T?,
+    theirsPresentAt: Long,
+    theirsRemovedAt: Long,
+): T? {
+    val myPick = if (mineRemovedAt > minePresentAt) null else mine
+    val myWhen = maxOf(minePresentAt, mineRemovedAt)
+    val theirPick = if (theirsRemovedAt > theirsPresentAt) null else theirs
+    val theirWhen = maxOf(theirsPresentAt, theirsRemovedAt)
+    return when {
+        myWhen > theirWhen -> myPick
+        theirWhen > myWhen -> theirPick
+        else -> myPick ?: theirPick
+    }
+}
 
 /** Bilan affiché après l'import : ce qui a bougé, et ce qui était déjà là. */
 data class ImportReport(
@@ -124,32 +158,46 @@ fun mergeWatchState(
             else -> key in current.watched || key in incoming.watched
         }
     }
-    val mergedWatchedAt = (current.watchedAt.keys + incoming.watchedAt.keys).associateWith { key ->
-        maxOf(current.watchedAt[key] ?: 0L, incoming.watchedAt[key] ?: 0L)
-    }
+    val mergedWatchedAt = stampUnion(current.watchedAt, incoming.watchedAt)
     val newlyWatched = mergedWatched.filterNot { it in current.watched }
 
-    // Reprises : une entrée par clé, la plus récemment mise à jour l'emporte.
+    // Reprises : la plus récente décision par clé, un retrait en étant une.
     val currentResume = current.resume.associateBy { it.key }
-    val mergedResume = currentResume.toMutableMap()
-    var resumeAdded = 0
-    var resumeUpdated = 0
-    for (entry in incoming.resume) {
-        val existing = mergedResume[entry.key]
-        when {
-            existing == null -> {
-                mergedResume[entry.key] = entry
-                resumeAdded++
-            }
-            entry.updatedAt > existing.updatedAt -> {
-                mergedResume[entry.key] = entry
-                resumeUpdated++
-            }
-        }
+    val incomingResume = incoming.resume.associateBy { it.key }
+    val resumeKeys = currentResume.keys + incomingResume.keys +
+        current.resumeRemovedAt.keys + incoming.resumeRemovedAt.keys
+    val mergedResume = resumeKeys.mapNotNull { key ->
+        latest(
+            mine = currentResume[key],
+            minePresentAt = currentResume[key]?.updatedAt ?: 0L,
+            mineRemovedAt = current.resumeRemovedAt[key] ?: 0L,
+            theirs = incomingResume[key],
+            theirsPresentAt = incomingResume[key]?.updatedAt ?: 0L,
+            theirsRemovedAt = incoming.resumeRemovedAt[key] ?: 0L,
+        )
     }
+    val resumeAdded = mergedResume.count { it.key !in currentResume }
+    val resumeUpdated = mergedResume.count { kept ->
+        currentResume[kept.key]?.let { it.updatedAt < kept.updatedAt } == true
+    }
+    val mergedResumeRemovedAt = stampUnion(current.resumeRemovedAt, incoming.resumeRemovedAt)
 
     val currentLater = current.watchlist.associateBy { it.key }
-    val newLater = incoming.watchlist.filterNot { it.key in currentLater }
+    val incomingLater = incoming.watchlist.associateBy { it.key }
+    val laterKeys = currentLater.keys + incomingLater.keys +
+        current.watchlistRemovedAt.keys + incoming.watchlistRemovedAt.keys
+    val mergedWatchlist = laterKeys.mapNotNull { key ->
+        latest(
+            mine = currentLater[key],
+            minePresentAt = currentLater[key]?.addedAt ?: 0L,
+            mineRemovedAt = current.watchlistRemovedAt[key] ?: 0L,
+            theirs = incomingLater[key],
+            theirsPresentAt = incomingLater[key]?.addedAt ?: 0L,
+            theirsRemovedAt = incoming.watchlistRemovedAt[key] ?: 0L,
+        )
+    }
+    val newLater = mergedWatchlist.filterNot { it.key in currentLater }
+    val mergedWatchlistRemovedAt = stampUnion(current.watchlistRemovedAt, incoming.watchlistRemovedAt)
 
     // Historique : dédoublonné sur (clé, moment), deux appareils pouvant avoir
     // vu le même épisode à des instants différents — ce sont deux visionnages.
@@ -157,8 +205,10 @@ fun mergeWatchState(
     val newHistory = incoming.history.filterNot { (it.key to it.watchedAt) in seenHistory }
 
     val merged = WatchState(
-        resume = mergedResume.values.sortedByDescending { it.updatedAt },
-        watchlist = current.watchlist + newLater,
+        resume = mergedResume.sortedByDescending { it.updatedAt },
+        watchlist = mergedWatchlist,
+        resumeRemovedAt = mergedResumeRemovedAt,
+        watchlistRemovedAt = mergedWatchlistRemovedAt,
         watched = mergedWatched,
         watchedAt = mergedWatchedAt,
         history = (current.history + newHistory).sortedByDescending { it.watchedAt },
@@ -176,3 +226,7 @@ fun mergeWatchState(
         historyAdded = newHistory.size,
     )
 }
+
+/** Union de deux tables d'horodatage : la plus récente date pour chaque clé. */
+private fun stampUnion(a: Map<String, Long>, b: Map<String, Long>): Map<String, Long> =
+    (a.keys + b.keys).associateWith { maxOf(a[it] ?: 0L, b[it] ?: 0L) }

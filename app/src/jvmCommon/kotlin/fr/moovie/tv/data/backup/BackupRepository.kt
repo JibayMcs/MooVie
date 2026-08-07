@@ -64,6 +64,8 @@ class BackupRepository(
                 watchlist = watch.watchlist.first(),
                 watched = watch.watched.first().toList(),
                 watchedAt = watch.watchedAt(),
+                resumeRemovedAt = watch.resumeRemovedAt(),
+                watchlistRemovedAt = watch.watchlistRemovedAt(),
                 history = watch.history.first(),
                 audioTracks = watch.audioTracks(),
                 titles = watch.titles(),
@@ -118,6 +120,8 @@ class BackupRepository(
                 watchlist = watch.watchlist.first(),
                 watched = watch.watched.first(),
                 watchedAt = watch.watchedAt(),
+                resumeRemovedAt = watch.resumeRemovedAt(),
+                watchlistRemovedAt = watch.watchlistRemovedAt(),
                 history = watch.history.first(),
                 audioTracks = watch.audioTracks(),
             )
@@ -126,6 +130,8 @@ class BackupRepository(
                 watchlist = entry.watchlist,
                 watched = entry.watched.toSet(),
                 watchedAt = entry.watchedAt,
+                resumeRemovedAt = entry.resumeRemovedAt,
+                watchlistRemovedAt = entry.watchlistRemovedAt,
                 history = entry.history,
                 audioTracks = entry.audioTracks,
             )
@@ -138,6 +144,8 @@ class BackupRepository(
                 audioTracks = merged.audioTracks,
                 titles = entry.titles,
                 watchedAt = merged.watchedAt,
+                resumeRemovedAt = merged.resumeRemovedAt,
+                watchlistRemovedAt = merged.watchlistRemovedAt,
             )
             if (entry.homeLayout.isNotEmpty()) {
                 layout.replaceAll(
@@ -159,6 +167,8 @@ class BackupRepository(
             watchlist = watchRepo.watchlist.first(),
             watched = watchRepo.watched.first(),
             watchedAt = watchRepo.watchedAt(),
+            resumeRemovedAt = watchRepo.resumeRemovedAt(),
+            watchlistRemovedAt = watchRepo.watchlistRemovedAt(),
             history = watchRepo.history.first(),
             audioTracks = watchRepo.audioTracks(),
         )
@@ -174,6 +184,8 @@ class BackupRepository(
             // celles du fichier viennent les compléter.
             titles = backup.titles,
             watchedAt = merged.watchedAt,
+            resumeRemovedAt = merged.resumeRemovedAt,
+            watchlistRemovedAt = merged.watchlistRemovedAt,
         )
         // L'ordre du fichier l'emporte ; en fusion, les genres épinglés propres à
         // cet appareil sont conservés (voir [mergeHomeLayouts]).

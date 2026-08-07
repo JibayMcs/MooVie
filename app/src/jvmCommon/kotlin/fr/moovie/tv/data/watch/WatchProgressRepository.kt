@@ -31,6 +31,19 @@ private const val SEEN_PREFIX = "seen:"
  */
 private const val SEEN_AT_PREFIX = "seenat:"
 private const val LATER_PREFIX = "later:"
+
+/**
+ * Pierres tombales de la reprise et de la liste.
+ *
+ * Ces deux-là portent déjà leur date de *présence* — `ResumeEntry.updatedAt`,
+ * `WatchlistEntry.addedAt` — il ne manquait que celle du retrait. On n'écrit
+ * donc ici qu'en enterrant, et on efface la pierre en cas de retour : une clé
+ * n'est jamais à la fois présente et enterrée.
+ */
+private const val RESUME_AT_PREFIX = "resumeat:"
+
+/** Voir [RESUME_AT_PREFIX]. */
+private const val LATER_AT_PREFIX = "laterat:"
 private const val HIST_PREFIX = "hist:"
 private const val META_PREFIX = "meta:"
 private const val AUDIO_PREFIX = "audio:"
@@ -82,6 +95,18 @@ class WatchProgressRepository(
         .mapNotNull { (k, v) ->
             if (!k.name.startsWith(SEEN_AT_PREFIX)) return@mapNotNull null
             (v as? Long)?.let { k.name.removePrefix(SEEN_AT_PREFIX) to it }
+        }.toMap()
+
+    /** Dates de retrait des reprises — voir [RESUME_AT_PREFIX]. */
+    suspend fun resumeRemovedAt(): Map<String, Long> = stamps(RESUME_AT_PREFIX)
+
+    /** Dates de retrait de la liste « à voir ». */
+    suspend fun watchlistRemovedAt(): Map<String, Long> = stamps(LATER_AT_PREFIX)
+
+    private suspend fun stamps(prefix: String): Map<String, Long> = store.data.first().asMap()
+        .mapNotNull { (k, v) ->
+            if (!k.name.startsWith(prefix)) return@mapNotNull null
+            (v as? Long)?.let { k.name.removePrefix(prefix) to it }
         }.toMap()
 
     val watchlist: Flow<List<WatchlistEntry>> = store.data.map { prefs ->
@@ -147,13 +172,16 @@ class WatchProgressRepository(
         titles: Map<String, TitleMeta> = emptyMap(),
         /** Horodatages fusionnés, retraits compris — voir [SEEN_AT_PREFIX]. */
         watchedAt: Map<String, Long> = emptyMap(),
+        /** Dates de retrait fusionnées — voir [RESUME_AT_PREFIX]. */
+        resumeRemovedAt: Map<String, Long> = emptyMap(),
+        watchlistRemovedAt: Map<String, Long> = emptyMap(),
     ) {
         store.edit { prefs ->
             prefs.asMap().keys
                 .filter { key ->
                     listOf(
-                        RESUME_PREFIX, SEEN_PREFIX, SEEN_AT_PREFIX, LATER_PREFIX,
-                        HIST_PREFIX, AUDIO_PREFIX,
+                        RESUME_PREFIX, RESUME_AT_PREFIX, SEEN_PREFIX, SEEN_AT_PREFIX,
+                        LATER_PREFIX, LATER_AT_PREFIX, HIST_PREFIX, AUDIO_PREFIX,
                     )
                         .any { key.name.startsWith(it) }
                 }
@@ -166,6 +194,8 @@ class WatchProgressRepository(
             // plus de `seen:` mais garde sa date, sans quoi la fusion suivante
             // la ressusciterait.
             watchedAt.forEach { (k, at) -> prefs[longPreferencesKey(SEEN_AT_PREFIX + k)] = at }
+            resumeRemovedAt.forEach { (k, at) -> prefs[longPreferencesKey(RESUME_AT_PREFIX + k)] = at }
+            watchlistRemovedAt.forEach { (k, at) -> prefs[longPreferencesKey(LATER_AT_PREFIX + k)] = at }
             history.forEach { prefs[stringPreferencesKey(HIST_PREFIX + it.key)] = json.encodeToString(it) }
             audioTracks.forEach { (k, v) -> prefs[stringPreferencesKey(AUDIO_PREFIX + k)] = v }
             titles.forEach { (k, v) -> prefs[stringPreferencesKey(META_PREFIX + k)] = json.encodeToString(v) }
@@ -178,6 +208,7 @@ class WatchProgressRepository(
     /** Ajoute un titre à « À regarder plus tard » (ou rafraîchit ses métadonnées). */
     suspend fun addToWatchlist(entry: WatchlistEntry) {
         store.edit { prefs ->
+            prefs.unbury(LATER_AT_PREFIX, entry.key)
             prefs[stringPreferencesKey(LATER_PREFIX + entry.key)] =
                 json.encodeToString(entry.copy(addedAt = System.currentTimeMillis()))
         }
@@ -185,7 +216,7 @@ class WatchProgressRepository(
 
     /** Retire un titre de « À regarder plus tard ». */
     suspend fun removeFromWatchlist(key: String) {
-        store.edit { it.remove(stringPreferencesKey(LATER_PREFIX + key)) }
+        store.edit { it.buryWatchlist(key, System.currentTimeMillis()) }
     }
 
     /**
@@ -196,6 +227,7 @@ class WatchProgressRepository(
         store.edit { prefs ->
             val k = stringPreferencesKey(RESUME_PREFIX + meta.key)
             val existing = prefs[k]?.let { decode(it) }
+            prefs.unbury(RESUME_AT_PREFIX, meta.key)
             prefs[k] = json.encodeToString(
                 meta.copy(
                     positionMs = existing?.positionMs ?: 0,
@@ -228,6 +260,7 @@ class WatchProgressRepository(
             val k = stringPreferencesKey(RESUME_PREFIX + meta.key)
             val existing = prefs[k]?.let { decode(it) }
             if (existing != null && existing.positionMs > 0) return@edit
+            prefs.unbury(RESUME_AT_PREFIX, meta.key)
             prefs[k] = json.encodeToString(
                 meta.copy(
                     queued = true,
@@ -247,10 +280,12 @@ class WatchProgressRepository(
                 durationMs > 0 && positionMs >= durationMs - 10_000 -> {
                     // Avant le remove : c'est l'entrée de reprise qui porte le
                     // titre et l'affiche de la ligne d'historique.
-                    prefs.recordHistory(key, System.currentTimeMillis())
-                    prefs.remove(k)
+                    val now = System.currentTimeMillis()
+                    prefs.recordHistory(key, now)
+                    prefs.buryResume(key, now)
                     prefs[booleanPreferencesKey(SEEN_PREFIX + key)] = true
-                    prefs.pruneWatchlist(key)
+                    prefs[longPreferencesKey(SEEN_AT_PREFIX + key)] = now
+                    prefs.pruneWatchlist(key, now)
                 }
                 positionMs > 5_000 -> prefs[k] = json.encodeToString(
                     existing.copy(
@@ -281,7 +316,7 @@ class WatchProgressRepository(
     }
 
     suspend fun remove(key: String) {
-        store.edit { it.remove(stringPreferencesKey(RESUME_PREFIX + key)) }
+        store.edit { it.buryResume(key, System.currentTimeMillis()) }
     }
 
     /** Marque vu/non vu. Marquer vu retire aussi le contenu de la reprise. */
@@ -292,8 +327,8 @@ class WatchProgressRepository(
             if (watched) {
                 prefs[booleanPreferencesKey(SEEN_PREFIX + key)] = true
                 prefs.recordHistory(key, now)
-                prefs.remove(stringPreferencesKey(RESUME_PREFIX + key))
-                prefs.pruneWatchlist(key)
+                prefs.buryResume(key, now)
+                prefs.pruneWatchlist(key, now)
             } else {
                 prefs.remove(booleanPreferencesKey(SEEN_PREFIX + key))
             }
@@ -309,14 +344,14 @@ class WatchProgressRepository(
                 if (watched) {
                     prefs[booleanPreferencesKey(SEEN_PREFIX + key)] = true
                     prefs.recordHistory(key, now)
-                    prefs.remove(stringPreferencesKey(RESUME_PREFIX + key))
+                    prefs.buryResume(key, now)
                 } else {
                     prefs.remove(booleanPreferencesKey(SEEN_PREFIX + key))
                 }
             }
             // Après le lot : le total d'épisodes vus n'est atteint qu'une fois
             // toutes les clés posées.
-            if (watched) keys.firstOrNull()?.let { prefs.pruneWatchlist(it) }
+            if (watched) keys.firstOrNull()?.let { prefs.pruneWatchlist(it, now) }
         }
     }
 
@@ -373,7 +408,7 @@ class WatchProgressRepository(
      * pour que la règle vaille aussi quand le titre est terminé depuis le
      * lecteur, sans repasser par la fiche.
      */
-    private fun MutablePreferences.pruneWatchlist(watchedKey: String) {
+    private fun MutablePreferences.pruneWatchlist(watchedKey: String, now: Long) {
         val titleKey = when {
             watchedKey.startsWith("movie:") -> watchedKey
             // "tv:<id>:s1e2" → "tv:<id>" : la liste est au niveau du titre.
@@ -386,7 +421,9 @@ class WatchProgressRepository(
         } ?: return
 
         if (!entry.isTv) {
-            if (this[booleanPreferencesKey(SEEN_PREFIX + titleKey)] == true) remove(laterKey)
+            if (this[booleanPreferencesKey(SEEN_PREFIX + titleKey)] == true) {
+                buryWatchlist(titleKey, now)
+            }
             return
         }
         // Sans total connu, on ne peut pas conclure : on garde la série plutôt
@@ -395,7 +432,24 @@ class WatchProgressRepository(
         val seen = asMap().keys.count {
             it.name.startsWith("$SEEN_PREFIX$titleKey:")
         }
-        if (seen >= entry.totalEpisodes) remove(laterKey)
+        if (seen >= entry.totalEpisodes) buryWatchlist(titleKey, now)
+    }
+
+    /** Retire une reprise **en datant le retrait**, pour que la fusion le respecte. */
+    private fun MutablePreferences.buryResume(key: String, now: Long) {
+        remove(stringPreferencesKey(RESUME_PREFIX + key))
+        this[longPreferencesKey(RESUME_AT_PREFIX + key)] = now
+    }
+
+    /** Voir [buryResume] : même mécanique pour la liste « à voir ». */
+    private fun MutablePreferences.buryWatchlist(key: String, now: Long) {
+        remove(stringPreferencesKey(LATER_PREFIX + key))
+        this[longPreferencesKey(LATER_AT_PREFIX + key)] = now
+    }
+
+    /** Un retour annule la pierre : une clé n'est jamais présente *et* enterrée. */
+    private fun MutablePreferences.unbury(prefix: String, key: String) {
+        remove(longPreferencesKey(prefix + key))
     }
 
     private suspend fun entry(key: String): ResumeEntry? =
