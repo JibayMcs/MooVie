@@ -256,9 +256,9 @@ internal fun DesktopDetailsScreen(
                         nextEpisode = vm.playbackNext?.second ?: 0,
                         posterUrl = vm.playbackPoster,
                         expectedMinutes = vm.playbackMinutes ?: 0,
-                        sourceUrl = vm.playbackLink?.url.orEmpty(),
-                        hoster = vm.playbackLink?.hoster.orEmpty(),
-                        language = vm.playbackLink?.language.orEmpty(),
+                        sourceUrl = vm.playingLink?.url.orEmpty(),
+                        hoster = vm.playingLink?.hoster.orEmpty(),
+                        language = vm.playingLink?.language.orEmpty(),
                     ),
                 )
             }

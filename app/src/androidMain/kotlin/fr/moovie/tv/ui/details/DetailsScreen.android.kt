@@ -79,9 +79,9 @@ fun DetailsScreen(
                         nextEpisode = viewModel.playbackNext?.second ?: 0,
                         posterUrl = viewModel.playbackPoster,
                         expectedMinutes = viewModel.playbackMinutes ?: 0,
-                        sourceUrl = viewModel.playbackLink?.url.orEmpty(),
-                        hoster = viewModel.playbackLink?.hoster.orEmpty(),
-                        language = viewModel.playbackLink?.language.orEmpty(),
+                        sourceUrl = viewModel.playingLink?.url.orEmpty(),
+                        hoster = viewModel.playingLink?.hoster.orEmpty(),
+                        language = viewModel.playingLink?.language.orEmpty(),
                     ),
                 )
             }

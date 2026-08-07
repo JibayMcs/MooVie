@@ -165,7 +165,16 @@ class DetailsViewModel : ViewModel() {
     private val rejectedLinks = mutableSetOf<String>()
 
     /** Lien à l'origine du flux en cours de lecture, pour pouvoir l'écarter. */
-    private var playingLink: EmbedLink? = null
+    /**
+     * Le lien d'embed derrière la lecture en cours.
+     *
+     * Deux usages, et c'est pour ça qu'il n'y en a qu'un : rendre la main à la
+     * cascade quand le flux casse en route, et dire au lecteur quoi mettre en
+     * file de téléchargement. Null quand la lecture vient du disque — il n'y a
+     * alors ni source à réessayer, ni rien à télécharger.
+     */
+    var playingLink: EmbedLink? = null
+        private set
 
     /** Libellé de la lecture rapide en cours, réutilisé si la cascade reprend. */
     private var quickPlayLabel = ""
@@ -980,7 +989,7 @@ class DetailsViewModel : ViewModel() {
         pendingMeta?.key?.let { key ->
             localStream(key)?.let { local ->
                 viewModelScope.launch { pendingMeta?.let { watchRepo.register(it) } }
-                playbackLink = null
+                playingLink = null
                 _resolved.value = local
                 return
             }
@@ -1005,7 +1014,11 @@ class DetailsViewModel : ViewModel() {
                 // La lecture va démarrer : persiste les métadonnées pour le
                 // rail « Reprendre » (la position suivra depuis le lecteur).
                 pendingMeta?.let { watchRepo.register(it) }
-                playbackLink = link
+                // Renseigné ici aussi, et pas seulement par la lecture
+                // rapide : sans quoi le bouton de téléchargement manquait sur
+                // le chemin le plus courant, et la reprise après flux cassé ne
+                // savait pas quelle source venait d'échouer.
+                playingLink = link
                 _resolved.value = stream
             } else {
                 _resolveError.value = getString(Res.string.details_resolve_error, link.hoster)
@@ -1052,16 +1065,6 @@ class DetailsViewModel : ViewModel() {
             )
         }
     }
-
-    /**
-     * Le lien d'embed derrière la lecture en cours.
-     *
-     * Null quand elle vient du disque : il n'y a alors rien à télécharger, et
-     * c'est ce qui fait disparaître le bouton du lecteur plutôt que de lui
-     * faire retélécharger ce qui est déjà là.
-     */
-    var playbackLink: EmbedLink? = null
-        private set
 
     fun consumeResolved() { _resolved.value = null }
 }
