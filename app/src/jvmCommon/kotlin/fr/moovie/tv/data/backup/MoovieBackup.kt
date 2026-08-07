@@ -121,6 +121,16 @@ data class BackupProfile(
     val resume: List<ResumeEntry> = emptyList(),
     val watchlist: List<WatchlistEntry> = emptyList(),
     val watched: List<String> = emptyList(),
+    /**
+     * Date de la dernière décision sur chaque clé, **retrait compris**.
+     *
+     * C'est ce qui permet à la fusion de respecter un « démarqué » au lieu de le
+     * ressusciter. Une clé datée mais absente de [watched] est une pierre
+     * tombale. Vide sur un fichier d'avant : tout se lit alors à 0, et la fusion
+     * retombe sur l'union d'autrefois, ce qui est exactement ce qu'on peut dire
+     * d'un fichier incapable de décrire ses suppressions.
+     */
+    val watchedAt: Map<String, Long> = emptyMap(),
     val history: List<HistoryEntry> = emptyList(),
     val audioTracks: Map<String, String> = emptyMap(),
     val titles: Map<String, TitleMeta> = emptyMap(),

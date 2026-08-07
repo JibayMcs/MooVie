@@ -18,6 +18,11 @@ data class WatchState(
     val resume: List<ResumeEntry> = emptyList(),
     val watchlist: List<WatchlistEntry> = emptyList(),
     val watched: Set<String> = emptySet(),
+    /**
+     * Horodatage de la dernière décision sur chaque clé, **retrait compris**.
+     * Absent = donnée d'avant les pierres tombales, lue à 0.
+     */
+    val watchedAt: Map<String, Long> = emptyMap(),
     val history: List<HistoryEntry> = emptyList(),
     val audioTracks: Map<String, String> = emptyMap(),
 )
@@ -54,9 +59,17 @@ data class ImportReport(
  * l'épisode regardé hier sur la TV du salon ne doit pas être écrasé par une
  * sauvegarde d'avant-hier. D'où la comparaison sur `updatedAt` / `watchedAt`.
  *
- * Un titre **vu** ne redevient jamais non-vu par fusion : l'information « j'ai
- * fini ça » est plus forte que son absence, qui peut simplement vouloir dire
- * « pas encore synchronisé ».
+ * Pour les « vus », la décision **la plus récente** gagne, y compris quand c'est
+ * un retrait. C'est un revirement, et il mérite son explication : la règle
+ * d'avant faisait l'union, un titre vu ne redevenant jamais non-vu. Ce n'était
+ * pas un caprice — sans date sur les suppressions, une absence pouvait tout
+ * aussi bien vouloir dire « pas encore synchronisé », et ressusciter était le
+ * moindre mal. Les pierres tombales lèvent cette ambiguïté : on sait désormais
+ * *quand* quelqu'un a démarqué, donc on peut le respecter.
+ *
+ * À égalité d'horodatage — deux zéros, c'est-à-dire deux données d'avant — on
+ * refait l'union. L'ancien comportement reste donc exact pour les vieux
+ * fichiers, qui ne peuvent rien dire de leurs suppressions.
  */
 fun mergeBackup(
     current: WatchState,
@@ -98,7 +111,23 @@ fun mergeWatchState(
         )
     }
 
-    val newlyWatched = incoming.watched.filterNot { it in current.watched }
+    // Chaque clé connue d'un côté ou de l'autre, présente ou enterrée.
+    val watchedKeys = current.watched + incoming.watched +
+        current.watchedAt.keys + incoming.watchedAt.keys
+    val mergedWatched = watchedKeys.filterTo(mutableSetOf()) { key ->
+        val mine = current.watchedAt[key] ?: 0L
+        val theirs = incoming.watchedAt[key] ?: 0L
+        when {
+            theirs > mine -> key in incoming.watched
+            mine > theirs -> key in current.watched
+            // Égalité : aucune des deux parties ne sait dater sa décision.
+            else -> key in current.watched || key in incoming.watched
+        }
+    }
+    val mergedWatchedAt = (current.watchedAt.keys + incoming.watchedAt.keys).associateWith { key ->
+        maxOf(current.watchedAt[key] ?: 0L, incoming.watchedAt[key] ?: 0L)
+    }
+    val newlyWatched = mergedWatched.filterNot { it in current.watched }
 
     // Reprises : une entrée par clé, la plus récemment mise à jour l'emporte.
     val currentResume = current.resume.associateBy { it.key }
@@ -130,7 +159,8 @@ fun mergeWatchState(
     val merged = WatchState(
         resume = mergedResume.values.sortedByDescending { it.updatedAt },
         watchlist = current.watchlist + newLater,
-        watched = current.watched + newlyWatched,
+        watched = mergedWatched,
+        watchedAt = mergedWatchedAt,
         history = (current.history + newHistory).sortedByDescending { it.watchedAt },
         // Le choix de langue de l'appareil courant prime : il vient d'un geste
         // récent de l'utilisateur, là où la sauvegarde reflète un autre poste.
@@ -139,7 +169,7 @@ fun mergeWatchState(
 
     return merged to ImportReport(
         watchedAdded = newlyWatched.size,
-        watchedAlreadyThere = incoming.watched.size - newlyWatched.size,
+        watchedAlreadyThere = incoming.watched.count { it in current.watched },
         resumeAdded = resumeAdded,
         resumeUpdated = resumeUpdated,
         watchlistAdded = newLater.size,

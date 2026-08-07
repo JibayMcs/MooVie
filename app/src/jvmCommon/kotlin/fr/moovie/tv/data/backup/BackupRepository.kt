@@ -63,6 +63,7 @@ class BackupRepository(
                 resume = watch.continueWatching.first(),
                 watchlist = watch.watchlist.first(),
                 watched = watch.watched.first().toList(),
+                watchedAt = watch.watchedAt(),
                 history = watch.history.first(),
                 audioTracks = watch.audioTracks(),
                 titles = watch.titles(),
@@ -116,6 +117,7 @@ class BackupRepository(
                 resume = watch.continueWatching.first(),
                 watchlist = watch.watchlist.first(),
                 watched = watch.watched.first(),
+                watchedAt = watch.watchedAt(),
                 history = watch.history.first(),
                 audioTracks = watch.audioTracks(),
             )
@@ -123,6 +125,7 @@ class BackupRepository(
                 resume = entry.resume,
                 watchlist = entry.watchlist,
                 watched = entry.watched.toSet(),
+                watchedAt = entry.watchedAt,
                 history = entry.history,
                 audioTracks = entry.audioTracks,
             )
@@ -134,6 +137,7 @@ class BackupRepository(
                 history = merged.history,
                 audioTracks = merged.audioTracks,
                 titles = entry.titles,
+                watchedAt = merged.watchedAt,
             )
             if (entry.homeLayout.isNotEmpty()) {
                 layout.replaceAll(
@@ -154,6 +158,7 @@ class BackupRepository(
             resume = watchRepo.continueWatching.first(),
             watchlist = watchRepo.watchlist.first(),
             watched = watchRepo.watched.first(),
+            watchedAt = watchRepo.watchedAt(),
             history = watchRepo.history.first(),
             audioTracks = watchRepo.audioTracks(),
         )
@@ -168,6 +173,7 @@ class BackupRepository(
             // Les fiches de l'appareil ne sont pas effacées par `replaceAll` :
             // celles du fichier viennent les compléter.
             titles = backup.titles,
+            watchedAt = merged.watchedAt,
         )
         // L'ordre du fichier l'emporte ; en fusion, les genres épinglés propres à
         // cet appareil sont conservés (voir [mergeHomeLayouts]).

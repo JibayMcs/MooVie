@@ -2,6 +2,7 @@ package fr.moovie.tv.data.watch
 
 import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import fr.moovie.tv.data.store.ActiveProfile
@@ -16,6 +17,19 @@ import kotlinx.serialization.json.Json
 
 private const val RESUME_PREFIX = "resume:"
 private const val SEEN_PREFIX = "seen:"
+
+/**
+ * Horodatage de la dernière décision sur un « vu », **retrait compris**.
+ *
+ * C'est la pierre tombale : démarquer efface `seen:` mais écrit ici, si bien que
+ * l'absence devient datable. Sans elle, une fusion ne peut pas distinguer
+ * « démarqué hier » de « jamais connu », et doit choisir l'union — l'épisode
+ * qu'on vient de démarquer ressuscite au premier import.
+ *
+ * Aucune migration : une donnée d'avant n'a pas de clé ici, se lit donc à 0, et
+ * n'importe quelle décision explicite l'emporte.
+ */
+private const val SEEN_AT_PREFIX = "seenat:"
 private const val LATER_PREFIX = "later:"
 private const val HIST_PREFIX = "hist:"
 private const val META_PREFIX = "meta:"
@@ -60,6 +74,16 @@ class WatchProgressRepository(
     }
 
     /** Titres mis de côté, de l'ajout le plus récent au plus ancien. */
+    /**
+     * Horodatage par clé, y compris pour ce qui a été démarqué : c'est ce qui
+     * voyage dans la sauvegarde et permet à la fusion de trancher.
+     */
+    suspend fun watchedAt(): Map<String, Long> = store.data.first().asMap()
+        .mapNotNull { (k, v) ->
+            if (!k.name.startsWith(SEEN_AT_PREFIX)) return@mapNotNull null
+            (v as? Long)?.let { k.name.removePrefix(SEEN_AT_PREFIX) to it }
+        }.toMap()
+
     val watchlist: Flow<List<WatchlistEntry>> = store.data.map { prefs ->
         prefs.asMap().mapNotNull { (k, v) ->
             if (!k.name.startsWith(LATER_PREFIX)) return@mapNotNull null
@@ -121,11 +145,16 @@ class WatchProgressRepository(
         history: List<HistoryEntry>,
         audioTracks: Map<String, String>,
         titles: Map<String, TitleMeta> = emptyMap(),
+        /** Horodatages fusionnés, retraits compris — voir [SEEN_AT_PREFIX]. */
+        watchedAt: Map<String, Long> = emptyMap(),
     ) {
         store.edit { prefs ->
             prefs.asMap().keys
                 .filter { key ->
-                    listOf(RESUME_PREFIX, SEEN_PREFIX, LATER_PREFIX, HIST_PREFIX, AUDIO_PREFIX)
+                    listOf(
+                        RESUME_PREFIX, SEEN_PREFIX, SEEN_AT_PREFIX, LATER_PREFIX,
+                        HIST_PREFIX, AUDIO_PREFIX,
+                    )
                         .any { key.name.startsWith(it) }
                 }
                 .forEach { prefs.remove(it) }
@@ -133,6 +162,10 @@ class WatchProgressRepository(
             resume.forEach { prefs[stringPreferencesKey(RESUME_PREFIX + it.key)] = json.encodeToString(it) }
             watchlist.forEach { prefs[stringPreferencesKey(LATER_PREFIX + it.key)] = json.encodeToString(it) }
             watched.forEach { prefs[booleanPreferencesKey(SEEN_PREFIX + it)] = true }
+            // Les pierres tombales survivent au ménage : une clé démarquée n'a
+            // plus de `seen:` mais garde sa date, sans quoi la fusion suivante
+            // la ressusciterait.
+            watchedAt.forEach { (k, at) -> prefs[longPreferencesKey(SEEN_AT_PREFIX + k)] = at }
             history.forEach { prefs[stringPreferencesKey(HIST_PREFIX + it.key)] = json.encodeToString(it) }
             audioTracks.forEach { (k, v) -> prefs[stringPreferencesKey(AUDIO_PREFIX + k)] = v }
             titles.forEach { (k, v) -> prefs[stringPreferencesKey(META_PREFIX + k)] = json.encodeToString(v) }
@@ -254,9 +287,11 @@ class WatchProgressRepository(
     /** Marque vu/non vu. Marquer vu retire aussi le contenu de la reprise. */
     suspend fun setWatched(key: String, watched: Boolean) {
         store.edit { prefs ->
+            val now = System.currentTimeMillis()
+            prefs[longPreferencesKey(SEEN_AT_PREFIX + key)] = now
             if (watched) {
                 prefs[booleanPreferencesKey(SEEN_PREFIX + key)] = true
-                prefs.recordHistory(key, System.currentTimeMillis())
+                prefs.recordHistory(key, now)
                 prefs.remove(stringPreferencesKey(RESUME_PREFIX + key))
                 prefs.pruneWatchlist(key)
             } else {
@@ -270,6 +305,7 @@ class WatchProgressRepository(
         store.edit { prefs ->
             val now = System.currentTimeMillis()
             keys.forEach { key ->
+                prefs[longPreferencesKey(SEEN_AT_PREFIX + key)] = now
                 if (watched) {
                     prefs[booleanPreferencesKey(SEEN_PREFIX + key)] = true
                     prefs.recordHistory(key, now)
