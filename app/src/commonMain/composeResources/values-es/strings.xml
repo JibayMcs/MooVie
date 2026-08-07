@@ -390,7 +390,7 @@
     <string name="details_source_download_hint">Mantener pulsada una fuente para descargarla.</string>
     <!-- Descargas -->
     <string name="settings_cat_downloads">Descargas</string>
-    <string name="downloads_help">Los títulos descargados se reproducen desde su ficha, sin red. Pertenecen a este dispositivo y desaparecen si se desinstala la aplicación.</string>
+    <string name="downloads_help">Los títulos descargados se reproducen desde esta lista o desde su ficha, sin red. Pertenecen a este dispositivo y desaparecen si se desinstala la aplicación.</string>
     <string name="downloads_used">%1$s ocupados</string>
     <string name="downloads_empty">Ninguna descarga. Mantener pulsada una fuente, desde una ficha, para iniciar una.</string>
     <string name="downloads_ready">Listo sin conexión · %1$s</string>
@@ -400,4 +400,5 @@
     <string name="downloads_pause">Pausar</string>
     <string name="downloads_resume">Reanudar</string>
     <string name="downloads_remove">Eliminar</string>
+    <string name="downloads_play">Reproducir</string>
 </resources>

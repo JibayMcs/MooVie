@@ -17,6 +17,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import fr.moovie.tv.data.download.Download
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -47,6 +48,8 @@ import fr.moovie.tv.ui.components.MoovieButton
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
+    /** Lecture d'un titre téléchargé, sans passer par sa fiche ni par TMDB. */
+    onPlayDownload: (Download) -> Unit = {},
     viewModel: SettingsViewModel = viewModel(),
 ) {
     val apiKey by viewModel.tmdbApiKey.collectAsStateWithLifecycle()
@@ -99,6 +102,7 @@ fun SettingsScreen(
         onMoveProviderUp = viewModel::moveProviderUp,
         onMoveProviderDown = viewModel::moveProviderDown,
         onBack = onBack,
+        onPlayDownload = onPlayDownload,
         languageSelector = { LanguageSelector() },
     )
 }

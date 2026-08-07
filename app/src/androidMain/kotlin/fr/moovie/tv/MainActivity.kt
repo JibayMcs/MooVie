@@ -44,6 +44,7 @@ import fr.moovie.tv.ui.navigation.rememberNavStack
 import fr.moovie.tv.ui.onboarding.OnboardingScreen
 import fr.moovie.tv.ui.onboarding.rememberStartScreen
 import fr.moovie.tv.data.download.DownloadQueue
+import fr.moovie.tv.data.download.localStream
 import fr.moovie.tv.data.sync.SyncCoordinator
 import fr.moovie.tv.data.sync.SyncTrigger
 import fr.moovie.tv.ui.profile.ProfileHost
@@ -303,6 +304,22 @@ class MainActivity : ComponentActivity() {
                             )
                             Screen.Settings -> SettingsScreen(
                                 onBack = { nav.pop() },
+                                onPlayDownload = { download ->
+                                    // Pas de résolution de sources : le fichier
+                                    // est là, et hors ligne personne n'y
+                                    // répondrait de toute façon.
+                                    localStream(download.key)?.let { local ->
+                                        nav.push(
+                                            Screen.Player(
+                                                streamUrl = local.url,
+                                                mediaKey = download.key,
+                                                title = download.title,
+                                                subtitle = download.subtitle,
+                                                posterUrl = download.imageUrl.orEmpty(),
+                                            ),
+                                        )
+                                    }
+                                },
                             )
                             is Screen.Catalog -> CatalogScreen(
                                 select = s.select,

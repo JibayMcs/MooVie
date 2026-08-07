@@ -95,6 +95,7 @@ import fr.moovie.tv.resources.profile_switch
 import fr.moovie.tv.resources.profile_switch_help
 import fr.moovie.tv.resources.settings_cat_profiles
 import fr.moovie.tv.ui.profile.LocalSwitchProfile
+import fr.moovie.tv.data.download.Download
 import fr.moovie.tv.ui.download.DownloadsSection
 import fr.moovie.tv.ui.sync.SyncSection
 import fr.moovie.tv.resources.settings_cat_api
@@ -271,6 +272,8 @@ fun SettingsScreenContent(
     onMoveProviderUp: (String) -> Unit,
     onMoveProviderDown: (String) -> Unit,
     onBack: () -> Unit,
+    /** Lecture d'un titre téléchargé, sans passer par sa fiche. */
+    onPlayDownload: (Download) -> Unit = {},
     languageSelector: @Composable () -> Unit,
 ) {
     var section by remember { mutableStateOf(SettingsSection.API) }
@@ -638,7 +641,7 @@ fun SettingsScreenContent(
                 // Comme la sauvegarde : un parcours qui porte son propre état.
                 SettingsSection.SYNC -> SyncSection()
 
-                SettingsSection.DOWNLOADS -> DownloadsSection()
+                SettingsSection.DOWNLOADS -> DownloadsSection(onPlay = onPlayDownload)
             }
         }
     }

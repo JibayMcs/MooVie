@@ -29,6 +29,7 @@ import fr.moovie.tv.resources.downloads_empty
 import fr.moovie.tv.resources.downloads_failed
 import fr.moovie.tv.resources.downloads_help
 import fr.moovie.tv.resources.downloads_paused
+import fr.moovie.tv.resources.downloads_play
 import fr.moovie.tv.resources.downloads_pause
 import fr.moovie.tv.resources.downloads_queued
 import fr.moovie.tv.resources.downloads_ready
@@ -47,15 +48,25 @@ private val DIM = Color(0xFF9A9A9A)
 private val PANEL = Color(0xFF1A1A1A)
 
 /**
- * Gestion des téléchargements.
+ * Les téléchargements : ce qu'ils occupent, et de quoi les lire.
  *
- * On y vient pour **faire de la place**, pas pour regarder : lire un titre
- * téléchargé passe par sa fiche, comme n'importe quel autre, puisque la lecture
- * choisit d'elle-même la copie locale. D'où une liste qui montre d'abord ce que
- * chaque titre occupe, et pas ses affiches.
+ * La liste montre d'abord des tailles plutôt que des affiches, parce qu'on y
+ * vient surtout pour faire de la place. Mais elle porte aussi **le seul chemin
+ * de lecture qui ne dépende pas de TMDB** : hors ligne, la fiche d'un titre ne
+ * charge pas, et renvoyer vers elle pour ouvrir un fichier déjà sur le disque
+ * exigerait le réseau pour s'en passer.
  */
 @Composable
-fun DownloadsSection() {
+fun DownloadsSection(
+    /**
+     * Lance la lecture depuis la liste.
+     *
+     * Ce chemin est le seul qui ne dépende pas de TMDB : hors ligne la fiche
+     * d'un titre ne charge pas, donc y renvoyer pour lire un fichier qui est
+     * déjà sur le disque reviendrait à exiger le réseau pour s'en passer.
+     */
+    onPlay: (Download) -> Unit = {},
+) {
     val repo = remember { DownloadRepository() }
     val downloads by repo.downloads.collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
@@ -83,6 +94,7 @@ fun DownloadsSection() {
         downloads.forEach { download ->
             DownloadRow(
                 download = download,
+                onPlay = { onPlay(download) },
                 onPause = { DownloadQueue.pause(download.key) },
                 onResume = { scope.launch { DownloadQueue.resumePending() } },
                 onRemove = { scope.launch { DownloadQueue.remove(download.key) } },
@@ -94,6 +106,7 @@ fun DownloadsSection() {
 @Composable
 private fun DownloadRow(
     download: Download,
+    onPlay: () -> Unit,
     onPause: () -> Unit,
     onResume: () -> Unit,
     onRemove: () -> Unit,
@@ -141,7 +154,10 @@ private fun DownloadRow(
                 DownloadState.PAUSED, DownloadState.FAILED ->
                     MoovieButton(onClick = onResume) { Text(stringResource(Res.string.downloads_resume)) }
 
-                DownloadState.DONE -> Unit
+                DownloadState.DONE ->
+                    MoovieButton(onClick = onPlay, selected = true) {
+                        Text(stringResource(Res.string.downloads_play))
+                    }
             }
             MoovieButton(onClick = onRemove) { Text(stringResource(Res.string.downloads_remove)) }
         }

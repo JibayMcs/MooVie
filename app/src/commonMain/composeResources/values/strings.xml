@@ -392,7 +392,7 @@
     <string name="details_source_download_hint">Appui long sur une source pour la télécharger.</string>
     <!-- Téléchargements -->
     <string name="settings_cat_downloads">Téléchargements</string>
-    <string name="downloads_help">Les titres téléchargés se lisent depuis leur fiche, sans réseau. Ils sont propres à cet appareil et disparaissent si l'application est désinstallée.</string>
+    <string name="downloads_help">Les titres téléchargés se lisent depuis cette liste ou depuis leur fiche, sans réseau. Ils sont propres à cet appareil et disparaissent si l'application est désinstallée.</string>
     <string name="downloads_used">%1$s occupés</string>
     <string name="downloads_empty">Aucun téléchargement. Appui long sur une source, depuis une fiche, pour en lancer un.</string>
     <string name="downloads_ready">Prêt hors ligne · %1$s</string>
@@ -402,4 +402,5 @@
     <string name="downloads_pause">Mettre en pause</string>
     <string name="downloads_resume">Reprendre</string>
     <string name="downloads_remove">Supprimer</string>
+    <string name="downloads_play">Lire</string>
 </resources>
