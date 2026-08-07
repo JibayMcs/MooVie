@@ -100,6 +100,8 @@ import fr.moovie.tv.resources.details_searching_source
 import fr.moovie.tv.resources.details_trying_source
 import fr.moovie.tv.resources.details_seasons
 import fr.moovie.tv.resources.details_sources
+import fr.moovie.tv.resources.details_source_download_hint
+import fr.moovie.tv.resources.details_source_dead
 import fr.moovie.tv.resources.details_source_via
 import fr.moovie.tv.resources.details_catalogue_count
 import fr.moovie.tv.resources.details_source_count
@@ -218,9 +220,13 @@ fun DetailsScreenContent(
     onOpenPanel: () -> Unit,
     onClosePanel: () -> Unit,
     onPickSource: (EmbedLink) -> Unit,
+    /** Appui long sur une source : la mettre en file de téléchargement. */
+    onDownloadSource: (EmbedLink) -> Unit = {},
     /** Qualité vidéo mesurée par URL d'embed (voir DetailsViewModel.qualities). */
     sourceQualities: Map<String, String> = emptyMap(),
     onRequestQuality: (EmbedLink) -> Unit = {},
+    /** Verdict de la sonde par URL d'embed — voir [LinkStatus]. */
+    sourceStatuses: Map<String, LinkStatus> = emptyMap(),
     onDismissQuickPlay: () -> Unit,
     onBack: () -> Unit,
     // Desktop uniquement : bouton retour à l'écran (sur TV, la télécommande a
@@ -693,7 +699,9 @@ fun DetailsScreenContent(
                     resolveError = resolveError,
                     resolvingUrl = resolvingUrl,
                     onPick = onPickSource,
+                    onDownload = onDownloadSource,
                     qualities = sourceQualities,
+                    statuses = sourceStatuses,
                     onRequestQuality = onRequestQuality,
                 )
             }
@@ -762,6 +770,9 @@ private fun SourcesSlideOver(
     resolveError: String?,
     resolvingUrl: String?,
     onPick: (EmbedLink) -> Unit,
+    onDownload: (EmbedLink) -> Unit,
+    /** Verdict de la sonde par URL, rempli au fil de l'eau. */
+    statuses: Map<String, LinkStatus>,
     /** Qualité mesurée par URL d'embed, remplie au fil de l'eau. */
     qualities: Map<String, String>,
     /** Demande la mesure d'un lien ; sans effet si elle est déjà connue. */
@@ -812,6 +823,18 @@ private fun SourcesSlideOver(
             )
         }
         SourcesSummary(state.providers, sourceCount = links.size, modifier = pPad)
+
+        // L'appui long ne se devine pas. La mention ne s'affiche que lorsqu'il y
+        // a quelque chose à télécharger : sur un panneau vide elle décrirait une
+        // action impossible.
+        if (links.isNotEmpty()) {
+            Text(
+                stringResource(Res.string.details_source_download_hint),
+                style = MaterialTheme.typography.labelMedium,
+                color = Color.White.copy(alpha = 0.55f),
+                modifier = pPad,
+            )
+        }
 
         resolveError?.let {
             Text(it, style = MaterialTheme.typography.labelMedium, color = Color(0xFFE06A6A), modifier = pPad)
@@ -866,8 +889,10 @@ private fun SourcesSlideOver(
                             link = link,
                             rank = if ((ranks[id] ?: 1) > 1) rank else null,
                             quality = qualities[link.url],
+                            status = statuses[link.url] ?: LinkStatus.UNKNOWN,
                             resolving = link.url == resolvingUrl,
                             onClick = { onPick(link) },
+                            onLongClick = { onDownload(link) },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .then(
@@ -904,12 +929,27 @@ private fun SourceRow(
     link: EmbedLink,
     rank: Int?,
     quality: String?,
+    /**
+     * Ce que la sonde en a conclu. Une source morte est grisée et le dit, mais
+     * reste choisissable : la sonde a des faux négatifs, et interdire vaudrait
+     * moins bien que prévenir.
+     */
+    status: LinkStatus,
     /** Cette source est celle qu'on est en train d'ouvrir. */
     resolving: Boolean,
     onClick: () -> Unit,
+    /**
+     * Appui long = télécharger. Pas un second bouton : la ligne est déjà pleine,
+     * et sur un portrait un élément de plus la ferait déborder — c'est déjà la
+     * raison pour laquelle le témoin de résolution *remplace* la variante.
+     * L'appui long est par ailleurs l'idiome que l'app enseigne partout
+     * ailleurs : épingler un genre, marquer vu, renommer un profil.
+     */
+    onLongClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    MoovieButton(onClick = onClick, modifier = modifier) {
+    val dead = status == LinkStatus.DEAD
+    MoovieButton(onClick = onClick, onLongClick = onLongClick, modifier = modifier) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 buildString {
@@ -917,18 +957,30 @@ private fun SourceRow(
                     if (rank != null) append(" · $rank")
                 },
                 style = MaterialTheme.typography.titleSmall,
+                // Le titre s'éteint avec la source : c'est ce qui se lit en
+                // premier, donc ce qui doit porter le verdict.
+                color = if (dead) Color.White.copy(alpha = 0.45f) else Color.Unspecified,
             )
             // La qualité prime dès qu'elle est connue : c'est le critère de choix.
             // En attendant, le catalogue plutôt qu'une ligne vide — mieux vaut
             // apprendre d'où vient la source que de regarder un trou.
-            val secondary = quality ?: link.provider?.let {
-                stringResource(Res.string.details_source_via, it)
+            // Le verdict prime sur la qualité : savoir qu'une source ne
+            // répond pas vaut mieux que de savoir en quelle définition elle ne
+            // répond pas.
+            val secondary = if (dead) {
+                stringResource(Res.string.details_source_dead)
+            } else {
+                quality ?: link.provider?.let { stringResource(Res.string.details_source_via, it) }
             }
             secondary?.let {
                 Text(
                     it,
                     style = MaterialTheme.typography.labelSmall,
-                    color = Color.White.copy(alpha = if (quality != null) 0.9f else 0.55f),
+                    color = when {
+                        dead -> Color(0xFFE0A0A0)
+                        quality != null -> Color.White.copy(alpha = 0.9f)
+                        else -> Color.White.copy(alpha = 0.55f)
+                    },
                 )
             }
         }

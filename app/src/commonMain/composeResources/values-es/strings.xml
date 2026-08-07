@@ -387,4 +387,22 @@
     <string name="sync_passphrase">Cifrado (opcional)</string>
     <string name="sync_passphrase_help">Cifra el contenido antes de enviarlo. La misma frase debe introducirse en cada dispositivo. No se puede recuperar: perderla vuelve ilegibles los archivos del servicio, sin afectar a los datos locales.</string>
     <string name="sync_passphrase_hint">Frase de contraseña</string>
+    <string name="details_source_download_hint">Mantener pulsada una fuente para descargarla.</string>
+    <!-- Descargas -->
+    <string name="settings_cat_downloads">Descargas</string>
+    <string name="downloads_help">Los títulos descargados se reproducen desde esta lista o desde su ficha, sin red. Pertenecen a este dispositivo y desaparecen si se desinstala la aplicación.</string>
+    <string name="downloads_used">%1$s ocupados</string>
+    <string name="downloads_empty">Ninguna descarga. Mantener pulsada una fuente, desde una ficha, para iniciar una.</string>
+    <string name="downloads_ready">Listo sin conexión · %1$s</string>
+    <string name="downloads_queued">En espera</string>
+    <string name="downloads_paused">En pausa. Al reanudar continúa donde se detuvo.</string>
+    <string name="downloads_failed">Error</string>
+    <string name="downloads_pause">Pausar</string>
+    <string name="downloads_resume">Reanudar</string>
+    <string name="downloads_remove">Eliminar</string>
+    <string name="downloads_play">Reproducir</string>
+    <string name="player_download">Descargar para sin conexión</string>
+    <string name="player_download_pause">Pausar la descarga</string>
+    <string name="player_download_done">Disponible sin conexión</string>
+    <string name="details_source_dead">No responde</string>
 </resources>

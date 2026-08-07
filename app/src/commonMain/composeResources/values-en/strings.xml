@@ -387,4 +387,22 @@
     <string name="sync_passphrase">Encryption (optional)</string>
     <string name="sync_passphrase_help">Encrypts the contents before upload. The same phrase must be entered on every device. It cannot be recovered: losing it makes the files on the service unreadable, leaving local data untouched.</string>
     <string name="sync_passphrase_hint">Passphrase</string>
+    <string name="details_source_download_hint">Long-press a source to download it.</string>
+    <!-- Downloads -->
+    <string name="settings_cat_downloads">Downloads</string>
+    <string name="downloads_help">Downloaded titles play from this list or from their own page, with no network. They belong to this device and go away if the app is uninstalled.</string>
+    <string name="downloads_used">%1$s used</string>
+    <string name="downloads_empty">Nothing downloaded. Long-press a source, from a title page, to start one.</string>
+    <string name="downloads_ready">Ready offline · %1$s</string>
+    <string name="downloads_queued">Waiting</string>
+    <string name="downloads_paused">Paused. Resuming picks up where it stopped.</string>
+    <string name="downloads_failed">Failed</string>
+    <string name="downloads_pause">Pause</string>
+    <string name="downloads_resume">Resume</string>
+    <string name="downloads_remove">Delete</string>
+    <string name="downloads_play">Play</string>
+    <string name="player_download">Download for offline</string>
+    <string name="player_download_pause">Pause the download</string>
+    <string name="player_download_done">Available offline</string>
+    <string name="details_source_dead">Not responding</string>
 </resources>

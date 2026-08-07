@@ -83,6 +83,10 @@ import fr.moovie.tv.resources.player_mute
 import fr.moovie.tv.resources.player_next_in
 import fr.moovie.tv.resources.player_unmute
 import fr.moovie.tv.resources.player_update_chip
+import fr.moovie.tv.core.sources.model.PlayableStream
+import fr.moovie.tv.core.sources.model.StreamFormat
+import fr.moovie.tv.data.download.Download
+import fr.moovie.tv.data.download.DownloadQueue
 import fr.moovie.tv.ui.player.PLAYER_AUTO_NEXT_SECONDS
 import fr.moovie.tv.ui.player.PLAYER_SEEK_STEP_MS
 import fr.moovie.tv.ui.player.PLAYER_UPDATE_CHIP_MS
@@ -279,6 +283,14 @@ internal fun DesktopPlayerScreen(
     posterUrl: String = "",
     /** Durée annoncée par TMDB, en minutes (0 = inconnue) — voir [PlayerDurationGuard]. */
     expectedMinutes: Int = 0,
+    /**
+     * Le lien d'embed derrière ce flux, pour proposer le téléchargement depuis
+     * le lecteur. Vide = lecture locale ou source inconnue, et le bouton
+     * disparaît.
+     */
+    sourceUrl: String = "",
+    hoster: String = "",
+    language: String = "",
     isFullscreen: Boolean,
     onToggleFullscreen: () -> Unit,
     onBack: () -> Unit,
@@ -905,6 +917,34 @@ internal fun DesktopPlayerScreen(
                     tracks = controller.tracks()
                     dialog = PlayerDialogKind.SETTINGS
                 },
+                onDownload = if (mediaKey.isNotBlank() && sourceUrl.isNotBlank()) {
+                    {
+                        DownloadQueue.enqueue(
+                            Download(
+                                key = mediaKey,
+                                title = title,
+                                subtitle = subtitle,
+                                imageUrl = posterUrl.takeIf { it.isNotBlank() },
+                                createdAt = System.currentTimeMillis(),
+                                sourceUrl = sourceUrl,
+                                hoster = hoster,
+                                language = language,
+                            ),
+                            // Le flux en cours de lecture : déjà résolu, déjà
+                            // vérifié jouable. Le re-résoudre pour télécharger
+                            // ferait perdre du temps et pourrait rendre un autre
+                            // hébergeur.
+                            PlayableStream(
+                                url = streamUrl,
+                                format = StreamFormat.UNKNOWN,
+                                headers = headers,
+                            ),
+                        )
+                    }
+                } else {
+                    null
+                },
+                mediaKey = mediaKey,
                 onReportSegment = if (canReport && (introMissing || creditsMissing)) {
                     {
                         reportViewModel.bind(pid, controller.durationMs())

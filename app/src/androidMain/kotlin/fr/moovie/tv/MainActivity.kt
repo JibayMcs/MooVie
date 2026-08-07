@@ -43,6 +43,8 @@ import fr.moovie.tv.ui.navigation.Screen
 import fr.moovie.tv.ui.navigation.rememberNavStack
 import fr.moovie.tv.ui.onboarding.OnboardingScreen
 import fr.moovie.tv.ui.onboarding.rememberStartScreen
+import fr.moovie.tv.data.download.DownloadQueue
+import fr.moovie.tv.data.download.localStream
 import fr.moovie.tv.data.sync.SyncCoordinator
 import fr.moovie.tv.data.sync.SyncTrigger
 import fr.moovie.tv.ui.profile.ProfileHost
@@ -138,6 +140,12 @@ class MainActivity : ComponentActivity() {
                         // titre à interroger et n'affiche ni segments ni boutons.
                         val testStream = remember { intent?.getStringExtra("test_stream") }
                         val testKey = remember { intent?.getStringExtra("test_key").orEmpty() }
+                        // `test_source` : un lien d'embed factice, pour faire
+                        // apparaître le bouton de téléchargement sans dépendre
+                        // d'un hébergeur réel. Sans lui la chrome le masque, à
+                        // juste titre — un flux sans source n'a rien à
+                        // télécharger.
+                        val testSource = remember { intent?.getStringExtra("test_source").orEmpty() }
                         // Racine résolue avant de bâtir la pile : sans clé TMDB
                         // on démarre sur l'écran d'installation, et l'accueil
                         // vide n'apparaît pas même le temps d'une image.
@@ -148,6 +156,9 @@ class MainActivity : ComponentActivity() {
                                 Screen.Player(
                                     streamUrl = testStream,
                                     mediaKey = testKey,
+                                    sourceUrl = testSource,
+                                    hoster = "test",
+                                    language = "VF",
                                     title = "Flux de test",
                                     subtitle = "S1 · E1 — chrome partagée",
                                 )
@@ -174,6 +185,12 @@ class MainActivity : ComponentActivity() {
                                 if (everPlayed) SyncTrigger.PLAYBACK_ENDED else SyncTrigger.LAUNCH,
                                 System.currentTimeMillis(),
                             )
+                            // Au lancement seulement : un téléchargement coupé
+                            // reste RUNNING dans le magasin, personne n'ayant
+                            // été là pour écrire autre chose. Sans cette
+                            // relance il afficherait une barre qui n'avance
+                            // plus — l'état le plus déroutant possible.
+                            if (!everPlayed) DownloadQueue.resumePending()
                         }
                         var bannerOnPlayer by remember { mutableStateOf(false) }
                         LaunchedEffect(onPlayer) { if (!onPlayer) bannerOnPlayer = false }
@@ -296,6 +313,22 @@ class MainActivity : ComponentActivity() {
                             )
                             Screen.Settings -> SettingsScreen(
                                 onBack = { nav.pop() },
+                                onPlayDownload = { download ->
+                                    // Pas de résolution de sources : le fichier
+                                    // est là, et hors ligne personne n'y
+                                    // répondrait de toute façon.
+                                    localStream(download.key)?.let { local ->
+                                        nav.push(
+                                            Screen.Player(
+                                                streamUrl = local.url,
+                                                mediaKey = download.key,
+                                                title = download.title,
+                                                subtitle = download.subtitle,
+                                                posterUrl = download.imageUrl.orEmpty(),
+                                            ),
+                                        )
+                                    }
+                                },
                             )
                             is Screen.Catalog -> CatalogScreen(
                                 select = s.select,
@@ -335,6 +368,9 @@ class MainActivity : ComponentActivity() {
                                 streamUrl = s.streamUrl,
                                 headers = s.headers,
                                 mediaKey = s.mediaKey,
+                                sourceUrl = s.sourceUrl,
+                                hoster = s.hoster,
+                                language = s.language,
                                 subtitles = s.subtitles,
                                 title = s.title,
                                 subtitle = s.subtitle,

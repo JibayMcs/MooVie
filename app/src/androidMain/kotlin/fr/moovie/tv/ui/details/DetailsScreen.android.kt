@@ -35,6 +35,7 @@ fun DetailsScreen(
     val resolveError by viewModel.resolveError.collectAsStateWithLifecycle()
     val resolvingUrl by viewModel.resolving.collectAsStateWithLifecycle()
     val sourceQualities by viewModel.qualities.collectAsStateWithLifecycle()
+    val sourceStatuses by viewModel.linkStatus.collectAsStateWithLifecycle()
     val streamLang by viewModel.streamLanguage.collectAsStateWithLifecycle()
     val watched by viewModel.watched.collectAsStateWithLifecycle()
     val resume by viewModel.resume.collectAsStateWithLifecycle()
@@ -79,6 +80,9 @@ fun DetailsScreen(
                         nextEpisode = viewModel.playbackNext?.second ?: 0,
                         posterUrl = viewModel.playbackPoster,
                         expectedMinutes = viewModel.playbackMinutes ?: 0,
+                        sourceUrl = viewModel.playingLink?.url.orEmpty(),
+                        hoster = viewModel.playingLink?.hoster.orEmpty(),
+                        language = viewModel.playingLink?.language.orEmpty(),
                     ),
                 )
             }
@@ -118,6 +122,8 @@ fun DetailsScreen(
         onOpenPanel = viewModel::openPanel,
         onClosePanel = viewModel::closePanel,
         onPickSource = viewModel::play,
+        onDownloadSource = viewModel::download,
+        sourceStatuses = sourceStatuses,
         sourceQualities = sourceQualities,
         onRequestQuality = viewModel::requestQuality,
         onDismissQuickPlay = viewModel::dismissQuickPlay,

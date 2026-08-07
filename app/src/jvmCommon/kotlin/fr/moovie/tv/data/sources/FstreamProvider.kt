@@ -196,9 +196,11 @@ class FstreamProvider(private val http: OkHttpClient) : SourceProvider {
      * les liens « netu » : échec réseau, hôte injoignable.
      *
      * Tant qu'on ne sait pas vers quel hébergeur un identifiant nu pointe
-     * réellement, ne rien proposer vaut mieux que proposer faux.
+     * réellement, ne rien proposer vaut mieux que proposer faux. Même règle
+     * pour les hébergeurs qu'on a renoncé à lire, voir [UNSUPPORTED_HOST].
      */
-    private fun usableUrl(raw: String): String? = raw.takeIf { it.startsWith("http") }
+    private fun usableUrl(raw: String): String? =
+        raw.takeIf { it.startsWith("http") && !UNSUPPORTED_HOST.containsMatchIn(it) }
 
     private fun mapLanguage(version: String): String = when (version.lowercase()) {
         // "default" sur French-Stream = version française du site.
@@ -236,6 +238,29 @@ class FstreamProvider(private val http: OkHttpClient) : SourceProvider {
             // "vf", "vostfr", "vo", "default" : redondants avec la langue.
             else -> null
         }
+
+        /**
+         * Hébergeurs qu'on renonce à lire — donc qu'on cesse de proposer.
+         *
+         * Distinction volontaire avec « Ne répond pas » : ce libellé signale une
+         * source qui **pourrait** marcher et qu'on n'a pas réussi à joindre cette
+         * fois-ci. Ces deux-là ne peuvent pas marcher, jamais, faute
+         * d'extracteur — les afficher, c'est promettre une lecture qui n'aura
+         * pas lieu. Même raison que l'abandon des identifiants nus plus haut.
+         *
+         * - **filemoon** ne sert plus de page lecteur mais une coquille SPA :
+         *   il n'y a rien à décoder dans la réponse HTML, il faudrait exécuter
+         *   son JavaScript. Trop cher pour un hébergeur.
+         * - **mixdrop** (redirigé vers `miixdrop`) est extractible en théorie,
+         *   mais mesuré sur 5 titres et 148 liens il n'apparaît **qu'une fois**,
+         *   sur un titre offrant déjà 19 sources jouables dont du VF. Le gain ne
+         *   paye pas la rétro-ingénierie d'une obfuscation maison.
+         *
+         * Écrire l'extracteur un jour = retirer l'entrée d'ici. Constaté servi
+         * par ce seul catalogue ; si un autre s'y met, ce filtre remontera d'un
+         * cran plutôt que d'être recopié.
+         */
+        private val UNSUPPORTED_HOST = Regex("""mi+xdrop|filemoon""", RegexOption.IGNORE_CASE)
 
         private val LOCATION_HREF = Regex("""location\.href=['"]([^'"]+)['"]""")
         private val YEAR_PAREN = Regex("""\((\d{4})\)""")

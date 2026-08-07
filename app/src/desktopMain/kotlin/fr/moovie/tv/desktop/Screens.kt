@@ -25,6 +25,7 @@ import fr.moovie.tv.ui.person.PersonViewModel
 import fr.moovie.tv.ui.navigation.Screen
 import fr.moovie.tv.ui.search.SearchScreenContent
 import fr.moovie.tv.ui.search.SearchViewModel
+import fr.moovie.tv.data.download.Download
 import fr.moovie.tv.ui.settings.SettingsScreenContent
 import fr.moovie.tv.ui.settings.SettingsViewModel
 import fr.moovie.tv.resources.Res
@@ -135,7 +136,10 @@ internal fun DesktopHistoryScreen(
 }
 
 @Composable
-internal fun DesktopSettingsScreen(onBack: () -> Unit) {
+internal fun DesktopSettingsScreen(
+    onBack: () -> Unit,
+    onPlayDownload: (Download) -> Unit = {},
+) {
     val vm = Vm.settings
     val apiKey by vm.tmdbApiKey.collectAsState()
     val introDbKey by vm.introDbApiKey.collectAsState()
@@ -184,6 +188,7 @@ internal fun DesktopSettingsScreen(onBack: () -> Unit) {
         onMoveProviderUp = vm::moveProviderUp,
         onMoveProviderDown = vm::moveProviderDown,
         onBack = onBack,
+        onPlayDownload = onPlayDownload,
         languageSelector = {
             // Desktop : locale système pour l'instant (pas de sélecteur).
             Text("Langue du système", color = Color(0xFF9A9A9A))
@@ -207,6 +212,7 @@ internal fun DesktopDetailsScreen(
     val resolveError by vm.resolveError.collectAsState()
     val resolvingUrl by vm.resolving.collectAsState()
     val sourceQualities by vm.qualities.collectAsState()
+    val sourceStatuses by vm.linkStatus.collectAsState()
     val streamLang by vm.streamLanguage.collectAsState()
     val watched by vm.watched.collectAsState()
     val resume by vm.resume.collectAsState()
@@ -251,6 +257,9 @@ internal fun DesktopDetailsScreen(
                         nextEpisode = vm.playbackNext?.second ?: 0,
                         posterUrl = vm.playbackPoster,
                         expectedMinutes = vm.playbackMinutes ?: 0,
+                        sourceUrl = vm.playingLink?.url.orEmpty(),
+                        hoster = vm.playingLink?.hoster.orEmpty(),
+                        language = vm.playingLink?.language.orEmpty(),
                     ),
                 )
             }
@@ -300,6 +309,8 @@ internal fun DesktopDetailsScreen(
         onOpenPanel = vm::openPanel,
         onClosePanel = vm::closePanel,
         onPickSource = vm::play,
+        onDownloadSource = vm::download,
+        sourceStatuses = sourceStatuses,
         sourceQualities = sourceQualities,
         onRequestQuality = vm::requestQuality,
         onDismissQuickPlay = vm::dismissQuickPlay,

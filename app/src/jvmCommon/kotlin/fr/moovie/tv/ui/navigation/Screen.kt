@@ -76,5 +76,17 @@ sealed interface Screen {
          * sur du HLS — le lecteur, lui, connaît la durée quel que soit le format.
          */
         val expectedMinutes: Int = 0,
+        /**
+         * Le lien d'embed qui a produit ce flux, pour que le lecteur puisse
+         * proposer le téléchargement.
+         *
+         * Le flux lui-même ne suffirait pas : son jeton expire en deux heures,
+         * alors qu'un téléchargement dure plus longtemps et devra être
+         * re-résolu. Vide quand la lecture vient d'un fichier local — il n'y a
+         * alors plus rien à télécharger.
+         */
+        val sourceUrl: String = "",
+        val hoster: String = "",
+        val language: String = "",
     ) : Screen
 }

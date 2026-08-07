@@ -12,6 +12,9 @@ import fr.moovie.tv.core.watch.episodeToResume
 import fr.moovie.tv.core.watch.parseEpisodeKey
 import fr.moovie.tv.core.sources.port.SourceProvider
 import fr.moovie.tv.core.sources.usecase.nextLinkFor
+import fr.moovie.tv.data.download.Download
+import fr.moovie.tv.data.download.DownloadQueue
+import fr.moovie.tv.data.download.localStream
 import fr.moovie.tv.data.sources.ExtractorRegistry
 import fr.moovie.tv.core.sources.model.PlayableStream
 import fr.moovie.tv.data.sources.isStreamPlayable
@@ -86,6 +89,19 @@ class DetailsViewModel : ViewModel() {
     private val _qualities = MutableStateFlow<Map<String, String>>(emptyMap())
     val qualities: StateFlow<Map<String, String>> = _qualities
 
+    /**
+     * Verdict de la sonde, par URL d'embed.
+     *
+     * L'information existait déjà : mesurer la qualité oblige à résoudre le
+     * lien, donc à savoir s'il répond. On la jetait — un échec sortait
+     * silencieusement et la ligne restait indiscernable d'une source valide.
+     * D'où le reproche légitime : le panneau listait des sources qui
+     * n'ouvraient pas, et il fallait en essayer deux ou trois pour tomber sur
+     * la bonne.
+     */
+    private val _linkStatus = MutableStateFlow<Map<String, LinkStatus>>(emptyMap())
+    val linkStatus: StateFlow<Map<String, LinkStatus>> = _linkStatus
+
     /** URLs déjà mesurées ou en cours, pour ne jamais lancer deux fois le même travail. */
     private val qualityRequested = mutableSetOf<String>()
 
@@ -104,13 +120,34 @@ class DetailsViewModel : ViewModel() {
      */
     fun requestQuality(link: EmbedLink) {
         if (!qualityRequested.add(link.url)) return
+        _linkStatus.value = _linkStatus.value + (link.url to LinkStatus.CHECKING)
         viewModelScope.launch {
-            val label = runCatching {
+            val outcome = runCatching {
                 qualitySlots.withPermit {
-                    ExtractorRegistry.resolve(link)?.let { streamQuality(it) }
+                    val stream = ExtractorRegistry.resolve(link)
+                    // Le même verdict que celui de la lecture rapide, et pour
+                    // la même raison : une URL bien formée ne veut pas dire un
+                    // flux servi. Le mesurer ici plutôt qu'après le choix, c'est
+                    // toute la différence entre « voir » et « essayer ».
+                    if (stream == null || !isStreamPlayable(stream, playbackMinutes)) {
+                        null
+                    } else {
+                        stream to streamQuality(stream)
+                    }
                 }
-            }.getOrNull() ?: return@launch
-            _qualities.value = _qualities.value + (link.url to label)
+            }.getOrNull()
+
+            if (outcome == null) {
+                // Une source morte est **signalée, pas masquée**. La sonde a des
+                // faux négatifs connus : la durée ne se mesure que sur HLS, et
+                // certains hôtes refusent un HEAD venu d'un contexte inhabituel.
+                // Cacher rendrait injoignable ce qui aurait peut-être marché ;
+                // griser laisse le choix tout en disant lequel prendre.
+                _linkStatus.value = _linkStatus.value + (link.url to LinkStatus.DEAD)
+                return@launch
+            }
+            _linkStatus.value = _linkStatus.value + (link.url to LinkStatus.OK)
+            outcome.second?.let { _qualities.value = _qualities.value + (link.url to it) }
         }
     }
 
@@ -162,7 +199,16 @@ class DetailsViewModel : ViewModel() {
     private val rejectedLinks = mutableSetOf<String>()
 
     /** Lien à l'origine du flux en cours de lecture, pour pouvoir l'écarter. */
-    private var playingLink: EmbedLink? = null
+    /**
+     * Le lien d'embed derrière la lecture en cours.
+     *
+     * Deux usages, et c'est pour ça qu'il n'y en a qu'un : rendre la main à la
+     * cascade quand le flux casse en route, et dire au lecteur quoi mettre en
+     * file de téléchargement. Null quand la lecture vient du disque — il n'y a
+     * alors ni source à réessayer, ni rien à télécharger.
+     */
+    var playingLink: EmbedLink? = null
+        private set
 
     /** Libellé de la lecture rapide en cours, réutilisé si la cascade reprend. */
     private var quickPlayLabel = ""
@@ -971,6 +1017,17 @@ class DetailsViewModel : ViewModel() {
     /** Résout un lien d'embed en flux jouable via les extracteurs. */
     fun play(link: EmbedLink) {
         _resolveError.value = null
+        // Un titre téléchargé se lit depuis le disque, sans toucher au réseau —
+        // ni pour résoudre, ni pour vérifier que le flux répond. C'est ce qui
+        // fait qu'« hors ligne » veut dire hors ligne, et non « plus rapide ».
+        pendingMeta?.key?.let { key ->
+            localStream(key)?.let { local ->
+                viewModelScope.launch { pendingMeta?.let { watchRepo.register(it) } }
+                playingLink = null
+                _resolved.value = local
+                return
+            }
+        }
         _resolving.value = link.url
         val gen = ++resolveGen
         viewModelScope.launch {
@@ -991,6 +1048,11 @@ class DetailsViewModel : ViewModel() {
                 // La lecture va démarrer : persiste les métadonnées pour le
                 // rail « Reprendre » (la position suivra depuis le lecteur).
                 pendingMeta?.let { watchRepo.register(it) }
+                // Renseigné ici aussi, et pas seulement par la lecture
+                // rapide : sans quoi le bouton de téléchargement manquait sur
+                // le chemin le plus courant, et la reprise après flux cassé ne
+                // savait pas quelle source venait d'échouer.
+                playingLink = link
                 _resolved.value = stream
             } else {
                 _resolveError.value = getString(Res.string.details_resolve_error, link.hoster)
@@ -998,5 +1060,54 @@ class DetailsViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Met une source en file de téléchargement.
+     *
+     * On résout **ici** plutôt que de laisser la file le faire : c'est le seul
+     * moment où l'on sait dire à l'utilisateur que la source est morte, pendant
+     * qu'il la regarde. Une file qui échoue en silence deux minutes plus tard
+     * n'aide personne.
+     *
+     * Le lien d'embed voyage avec le téléchargement : c'est lui qu'on rejouera
+     * quand le jeton du flux aura expiré, pas cette URL-ci.
+     */
+    fun download(link: EmbedLink) {
+        val meta = pendingMeta ?: return
+        _resolveError.value = null
+        _resolving.value = link.url
+        viewModelScope.launch {
+            val stream = runCatching { ExtractorRegistry.resolve(link) }.getOrNull()
+            _resolving.value = null
+            if (stream == null) {
+                _resolveError.value = getString(Res.string.details_resolve_error, link.hoster)
+                return@launch
+            }
+            DownloadQueue.enqueue(
+                Download(
+                    key = meta.key,
+                    title = meta.title,
+                    subtitle = meta.episodeLabel.orEmpty(),
+                    imageUrl = meta.imageUrl,
+                    tmdbId = meta.tmdbId,
+                    isTv = meta.isTv,
+                    createdAt = System.currentTimeMillis(),
+                    sourceUrl = link.url,
+                    hoster = link.hoster,
+                    language = link.language.orEmpty(),
+                ),
+                stream,
+            )
+        }
+    }
+
     fun consumeResolved() { _resolved.value = null }
 }
+
+/**
+ * Ce que la sonde a conclu d'une source, avant qu'on la choisisse.
+ *
+ * [UNKNOWN] n'est pas « douteux » : c'est « pas encore regardé ». Les mesures
+ * partent trois par trois, sur les seules lignes visibles — une source non
+ * sondée ne doit donc rien laisser croire.
+ */
+enum class LinkStatus { UNKNOWN, CHECKING, OK, DEAD }
