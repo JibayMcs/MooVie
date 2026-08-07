@@ -155,6 +155,11 @@ import fr.moovie.tv.resources.update_never
 import fr.moovie.tv.ui.backup.BackupSection
 import fr.moovie.tv.ui.home.HomeLayoutSection
 import fr.moovie.tv.ui.adaptive.LocalUiFlavor
+import fr.moovie.tv.resources.pairing_title
+import fr.moovie.tv.resources.pairing_scan
+import fr.moovie.tv.resources.pairing_action
+import fr.moovie.tv.ui.pairing.PairingDialog
+import fr.moovie.tv.ui.adaptive.UiFlavor
 import fr.moovie.tv.ui.adaptive.useBottomNav
 import fr.moovie.tv.ui.components.MoovieButton
 import fr.moovie.tv.ui.subtitles.SubtitlesSection
@@ -169,6 +174,21 @@ import org.jetbrains.compose.resources.stringResource
 private val NAV_WIDTH = 260.dp
 
 /** Sections de l'écran, dans l'ordre d'affichage du volet gauche. */
+/**
+ * Crochet de dev : `MOOVIE_PAIRING=1` montre l'appairage hors TV.
+ *
+ * Il n'existe que pour le tester. L'émulateur Android est derrière le NAT de
+ * QEMU : l'adresse qu'il met dans le QR n'appartient qu'à son réseau virtuel, et
+ * aucun téléphone du Wi-Fi ne la joindra jamais. Lancer le desktop avec cette
+ * variable met l'application sur la **vraie** adresse du poste, ce qui rend le
+ * QR scannable pour de bon et permet d'éprouver la page au doigt, sur un
+ * téléphone réel, sans dépendre d'un téléviseur.
+ *
+ * Même esprit que `MOOVIE_TEST_STREAM` : hors du chemin normal, et sans effet
+ * tant que la variable n'est pas posée.
+ */
+private val PAIRING_FORCED = System.getenv("MOOVIE_PAIRING") == "1"
+
 private enum class SettingsSection {
     PROFILES, API, HOME, PLAYBACK, INTRO, SUBTITLES, HISTORY, SCREENSAVER, UPDATE, DNS, SOURCES,
     BACKUP, SYNC, DOWNLOADS,
@@ -428,8 +448,27 @@ fun SettingsScreenContent(
                 color = MaterialTheme.colorScheme.primary,
             )
 
+            // Appairage d'un téléphone pour la saisie. L'état vit hors du `when`
+            // pour que sa mémoire ne dépende pas de la branche affichée.
+            var pairing by remember { mutableStateOf(false) }
+            if (pairing) PairingDialog(onDismiss = { pairing = false })
+
             when (section) {
                 SettingsSection.API -> {
+                    // Réservé à la TV : c'est le seul appareil où saisir une clé
+                    // se fait à la télécommande, lettre par lettre. Un téléphone
+                    // et un ordinateur ont déjà un clavier — leur proposer de
+                    // s'appairer à eux-mêmes n'aurait aucun sens.
+                    if (LocalUiFlavor.current == UiFlavor.TV || PAIRING_FORCED) {
+                        SettingRow(
+                            label = stringResource(Res.string.pairing_title),
+                            help = stringResource(Res.string.pairing_scan),
+                        ) {
+                            MoovieButton(onClick = { pairing = true }) {
+                                Text(stringResource(Res.string.pairing_action))
+                            }
+                        }
+                    }
                     SettingRow(
                         label = stringResource(Res.string.settings_tmdb_key),
                         help = stringResource(Res.string.settings_tmdb_help),

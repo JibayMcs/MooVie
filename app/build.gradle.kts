@@ -98,6 +98,11 @@ kotlin {
                 // DNS-over-HTTPS : contourne le blocage DNS des FAI sur les domaines sources
                 implementation("com.squareup.okhttp3:okhttp-dnsoverhttps:4.12.0")
                 implementation("org.jsoup:jsoup:1.18.1")
+                // Encodage QR seulement (Java pur, sans dépendance Android) :
+                // l'appairage du téléphone en affiche un. Le codage QR est du
+                // Reed-Solomon et du masquage — pas quelque chose qu'on écrit
+                // à la main pour économiser un jar.
+                implementation("com.google.zxing:core:3.5.3")
                 // Images multiplateforme (Coil 3), fetcher réseau OkHttp
                 implementation("io.coil-kt.coil3:coil-compose:3.0.4")
                 implementation("io.coil-kt.coil3:coil-network-okhttp:3.0.4")

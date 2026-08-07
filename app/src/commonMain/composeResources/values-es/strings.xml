@@ -405,4 +405,19 @@
     <string name="player_download_pause">Pausar la descarga</string>
     <string name="player_download_done">Disponible sin conexión</string>
     <string name="details_source_dead">No responde</string>
+    <string name="pairing_action">Introducir desde el teléfono</string>
+    <string name="pairing_title">Introducir desde el teléfono</string>
+    <string name="pairing_scan">Escanear este código con un teléfono conectado a la misma red.</string>
+    <string name="pairing_or_url">O abrir esta dirección:</string>
+    <string name="pairing_waiting">Esperando al teléfono…</string>
+    <string name="pairing_opened">Teléfono conectado.</string>
+    <string name="pairing_saved">Ajustes guardados: %1$s</string>
+    <string name="pairing_no_network">No se ha detectado ninguna red local. Comprobar la conexión del televisor.</string>
+    <string name="pairing_no_socket">No se ha podido iniciar el servidor local.</string>
+    <string name="pairing_close">Finalizar</string>
+    <string name="pairing_page_intro">Dejar un campo vacío para no modificarlo.</string>
+    <string name="pairing_page_filled">ya configurado</string>
+    <string name="pairing_page_submit">Guardar</string>
+    <string name="pairing_page_done">Guardado</string>
+    <string name="pairing_page_done_detail">Los ajustes se han aplicado en el televisor. Se puede cerrar esta página.</string>
 </resources>

@@ -405,4 +405,19 @@
     <string name="player_download_pause">Pause the download</string>
     <string name="player_download_done">Available offline</string>
     <string name="details_source_dead">Not responding</string>
+    <string name="pairing_action">Enter from your phone</string>
+    <string name="pairing_title">Enter from your phone</string>
+    <string name="pairing_scan">Scan this code with a phone on the same network.</string>
+    <string name="pairing_or_url">Or open this address:</string>
+    <string name="pairing_waiting">Waiting for the phone…</string>
+    <string name="pairing_opened">Phone connected.</string>
+    <string name="pairing_saved">Settings saved: %1$s</string>
+    <string name="pairing_no_network">No local network found. Check the TV connection.</string>
+    <string name="pairing_no_socket">Could not start the local server.</string>
+    <string name="pairing_close">Done</string>
+    <string name="pairing_page_intro">Leave a field empty to keep its current value.</string>
+    <string name="pairing_page_filled">already set</string>
+    <string name="pairing_page_submit">Save</string>
+    <string name="pairing_page_done">Saved</string>
+    <string name="pairing_page_done_detail">The settings are applied on the TV. You can close this page.</string>
 </resources>
