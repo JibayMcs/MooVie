@@ -41,6 +41,13 @@ L'extraction des sources se fait **on-device** : pas de backend, pas de compte, 
   menus contextuels que la télécommande atteint en maintenant OK. Pas une seconde
   base de code : une seule source Kotlin Multiplatform, TV ou tactile tranché à
   l'exécution.
+- **Profils** - un nom et une couleur chacun, choisi au lancement. Progression,
+  vu/non vu, liste et disposition de l'accueil sont propres à chaque profil ; les clés
+  d'API, le DNS et l'ordre des sources restent ceux de l'installation. Sans mot de
+  passe ni contrôle parental : ce qui est séparé, c'est la progression, pas l'accès -
+  sur une télé partagée, l'ennui quotidien est de trouver l'épisode de quelqu'un
+  d'autre dans *Reprendre la lecture*, pas que les autres voient ce qu'on regarde. Le
+  sélecteur ne se montre pas tant qu'il n'existe qu'un profil.
 - **Accueil, rangé par toi** - les rangées sont une disposition qui t'appartient, pas
   une liste figée. Épingle n'importe quel genre du catalogue (appui long sur TV et
   téléphone, clic droit sur desktop) en choisissant où il atterrit ; déplace, masque
@@ -76,7 +83,8 @@ L'extraction des sources se fait **on-device** : pas de backend, pas de compte, 
   bascule sur la saison suivante en fin de saison.
 - **Écran de veille** - l'affiche rebondit à l'écran quand la lecture reste en pause.
 - **Sauvegarde & restauration** - exporte ta progression, ta liste, ton historique et tes
-  réglages sur une clé USB, et retrouve-les sur un autre appareil. L'import montre le
+  réglages sur une clé USB - tous les profils, pas seulement celui que tu regardes - et
+  retrouve-les sur un autre appareil. L'import montre le
   contenu du fichier avant d'agir (compteurs, date d'export, appareil d'origine) et laisse
   choisir entre **fusionner** - la progression la plus récente gagne, rien n'est perdu - et
   **remplacer**. Un écran de premier lancement propose la restauration plutôt que de
@@ -90,9 +98,6 @@ L'extraction des sources se fait **on-device** : pas de backend, pas de compte, 
 
 ## Feuille de route
 
-- **Profils légers** - progression, liste et vu/non vu séparés par profil
-  (« Salon » / « Enfants »), choisi au lancement. Les sauvegardes les
-  transporteront.
 - **Cast vers une télé (Google Cast)** - à l'étude, pour les utilisateurs mobiles
   qui n'ont pas d'Android TV. Ce n'est pas qu'une affaire de SDK : un Chromecast
   va chercher le flux lui-même, or presque aucune source ne répond sans un

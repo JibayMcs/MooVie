@@ -39,6 +39,13 @@ and ~~iOS~~, built from a single Kotlin Multiplatform codebase. Source extractio
   double-tap and pinch drive playback; a long press opens the context menus the
   remote reaches by holding OK. Not a second codebase - one Kotlin Multiplatform
   source, TV or touch decided at runtime.
+- **Profiles** - a name and a colour each, picked at launch. Progress, watched
+  state, watchlist and the home layout are separate per profile; API keys, DNS
+  and source order stay with the install. No password, no parental control: what
+  they separate is progress, not access - on a shared TV the daily annoyance is
+  finding somebody else's episode under *Continue watching*, not that others can
+  see what you watch. The picker stays out of the way until a second profile
+  exists.
 - **Home, arranged by you** - rows are a layout you own, not a fixed list. Pin any
   catalogue genre (long-press on TV and phone, right-click on desktop) and choose
   where it lands; move, hide or remove any row, built-in ones included, from
@@ -69,7 +76,8 @@ and ~~iOS~~, built from a single Kotlin Multiplatform codebase. Source extractio
   rolling over to the next season.
 - **Screensaver** - the poster bounces around the screen while playback stays paused.
 - **Backup & restore** - export your progress, watchlist, history and settings to a USB
-  stick, and pick them up on another device. The import previews the file before acting
+  stick - every profile, not just the one you are watching - and pick them up on another
+  device. The import previews the file before acting
   (counts, export date, source device) and lets you **merge** - most recent progress wins,
   nothing is lost - or **replace**. A first-launch screen offers the restore instead of
   dropping you on an empty home. On Android, grant *All files access* when the screen
@@ -81,8 +89,6 @@ and ~~iOS~~, built from a single Kotlin Multiplatform codebase. Source extractio
 
 ## Roadmap
 
-- **Light profiles** - separate progress, watchlist and watched state per profile
-  ("Living room" / "Kids"), picked at launch. Backups will carry them.
 - **Cast to a TV (Google Cast)** - under study, for phone users who own no
   Android TV. Not a matter of dropping in the SDK: a Chromecast fetches the
   stream itself, and nearly every source only answers with a `Referer` and a
