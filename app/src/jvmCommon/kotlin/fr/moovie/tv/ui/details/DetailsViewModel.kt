@@ -89,6 +89,19 @@ class DetailsViewModel : ViewModel() {
     private val _qualities = MutableStateFlow<Map<String, String>>(emptyMap())
     val qualities: StateFlow<Map<String, String>> = _qualities
 
+    /**
+     * Verdict de la sonde, par URL d'embed.
+     *
+     * L'information existait déjà : mesurer la qualité oblige à résoudre le
+     * lien, donc à savoir s'il répond. On la jetait — un échec sortait
+     * silencieusement et la ligne restait indiscernable d'une source valide.
+     * D'où le reproche légitime : le panneau listait des sources qui
+     * n'ouvraient pas, et il fallait en essayer deux ou trois pour tomber sur
+     * la bonne.
+     */
+    private val _linkStatus = MutableStateFlow<Map<String, LinkStatus>>(emptyMap())
+    val linkStatus: StateFlow<Map<String, LinkStatus>> = _linkStatus
+
     /** URLs déjà mesurées ou en cours, pour ne jamais lancer deux fois le même travail. */
     private val qualityRequested = mutableSetOf<String>()
 
@@ -107,13 +120,34 @@ class DetailsViewModel : ViewModel() {
      */
     fun requestQuality(link: EmbedLink) {
         if (!qualityRequested.add(link.url)) return
+        _linkStatus.value = _linkStatus.value + (link.url to LinkStatus.CHECKING)
         viewModelScope.launch {
-            val label = runCatching {
+            val outcome = runCatching {
                 qualitySlots.withPermit {
-                    ExtractorRegistry.resolve(link)?.let { streamQuality(it) }
+                    val stream = ExtractorRegistry.resolve(link)
+                    // Le même verdict que celui de la lecture rapide, et pour
+                    // la même raison : une URL bien formée ne veut pas dire un
+                    // flux servi. Le mesurer ici plutôt qu'après le choix, c'est
+                    // toute la différence entre « voir » et « essayer ».
+                    if (stream == null || !isStreamPlayable(stream, playbackMinutes)) {
+                        null
+                    } else {
+                        stream to streamQuality(stream)
+                    }
                 }
-            }.getOrNull() ?: return@launch
-            _qualities.value = _qualities.value + (link.url to label)
+            }.getOrNull()
+
+            if (outcome == null) {
+                // Une source morte est **signalée, pas masquée**. La sonde a des
+                // faux négatifs connus : la durée ne se mesure que sur HLS, et
+                // certains hôtes refusent un HEAD venu d'un contexte inhabituel.
+                // Cacher rendrait injoignable ce qui aurait peut-être marché ;
+                // griser laisse le choix tout en disant lequel prendre.
+                _linkStatus.value = _linkStatus.value + (link.url to LinkStatus.DEAD)
+                return@launch
+            }
+            _linkStatus.value = _linkStatus.value + (link.url to LinkStatus.OK)
+            outcome.second?.let { _qualities.value = _qualities.value + (link.url to it) }
         }
     }
 
@@ -1068,3 +1102,12 @@ class DetailsViewModel : ViewModel() {
 
     fun consumeResolved() { _resolved.value = null }
 }
+
+/**
+ * Ce que la sonde a conclu d'une source, avant qu'on la choisisse.
+ *
+ * [UNKNOWN] n'est pas « douteux » : c'est « pas encore regardé ». Les mesures
+ * partent trois par trois, sur les seules lignes visibles — une source non
+ * sondée ne doit donc rien laisser croire.
+ */
+enum class LinkStatus { UNKNOWN, CHECKING, OK, DEAD }

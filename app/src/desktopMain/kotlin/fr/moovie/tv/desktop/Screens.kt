@@ -212,6 +212,7 @@ internal fun DesktopDetailsScreen(
     val resolveError by vm.resolveError.collectAsState()
     val resolvingUrl by vm.resolving.collectAsState()
     val sourceQualities by vm.qualities.collectAsState()
+    val sourceStatuses by vm.linkStatus.collectAsState()
     val streamLang by vm.streamLanguage.collectAsState()
     val watched by vm.watched.collectAsState()
     val resume by vm.resume.collectAsState()
@@ -309,6 +310,7 @@ internal fun DesktopDetailsScreen(
         onClosePanel = vm::closePanel,
         onPickSource = vm::play,
         onDownloadSource = vm::download,
+        sourceStatuses = sourceStatuses,
         sourceQualities = sourceQualities,
         onRequestQuality = vm::requestQuality,
         onDismissQuickPlay = vm::dismissQuickPlay,

@@ -404,4 +404,5 @@
     <string name="player_download">Download for offline</string>
     <string name="player_download_pause">Pause the download</string>
     <string name="player_download_done">Available offline</string>
+    <string name="details_source_dead">Not responding</string>
 </resources>
