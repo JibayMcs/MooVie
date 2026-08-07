@@ -78,7 +78,7 @@ internal class B2SyncStore(
 
     override suspend fun list(): List<SyncFile> = withSession { s ->
         val body = post(
-            url = "${s.apiUrl}/b2api/v2/b2_list_file_names",
+            url = "${s.apiUrl}/b2api/$API_VERSION/b2_list_file_names",
             token = s.token,
             payload = """{"bucketId":"${s.bucketId}","prefix":"$PREFIX","maxFileCount":1000}""",
         )
@@ -101,7 +101,7 @@ internal class B2SyncStore(
     override suspend fun write(name: String, content: String): Long = withSession { s ->
         val upload = json.decodeFromString<UploadUrl>(
             post(
-                url = "${s.apiUrl}/b2api/v2/b2_get_upload_url",
+                url = "${s.apiUrl}/b2api/$API_VERSION/b2_get_upload_url",
                 token = s.token,
                 payload = """{"bucketId":"${s.bucketId}"}""",
             ),
@@ -141,19 +141,39 @@ internal class B2SyncStore(
     private fun authorize(): B2Session {
         val basic = Base64.getEncoder().encodeToString("$keyId:$applicationKey".toByteArray())
         val request = Request.Builder()
-            .url("https://api.backblazeb2.com/b2api/v2/b2_authorize_account")
+            .url("https://api.backblazeb2.com/b2api/$API_VERSION/b2_authorize_account")
             .header("Authorization", "Basic $basic")
             .build()
         val auth = json.decodeFromString<AuthResponse>(call(request) { it.body?.string().orEmpty() })
-        val bucketId = auth.allowed.bucketId
-        val bucketName = auth.allowed.bucketName
-        if (bucketId == null || bucketName == null) {
-            throw SyncException(
+        val storage = auth.apiInfo.storageApi
+
+        // Une clé de compte ne restreint aucun bucket : la liste est vide. On la
+        // refuse ici plutôt que de laisser l'utilisateur découvrir un 403 à la
+        // première synchro — et refuser oblige à créer une clé qui ne peut
+        // toucher que ce bucket, ce qui vaut mieux pour lui.
+        val bucket = storage.allowed.buckets.firstOrNull()
+            ?: throw SyncException(
                 SyncFailure.CREDENTIALS,
                 "La clé doit être limitée à un bucket : en recréer une en la restreignant.",
             )
+
+        // Les capacités se lisent à l'autorisation : autant le dire maintenant
+        // qu'au premier refus, quand l'utilisateur ne fait plus le lien.
+        val missing = REQUIRED_CAPABILITIES - storage.allowed.capabilities.toSet()
+        if (missing.isNotEmpty()) {
+            throw SyncException(
+                SyncFailure.CREDENTIALS,
+                "Il manque à la clé : ${missing.joinToString(", ")}.",
+            )
         }
-        return B2Session(auth.authorizationToken, auth.apiUrl, auth.downloadUrl, bucketId, bucketName)
+
+        return B2Session(
+            token = auth.authorizationToken,
+            apiUrl = storage.apiUrl,
+            downloadUrl = storage.downloadUrl,
+            bucketId = bucket.id,
+            bucketName = bucket.name,
+        )
     }
 
     private fun post(url: String, token: String, payload: String): String {
@@ -189,6 +209,17 @@ internal class B2SyncStore(
         MessageDigest.getInstance("SHA-1").digest(bytes).joinToString("") { "%02x".format(it) }
 
     private companion object {
+        /**
+         * Version de l'API. La v4 (avril 2025) a **déplacé** `apiUrl`,
+         * `downloadUrl` et `allowed` sous `apiInfo.storageApi`, et regroupé les
+         * buckets autorisés dans un tableau au lieu d'un couple de champs à la
+         * racine. Lire la réponse à plat, comme en v2, ne trouvait rien.
+         */
+        const val API_VERSION = "v4"
+
+        /** Sans ces trois-là, la synchro ne peut ni lister, ni lire, ni publier. */
+        val REQUIRED_CAPABILITIES = setOf("listFiles", "readFiles", "writeFiles")
+
         /** Préfixe commun : le bucket peut servir à autre chose que Moo-vie. */
         const val PREFIX = "moovie-sync-"
         val JSON_MEDIA = "application/json".toMediaType()
@@ -205,13 +236,28 @@ internal class B2SyncStore(
 @Serializable
 private data class AuthResponse(
     val authorizationToken: String,
+    val apiInfo: ApiInfo,
+)
+
+@Serializable
+private data class ApiInfo(val storageApi: StorageApi)
+
+@Serializable
+private data class StorageApi(
     val apiUrl: String,
     val downloadUrl: String,
     val allowed: Allowed,
 )
 
 @Serializable
-private data class Allowed(val bucketId: String? = null, val bucketName: String? = null)
+private data class Allowed(
+    /** Les buckets que la clé peut toucher. Vide = clé de compte, refusée. */
+    val buckets: List<AllowedBucket> = emptyList(),
+    val capabilities: List<String> = emptyList(),
+)
+
+@Serializable
+private data class AllowedBucket(val id: String, val name: String)
 
 @Serializable
 private data class ListResponse(val files: List<B2File> = emptyList())
