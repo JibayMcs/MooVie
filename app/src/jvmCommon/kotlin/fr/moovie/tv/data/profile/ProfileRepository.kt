@@ -4,7 +4,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import fr.moovie.tv.data.store.ActiveProfile
 import fr.moovie.tv.data.store.DEFAULT_PROFILE_ID
-import fr.moovie.tv.data.store.dropProfileStores
+import fr.moovie.tv.data.store.clearProfileStores
 import fr.moovie.tv.data.store.preferencesStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -108,13 +108,13 @@ class ProfileRepository {
      * le monde en croyant n'effacer qu'un profil.
      *
      * On bascule d'abord si c'était l'actif, pour qu'aucun flux ne lise les
-     * fichiers au moment où ils disparaissent.
+     * données au moment où elles sont vidées.
      */
     suspend fun delete(id: String) {
         if (id == DEFAULT_PROFILE_ID) return
         if (activeId.first() == id) setActive(DEFAULT_PROFILE_ID)
         write(profiles.first().filterNot { it.id == id })
-        dropProfileStores(id)
+        clearProfileStores(id)
     }
 
     private suspend fun write(list: List<Profile>) {

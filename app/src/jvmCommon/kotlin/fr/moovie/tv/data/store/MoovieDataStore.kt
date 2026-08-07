@@ -2,6 +2,7 @@ package fr.moovie.tv.data.store
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.Preferences
 import java.io.File
 
@@ -74,21 +75,24 @@ fun preferencesStore(name: String): DataStore<Preferences> = synchronized(stores
 }
 
 /**
- * Efface les données d'un profil supprimé, et oublie ses instances.
+ * Efface les données d'un profil supprimé.
  *
- * L'oubli n'est pas cosmétique : DataStore interdit deux instances vivantes sur
- * un même fichier, donc recréer plus tard un profil qui retomberait sur le même
- * identifiant heurterait l'instance morte. On ne supprime jamais le profil
- * actif — l'appelant bascule d'abord — de sorte qu'aucun flux ne lit le fichier
- * au moment où il disparaît.
+ * **On vide, on ne supprime pas.** Retirer l'instance du cache puis effacer le
+ * fichier semblait plus propre : c'est ce qui faisait planter l'app dès qu'on
+ * recréait un profil au même identifiant — l'instance oubliée du cache restait
+ * bien vivante, et la suivante tombait sur « multiple DataStores active for the
+ * same file ». Le cas se produit à chaque import d'une sauvegarde après une
+ * suppression, c'est-à-dire exactement quand on compte sur ses données.
+ *
+ * Passer par `edit { clear() }` laisse une instance unique par fichier, celle
+ * que DataStore exige. Il reste un fichier vide de quelques octets par profil
+ * supprimé : le prix est dérisoire à côté d'un crash.
  */
-fun dropProfileStores(profileId: String) {
+suspend fun clearProfileStores(profileId: String) {
+    // Le profil d'origine n'a pas de fichiers à lui : ce sont ceux de
+    // l'installation, les vider effacerait l'historique de tout le monde.
     if (profileId == DEFAULT_PROFILE_ID) return
-    synchronized(stores) {
-        PROFILE_SCOPED_STORES.forEach { base ->
-            val name = profileStoreName(base, profileId)
-            stores.remove(name)
-            runCatching { moovieDataStoreFile(name).delete() }
-        }
+    PROFILE_SCOPED_STORES.forEach { base ->
+        preferencesStore(profileStoreName(base, profileId)).edit { it.clear() }
     }
 }
