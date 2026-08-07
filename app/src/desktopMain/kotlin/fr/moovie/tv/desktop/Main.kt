@@ -41,6 +41,8 @@ import fr.moovie.tv.ui.onboarding.OnboardingScreen
 import fr.moovie.tv.ui.onboarding.rememberStartScreen
 import fr.moovie.tv.ui.adaptive.AdaptiveRoot
 import fr.moovie.tv.ui.adaptive.UiFlavor
+import fr.moovie.tv.data.sync.SyncCoordinator
+import fr.moovie.tv.data.sync.SyncTrigger
 import fr.moovie.tv.ui.profile.ProfileHost
 import fr.moovie.tv.ui.theme.MooVieTheme
 import fr.moovie.tv.ui.update.UpdateBanner
@@ -176,6 +178,23 @@ private fun DesktopApp(
         // affiche une pastille discrète, et la bannière n'apparaît qu'une fois
         // celle-ci activée.
         val onPlayer = nav.current is Screen.Player
+
+        // Publie au lancement, et surtout **en sortant du
+        // lecteur** : c'est là que l'état vient de changer.
+        // Sans ce second cas la TV ne publierait qu'à son
+        // prochain démarrage, et le PC lirait au bureau un
+        // fichier d'avant la soirée.
+        var everPlayed by remember { mutableStateOf(false) }
+        LaunchedEffect(onPlayer) {
+            if (onPlayer) {
+                everPlayed = true
+                return@LaunchedEffect
+            }
+            SyncCoordinator.sync(
+                if (everPlayed) SyncTrigger.PLAYBACK_ENDED else SyncTrigger.LAUNCH,
+                System.currentTimeMillis(),
+            )
+        }
         var bannerOnPlayer by remember { mutableStateOf(false) }
         LaunchedEffect(onPlayer) { if (!onPlayer) bannerOnPlayer = false }
 

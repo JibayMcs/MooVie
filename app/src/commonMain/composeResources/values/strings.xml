@@ -384,4 +384,6 @@
         <item quantity="one">Synchronisé avec %1$d autre appareil.</item>
         <item quantity="other">Synchronisé avec %1$d autres appareils.</item>
     </plurals>
+    <string name="sync_last">Dernière synchro : %1$s</string>
+    <string name="sync_background_failed">Dernière synchro automatique en échec : %1$s</string>
 </resources>

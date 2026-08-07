@@ -46,6 +46,21 @@ class SyncSettingsRepository {
     val lastSyncAt: Flow<Long> = store.data.map { it[LAST_SYNC] ?: 0L }
 
     /**
+     * Ce qui a fait échouer la dernière synchro **de fond**, ou null.
+     *
+     * Les synchros de fond sont silencieuses — une panne de réseau n'a rien à
+     * dire. Mais silencieuses ne veut pas dire invisibles : sans cette trace,
+     * une clé fausse laisserait l'app ne rien synchroniser pendant des semaines
+     * sans que personne ne puisse le constater. La forme est
+     * `CATÉGORIE|détail`, décodée par l'écran.
+     */
+    val lastFailure: Flow<String?> = store.data.map { it[LAST_FAILURE] }
+
+    suspend fun recordFailure(failure: SyncFailure, detail: String?) {
+        store.edit { it[LAST_FAILURE] = listOfNotNull(failure.name, detail).joinToString("|") }
+    }
+
+    /**
      * Écart mesuré avec l'horloge du serveur, à ajouter à nos horodatages.
      *
      * Voir [SyncReport.clockOffset] : c'est ce qui rend la dérive d'horloge
@@ -80,6 +95,9 @@ class SyncSettingsRepository {
         store.edit {
             it[LAST_SYNC] = at
             it[CLOCK_OFFSET] = clockOffset
+            // Une réussite efface la panne précédente : laisser une vieille
+            // erreur à l'écran alors que tout remarche est pire que se taire.
+            it.remove(LAST_FAILURE)
         }
     }
 
@@ -96,5 +114,6 @@ class SyncSettingsRepository {
         val DEVICE_ID = stringPreferencesKey("device_id")
         val LAST_SYNC = longPreferencesKey("last_sync_at")
         val CLOCK_OFFSET = longPreferencesKey("clock_offset")
+        val LAST_FAILURE = stringPreferencesKey("last_failure")
     }
 }

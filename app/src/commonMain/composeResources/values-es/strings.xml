@@ -382,4 +382,6 @@
         <item quantity="one">Sincronizado con %1$d dispositivo más.</item>
         <item quantity="other">Sincronizado con %1$d dispositivos más.</item>
     </plurals>
+    <string name="sync_last">Última sincronización: %1$s</string>
+    <string name="sync_background_failed">La última sincronización automática falló: %1$s</string>
 </resources>

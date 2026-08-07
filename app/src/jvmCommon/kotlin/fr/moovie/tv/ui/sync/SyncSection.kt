@@ -28,13 +28,16 @@ import fr.moovie.tv.resources.sync_error_not_configured
 import fr.moovie.tv.resources.sync_error_store
 import fr.moovie.tv.resources.sync_field_b2_app_key
 import fr.moovie.tv.resources.sync_field_b2_key_id
+import fr.moovie.tv.resources.sync_background_failed
 import fr.moovie.tv.resources.sync_help
+import fr.moovie.tv.resources.sync_last
 import fr.moovie.tv.resources.sync_never
 import fr.moovie.tv.resources.sync_none
 import fr.moovie.tv.resources.sync_now
 import fr.moovie.tv.resources.sync_provider
 import fr.moovie.tv.resources.sync_running
 import fr.moovie.tv.ui.components.MoovieButton
+import fr.moovie.tv.ui.format.formatBackupDate
 import fr.moovie.tv.ui.settings.ApiKeyField
 import fr.moovie.tv.ui.theme.MoovieShape
 import org.jetbrains.compose.resources.pluralStringResource
@@ -58,6 +61,7 @@ fun SyncSection(viewModel: SyncViewModel = remember { SyncViewModel() }) {
     val credentials by viewModel.credentials.collectAsState()
     val state by viewModel.state.collectAsState()
     val lastSync by viewModel.lastSyncAt.collectAsState()
+    val backgroundFailure by viewModel.backgroundFailure.collectAsState()
 
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text(stringResource(Res.string.sync_help), style = MaterialTheme.typography.bodySmall, color = DIM)
@@ -101,13 +105,13 @@ fun SyncSection(viewModel: SyncViewModel = remember { SyncViewModel() }) {
                     )
                 }
             }
-            Status(state = state, lastSync = lastSync)
+            Status(state = state, lastSync = lastSync, backgroundFailure = backgroundFailure)
         }
     }
 }
 
 @Composable
-private fun Status(state: SyncState, lastSync: Long) {
+private fun Status(state: SyncState, lastSync: Long, backgroundFailure: String?) {
     val message = when (state) {
         is SyncState.Failed -> stringResource(
             when (state.failure) {
@@ -124,12 +128,24 @@ private fun Status(state: SyncState, lastSync: Long) {
             state.report.devicesSeen,
         )
 
-        // Rien de neuf à dire : on rappelle la fraîcheur, qui est la seule
-        // chose utile quand la synchro dort. « Jamais » compris — c'est ce qui
-        // distingue « pas encore configuré » de « configuré et silencieux ».
-        else -> if (lastSync == 0L) stringResource(Res.string.sync_never) else null
+        // Au repos, la fraîcheur est la seule chose utile — et la seule qui
+        // rende visible une synchro automatique, qui par définition ne se
+        // montre pas. « Jamais » compris : c'est ce qui distingue « pas encore
+        // configuré » de « configuré et silencieux ».
+        else -> if (lastSync == 0L) {
+            stringResource(Res.string.sync_never)
+        } else {
+            stringResource(Res.string.sync_last, formatBackupDate(lastSync))
+        }
     }
-    if (message == null && state !is SyncState.Failed) return
+
+    // Une panne de fond survit à l'ouverture de l'écran : sans elle, une clé
+    // fausse laisserait l'app ne rien synchroniser pendant des semaines sans
+    // que rien ne le laisse voir.
+    val background = backgroundFailure
+        ?.takeIf { state is SyncState.Idle }
+        ?.substringAfter('|', "")
+        ?.takeIf { it.isNotBlank() }
 
     Column(
         modifier = Modifier
@@ -144,6 +160,13 @@ private fun Status(state: SyncState, lastSync: Long) {
         // qu'il faut savoir, et aucune phrase générique ne le remplacerait.
         (state as? SyncState.Failed)?.detail?.let {
             Text(it, style = MaterialTheme.typography.bodySmall, color = DIM)
+        }
+        background?.let {
+            Text(
+                stringResource(Res.string.sync_background_failed, it),
+                style = MaterialTheme.typography.bodySmall,
+                color = DIM,
+            )
         }
     }
 }

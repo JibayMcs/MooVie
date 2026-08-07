@@ -54,6 +54,15 @@ class SyncViewModel : ViewModel() {
     val lastSyncAt: StateFlow<Long> =
         settings.lastSyncAt.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
 
+    /**
+     * Ce qui a fait échouer la dernière synchro **de fond**.
+     *
+     * Séparé de [state], qui ne parle que de la synchro qu'on vient de demander :
+     * une panne de fond n'a pas à disparaître parce qu'on a ouvert l'écran.
+     */
+    val backgroundFailure: StateFlow<String?> =
+        settings.lastFailure.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
     private val _state = MutableStateFlow<SyncState>(SyncState.Idle)
     val state: StateFlow<SyncState> = _state
 

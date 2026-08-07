@@ -382,4 +382,6 @@
         <item quantity="one">Synced with %1$d other device.</item>
         <item quantity="other">Synced with %1$d other devices.</item>
     </plurals>
+    <string name="sync_last">Last sync: %1$s</string>
+    <string name="sync_background_failed">Last automatic sync failed: %1$s</string>
 </resources>
