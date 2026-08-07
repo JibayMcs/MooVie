@@ -41,6 +41,7 @@ import fr.moovie.tv.ui.onboarding.OnboardingScreen
 import fr.moovie.tv.ui.onboarding.rememberStartScreen
 import fr.moovie.tv.ui.adaptive.AdaptiveRoot
 import fr.moovie.tv.ui.adaptive.UiFlavor
+import fr.moovie.tv.data.download.DownloadQueue
 import fr.moovie.tv.data.sync.SyncCoordinator
 import fr.moovie.tv.data.sync.SyncTrigger
 import fr.moovie.tv.ui.profile.ProfileHost
@@ -194,6 +195,12 @@ private fun DesktopApp(
                 if (everPlayed) SyncTrigger.PLAYBACK_ENDED else SyncTrigger.LAUNCH,
                 System.currentTimeMillis(),
             )
+            // Au lancement seulement : un téléchargement coupé
+            // reste RUNNING dans le magasin, personne n'ayant
+            // été là pour écrire autre chose. Sans cette
+            // relance il afficherait une barre qui n'avance
+            // plus — l'état le plus déroutant possible.
+            if (!everPlayed) DownloadQueue.resumePending()
         }
         var bannerOnPlayer by remember { mutableStateOf(false) }
         LaunchedEffect(onPlayer) { if (!onPlayer) bannerOnPlayer = false }

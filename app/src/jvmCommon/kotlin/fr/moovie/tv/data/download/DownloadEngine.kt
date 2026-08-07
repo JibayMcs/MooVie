@@ -1,6 +1,7 @@
 package fr.moovie.tv.data.download
 
 import fr.moovie.tv.core.sources.model.PlayableStream
+import fr.moovie.tv.core.sources.model.StreamFormat
 import java.io.File
 
 /**
@@ -209,4 +210,24 @@ fun playableFile(key: String): File? {
     if (playlist.exists()) return playlist
     val mp4 = File(dir, "video.mp4")
     return mp4.takeIf { it.length() > 0 }
+}
+
+/**
+ * La copie locale sous forme de flux, ou null.
+ *
+ * Rendre un [PlayableStream] plutôt qu'un chemin permet à toute la chaîne de
+ * lecture de rester identique : le lecteur ne sait pas qu'il ouvre un fichier,
+ * et rien de ce qui suit — reprise, sous-titres, épisode suivant — n'a besoin
+ * d'un cas particulier.
+ *
+ * **Aucun en-tête** : c'est ce qui rend la lecture réellement hors ligne. Un
+ * `Referer` sur un `file://` n'aurait aucun sens, et sa présence trahirait que
+ * quelque chose part encore sur le réseau.
+ */
+fun localStream(key: String): PlayableStream? {
+    val file = playableFile(key) ?: return null
+    return PlayableStream(
+        url = file.toURI().toString(),
+        format = if (file.name == PLAYLIST_NAME) StreamFormat.HLS else StreamFormat.MP4,
+    )
 }

@@ -12,6 +12,9 @@ import fr.moovie.tv.core.watch.episodeToResume
 import fr.moovie.tv.core.watch.parseEpisodeKey
 import fr.moovie.tv.core.sources.port.SourceProvider
 import fr.moovie.tv.core.sources.usecase.nextLinkFor
+import fr.moovie.tv.data.download.Download
+import fr.moovie.tv.data.download.DownloadQueue
+import fr.moovie.tv.data.download.localStream
 import fr.moovie.tv.data.sources.ExtractorRegistry
 import fr.moovie.tv.core.sources.model.PlayableStream
 import fr.moovie.tv.data.sources.isStreamPlayable
@@ -971,6 +974,16 @@ class DetailsViewModel : ViewModel() {
     /** Résout un lien d'embed en flux jouable via les extracteurs. */
     fun play(link: EmbedLink) {
         _resolveError.value = null
+        // Un titre téléchargé se lit depuis le disque, sans toucher au réseau —
+        // ni pour résoudre, ni pour vérifier que le flux répond. C'est ce qui
+        // fait qu'« hors ligne » veut dire hors ligne, et non « plus rapide ».
+        pendingMeta?.key?.let { key ->
+            localStream(key)?.let { local ->
+                viewModelScope.launch { pendingMeta?.let { watchRepo.register(it) } }
+                _resolved.value = local
+                return
+            }
+        }
         _resolving.value = link.url
         val gen = ++resolveGen
         viewModelScope.launch {
@@ -995,6 +1008,46 @@ class DetailsViewModel : ViewModel() {
             } else {
                 _resolveError.value = getString(Res.string.details_resolve_error, link.hoster)
             }
+        }
+    }
+
+    /**
+     * Met une source en file de téléchargement.
+     *
+     * On résout **ici** plutôt que de laisser la file le faire : c'est le seul
+     * moment où l'on sait dire à l'utilisateur que la source est morte, pendant
+     * qu'il la regarde. Une file qui échoue en silence deux minutes plus tard
+     * n'aide personne.
+     *
+     * Le lien d'embed voyage avec le téléchargement : c'est lui qu'on rejouera
+     * quand le jeton du flux aura expiré, pas cette URL-ci.
+     */
+    fun download(link: EmbedLink) {
+        val meta = pendingMeta ?: return
+        _resolveError.value = null
+        _resolving.value = link.url
+        viewModelScope.launch {
+            val stream = runCatching { ExtractorRegistry.resolve(link) }.getOrNull()
+            _resolving.value = null
+            if (stream == null) {
+                _resolveError.value = getString(Res.string.details_resolve_error, link.hoster)
+                return@launch
+            }
+            DownloadQueue.enqueue(
+                Download(
+                    key = meta.key,
+                    title = meta.title,
+                    subtitle = meta.episodeLabel.orEmpty(),
+                    imageUrl = meta.imageUrl,
+                    tmdbId = meta.tmdbId,
+                    isTv = meta.isTv,
+                    createdAt = System.currentTimeMillis(),
+                    sourceUrl = link.url,
+                    hoster = link.hoster,
+                    language = link.language.orEmpty(),
+                ),
+                stream,
+            )
         }
     }
 

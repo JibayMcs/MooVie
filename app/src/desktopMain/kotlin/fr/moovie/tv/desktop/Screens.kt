@@ -300,6 +300,7 @@ internal fun DesktopDetailsScreen(
         onOpenPanel = vm::openPanel,
         onClosePanel = vm::closePanel,
         onPickSource = vm::play,
+        onDownloadSource = vm::download,
         sourceQualities = sourceQualities,
         onRequestQuality = vm::requestQuality,
         onDismissQuickPlay = vm::dismissQuickPlay,

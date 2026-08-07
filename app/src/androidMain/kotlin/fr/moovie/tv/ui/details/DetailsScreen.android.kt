@@ -118,6 +118,7 @@ fun DetailsScreen(
         onOpenPanel = viewModel::openPanel,
         onClosePanel = viewModel::closePanel,
         onPickSource = viewModel::play,
+        onDownloadSource = viewModel::download,
         sourceQualities = sourceQualities,
         onRequestQuality = viewModel::requestQuality,
         onDismissQuickPlay = viewModel::dismissQuickPlay,

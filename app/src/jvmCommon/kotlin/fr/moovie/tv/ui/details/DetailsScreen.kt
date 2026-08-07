@@ -100,6 +100,7 @@ import fr.moovie.tv.resources.details_searching_source
 import fr.moovie.tv.resources.details_trying_source
 import fr.moovie.tv.resources.details_seasons
 import fr.moovie.tv.resources.details_sources
+import fr.moovie.tv.resources.details_source_download_hint
 import fr.moovie.tv.resources.details_source_via
 import fr.moovie.tv.resources.details_catalogue_count
 import fr.moovie.tv.resources.details_source_count
@@ -218,6 +219,8 @@ fun DetailsScreenContent(
     onOpenPanel: () -> Unit,
     onClosePanel: () -> Unit,
     onPickSource: (EmbedLink) -> Unit,
+    /** Appui long sur une source : la mettre en file de téléchargement. */
+    onDownloadSource: (EmbedLink) -> Unit = {},
     /** Qualité vidéo mesurée par URL d'embed (voir DetailsViewModel.qualities). */
     sourceQualities: Map<String, String> = emptyMap(),
     onRequestQuality: (EmbedLink) -> Unit = {},
@@ -693,6 +696,7 @@ fun DetailsScreenContent(
                     resolveError = resolveError,
                     resolvingUrl = resolvingUrl,
                     onPick = onPickSource,
+                    onDownload = onDownloadSource,
                     qualities = sourceQualities,
                     onRequestQuality = onRequestQuality,
                 )
@@ -762,6 +766,7 @@ private fun SourcesSlideOver(
     resolveError: String?,
     resolvingUrl: String?,
     onPick: (EmbedLink) -> Unit,
+    onDownload: (EmbedLink) -> Unit,
     /** Qualité mesurée par URL d'embed, remplie au fil de l'eau. */
     qualities: Map<String, String>,
     /** Demande la mesure d'un lien ; sans effet si elle est déjà connue. */
@@ -812,6 +817,18 @@ private fun SourcesSlideOver(
             )
         }
         SourcesSummary(state.providers, sourceCount = links.size, modifier = pPad)
+
+        // L'appui long ne se devine pas. La mention ne s'affiche que lorsqu'il y
+        // a quelque chose à télécharger : sur un panneau vide elle décrirait une
+        // action impossible.
+        if (links.isNotEmpty()) {
+            Text(
+                stringResource(Res.string.details_source_download_hint),
+                style = MaterialTheme.typography.labelMedium,
+                color = Color.White.copy(alpha = 0.55f),
+                modifier = pPad,
+            )
+        }
 
         resolveError?.let {
             Text(it, style = MaterialTheme.typography.labelMedium, color = Color(0xFFE06A6A), modifier = pPad)
@@ -868,6 +885,7 @@ private fun SourcesSlideOver(
                             quality = qualities[link.url],
                             resolving = link.url == resolvingUrl,
                             onClick = { onPick(link) },
+                            onLongClick = { onDownload(link) },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .then(
@@ -907,9 +925,17 @@ private fun SourceRow(
     /** Cette source est celle qu'on est en train d'ouvrir. */
     resolving: Boolean,
     onClick: () -> Unit,
+    /**
+     * Appui long = télécharger. Pas un second bouton : la ligne est déjà pleine,
+     * et sur un portrait un élément de plus la ferait déborder — c'est déjà la
+     * raison pour laquelle le témoin de résolution *remplace* la variante.
+     * L'appui long est par ailleurs l'idiome que l'app enseigne partout
+     * ailleurs : épingler un genre, marquer vu, renommer un profil.
+     */
+    onLongClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    MoovieButton(onClick = onClick, modifier = modifier) {
+    MoovieButton(onClick = onClick, onLongClick = onLongClick, modifier = modifier) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 buildString {
