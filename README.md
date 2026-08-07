@@ -83,6 +83,24 @@ and ~~iOS~~, built from a single Kotlin Multiplatform codebase. Source extractio
   dropping you on an empty home. On Android, grant *All files access* when the screen
   asks: without it the file can only go in the app's own folder, which uninstalling
   erases - so a backup would survive a move to another device, but not a reinstall.
+- **Sync across devices** - progress, watchlist and history follow you to every device,
+  with no account and no server of ours. You supply the storage (Backblaze B2 today: a key
+  to create and paste, like the TMDB one) and each device publishes **its own file** -
+  nobody overwrites anybody. Merging keeps the most recent decision, deletions included:
+  unmarking an episode here does not resurrect it there. The contents can be encrypted
+  with a passphrase only you know; without it the host sees nothing but bytes. A wrong
+  clock is not a problem - the drift against the server is measured and corrected.
+- **Offline downloads** - keep a film or an episode on the device and watch it with no
+  network, on TV, phone and desktop. From the sources panel with a long press, or straight
+  from the player, where the button carries its own progress ring. The playlist and its
+  segments are rewritten to local paths, so playback never calls the host back: a source
+  link expires, what you downloaded does not.
+- **Enter keys from your phone** (Android TV) - typing an API key on a remote, letter by
+  letter on a grid keyboard, is the worst moment in the app. The TV shows a QR code, your
+  phone opens a page served by the app itself over the local network, and you type on a
+  touch keyboard: TMDB and TheIntroDB keys, OpenSubtitles account, sync credentials and
+  passphrase. The server only lives while the code is on screen, its address carries a
+  random token, and the page never shows an existing value back - only that it is set.
 - **Offline-friendly** - TMDB responses and resolved source links are cached on disk.
 - **In-app updates** - periodic check against GitHub Releases; a banner on the home
   screen, a discreet chip during playback.

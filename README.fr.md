@@ -92,6 +92,26 @@ L'extraction des sources se fait **on-device** : pas de backend, pas de compte, 
   fichiers* quand l'écran le demande : sans lui le fichier ne peut aller que dans le
   dossier de l'app, que la désinstallation efface - la sauvegarde passerait alors d'un
   appareil à l'autre, mais pas d'une réinstallation à la suivante.
+- **Synchro entre appareils** - la progression, la liste et l'historique se retrouvent sur
+  chaque appareil, sans compte et sans serveur à nous. Tu fournis l'espace de stockage
+  (Backblaze B2 aujourd'hui : une clé à créer et à coller, comme celle de TMDB) et chaque
+  appareil y publie **son propre fichier** - personne n'écrase celui d'un autre. La fusion
+  garde la décision la plus récente, y compris les suppressions : démarquer un épisode ici
+  ne le fait pas ressusciter là-bas. Le contenu peut être chiffré par une phrase secrète
+  que tu es seul à connaître ; sans elle, l'hébergeur ne voit que des octets. Une horloge
+  mal réglée n'est pas un problème : l'écart avec le serveur est mesuré et corrigé.
+- **Téléchargement hors ligne** - garde un film ou un épisode sur l'appareil et regarde-le
+  sans réseau, sur TV, téléphone et desktop. Depuis le panneau des sources par un appui
+  long, ou directement depuis le lecteur, où le bouton porte l'avancement en anneau. La
+  playlist et ses segments sont réécrits en chemins locaux : la lecture ne rappelle jamais
+  l'hébergeur, et un lien de source expire quand ce que tu as téléchargé reste.
+- **Saisie depuis le téléphone** (Android TV) - taper une clé d'API à la télécommande,
+  lettre par lettre sur un clavier en grille, est le pire moment de l'application. La TV
+  affiche un QR code, ton téléphone ouvre une page servie par l'app elle-même sur le réseau
+  local, et tu tapes au clavier tactile : clés TMDB et TheIntroDB, compte OpenSubtitles,
+  identifiants de synchro et phrase secrète. Le serveur ne vit que pendant que le code est
+  affiché, son adresse porte un jeton tiré au hasard, et la page ne réaffiche jamais une
+  valeur déjà en place - elle indique seulement qu'elle existe.
 - **Cache disque** - réponses TMDB et liens de sources résolus mis en cache.
 - **Mises à jour intégrées** - vérification périodique des releases GitHub : bandeau sur
   l'accueil, pastille discrète pendant la lecture.
