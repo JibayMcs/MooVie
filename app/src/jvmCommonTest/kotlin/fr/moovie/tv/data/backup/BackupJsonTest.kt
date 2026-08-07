@@ -62,7 +62,8 @@ class BackupJsonTest {
      */
     @Test
     fun `un format plus recent est refuse`() {
-        val future = BackupJson.encode(full).replace("\"version\": 1", "\"version\": 99")
+        val future = BackupJson.encode(full)
+            .replace(Regex("\"version\": \\d+"), "\"version\": 99")
 
         assertNull(BackupJson.decode(future))
     }

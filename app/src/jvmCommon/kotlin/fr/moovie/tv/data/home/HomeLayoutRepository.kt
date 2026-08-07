@@ -2,6 +2,7 @@ package fr.moovie.tv.data.home
 
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
+import fr.moovie.tv.data.store.ActiveProfile
 import fr.moovie.tv.data.store.STORE_HOME
 import fr.moovie.tv.data.store.preferencesStore
 import fr.moovie.tv.data.store.profileStoreName
@@ -33,9 +34,12 @@ import kotlinx.serialization.json.Json
  * contenu, pas une préférence, et il entre dans la sauvegarde USB au même titre
  * que la liste et l'historique.
  */
-class HomeLayoutRepository {
+class HomeLayoutRepository(
+    /** Voir [fr.moovie.tv.data.watch.WatchProgressRepository] : l'export lit les autres profils. */
+    profileId: String = ActiveProfile.id,
+) {
 
-    private val store = preferencesStore(profileStoreName(STORE_HOME))
+    private val store = preferencesStore(profileStoreName(STORE_HOME, profileId))
     private val json = Json { ignoreUnknownKeys = true }
 
     /**

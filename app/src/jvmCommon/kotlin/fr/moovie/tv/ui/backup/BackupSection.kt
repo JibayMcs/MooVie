@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import fr.moovie.tv.data.backup.BackupFile
 import fr.moovie.tv.data.backup.BackupSummary
+import fr.moovie.tv.resources.backup_stat_profiles
 import fr.moovie.tv.data.backup.BackupTarget
 import fr.moovie.tv.data.backup.canWriteBackupRoot
 import fr.moovie.tv.data.backup.requestBackupRootAccess
@@ -78,6 +79,7 @@ import fr.moovie.tv.ui.components.MoovieButton
 import fr.moovie.tv.ui.format.formatBackupDate
 import fr.moovie.tv.ui.theme.MoovieShape
 import kotlinx.coroutines.delay
+import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 
 private val DIM = Color(0xFF9A9A9A)
@@ -448,6 +450,11 @@ private fun Summary(title: String, summary: BackupSummary) {
             color = DIM,
         )
         val extras = listOfNotNull(
+            // Seulement quand le fichier en porte : une sauvegarde d'avant les
+            // profils n'a pas à s'annoncer « 0 profil », elle n'en parle pas.
+            summary.profiles.takeIf { it > 0 }?.let {
+                pluralStringResource(Res.plurals.backup_stat_profiles, it, it)
+            },
             stringResource(Res.string.backup_has_key).takeIf { summary.hasApiKey },
             stringResource(Res.string.backup_has_settings).takeIf { summary.hasSettings },
         )

@@ -362,4 +362,8 @@
     <string name="profile_switch">Changer de profil</string>
     <string name="settings_cat_profiles">Profils</string>
     <string name="profile_switch_help">Choisir qui regarde. Chaque profil a sa progression, sa liste et son accueil.</string>
+    <plurals name="backup_stat_profiles">
+        <item quantity="one">%1$d profil</item>
+        <item quantity="other">%1$d profils</item>
+    </plurals>
 </resources>

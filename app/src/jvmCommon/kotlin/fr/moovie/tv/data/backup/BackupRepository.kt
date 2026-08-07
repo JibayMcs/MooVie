@@ -3,6 +3,8 @@ package fr.moovie.tv.data.backup
 import fr.moovie.tv.data.home.HomeLayoutRepository
 import fr.moovie.tv.data.home.mergeHomeLayouts
 import fr.moovie.tv.data.net.DohProvider
+import fr.moovie.tv.data.profile.Profile
+import fr.moovie.tv.data.profile.ProfileRepository
 import fr.moovie.tv.data.settings.ScreensaverDelay
 import fr.moovie.tv.data.settings.SettingsRepository
 import fr.moovie.tv.data.settings.StreamLanguage
@@ -23,6 +25,7 @@ class BackupRepository(
     private val watchRepo: WatchProgressRepository,
     private val settingsRepo: SettingsRepository,
     private val layoutRepo: HomeLayoutRepository = HomeLayoutRepository(),
+    private val profileRepo: ProfileRepository = ProfileRepository(),
 ) {
 
     /**
@@ -37,17 +40,35 @@ class BackupRepository(
         exportedAt = now,
         appVersion = appVersionName,
         platform = platformName,
-        resume = watchRepo.continueWatching.first(),
-        watchlist = watchRepo.watchlist.first(),
-        watched = watchRepo.watched.first().toList(),
-        history = watchRepo.history.first(),
-        audioTracks = watchRepo.audioTracks(),
-        titles = watchRepo.titles(),
-        homeLayout = layoutRepo.layout.first(),
+        // Tous les profils, pas seulement celui qu'on regarde. Sauvegarder
+        // l'appareil et n'en emporter qu'un tiers serait la pire des demi-mesures :
+        // l'utilisateur croit ses données à l'abri, et découvre le manque le jour
+        // où il restaure.
+        profiles = allProfiles(),
         tmdbApiKey = settingsRepo.tmdbApiKey.first().takeIf { includeApiKey && it.isNotBlank() },
         introDbApiKey = settingsRepo.introDbApiKey.first().takeIf { includeApiKey && it.isNotBlank() },
         settings = currentSettings(),
     )
+
+    private suspend fun allProfiles(): List<BackupProfile> =
+        profileRepo.profiles.first().map { profile ->
+            // Dépôts visant explicitement ce profil : basculer dessus pour le
+            // lire aurait fait clignoter l'écran de l'utilisateur à chaque export.
+            val watch = WatchProgressRepository(profile.id)
+            val layout = HomeLayoutRepository(profile.id)
+            BackupProfile(
+                id = profile.id,
+                name = profile.name,
+                colorIndex = profile.colorIndex,
+                resume = watch.continueWatching.first(),
+                watchlist = watch.watchlist.first(),
+                watched = watch.watched.first().toList(),
+                history = watch.history.first(),
+                audioTracks = watch.audioTracks(),
+                titles = watch.titles(),
+                homeLayout = layout.layout.first(),
+            )
+        }
 
     /**
      * Écrit la sauvegarde et rend le chemin obtenu, ou null si le support a
@@ -59,8 +80,76 @@ class BackupRepository(
     /** Relit une sauvegarde depuis un support. Null si illisible ou étrangère. */
     fun read(path: String): MoovieBackup? = readBackup(path)?.let { BackupJson.decode(it) }
 
-    /** Applique une sauvegarde et rend le bilan à afficher. */
+    /**
+     * Applique une sauvegarde et rend le bilan à afficher.
+     *
+     * Deux formats à servir : un fichier d'avant les profils n'en désigne aucun
+     * et part donc dans le profil actif — c'est la seule lecture possible, il ne
+     * dit pas de qui il vient. Un fichier v2 s'applique profil par profil.
+     */
     suspend fun import(backup: MoovieBackup, mode: ImportMode): ImportReport {
+        val report =
+            if (backup.profiles.isEmpty()) importLegacy(backup, mode) else importProfiles(backup, mode)
+        backup.settings?.let { applySettings(it) }
+        backup.tmdbApiKey?.takeIf { it.isNotBlank() }?.let { settingsRepo.setTmdbApiKey(it) }
+        backup.introDbApiKey?.takeIf { it.isNotBlank() }?.let { settingsRepo.setIntroDbApiKey(it) }
+        return report
+    }
+
+    /**
+     * Un profil par entrée du fichier, recréé au besoin **à son identifiant
+     * d'origine** pour qu'un second import retombe dessus au lieu d'en faire un
+     * jumeau.
+     *
+     * Le bilan est la somme des profils : l'écran d'après annonce ce qui a bougé
+     * sur l'appareil, pas un détail par personne que personne n'a demandé.
+     */
+    private suspend fun importProfiles(backup: MoovieBackup, mode: ImportMode): ImportReport {
+        var total = ImportReport(0, 0, 0, 0, 0, 0)
+        for (entry in backup.profiles) {
+            profileRepo.upsert(
+                Profile(id = entry.id, name = entry.name, colorIndex = entry.colorIndex),
+            )
+            val watch = WatchProgressRepository(entry.id)
+            val layout = HomeLayoutRepository(entry.id)
+            val current = WatchState(
+                resume = watch.continueWatching.first(),
+                watchlist = watch.watchlist.first(),
+                watched = watch.watched.first(),
+                history = watch.history.first(),
+                audioTracks = watch.audioTracks(),
+            )
+            val incoming = WatchState(
+                resume = entry.resume,
+                watchlist = entry.watchlist,
+                watched = entry.watched.toSet(),
+                history = entry.history,
+                audioTracks = entry.audioTracks,
+            )
+            val (merged, report) = mergeWatchState(current, incoming, mode)
+            watch.replaceAll(
+                resume = merged.resume,
+                watchlist = merged.watchlist,
+                watched = merged.watched,
+                history = merged.history,
+                audioTracks = merged.audioTracks,
+                titles = entry.titles,
+            )
+            if (entry.homeLayout.isNotEmpty()) {
+                layout.replaceAll(
+                    when (mode) {
+                        ImportMode.REPLACE -> entry.homeLayout
+                        ImportMode.MERGE -> mergeHomeLayouts(layout.layout.first(), entry.homeLayout)
+                    },
+                )
+            }
+            total = total.plus(report)
+        }
+        return total
+    }
+
+    /** Chemin des sauvegardes d'avant les profils : tout va dans le profil actif. */
+    private suspend fun importLegacy(backup: MoovieBackup, mode: ImportMode): ImportReport {
         val current = WatchState(
             resume = watchRepo.continueWatching.first(),
             watchlist = watchRepo.watchlist.first(),
@@ -90,9 +179,6 @@ class BackupRepository(
                 },
             )
         }
-        backup.settings?.let { applySettings(it) }
-        backup.tmdbApiKey?.takeIf { it.isNotBlank() }?.let { settingsRepo.setTmdbApiKey(it) }
-        backup.introDbApiKey?.takeIf { it.isNotBlank() }?.let { settingsRepo.setIntroDbApiKey(it) }
         return report
     }
 

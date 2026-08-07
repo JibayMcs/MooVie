@@ -75,12 +75,57 @@ data class MoovieBackup(
      */
     val introDbApiKey: String? = null,
     val settings: BackupSettings? = null,
+
+    /**
+     * Les profils et, pour chacun, ses données (format 2).
+     *
+     * **Vide = sauvegarde d'avant les profils** : tout ce qui précède part alors
+     * dans le profil actif, exactement comme avant. C'est le seul comportement
+     * qu'on puisse tenir sans inventer une intention — un fichier v1 ne dit pas
+     * de qui il vient.
+     *
+     * Quand elle est remplie, **elle est la seule source** : les champs de
+     * premier niveau restent vides. On avait envisagé d'y recopier le profil
+     * actif pour qu'une version antérieure retrouve quelque chose — inutile :
+     * [BackupJson.decode] refuse tout fichier dont le format dépasse celui qu'il
+     * connaît, donc une 1.15 rejette un v2 en bloc sans jamais regarder dedans.
+     * Dupliquer n'aurait acheté que deux états à garder d'accord.
+     */
+    val profiles: List<BackupProfile> = emptyList(),
 ) {
     companion object {
-        /** À incrémenter dès qu'un champ change de sens, jamais pour un ajout. */
-        const val FORMAT_VERSION = 1
+        /**
+         * À incrémenter dès qu'un champ change de sens, jamais pour un ajout.
+         *
+         * Passé à 2 avec les profils : un fichier v2 rangerait ses données là où
+         * une v1 ne les cherche pas, et lui en laisser lire la moitié serait
+         * pire que de refuser. C'est [BackupJson.decode] qui refuse.
+         */
+        const val FORMAT_VERSION = 2
     }
 }
+
+/**
+ * Un profil et ce qu'il a regardé, tel qu'il voyage dans le fichier.
+ *
+ * L'identifiant est transporté pour qu'un aller-retour entre deux appareils
+ * retombe sur le même profil au lieu d'en créer un jumeau à chaque import.
+ */
+@Serializable
+data class BackupProfile(
+    val id: String,
+    /** Vide pour le profil d'origine, qui porte le libellé traduit. */
+    val name: String = "",
+    val colorIndex: Int = 0,
+
+    val resume: List<ResumeEntry> = emptyList(),
+    val watchlist: List<WatchlistEntry> = emptyList(),
+    val watched: List<String> = emptyList(),
+    val history: List<HistoryEntry> = emptyList(),
+    val audioTracks: Map<String, String> = emptyMap(),
+    val titles: Map<String, TitleMeta> = emptyMap(),
+    val homeLayout: List<HomeLayoutEntry> = emptyList(),
+)
 
 /** Réglages transportés. Nommés, pas sérialisés en vrac, pour rester lisibles. */
 @Serializable
@@ -157,16 +202,24 @@ data class BackupSummary(
     /** Vrai dès qu'**une** clé est du voyage : elles partent ou restent ensemble. */
     val hasApiKey: Boolean,
     val hasSettings: Boolean,
+    /** Nombre de profils portés. 0 = fichier d'avant la v2. */
+    val profiles: Int = 0,
 )
 
+/**
+ * L'aperçu compte ce que le fichier contient **vraiment** : sur un format 2 les
+ * données sont dans les profils, et lire le premier niveau annoncerait « 0 vu »
+ * juste avant un import qui en restaure des centaines.
+ */
 fun MoovieBackup.summary() = BackupSummary(
-    watched = watched.size,
-    resume = resume.size,
-    watchlist = watchlist.size,
-    history = history.size,
+    watched = watched.size + profiles.sumOf { it.watched.size },
+    resume = resume.size + profiles.sumOf { it.resume.size },
+    watchlist = watchlist.size + profiles.sumOf { it.watchlist.size },
+    history = history.size + profiles.sumOf { it.history.size },
     exportedAt = exportedAt,
     appVersion = appVersion,
     platform = platform,
     hasApiKey = !tmdbApiKey.isNullOrBlank() || !introDbApiKey.isNullOrBlank(),
     hasSettings = settings != null,
+    profiles = profiles.size,
 )

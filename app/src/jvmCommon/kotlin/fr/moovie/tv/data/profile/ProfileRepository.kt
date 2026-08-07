@@ -91,6 +91,32 @@ class ProfileRepository {
         return profile
     }
 
+    /**
+     * Ajoute un profil **à son identifiant d'origine**, ou met à jour le nom et
+     * la couleur s'il existe déjà.
+     *
+     * C'est ce dont l'import a besoin, et ce que [create] ne peut pas faire :
+     * il forge un identifiant neuf, si bien que restaurer deux fois la même
+     * sauvegarde fabriquerait deux « Enfants » côte à côte, chacun avec la
+     * moitié de l'historique.
+     */
+    suspend fun upsert(profile: Profile) {
+        if (profile.isDefault) {
+            // Le profil d'origine n'a pas à être créé : il existe partout. Seuls
+            // son nom et sa couleur voyagent.
+            write(profiles.first().map { if (it.isDefault) profile else it })
+            return
+        }
+        val current = profiles.first()
+        write(
+            if (current.any { it.id == profile.id }) {
+                current.map { if (it.id == profile.id) it.copy(name = profile.name, colorIndex = profile.colorIndex) else it }
+            } else {
+                current + profile
+            },
+        )
+    }
+
     /** Renomme. Un nom vide sur le profil d'origine le renvoie à son libellé traduit. */
     suspend fun rename(id: String, name: String) {
         write(profiles.first().map { if (it.id == id) it.copy(name = name.trim()) else it })

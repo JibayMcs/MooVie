@@ -360,4 +360,8 @@
     <string name="profile_switch">Cambiar de perfil</string>
     <string name="settings_cat_profiles">Perfiles</string>
     <string name="profile_switch_help">Elegir quién está viendo. Cada perfil tiene su progreso, su lista y su inicio.</string>
+    <plurals name="backup_stat_profiles">
+        <item quantity="one">%1$d perfil</item>
+        <item quantity="other">%1$d perfiles</item>
+    </plurals>
 </resources>

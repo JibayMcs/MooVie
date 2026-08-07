@@ -4,6 +4,7 @@ import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
+import fr.moovie.tv.data.store.ActiveProfile
 import fr.moovie.tv.data.store.STORE_WATCH
 import fr.moovie.tv.data.store.preferencesStore
 import fr.moovie.tv.data.store.profileStoreName
@@ -25,9 +26,16 @@ private const val AUDIO_PREFIX = "audio:"
  * Un contenu terminé (moins de 10 s restantes) quitte la reprise et passe
  * automatiquement en « vu ».
  */
-class WatchProgressRepository {
+class WatchProgressRepository(
+    /**
+     * Profil servi. Le défaut couvre tous les appels de l'UI ; seul l'export le
+     * précise, pour lire un profil qui n'est pas l'actif sans avoir à basculer
+     * dessus — basculer aurait fait clignoter l'écran de tout le monde.
+     */
+    profileId: String = ActiveProfile.id,
+) {
 
-    private val store = preferencesStore(profileStoreName(STORE_WATCH))
+    private val store = preferencesStore(profileStoreName(STORE_WATCH, profileId))
     private val json = Json { ignoreUnknownKeys = true }
 
     /** Contenus en cours, du plus récent au plus ancien. */

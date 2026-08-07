@@ -360,4 +360,8 @@
     <string name="profile_switch">Switch profile</string>
     <string name="settings_cat_profiles">Profiles</string>
     <string name="profile_switch_help">Choose who is watching. Each profile has its own progress, watchlist and home.</string>
+    <plurals name="backup_stat_profiles">
+        <item quantity="one">%1$d profile</item>
+        <item quantity="other">%1$d profiles</item>
+    </plurals>
 </resources>
