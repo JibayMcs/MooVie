@@ -401,4 +401,7 @@
     <string name="downloads_resume">Reanudar</string>
     <string name="downloads_remove">Eliminar</string>
     <string name="downloads_play">Reproducir</string>
+    <string name="player_download">Descargar para sin conexión</string>
+    <string name="player_download_pause">Pausar la descarga</string>
+    <string name="player_download_done">Disponible sin conexión</string>
 </resources>

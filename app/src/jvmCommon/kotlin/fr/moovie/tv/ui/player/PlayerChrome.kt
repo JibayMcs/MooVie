@@ -147,6 +147,16 @@ fun PlayerControlBar(
      * n'apparaît pas du tout : une cible inerte est une cible de trop au D-pad.
      */
     onReportSegment: (() -> Unit)? = null,
+    /**
+     * Met le titre en cours en file de téléchargement.
+     *
+     * Null quand il n'y a rien à faire : lecture déjà locale, ou source
+     * inconnue. Même règle que [onReportSegment] — l'icône disparaît alors, une
+     * cible inerte étant une cible de trop au D-pad.
+     */
+    onDownload: (() -> Unit)? = null,
+    /** Clé média, pour lire l'avancement du téléchargement sur le bouton. */
+    mediaKey: String = "",
     onActivity: () -> Unit,
     /**
      * Rendu non nul uniquement là où la barre est pilotable au pointeur : active
@@ -230,6 +240,9 @@ fun PlayerControlBar(
                     icon = Icons.Default.MoreTime,
                     contentDescription = stringResource(Res.string.report_segment),
                 )
+            }
+            onDownload?.let { enqueue ->
+                PlayerDownloadButton(mediaKey = mediaKey, onEnqueue = enqueue)
             }
             MoovieIconButton(
                 onClick = onOpenSettings,

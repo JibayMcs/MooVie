@@ -140,6 +140,12 @@ class MainActivity : ComponentActivity() {
                         // titre à interroger et n'affiche ni segments ni boutons.
                         val testStream = remember { intent?.getStringExtra("test_stream") }
                         val testKey = remember { intent?.getStringExtra("test_key").orEmpty() }
+                        // `test_source` : un lien d'embed factice, pour faire
+                        // apparaître le bouton de téléchargement sans dépendre
+                        // d'un hébergeur réel. Sans lui la chrome le masque, à
+                        // juste titre — un flux sans source n'a rien à
+                        // télécharger.
+                        val testSource = remember { intent?.getStringExtra("test_source").orEmpty() }
                         // Racine résolue avant de bâtir la pile : sans clé TMDB
                         // on démarre sur l'écran d'installation, et l'accueil
                         // vide n'apparaît pas même le temps d'une image.
@@ -150,6 +156,9 @@ class MainActivity : ComponentActivity() {
                                 Screen.Player(
                                     streamUrl = testStream,
                                     mediaKey = testKey,
+                                    sourceUrl = testSource,
+                                    hoster = "test",
+                                    language = "VF",
                                     title = "Flux de test",
                                     subtitle = "S1 · E1 — chrome partagée",
                                 )
@@ -359,6 +368,9 @@ class MainActivity : ComponentActivity() {
                                 streamUrl = s.streamUrl,
                                 headers = s.headers,
                                 mediaKey = s.mediaKey,
+                                sourceUrl = s.sourceUrl,
+                                hoster = s.hoster,
+                                language = s.language,
                                 subtitles = s.subtitles,
                                 title = s.title,
                                 subtitle = s.subtitle,

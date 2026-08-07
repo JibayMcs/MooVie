@@ -1,5 +1,9 @@
 package fr.moovie.tv.ui.player
 
+import fr.moovie.tv.data.download.DownloadQueue
+import fr.moovie.tv.data.download.Download
+import fr.moovie.tv.core.sources.model.StreamFormat
+import fr.moovie.tv.core.sources.model.PlayableStream
 import android.net.Uri
 import android.view.ViewGroup
 import androidx.compose.animation.AnimatedVisibility
@@ -145,6 +149,14 @@ fun PlayerScreen(
     posterUrl: String = "",
     /** Durée annoncée par TMDB, en minutes (0 = inconnue) — voir [PlayerDurationGuard]. */
     expectedMinutes: Int = 0,
+    /**
+     * Le lien d'embed derrière ce flux, pour proposer le téléchargement depuis
+     * le lecteur. Vide = lecture locale ou source inconnue, et le bouton
+     * disparaît.
+     */
+    sourceUrl: String = "",
+    hoster: String = "",
+    language: String = "",
     onBack: () -> Unit,
     onNextEpisode: (tmdbId: Int, season: Int, episode: Int) -> Unit = { _, _, _ -> },
     /** Appelé une fois quand l'épisode approche de sa fin (voir PREFETCH_AT). */
@@ -959,6 +971,34 @@ fun PlayerScreen(
                 },
                 onOpenSubtitles = { dialog = PlayerDialogKind.SUBTITLES },
                 onOpenSettings = { dialog = PlayerDialogKind.SETTINGS },
+                onDownload = if (mediaKey.isNotBlank() && sourceUrl.isNotBlank()) {
+                    {
+                        DownloadQueue.enqueue(
+                            Download(
+                                key = mediaKey,
+                                title = title,
+                                subtitle = subtitle,
+                                imageUrl = posterUrl.takeIf { it.isNotBlank() },
+                                createdAt = System.currentTimeMillis(),
+                                sourceUrl = sourceUrl,
+                                hoster = hoster,
+                                language = language,
+                            ),
+                            // Le flux en cours de lecture : déjà résolu, déjà
+                            // vérifié jouable. Le re-résoudre pour télécharger
+                            // ferait perdre du temps et pourrait rendre un autre
+                            // hébergeur.
+                            PlayableStream(
+                                url = streamUrl,
+                                format = StreamFormat.UNKNOWN,
+                                headers = headers,
+                            ),
+                        )
+                    }
+                } else {
+                    null
+                },
+                mediaKey = mediaKey,
                 onReportSegment = if (canReport && (introMissing || creditsMissing)) {
                     {
                         reportViewModel.bind(pid, controller.durationMs())

@@ -980,6 +980,7 @@ class DetailsViewModel : ViewModel() {
         pendingMeta?.key?.let { key ->
             localStream(key)?.let { local ->
                 viewModelScope.launch { pendingMeta?.let { watchRepo.register(it) } }
+                playbackLink = null
                 _resolved.value = local
                 return
             }
@@ -1004,6 +1005,7 @@ class DetailsViewModel : ViewModel() {
                 // La lecture va démarrer : persiste les métadonnées pour le
                 // rail « Reprendre » (la position suivra depuis le lecteur).
                 pendingMeta?.let { watchRepo.register(it) }
+                playbackLink = link
                 _resolved.value = stream
             } else {
                 _resolveError.value = getString(Res.string.details_resolve_error, link.hoster)
@@ -1050,6 +1052,16 @@ class DetailsViewModel : ViewModel() {
             )
         }
     }
+
+    /**
+     * Le lien d'embed derrière la lecture en cours.
+     *
+     * Null quand elle vient du disque : il n'y a alors rien à télécharger, et
+     * c'est ce qui fait disparaître le bouton du lecteur plutôt que de lui
+     * faire retélécharger ce qui est déjà là.
+     */
+    var playbackLink: EmbedLink? = null
+        private set
 
     fun consumeResolved() { _resolved.value = null }
 }

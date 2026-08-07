@@ -403,4 +403,7 @@
     <string name="downloads_resume">Reprendre</string>
     <string name="downloads_remove">Supprimer</string>
     <string name="downloads_play">Lire</string>
+    <string name="player_download">Télécharger pour hors ligne</string>
+    <string name="player_download_pause">Mettre le téléchargement en pause</string>
+    <string name="player_download_done">Disponible hors ligne</string>
 </resources>
