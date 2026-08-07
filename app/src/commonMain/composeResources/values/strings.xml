@@ -366,4 +366,22 @@
         <item quantity="one">%1$d profil</item>
         <item quantity="other">%1$d profils</item>
     </plurals>
+    <!-- Synchro en ligne -->
+    <string name="settings_cat_sync">Synchro</string>
+    <string name="sync_help">Met en commun la progression, la liste et l'historique entre plusieurs appareils, via un espace de stockage personnel. Les réglages et les clés d'API ne voyagent pas.</string>
+    <string name="sync_provider">Service de stockage</string>
+    <string name="sync_none">Désactivée</string>
+    <string name="sync_now">Synchroniser maintenant</string>
+    <string name="sync_running">Synchronisation…</string>
+    <string name="sync_never">Jamais synchronisé sur cet appareil.</string>
+    <string name="sync_field_b2_key_id">Identifiant de clé (keyID)</string>
+    <string name="sync_field_b2_app_key">Clé applicative</string>
+    <string name="sync_error_not_configured">Renseigner les identifiants pour synchroniser.</string>
+    <string name="sync_error_credentials">Identifiants refusés par le service.</string>
+    <string name="sync_error_network">Service injoignable. La synchro reprendra plus tard.</string>
+    <string name="sync_error_store">Le service a répondu de façon inattendue.</string>
+    <plurals name="sync_devices_seen">
+        <item quantity="one">Synchronisé avec %1$d autre appareil.</item>
+        <item quantity="other">Synchronisé avec %1$d autres appareils.</item>
+    </plurals>
 </resources>

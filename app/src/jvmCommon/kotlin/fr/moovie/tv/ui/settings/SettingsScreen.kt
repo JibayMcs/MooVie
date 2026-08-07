@@ -21,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.MenuOpen
 import androidx.compose.material.icons.filled.Bedtime
+import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.ClosedCaption
 import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.History
@@ -93,6 +94,7 @@ import fr.moovie.tv.resources.profile_switch
 import fr.moovie.tv.resources.profile_switch_help
 import fr.moovie.tv.resources.settings_cat_profiles
 import fr.moovie.tv.ui.profile.LocalSwitchProfile
+import fr.moovie.tv.ui.sync.SyncSection
 import fr.moovie.tv.resources.settings_cat_api
 import fr.moovie.tv.resources.settings_cat_backup
 import fr.moovie.tv.resources.settings_cat_dns
@@ -101,6 +103,7 @@ import fr.moovie.tv.resources.settings_cat_intro
 import fr.moovie.tv.resources.settings_cat_playback
 import fr.moovie.tv.resources.settings_cat_screensaver
 import fr.moovie.tv.resources.settings_cat_sources
+import fr.moovie.tv.resources.settings_cat_sync
 import fr.moovie.tv.resources.settings_cat_subtitles
 import fr.moovie.tv.resources.settings_cat_update
 import fr.moovie.tv.resources.settings_disable
@@ -164,7 +167,7 @@ private val NAV_WIDTH = 260.dp
 /** Sections de l'écran, dans l'ordre d'affichage du volet gauche. */
 private enum class SettingsSection {
     PROFILES, API, HOME, PLAYBACK, INTRO, SUBTITLES, HISTORY, SCREENSAVER, UPDATE, DNS, SOURCES,
-    BACKUP,
+    BACKUP, SYNC,
 }
 
 /**
@@ -196,6 +199,7 @@ private fun sectionIcon(section: SettingsSection): ImageVector = when (section) 
     SettingsSection.DNS -> Icons.Default.Dns
     SettingsSection.SOURCES -> Icons.Default.Layers
     SettingsSection.BACKUP -> Icons.Default.Save
+    SettingsSection.SYNC -> Icons.Default.CloudSync
 }
 
 @Composable
@@ -213,6 +217,7 @@ private fun sectionLabel(section: SettingsSection): String = stringResource(
         SettingsSection.SOURCES -> Res.string.settings_cat_sources
         SettingsSection.SUBTITLES -> Res.string.settings_cat_subtitles
         SettingsSection.BACKUP -> Res.string.settings_cat_backup
+        SettingsSection.SYNC -> Res.string.settings_cat_sync
     },
 )
 
@@ -624,6 +629,9 @@ fun SettingsScreenContent(
                 SettingsSection.PROFILES -> ProfilesSection()
 
                 SettingsSection.BACKUP -> BackupSection()
+
+                // Comme la sauvegarde : un parcours qui porte son propre état.
+                SettingsSection.SYNC -> SyncSection()
             }
         }
     }
@@ -827,7 +835,7 @@ private fun updateIntervalLabel(interval: UpdateInterval): String = when {
  * signale — et le masquage, longtemps soupçonné, n'y était pour rien.
  */
 @Composable
-private fun ApiKeyField(value: String, hint: String, onValueChange: (String) -> Unit) {
+internal fun ApiKeyField(value: String, hint: String, onValueChange: (String) -> Unit) {
     val focusManager = LocalFocusManager.current
     // Au D-pad, l'œil se place **avant** le champ. Entrer dans un champ texte
     // ouvre le clavier virtuel d'Android TV, qui capte alors toute la

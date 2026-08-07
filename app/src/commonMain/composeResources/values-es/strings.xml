@@ -364,4 +364,22 @@
         <item quantity="one">%1$d perfil</item>
         <item quantity="other">%1$d perfiles</item>
     </plurals>
+    <!-- Sincronización en línea -->
+    <string name="settings_cat_sync">Sincronización</string>
+    <string name="sync_help">Comparte el progreso, la lista y el historial entre varios dispositivos, a través de un espacio de almacenamiento propio. Los ajustes y las claves de API no viajan.</string>
+    <string name="sync_provider">Servicio de almacenamiento</string>
+    <string name="sync_none">Desactivada</string>
+    <string name="sync_now">Sincronizar ahora</string>
+    <string name="sync_running">Sincronizando…</string>
+    <string name="sync_never">Nunca sincronizado en este dispositivo.</string>
+    <string name="sync_field_b2_key_id">Identificador de clave (keyID)</string>
+    <string name="sync_field_b2_app_key">Clave de aplicación</string>
+    <string name="sync_error_not_configured">Introducir las credenciales para sincronizar.</string>
+    <string name="sync_error_credentials">El servicio rechazó las credenciales.</string>
+    <string name="sync_error_network">Servicio inaccesible. La sincronización se reanudará más tarde.</string>
+    <string name="sync_error_store">El servicio respondió de forma inesperada.</string>
+    <plurals name="sync_devices_seen">
+        <item quantity="one">Sincronizado con %1$d dispositivo más.</item>
+        <item quantity="other">Sincronizado con %1$d dispositivos más.</item>
+    </plurals>
 </resources>

@@ -364,4 +364,22 @@
         <item quantity="one">%1$d profile</item>
         <item quantity="other">%1$d profiles</item>
     </plurals>
+    <!-- Online sync -->
+    <string name="settings_cat_sync">Sync</string>
+    <string name="sync_help">Shares progress, watchlist and history between devices through your own storage space. Settings and API keys stay put.</string>
+    <string name="sync_provider">Storage service</string>
+    <string name="sync_none">Off</string>
+    <string name="sync_now">Sync now</string>
+    <string name="sync_running">Syncing…</string>
+    <string name="sync_never">Never synced on this device.</string>
+    <string name="sync_field_b2_key_id">Key ID</string>
+    <string name="sync_field_b2_app_key">Application key</string>
+    <string name="sync_error_not_configured">Fill in the credentials to sync.</string>
+    <string name="sync_error_credentials">The service refused these credentials.</string>
+    <string name="sync_error_network">Service unreachable. Sync will resume later.</string>
+    <string name="sync_error_store">The service answered unexpectedly.</string>
+    <plurals name="sync_devices_seen">
+        <item quantity="one">Synced with %1$d other device.</item>
+        <item quantity="other">Synced with %1$d other devices.</item>
+    </plurals>
 </resources>
