@@ -384,4 +384,7 @@
     </plurals>
     <string name="sync_last">Last sync: %1$s</string>
     <string name="sync_background_failed">Last automatic sync failed: %1$s</string>
+    <string name="sync_passphrase">Encryption (optional)</string>
+    <string name="sync_passphrase_help">Encrypts the contents before upload. The same phrase must be entered on every device. It cannot be recovered: losing it makes the files on the service unreadable, leaving local data untouched.</string>
+    <string name="sync_passphrase_hint">Passphrase</string>
 </resources>

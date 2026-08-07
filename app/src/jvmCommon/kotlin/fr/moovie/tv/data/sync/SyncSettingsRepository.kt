@@ -101,11 +101,31 @@ class SyncSettingsRepository {
         }
     }
 
-    /** Ouvre le dépôt configuré, ou null si la synchro est éteinte ou incomplète. */
+    /**
+     * Phrase de passe du chiffrement. Vide = les fichiers partent en clair.
+     *
+     * Elle n'est pas un identifiant du fournisseur : elle vaut pour tous, d'où
+     * sa place ici et non dans un descripteur.
+     */
+    val passphrase: Flow<String> = store.data.map { it[PASSPHRASE].orEmpty() }
+
+    suspend fun setPassphrase(value: String) {
+        store.edit { it[PASSPHRASE] = value }
+    }
+
+    /**
+     * Ouvre le dépôt configuré, ou null si la synchro est éteinte ou incomplète.
+     *
+     * Le chiffrement s'ajoute ici, en enveloppant : c'est le seul endroit qui
+     * connaisse à la fois le fournisseur choisi et la phrase de passe, et
+     * l'enveloppe garde le moteur et les adaptateurs à l'écart du sujet.
+     */
     suspend fun openStore(): SyncStore? {
         val active = provider.first()
         if (active == SyncProvider.NONE) return null
-        return SyncProviders.open(active, credentials.first())
+        val store = SyncProviders.open(active, credentials.first()) ?: return null
+        val secret = passphrase.first()
+        return if (secret.isBlank()) store else EncryptedSyncStore(store, secret)
     }
 
     private companion object {
@@ -115,5 +135,6 @@ class SyncSettingsRepository {
         val LAST_SYNC = longPreferencesKey("last_sync_at")
         val CLOCK_OFFSET = longPreferencesKey("clock_offset")
         val LAST_FAILURE = stringPreferencesKey("last_failure")
+        val PASSPHRASE = stringPreferencesKey("passphrase")
     }
 }

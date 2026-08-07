@@ -3,6 +3,7 @@ package fr.moovie.tv.data.sync
 import fr.moovie.tv.data.backup.BackupRepository
 import fr.moovie.tv.data.settings.SettingsRepository
 import fr.moovie.tv.data.watch.WatchProgressRepository
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -64,6 +65,10 @@ object SyncCoordinator {
         // faire la queue pour refaire le même travail.
         lastAttemptAt = now
         return mutex.withLock {
+            // La correction de la synchro précédente vaut dès maintenant : les
+            // horodatages écrits *pendant* cette synchro doivent déjà en tenir
+            // compte, pas seulement ceux d'après.
+            MoovieClock.correctBy(settings.clockOffset.first())
             val store = settings.openStore() ?: return@withLock null
             val engine = SyncEngine(
                 store = store,
@@ -75,6 +80,7 @@ object SyncCoordinator {
             try {
                 engine.sync(now).also {
                     settings.recordSync(at = now, clockOffset = it.clockOffset)
+                    MoovieClock.correctBy(it.clockOffset)
                 }
             } catch (e: SyncException) {
                 settings.recordFailure(e.failure, e.message)

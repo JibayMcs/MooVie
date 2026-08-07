@@ -34,6 +34,9 @@ import fr.moovie.tv.resources.sync_last
 import fr.moovie.tv.resources.sync_never
 import fr.moovie.tv.resources.sync_none
 import fr.moovie.tv.resources.sync_now
+import fr.moovie.tv.resources.sync_passphrase
+import fr.moovie.tv.resources.sync_passphrase_help
+import fr.moovie.tv.resources.sync_passphrase_hint
 import fr.moovie.tv.resources.sync_provider
 import fr.moovie.tv.resources.sync_running
 import fr.moovie.tv.ui.components.MoovieButton
@@ -62,6 +65,7 @@ fun SyncSection(viewModel: SyncViewModel = remember { SyncViewModel() }) {
     val state by viewModel.state.collectAsState()
     val lastSync by viewModel.lastSyncAt.collectAsState()
     val backgroundFailure by viewModel.backgroundFailure.collectAsState()
+    val passphrase by viewModel.passphrase.collectAsState()
 
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text(stringResource(Res.string.sync_help), style = MaterialTheme.typography.bodySmall, color = DIM)
@@ -91,6 +95,22 @@ fun SyncSection(viewModel: SyncViewModel = remember { SyncViewModel() }) {
         }
 
         if (provider != SyncProvider.NONE) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    stringResource(Res.string.sync_passphrase),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Text(
+                    stringResource(Res.string.sync_passphrase_help),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = DIM,
+                )
+                ApiKeyField(
+                    value = passphrase,
+                    hint = stringResource(Res.string.sync_passphrase_hint),
+                    onValueChange = viewModel::setPassphrase,
+                )
+            }
             Row(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {

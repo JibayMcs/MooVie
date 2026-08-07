@@ -384,4 +384,7 @@
     </plurals>
     <string name="sync_last">Última sincronización: %1$s</string>
     <string name="sync_background_failed">La última sincronización automática falló: %1$s</string>
+    <string name="sync_passphrase">Cifrado (opcional)</string>
+    <string name="sync_passphrase_help">Cifra el contenido antes de enviarlo. La misma frase debe introducirse en cada dispositivo. No se puede recuperar: perderla vuelve ilegibles los archivos del servicio, sin afectar a los datos locales.</string>
+    <string name="sync_passphrase_hint">Frase de contraseña</string>
 </resources>

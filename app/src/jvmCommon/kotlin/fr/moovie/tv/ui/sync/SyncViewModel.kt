@@ -63,6 +63,13 @@ class SyncViewModel : ViewModel() {
     val backgroundFailure: StateFlow<String?> =
         settings.lastFailure.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
+    val passphrase: StateFlow<String> =
+        settings.passphrase.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "")
+
+    fun setPassphrase(value: String) {
+        viewModelScope.launch { settings.setPassphrase(value) }
+    }
+
     private val _state = MutableStateFlow<SyncState>(SyncState.Idle)
     val state: StateFlow<SyncState> = _state
 

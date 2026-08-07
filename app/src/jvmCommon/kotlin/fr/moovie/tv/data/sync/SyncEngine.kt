@@ -41,8 +41,20 @@ class BackupSyncSubject(
     override suspend fun snapshot(now: Long): MoovieBackup =
         backup.export(includeApiKey = false, now = now).stripped()
 
-    override suspend fun merge(incoming: MoovieBackup): ImportReport =
-        backup.import(incoming.stripped(), ImportMode.MERGE)
+    override suspend fun merge(incoming: MoovieBackup): ImportReport {
+        // Avant de fusionner : notre horloge prend acte de ce qu'on vient de
+        // lire. Sans ça, une décision prise juste après pourrait porter un
+        // horodatage *inférieur* à celui d'en face — et se faire écraser par ce
+        // qu'elle était censée corriger.
+        incoming.profiles.forEach { profile ->
+            profile.watchedAt.values.forEach(MoovieClock::observe)
+            profile.resumeRemovedAt.values.forEach(MoovieClock::observe)
+            profile.watchlistRemovedAt.values.forEach(MoovieClock::observe)
+            profile.resume.forEach { MoovieClock.observe(it.updatedAt) }
+            profile.watchlist.forEach { MoovieClock.observe(it.addedAt) }
+        }
+        return backup.import(incoming.stripped(), ImportMode.MERGE)
+    }
 
     private fun MoovieBackup.stripped() = copy(
         settings = null,

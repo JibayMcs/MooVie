@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import fr.moovie.tv.data.store.ActiveProfile
+import fr.moovie.tv.data.sync.MoovieClock
 import fr.moovie.tv.data.store.STORE_WATCH
 import fr.moovie.tv.data.store.preferencesStore
 import fr.moovie.tv.data.store.profileStoreName
@@ -210,13 +211,13 @@ class WatchProgressRepository(
         store.edit { prefs ->
             prefs.unbury(LATER_AT_PREFIX, entry.key)
             prefs[stringPreferencesKey(LATER_PREFIX + entry.key)] =
-                json.encodeToString(entry.copy(addedAt = System.currentTimeMillis()))
+                json.encodeToString(entry.copy(addedAt = MoovieClock.now()))
         }
     }
 
     /** Retire un titre de « À regarder plus tard ». */
     suspend fun removeFromWatchlist(key: String) {
-        store.edit { it.buryWatchlist(key, System.currentTimeMillis()) }
+        store.edit { it.buryWatchlist(key, MoovieClock.now()) }
     }
 
     /**
@@ -232,7 +233,7 @@ class WatchProgressRepository(
                 meta.copy(
                     positionMs = existing?.positionMs ?: 0,
                     durationMs = existing?.durationMs ?: 0,
-                    updatedAt = System.currentTimeMillis(),
+                    updatedAt = MoovieClock.now(),
                 ),
             )
         }
@@ -266,7 +267,7 @@ class WatchProgressRepository(
                     queued = true,
                     positionMs = 0,
                     durationMs = 0,
-                    updatedAt = System.currentTimeMillis(),
+                    updatedAt = MoovieClock.now(),
                 ),
             )
         }
@@ -280,7 +281,7 @@ class WatchProgressRepository(
                 durationMs > 0 && positionMs >= durationMs - 10_000 -> {
                     // Avant le remove : c'est l'entrée de reprise qui porte le
                     // titre et l'affiche de la ligne d'historique.
-                    val now = System.currentTimeMillis()
+                    val now = MoovieClock.now()
                     prefs.recordHistory(key, now)
                     prefs.buryResume(key, now)
                     prefs[booleanPreferencesKey(SEEN_PREFIX + key)] = true
@@ -291,7 +292,7 @@ class WatchProgressRepository(
                     existing.copy(
                         positionMs = positionMs,
                         durationMs = durationMs,
-                        updatedAt = System.currentTimeMillis(),
+                        updatedAt = MoovieClock.now(),
                     ),
                 )
             }
@@ -316,13 +317,13 @@ class WatchProgressRepository(
     }
 
     suspend fun remove(key: String) {
-        store.edit { it.buryResume(key, System.currentTimeMillis()) }
+        store.edit { it.buryResume(key, MoovieClock.now()) }
     }
 
     /** Marque vu/non vu. Marquer vu retire aussi le contenu de la reprise. */
     suspend fun setWatched(key: String, watched: Boolean) {
         store.edit { prefs ->
-            val now = System.currentTimeMillis()
+            val now = MoovieClock.now()
             prefs[longPreferencesKey(SEEN_AT_PREFIX + key)] = now
             if (watched) {
                 prefs[booleanPreferencesKey(SEEN_PREFIX + key)] = true
@@ -338,7 +339,7 @@ class WatchProgressRepository(
     /** Marque vu/non vu en lot (une saison entière, par exemple). */
     suspend fun setAllWatched(keys: List<String>, watched: Boolean) {
         store.edit { prefs ->
-            val now = System.currentTimeMillis()
+            val now = MoovieClock.now()
             keys.forEach { key ->
                 prefs[longPreferencesKey(SEEN_AT_PREFIX + key)] = now
                 if (watched) {

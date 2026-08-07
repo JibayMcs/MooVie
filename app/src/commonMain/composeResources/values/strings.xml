@@ -386,4 +386,7 @@
     </plurals>
     <string name="sync_last">Dernière synchro : %1$s</string>
     <string name="sync_background_failed">Dernière synchro automatique en échec : %1$s</string>
+    <string name="sync_passphrase">Chiffrement (facultatif)</string>
+    <string name="sync_passphrase_help">Chiffre le contenu avant l'envoi. La même phrase doit être saisie sur chaque appareil. Elle ne peut pas être récupérée : la perdre rend les fichiers du service illisibles, sans toucher aux données locales.</string>
+    <string name="sync_passphrase_hint">Phrase de passe</string>
 </resources>
