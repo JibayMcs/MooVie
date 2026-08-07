@@ -43,6 +43,7 @@ import fr.moovie.tv.ui.navigation.Screen
 import fr.moovie.tv.ui.navigation.rememberNavStack
 import fr.moovie.tv.ui.onboarding.OnboardingScreen
 import fr.moovie.tv.ui.onboarding.rememberStartScreen
+import fr.moovie.tv.ui.profile.ProfileHost
 import fr.moovie.tv.ui.details.DetailsScreen
 import fr.moovie.tv.ui.history.HistoryScreen
 import fr.moovie.tv.ui.home.HomeScreen
@@ -116,6 +117,9 @@ class MainActivity : ComponentActivity() {
                 // héritent d'une couleur sombre sans Surface parent → invisibles).
                 CompositionLocalProvider(LocalContentColor provides Color.White) {
                     AdaptiveRoot(flavor = uiFlavor, modifier = Modifier.fillMaxSize()) {
+                    // Le profil est tranché avant que la pile n'existe : les
+                    // dépôts lisent le profil actif à leur construction.
+                    ProfileHost { _ ->
                     Column(modifier = Modifier.fillMaxSize().background(Color(0xFF0A0A0A))) {
                         val updateViewModel: UpdateViewModel = viewModel()
                         // Même instance que celle de DetailsScreen (scope
@@ -365,6 +369,7 @@ class MainActivity : ComponentActivity() {
                     }
                     if (!splashDone && splashEnabled == true) {
                         MoovieSplash(onFinished = { splashDone = true })
+                    }
                     }
                     }
                 }

@@ -345,4 +345,19 @@
     <string name="report_problem_generic">Esta lectura no se puede enviar.</string>
     <string name="report_mark_now">Marcar ahora</string>
     <string name="report_seek_hint">Izquierda / derecha: 15 s · Arriba / abajo: 1 s</string>
+
+    <!-- Perfiles -->
+    <string name="profile_choose">¿Quién está viendo?</string>
+    <string name="profile_default">Principal</string>
+    <string name="profile_add">Nuevo perfil</string>
+    <string name="profile_manage">Gestionar</string>
+    <string name="profile_done">Hecho</string>
+    <string name="profile_rename">Mantener pulsado para renombrar</string>
+    <string name="profile_delete">Eliminar</string>
+    <string name="profile_delete_confirm">¿Eliminar «%1$s»? Se perderán su progreso, su lista y su historial.</string>
+    <string name="profile_name_hint">Nombre del perfil</string>
+    <string name="profile_create">Confirmar</string>
+    <string name="profile_switch">Cambiar de perfil</string>
+    <string name="settings_cat_profiles">Perfiles</string>
+    <string name="profile_switch_help">Elegir quién está viendo. Cada perfil tiene su progreso, su lista y su inicio.</string>
 </resources>

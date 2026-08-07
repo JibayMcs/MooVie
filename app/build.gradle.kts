@@ -107,6 +107,11 @@ kotlin {
                 // ViewModels multiplateformes (androidx.lifecycle réel côté Android,
                 // port JetBrains côté desktop)
                 implementation("org.jetbrains.androidx.lifecycle:lifecycle-viewmodel:2.8.4")
+                // LocalViewModelStoreOwner, que ProfileHost redéfinit pour donner
+                // à chaque profil son propre magasin de ViewModels — sans quoi
+                // `viewModel()` rend l'instance construite sous le profil
+                // précédent. Le port JetBrains, pour rester en jvmCommon.
+                implementation("org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-compose:2.8.4")
             }
         }
 

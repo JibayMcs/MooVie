@@ -41,6 +41,7 @@ import fr.moovie.tv.ui.onboarding.OnboardingScreen
 import fr.moovie.tv.ui.onboarding.rememberStartScreen
 import fr.moovie.tv.ui.adaptive.AdaptiveRoot
 import fr.moovie.tv.ui.adaptive.UiFlavor
+import fr.moovie.tv.ui.profile.ProfileHost
 import fr.moovie.tv.ui.theme.MooVieTheme
 import fr.moovie.tv.ui.update.UpdateBanner
 import fr.moovie.tv.ui.update.UpdateState
@@ -132,6 +133,12 @@ fun main() {
                 // les classes de taille sont donc recalculées à chaque
                 // redimensionnement, pas seulement à la rotation.
                 AdaptiveRoot(flavor = UiFlavor.POINTER, modifier = Modifier.fillMaxSize()) {
+                ProfileHost { profileId ->
+                // La pile naît hors de l'enveloppe — elle est capturée par la
+                // fenêtre, dont le clavier s'en sert. On la ramène donc à sa
+                // racine à la main : changer de profil et retomber sur la fiche
+                // d'épisode du précédent serait le contraire de ce qu'on demande.
+                LaunchedEffect(profileId) { nav.popToRoot() }
                 Box(modifier = Modifier.fillMaxSize()) {
                     if (start != null) {
                     DesktopApp(
@@ -147,6 +154,7 @@ fun main() {
                     if (!splashDone && splashEnabled == true) {
                         DesktopSplash(onFinished = { splashDone = true })
                     }
+                }
                 }
                 }
             }

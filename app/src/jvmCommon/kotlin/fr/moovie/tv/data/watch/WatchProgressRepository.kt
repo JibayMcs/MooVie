@@ -4,7 +4,9 @@ import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
+import fr.moovie.tv.data.store.STORE_WATCH
 import fr.moovie.tv.data.store.preferencesStore
+import fr.moovie.tv.data.store.profileStoreName
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -25,7 +27,7 @@ private const val AUDIO_PREFIX = "audio:"
  */
 class WatchProgressRepository {
 
-    private val store = preferencesStore("moovie_watch")
+    private val store = preferencesStore(profileStoreName(STORE_WATCH))
     private val json = Json { ignoreUnknownKeys = true }
 
     /** Contenus en cours, du plus récent au plus ancien. */

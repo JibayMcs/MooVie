@@ -347,4 +347,19 @@
     <string name="report_problem_generic">Ce relevé ne peut pas être envoyé.</string>
     <string name="report_mark_now">Marquer maintenant</string>
     <string name="report_seek_hint">Gauche / droite : 15 s · Haut / bas : 1 s</string>
+
+    <!-- Profils -->
+    <string name="profile_choose">Qui regarde ?</string>
+    <string name="profile_default">Principal</string>
+    <string name="profile_add">Nouveau profil</string>
+    <string name="profile_manage">Gérer</string>
+    <string name="profile_done">Terminé</string>
+    <string name="profile_rename">Appui long pour renommer</string>
+    <string name="profile_delete">Supprimer</string>
+    <string name="profile_delete_confirm">Supprimer « %1$s » ? Sa progression, sa liste et son historique seront perdus.</string>
+    <string name="profile_name_hint">Nom du profil</string>
+    <string name="profile_create">Valider</string>
+    <string name="profile_switch">Changer de profil</string>
+    <string name="settings_cat_profiles">Profils</string>
+    <string name="profile_switch_help">Choisir qui regarde. Chaque profil a sa progression, sa liste et son accueil.</string>
 </resources>

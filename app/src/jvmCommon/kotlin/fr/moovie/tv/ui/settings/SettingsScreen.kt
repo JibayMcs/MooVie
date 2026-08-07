@@ -41,6 +41,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -84,6 +85,14 @@ import fr.moovie.tv.resources.settings_autoplay
 import fr.moovie.tv.resources.settings_key_hide
 import fr.moovie.tv.resources.settings_key_show
 import fr.moovie.tv.resources.settings_autoplay_help
+import androidx.compose.material.icons.filled.Person
+import fr.moovie.tv.data.profile.Profile
+import fr.moovie.tv.data.profile.ProfileRepository
+import fr.moovie.tv.resources.profile_default
+import fr.moovie.tv.resources.profile_switch
+import fr.moovie.tv.resources.profile_switch_help
+import fr.moovie.tv.resources.settings_cat_profiles
+import fr.moovie.tv.ui.profile.LocalSwitchProfile
 import fr.moovie.tv.resources.settings_cat_api
 import fr.moovie.tv.resources.settings_cat_backup
 import fr.moovie.tv.resources.settings_cat_dns
@@ -154,7 +163,8 @@ private val NAV_WIDTH = 260.dp
 
 /** Sections de l'écran, dans l'ordre d'affichage du volet gauche. */
 private enum class SettingsSection {
-    API, HOME, PLAYBACK, INTRO, SUBTITLES, HISTORY, SCREENSAVER, UPDATE, DNS, SOURCES, BACKUP,
+    PROFILES, API, HOME, PLAYBACK, INTRO, SUBTITLES, HISTORY, SCREENSAVER, UPDATE, DNS, SOURCES,
+    BACKUP,
 }
 
 /**
@@ -174,6 +184,7 @@ private val RAIL_WIDTH = 68.dp
  * reste à un appui, en dépliant.
  */
 private fun sectionIcon(section: SettingsSection): ImageVector = when (section) {
+    SettingsSection.PROFILES -> Icons.Default.Person
     SettingsSection.API -> Icons.Default.Key
     SettingsSection.HOME -> Icons.Default.ViewList
     SettingsSection.PLAYBACK -> Icons.Default.PlayArrow
@@ -190,6 +201,7 @@ private fun sectionIcon(section: SettingsSection): ImageVector = when (section) 
 @Composable
 private fun sectionLabel(section: SettingsSection): String = stringResource(
     when (section) {
+        SettingsSection.PROFILES -> Res.string.settings_cat_profiles
         SettingsSection.API -> Res.string.settings_cat_api
         SettingsSection.HOME -> Res.string.settings_cat_home
         SettingsSection.PLAYBACK -> Res.string.settings_cat_playback
@@ -609,9 +621,32 @@ fun SettingsScreenContent(
                 // pas un réglage hissé jusqu'ici. Voir [HomeLayoutSection].
                 SettingsSection.HOME -> HomeLayoutSection()
 
+                SettingsSection.PROFILES -> ProfilesSection()
+
                 SettingsSection.BACKUP -> BackupSection()
             }
         }
+    }
+}
+
+/**
+ * Section « Profils ».
+ *
+ * Volontairement maigre : tout se fait sur la porte d'entrée, qui est déjà
+ * l'écran de gestion. Cette section n'existe que pour **l'atteindre**, sans quoi
+ * une installation à profil unique n'aurait aucun moyen d'en créer un second —
+ * la porte ne s'ouvre pas quand il n'y a rien à choisir.
+ */
+@Composable
+private fun ProfilesSection() {
+    val repo = remember { ProfileRepository() }
+    val active by repo.active.collectAsState(initial = Profile.Default)
+    val switch = LocalSwitchProfile.current
+    SettingRow(
+        label = active.name.ifBlank { stringResource(Res.string.profile_default) },
+        help = stringResource(Res.string.profile_switch_help),
+    ) {
+        MoovieButton(onClick = switch) { Text(stringResource(Res.string.profile_switch)) }
     }
 }
 

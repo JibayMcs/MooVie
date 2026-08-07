@@ -345,4 +345,19 @@
     <string name="report_problem_generic">This reading cannot be sent.</string>
     <string name="report_mark_now">Mark now</string>
     <string name="report_seek_hint">Left / right: 15 s · Up / down: 1 s</string>
+
+    <!-- Profiles -->
+    <string name="profile_choose">Who’s watching?</string>
+    <string name="profile_default">Main</string>
+    <string name="profile_add">New profile</string>
+    <string name="profile_manage">Manage</string>
+    <string name="profile_done">Done</string>
+    <string name="profile_rename">Long-press to rename</string>
+    <string name="profile_delete">Delete</string>
+    <string name="profile_delete_confirm">Delete “%1$s”? Its progress, watchlist and history will be lost.</string>
+    <string name="profile_name_hint">Profile name</string>
+    <string name="profile_create">Confirm</string>
+    <string name="profile_switch">Switch profile</string>
+    <string name="settings_cat_profiles">Profiles</string>
+    <string name="profile_switch_help">Choose who is watching. Each profile has its own progress, watchlist and home.</string>
 </resources>

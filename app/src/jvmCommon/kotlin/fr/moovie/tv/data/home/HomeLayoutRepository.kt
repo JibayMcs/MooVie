@@ -2,7 +2,9 @@ package fr.moovie.tv.data.home
 
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
+import fr.moovie.tv.data.store.STORE_HOME
 import fr.moovie.tv.data.store.preferencesStore
+import fr.moovie.tv.data.store.profileStoreName
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -33,7 +35,7 @@ import kotlinx.serialization.json.Json
  */
 class HomeLayoutRepository {
 
-    private val store = preferencesStore("moovie_home")
+    private val store = preferencesStore(profileStoreName(STORE_HOME))
     private val json = Json { ignoreUnknownKeys = true }
 
     /**
