@@ -407,4 +407,19 @@
     <string name="player_download_pause">Mettre le téléchargement en pause</string>
     <string name="player_download_done">Disponible hors ligne</string>
     <string name="details_source_dead">Ne répond pas</string>
+    <string name="pairing_action">Saisir depuis le téléphone</string>
+    <string name="pairing_title">Saisie depuis le téléphone</string>
+    <string name="pairing_scan">Scanner ce code avec un téléphone connecté au même réseau.</string>
+    <string name="pairing_or_url">Ou ouvrir cette adresse :</string>
+    <string name="pairing_waiting">En attente du téléphone…</string>
+    <string name="pairing_opened">Téléphone connecté.</string>
+    <string name="pairing_saved">Réglages enregistrés : %1$s</string>
+    <string name="pairing_no_network">Aucun réseau local détecté. Vérifier la connexion du téléviseur.</string>
+    <string name="pairing_no_socket">Impossible de démarrer le serveur local.</string>
+    <string name="pairing_close">Terminer</string>
+    <string name="pairing_page_intro">Laisser un champ vide pour ne pas le modifier.</string>
+    <string name="pairing_page_filled">déjà renseigné</string>
+    <string name="pairing_page_submit">Enregistrer</string>
+    <string name="pairing_page_done">Enregistré</string>
+    <string name="pairing_page_done_detail">Les réglages sont appliqués sur le téléviseur. Cette page peut être fermée.</string>
 </resources>
