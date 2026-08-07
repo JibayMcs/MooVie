@@ -64,8 +64,11 @@ class SettingsViewModel : ViewModel() {
         viewModelScope.launch { repo.setHideHistoryWidgets(value) }
     }
 
+    // Valeur d'attente alignée sur le défaut du dépôt : la désaccorder ferait
+    // afficher « activé » à l'interrupteur le temps de la lecture DataStore,
+    // pour le voir retomber tout seul juste après.
     val splashAnimation: StateFlow<Boolean> =
-        repo.splashAnimation.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+        repo.splashAnimation.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     fun setSplashAnimation(value: Boolean) {
         viewModelScope.launch { repo.setSplashAnimation(value) }

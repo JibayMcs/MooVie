@@ -72,14 +72,17 @@ class SettingsRepository {
         store.edit { it[HIDE_HISTORY_WIDGETS] = value }
 
     /**
-     * Animation de lancement — active par défaut.
+     * Animation de lancement — **inactive par défaut**.
      *
      * Elle se pose *au-dessus* de l'app pendant que l'accueil charge, elle ne
      * retarde donc rien. Reste qu'on la revoit à chaque ouverture : au bout de
-     * la centième, certains préfèrent aller droit au but.
+     * la centième, aller droit au but est le comportement qu'on attend, et une
+     * app se juge sur son millième lancement plutôt que sur le premier. Ceux qui
+     * la veulent l'activent ; l'inverse imposait un détour par les réglages à
+     * tout le monde.
      */
     val splashAnimation: Flow<Boolean> =
-        store.data.map { it[SPLASH_ANIMATION] ?: true }
+        store.data.map { it[SPLASH_ANIMATION] ?: false }
 
     suspend fun setSplashAnimation(value: Boolean) =
         store.edit { it[SPLASH_ANIMATION] = value }
