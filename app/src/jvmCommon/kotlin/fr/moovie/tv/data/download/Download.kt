@@ -56,13 +56,17 @@ data class Download(
     val createdAt: Long = 0,
 
     /**
-     * La langue et l'hébergeur retenus, pour pouvoir **re-résoudre** la source.
+     * Le **lien d'embed** d'origine, et de quoi le rejouer.
      *
-     * Une URL de flux expire en moins de deux heures ; un téléchargement de
-     * plusieurs gigaoctets peut dépasser ce délai. Sans de quoi retrouver la
-     * source, une reprise repartirait de zéro à chaque expiration — et un film
-     * assez gros ne finirait jamais.
+     * C'est le maillon qu'il faut garder, et pas l'URL de flux : celle-ci porte
+     * un jeton qui expire en moins de deux heures, alors que le lien d'embed
+     * (`https://uqload.net/embed-xxx.html`) reste valable des jours. Le
+     * re-résoudre coûte une requête et rend un flux frais ; sans lui, une
+     * reprise après expiration repartirait de zéro et un film assez gros ne
+     * finirait jamais.
      */
+    val sourceUrl: String = "",
+    val hoster: String = "",
     val language: String = "",
 
     /** Message de la dernière panne, tel qu'on peut le montrer. */
