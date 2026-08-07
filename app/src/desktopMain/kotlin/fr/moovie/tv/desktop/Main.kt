@@ -97,6 +97,32 @@ fun main() {
         val windowState = rememberWindowState(width = 1280.dp, height = 720.dp)
         val isFullscreen = windowState.placement == WindowPlacement.Fullscreen
 
+        // Le plein écran est un mode du **lecteur**, pas de la fenêtre : elle y
+        // entre avec lui et en sort avec lui.
+        //
+        // En faire un état de fenêtre laissait l'application en plein écran sans
+        // bordure dès qu'on quittait le lecteur : le seul bouton pour en sortir
+        // venait de disparaître avec lui, et le plein écran ayant retiré la barre
+        // de titre, il ne restait plus rien pour fermer. Tuer le processus était
+        // la seule issue.
+        //
+        // On mémorise l'*intention* plutôt que de rétablir la fenêtre sur chaque
+        // sortie : on quitte le lecteur par le retour, par l'échec de lecture,
+        // par l'absence de VLC et par l'enchaînement d'épisodes — les câbler une
+        // par une, c'est en oublier une, aujourd'hui ou à la prochaine ajoutée.
+        // Et comme l'intention survit à l'écran, revenir au lecteur pour
+        // l'épisode suivant retrouve le plein écran sans rien redemander.
+        var wantsFullscreen by remember { mutableStateOf(false) }
+        val inPlayer = nav.current is Screen.Player
+        LaunchedEffect(inPlayer, wantsFullscreen) {
+            when {
+                inPlayer && wantsFullscreen -> windowState.placement = WindowPlacement.Fullscreen
+                // Uniquement depuis le plein écran : une fenêtre que
+                // l'utilisateur a maximisée lui-même doit le rester.
+                isFullscreen -> windowState.placement = WindowPlacement.Floating
+            }
+        }
+
         Window(
             onCloseRequest = ::exitApplication,
             title = "Moo-vie",
@@ -109,7 +135,7 @@ fun main() {
                 // Échap quitte d'abord le plein écran, puis fait retour.
                 when {
                     isFullscreen -> {
-                        windowState.placement = WindowPlacement.Floating
+                        wantsFullscreen = false
                         true
                     }
                     innerBack != null -> {
@@ -149,10 +175,7 @@ fun main() {
                         nav = nav,
                         onRegisterBack = { innerBack = it },
                         isFullscreen = isFullscreen,
-                        onToggleFullscreen = {
-                            windowState.placement =
-                                if (isFullscreen) WindowPlacement.Floating else WindowPlacement.Fullscreen
-                        },
+                        onToggleFullscreen = { wantsFullscreen = !wantsFullscreen },
                     )
                     }
                     if (!splashDone && splashEnabled == true) {
