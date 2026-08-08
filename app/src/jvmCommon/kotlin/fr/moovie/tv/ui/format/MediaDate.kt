@@ -91,3 +91,24 @@ fun formatNowDateTime(nowMs: Long): String {
         .format(moment)
     return "$date · $time"
 }
+
+/**
+ * La date d'un épisode **à venir**, formatée, ou null s'il est déjà sorti.
+ *
+ * Répond à ce que la vignette vide ne pouvait pas dire : une saison non diffusée
+ * n'a chez TMDB ni image ni titre d'épisode, et l'application n'affichait qu'un
+ * cadre gris. La date, elle, est presque toujours là — c'est la seule
+ * information utile à ce stade.
+ *
+ * Le jour même compte comme sorti : un épisode diffusé ce soir n'est pas
+ * « prévu », il arrive. La comparaison se fait donc sur `isAfter`.
+ *
+ * `LocalDate.now()` sans fuseau explicite, volontairement : c'est la date du
+ * calendrier de l'utilisateur qui décide de ce qui est « à venir » pour lui, pas
+ * celle du diffuseur.
+ */
+fun upcomingDate(raw: String?): String? {
+    val value = raw?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+    val date = runCatching { LocalDate.parse(value) }.getOrNull() ?: return null
+    return if (date.isAfter(LocalDate.now())) formatMediaDate(value) else null
+}

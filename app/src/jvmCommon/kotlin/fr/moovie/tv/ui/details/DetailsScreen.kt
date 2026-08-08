@@ -115,6 +115,8 @@ import fr.moovie.tv.resources.details_download_season_partial
 import fr.moovie.tv.resources.details_download_season_queued
 import fr.moovie.tv.resources.details_download_season
 import fr.moovie.tv.resources.details_download_season_progress
+import fr.moovie.tv.ui.format.upcomingDate
+import fr.moovie.tv.resources.details_episode_upcoming
 import fr.moovie.tv.resources.details_source_dead
 import fr.moovie.tv.resources.details_source_via
 import fr.moovie.tv.resources.details_catalogue_count
@@ -495,7 +497,15 @@ fun DetailsScreenContent(
                         // Ils ne l'étaient jamais : le parseur ignorait les deux
                         // champs, si bien que les vingt-deux saisons d'une série
                         // affichaient le même texte et la même année.
-                        (s.seasonYear ?: s.details.year)?.let { Text(it) }
+                        // Saison annoncée mais pas commencée : sa date de
+                        // première diffusion vaut mieux que son année nue.
+                        val seasonUpcoming = upcomingDate(s.seasonAirDate)
+                        if (seasonUpcoming != null) {
+                            Text(
+                                stringResource(Res.string.details_episode_upcoming, seasonUpcoming),
+                                color = MOOVIE_ACCENT,
+                            )
+                        } else (s.seasonYear ?: s.details.year)?.let { Text(it) }
                         ScrollingSynopsis(
                             text = s.seasonOverview.ifBlank { s.details.overview },
                             // Colonne étroite : le texte y tient sur plus de
@@ -532,6 +542,14 @@ fun DetailsScreenContent(
                             // chaque épisode, son panneau de sources, et tomber
                             // une fois sur deux sur un hébergeur mort. La
                             // sélection réutilise le verdict du lecteur.
+                            // Rien de diffusé, rien à télécharger : le bouton
+                            // disparaît au lieu de rester inerte. C'est le cas
+                            // d'une saison annoncée, où l'appui ne produisait
+                            // aucun effet visible et ressemblait à une panne.
+                            val airedCount = s.episodes.count {
+                                it.episodeNumber > 0 && upcomingDate(it.airDate) == null
+                            }
+                            if (airedCount > 0) {
                             MoovieButton(onClick = { onDownloadSeason(s.season) }) {
                                 Text(
                                     when {
@@ -570,6 +588,7 @@ fun DetailsScreenContent(
                                     },
                                 )
                             }
+                            }
                         }
                         val seasonsState = rememberLazyListState()
                         MoovieRail(seasonsState) {
@@ -604,7 +623,21 @@ fun DetailsScreenContent(
                                             s.details.id,
                                             season.seasonNumber,
                                         )
-                                        val total = season.episodeCount
+                                        // TMDB compte les épisodes annoncés, pas
+                                        // les diffusés : sur une saison en cours
+                                        // le dénominateur inclut ce qui n'existe
+                                        // pas encore, et la pastille ne passait
+                                        // jamais au vert même tout téléchargé.
+                                        // La liste d'épisodes n'est chargée que
+                                        // pour la saison affichée — ailleurs, le
+                                        // compte annoncé reste la seule mesure.
+                                        val total = if (season.seasonNumber == s.season) {
+                                            s.episodes.count {
+                                                it.episodeNumber > 0 && upcomingDate(it.airDate) == null
+                                            }
+                                        } else {
+                                            season.episodeCount
+                                        }
                                         val complete = ready > 0 && ready >= total
                                         Text(
                                             buildString {
@@ -1357,7 +1390,18 @@ private fun MovieMeta(
                 if (isWatched) WatchedBadge()
             }
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                details.year?.let {
+                // Film pas encore sorti : la date complète remplace l'année,
+                // qui à elle seule ne dit pas s'il est déjà disponible. Aucune
+                // source n'existera avant, autant l'annoncer que laisser
+                // chercher.
+                val upcoming = upcomingDate(details.releaseDate)
+                if (upcoming != null) {
+                    Text(
+                        stringResource(Res.string.details_episode_upcoming, upcoming),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MOOVIE_ACCENT,
+                    )
+                } else details.year?.let {
                     Text(it, style = MaterialTheme.typography.titleSmall, color = Color(0xFFCCCCCC))
                 }
                 formatDuration(details.runtime)?.let {
@@ -1630,7 +1674,18 @@ private fun EpisodeRow(
                     style = MaterialTheme.typography.titleSmall,
                     color = if (isWatched) Color(0xFF9A9A9A) else Color.White,
                 )
-                if (ep.overview.isNotBlank()) {
+                // Épisode à venir : sa date remplace le synopsis, qui est de
+                // toute façon vide à ce stade. C'est ce que le cadre gris ne
+                // savait pas dire.
+                val upcoming = upcomingDate(ep.airDate)
+                if (upcoming != null) {
+                    Text(
+                        stringResource(Res.string.details_episode_upcoming, upcoming),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MOOVIE_ACCENT,
+                    )
+                }
+                if (upcoming == null && ep.overview.isNotBlank()) {
                     ScrollingSynopsis(ep.overview)
                 }
             }

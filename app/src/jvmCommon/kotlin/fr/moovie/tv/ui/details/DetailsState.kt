@@ -26,6 +26,11 @@ sealed interface DetailsState {
          */
         val seasonOverview: String = "",
         val seasonYear: String? = null,
+        /**
+         * Date de première diffusion de la saison, brute. L'année seule ne
+         * suffit pas à distinguer une saison sortie d'une saison annoncée.
+         */
+        val seasonAirDate: String? = null,
     ) : DetailsState
     data class Error(val message: String) : DetailsState
 }

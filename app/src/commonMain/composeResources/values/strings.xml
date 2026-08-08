@@ -443,4 +443,5 @@
     <string name="downloads_group_running">%1$s épisodes · %2$s en cours</string>
     <string name="details_download_season_partial">%1$s en file · %2$s sans source</string>
     <string name="details_download_season_queued">%1$s épisodes en file</string>
+    <string name="details_episode_upcoming">Prévu le %1$s</string>
 </resources>

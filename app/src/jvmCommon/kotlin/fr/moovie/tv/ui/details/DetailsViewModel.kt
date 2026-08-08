@@ -26,6 +26,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import fr.moovie.tv.data.sources.ProviderRegistry
 import fr.moovie.tv.data.sources.SourceCacheRepository
+import fr.moovie.tv.ui.format.upcomingDate
 import fr.moovie.tv.data.tmdb.Episode
 import fr.moovie.tv.data.tmdb.TmdbRepository
 import fr.moovie.tv.data.tmdb.TvDetails
@@ -415,6 +416,7 @@ class DetailsViewModel : ViewModel() {
                         resumeEpisode = focusEpisode,
                         seasonOverview = seasonDetails.overview,
                         seasonYear = seasonDetails.year,
+                        seasonAirDate = seasonDetails.airDate,
                     )
                 } else {
                     DetailsState.Movie(repo.movieDetails(apiKey, tmdbId))
@@ -472,6 +474,7 @@ class DetailsViewModel : ViewModel() {
                         resumeEpisode = if (target?.season == season) target.episode else 0,
                         seasonOverview = details.overview,
                         seasonYear = details.year,
+                        seasonAirDate = details.airDate,
                     )
                 }
         }
@@ -1174,7 +1177,11 @@ class DetailsViewModel : ViewModel() {
         if (seasonJob?.isActive == true) return
         val tv = _state.value as? DetailsState.Tv ?: return
         if (tv.season != season) return
-        val episodes = tv.episodes.filter { it.episodeNumber > 0 }
+        // Les épisodes non diffusés sont exclus : aucune source n'existe pour eux,
+        // et les inclure faisait passer la cascade complète — six tentatives par
+        // épisode — sur des numéros qui n'ont encore rien à offrir. La saison
+        // semblait alors « échouer » alors qu'elle était simplement en avance.
+        val episodes = tv.episodes.filter { it.episodeNumber > 0 && upcomingDate(it.airDate) == null }
         if (episodes.isEmpty()) return
 
         seasonJob = viewModelScope.launch {
