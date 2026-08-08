@@ -24,6 +24,14 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import fr.moovie.tv.data.download.DownloadRepository
+import fr.moovie.tv.data.download.DownloadState
+import fr.moovie.tv.ui.theme.MOOVIE_ACCENT
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -60,6 +68,22 @@ private enum class NavTab(val screen: Screen, val icon: ImageVector, val label: 
 
 /** Vrai si [screen] est une destination de premier niveau, donc porteuse d'onglet. */
 fun isTopLevel(screen: Screen): Boolean = NavTab.entries.any { sameTab(it.screen, screen) }
+
+/**
+ * Vrai là où la barre doit s'effacer.
+ *
+ * Elle ne s'affichait que sur les six destinations de premier niveau, ce qui
+ * paraît raisonnable jusqu'à ce qu'on regarde où l'on passe son temps : sur une
+ * **fiche**. La barre y disparaissait, et avec elle tout repère — il fallait
+ * revenir à l'accueil pour retrouver où l'on était.
+ *
+ * Deux écrans seulement la font disparaître, et pour la même raison : ils
+ * prennent tout l'écran et ne mènent nulle part. Le lecteur, parce qu'une barre
+ * d'onglets par-dessus une vidéo n'a aucun sens ; la première installation,
+ * parce qu'il n'y a encore rien à naviguer.
+ */
+fun hidesBottomBar(screen: Screen): Boolean =
+    screen is Screen.Player || screen is Screen.Onboarding
 
 /**
  * Deux écrans du même onglet. Comparé par **type** et non par égalité : depuis
@@ -100,11 +124,20 @@ fun MoovieBottomBar(
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        // Nombre de téléchargements en cours, pour la pastille. Collecté ici
+        // plutôt que passé par chaque écran : la barre est le seul endroit qui
+        // s'en sert, et elle vit sous tous les écrans.
+        val running by remember { DownloadRepository().downloads }
+            .collectAsState(initial = emptyList())
+        val active = running.count {
+            it.state == DownloadState.RUNNING || it.state == DownloadState.QUEUED
+        }
         NavTab.entries.forEach { tab ->
             NavTabItem(
                 tab = tab,
                 selected = sameTab(current, tab.screen),
                 onClick = { onSelect(tab.screen) },
+                badge = if (tab == NavTab.DOWNLOADS) active else 0,
                 modifier = Modifier.weight(1f),
             )
         }
@@ -116,6 +149,8 @@ private fun NavTabItem(
     tab: NavTab,
     selected: Boolean,
     onClick: () -> Unit,
+    /** Compteur posé sur l'icône. Zéro = rien du tout, pas un « 0 ». */
+    badge: Int = 0,
     modifier: Modifier = Modifier,
 ) {
     val tint = if (selected) MaterialTheme.colorScheme.primary else Color(0xFF9E9E9E)
@@ -132,12 +167,28 @@ private fun NavTabItem(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Icon(
-            imageVector = tab.icon,
-            contentDescription = null,
-            tint = tint,
-            modifier = Modifier.size(24.dp),
-        )
+        // La pastille se pose **sur** l'icône plutôt qu'à côté : elle ne doit
+        // pas élargir l'onglet, sinon les six se décalent dès qu'un
+        // téléchargement démarre — sous le pouce, au pire moment.
+        Box(contentAlignment = Alignment.TopEnd) {
+            Icon(
+                imageVector = tab.icon,
+                contentDescription = null,
+                tint = tint,
+                modifier = Modifier.size(24.dp),
+            )
+            if (badge > 0) {
+                Text(
+                    text = badge.toString(),
+                    color = Color.White,
+                    style = MaterialTheme.typography.labelSmall,
+                    modifier = Modifier
+                        .offset(x = 8.dp, y = (-6).dp)
+                        .background(MOOVIE_ACCENT, CircleShape)
+                        .padding(horizontal = 5.dp),
+                )
+            }
+        }
         Spacer(Modifier.height(2.dp))
         Text(
             text = stringResource(tab.label),

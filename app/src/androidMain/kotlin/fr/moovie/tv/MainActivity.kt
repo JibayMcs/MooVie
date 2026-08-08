@@ -68,6 +68,7 @@ import android.content.pm.ActivityInfo
 import fr.moovie.tv.ui.adaptive.AdaptiveRoot
 import fr.moovie.tv.ui.adaptive.MoovieBottomBar
 import fr.moovie.tv.ui.adaptive.UiFlavor
+import fr.moovie.tv.ui.adaptive.hidesBottomBar
 import fr.moovie.tv.ui.adaptive.isTopLevel
 import fr.moovie.tv.ui.adaptive.useBottomNav
 import fr.moovie.tv.ui.theme.MooVieTheme
@@ -457,9 +458,12 @@ class MainActivity : ComponentActivity() {
                         }
                         }
 
-                        // Sous le contenu, hors lecteur et hors fiche : la barre
-                        // d'onglets ne s'affiche que là où elle a un sens.
-                        if (useBottomNav && isTopLevel(nav.current)) {
+                        // Sous le contenu, partout sauf là où l'écran est pris
+                        // en entier. La restreindre aux destinations de premier
+                        // niveau la faisait disparaître sur les fiches — c'est-à-
+                        // dire là où l'on passe le plus de temps, et où l'on
+                        // perdait donc tout repère.
+                        if (useBottomNav && !hidesBottomBar(nav.current)) {
                             MoovieBottomBar(
                                 current = nav.current,
                                 onSelect = { nav.switchTop(it) },

@@ -1530,12 +1530,24 @@ private fun EpisodeRow(
                 // Pastille « sur le disque » : elle dit ce qu'aucune autre
                 // marque ne dit — que cet épisode se regardera sans réseau.
                 if (download?.state == DownloadState.DONE) {
-                    Icon(
-                        Icons.Default.DownloadDone,
-                        contentDescription = stringResource(Res.string.player_download_done),
-                        tint = Color(0xFF7DDC7D),
-                        modifier = Modifier.align(Alignment.TopStart).padding(4.dp).size(16.dp),
-                    )
+                    // Sur fond opaque : une icône claire posée à même la
+                    // vignette disparaît dès que l'image est claire, ce qui est
+                    // le cas d'une scène de jour sur deux. Le disque sombre la
+                    // rend lisible quelle que soit l'image dessous.
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(6.dp)
+                            .background(Color(0xCC000000), CircleShape)
+                            .padding(4.dp),
+                    ) {
+                        Icon(
+                            Icons.Default.DownloadDone,
+                            contentDescription = stringResource(Res.string.player_download_done),
+                            tint = Color(0xFF7DDC7D),
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
                 }
                 // En cours : barre accent en bas de la vignette. Elle occupe la
                 // même bande que la progression de lecture, qui n'a pas de sens
