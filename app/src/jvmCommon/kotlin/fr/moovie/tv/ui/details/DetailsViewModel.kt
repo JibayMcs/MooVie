@@ -929,6 +929,23 @@ class DetailsViewModel : ViewModel() {
         val gen = ++resolveGen
         quickPlayLabel = label
         quickPlayJob = viewModelScope.launch {
+            // Le fichier local passe **avant toute résolution**, et pas seulement
+            // hors ligne : un épisode déjà sur le disque se lit instantanément,
+            // sans jeton qui expire, sans hébergeur qui répond 403, sans les
+            // deux à trois secondes de cascade. Interroger le réseau pour
+            // ignorer ensuite sa réponse n'aurait servi à rien.
+            //
+            // C'est aussi ce qui rend le mode hors ligne automatique : il n'y a
+            // pas de détection de réseau à faire, la présence du fichier suffit
+            // à trancher.
+            pendingMeta?.key?.let { key ->
+                localStream(key)?.let { local ->
+                    pendingMeta?.let { watchRepo.register(it) }
+                    _quickPlay.value = QuickPlayState.Idle
+                    _resolved.value = local
+                    return@launch
+                }
+            }
             val lang = settings.streamLanguage.first().name
             _quickPlay.value = QuickPlayState.Searching(if (label.isBlank()) lang else "$label · $lang")
             _resolveError.value = null

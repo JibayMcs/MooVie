@@ -437,4 +437,6 @@
     <string name="downloads_notification_channel">Descargas</string>
     <string name="details_download_season">Descargar la temporada</string>
     <string name="details_download_season_progress">Comprobando %1$s/%2$s…</string>
+    <string name="downloads_group">%1$s episodios</string>
+    <string name="downloads_group_running">%1$s episodios · %2$s en curso</string>
 </resources>

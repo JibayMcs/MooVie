@@ -3,6 +3,7 @@ package fr.moovie.tv.data.download
 import fr.moovie.tv.core.sources.model.PlayableStream
 import fr.moovie.tv.core.sources.model.StreamFormat
 import java.io.File
+import java.net.URI
 
 /**
  * Port de récupération d'octets.
@@ -227,7 +228,27 @@ fun playableFile(key: String): File? {
 fun localStream(key: String): PlayableStream? {
     val file = playableFile(key) ?: return null
     return PlayableStream(
-        url = file.toURI().toString(),
+        url = fileUrl(file),
         format = if (file.name == PLAYLIST_NAME) StreamFormat.HLS else StreamFormat.MP4,
     )
+}
+
+/**
+ * L'URL `file://` d'un fichier local, avec **trois** barres obliques.
+ *
+ * `File.toURI()` rend la forme dégénérée `file:/home/…`, à une seule barre.
+ * Android la tolère, libVLC non : il n'y reconnaît aucun schéma, traite la
+ * chaîne comme un chemin relatif et la résout contre le répertoire de travail.
+ * D'où l'erreur observée, où le chemin du dépôt se retrouvait collé devant
+ * celui du téléchargement :
+ *
+ *     .../Moo-vie/app/file:/home/…/downloads/tv_108978_s2e3/stream.m3u8
+ *
+ * On reconstruit donc l'URI avec une autorité vide, ce qui donne
+ * `file:///home/…`. Passer par `uri.path` plutôt que par `absolutePath` garde
+ * l'échappement et le cas Windows, où le chemin devient `/C:/…`.
+ */
+internal fun fileUrl(file: File): String {
+    val uri = file.toURI()
+    return URI(uri.scheme, "", uri.path, null).toString()
 }

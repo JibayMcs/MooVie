@@ -9,6 +9,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material3.Icon
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import fr.moovie.tv.resources.downloads_group
+import fr.moovie.tv.resources.downloads_group_running
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -91,14 +99,101 @@ fun DownloadsSection(
             return@Column
         }
 
-        downloads.forEach { download ->
-            DownloadRow(
-                download = download,
-                onPlay = { onPlay(download) },
-                onPause = { DownloadQueue.pause(download.key) },
-                onResume = { scope.launch { DownloadQueue.resumePending() } },
-                onRemove = { scope.launch { DownloadQueue.remove(download.key) } },
+        // Regroupé par série : six épisodes de la même série faisaient six
+        // entrées indiscernables, dont le titre ne différait que par un « S2 ·
+        // E3 » noyé au milieu de la ligne. Un film reste seul — le grouper avec
+        // lui-même n'ajouterait qu'un pli à ouvrir.
+        //
+        // La clé de groupe se lit dans `key` (`tv:1396:s1e1`), sans rien
+        // ajouter au modèle : c'est déjà l'identité du titre, l'épisode n'en
+        // est qu'un suffixe.
+        downloads.groupBy { it.groupKey() }.forEach { (_, items) ->
+            if (items.size == 1) {
+                val download = items.first()
+                DownloadRow(
+                    download = download,
+                    onPlay = { onPlay(download) },
+                    onPause = { DownloadQueue.pause(download.key) },
+                    onResume = { scope.launch { DownloadQueue.resumePending() } },
+                    onRemove = { scope.launch { DownloadQueue.remove(download.key) } },
+                )
+            } else {
+                SeriesGroup(
+                    items = items,
+                    onPlay = onPlay,
+                    scope = scope,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Identité du titre, épisode exclu.
+ *
+ * `tv:1396:s1e1` et `tv:1396:s1e2` partagent `tv:1396` ; un film garde sa clé
+ * entière et reste donc seul dans son groupe.
+ */
+private fun Download.groupKey(): String =
+    if (isTv) key.split(':').take(2).joinToString(":") else key
+
+/**
+ * Une série et ses épisodes, repliés sous une seule entrée.
+ *
+ * Dépliée par défaut quand quelque chose y tourne : on vient justement voir où
+ * ça en est, et refermer l'information qu'on cherche serait absurde. Repliée
+ * sinon, ce qui rend la liste lisible quand on a téléchargé trois saisons.
+ */
+@Composable
+private fun SeriesGroup(
+    items: List<Download>,
+    onPlay: (Download) -> Unit,
+    scope: kotlinx.coroutines.CoroutineScope,
+) {
+    val running = items.count {
+        it.state == DownloadState.RUNNING || it.state == DownloadState.QUEUED
+    }
+    var expanded by remember(items.first().groupKey()) { mutableStateOf(running > 0) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        MoovieButton(onClick = { expanded = !expanded }, modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    items.first().title,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    if (running > 0) {
+                        stringResource(
+                            Res.string.downloads_group_running,
+                            items.size.toString(),
+                            running.toString(),
+                        )
+                    } else {
+                        stringResource(Res.string.downloads_group, items.size.toString())
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = DIM,
+                )
+            }
+            Icon(
+                if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                contentDescription = null,
             )
+        }
+        if (expanded) {
+            items.sortedBy { it.key }.forEach { download ->
+                DownloadRow(
+                    download = download,
+                    onPlay = { onPlay(download) },
+                    onPause = { DownloadQueue.pause(download.key) },
+                    onResume = { scope.launch { DownloadQueue.resumePending() } },
+                    onRemove = { scope.launch { DownloadQueue.remove(download.key) } },
+                    modifier = Modifier.padding(start = 16.dp),
+                )
+            }
         }
     }
 }
@@ -110,9 +205,10 @@ private fun DownloadRow(
     onPause: () -> Unit,
     onResume: () -> Unit,
     onRemove: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .background(PANEL, MoovieShape)
             .padding(horizontal = 16.dp, vertical = 12.dp),
