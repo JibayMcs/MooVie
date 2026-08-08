@@ -192,7 +192,13 @@ private fun Status(state: SyncState, lastSync: Long, backgroundFailure: String?)
 }
 
 @Composable
-private fun providerLabel(provider: SyncProvider): String = when (provider) {
+/**
+ * Nom affichable d'un fournisseur. Des marques, donc pas de traduction et pas de
+ * ressource — mais un seul endroit : la page d'appairage titre sa section avec,
+ * et recopier « Backblaze B2 » ailleurs serait le même doublon que celui payé
+ * avec `androidMain/res`.
+ */
+internal fun providerLabel(provider: SyncProvider): String = when (provider) {
     SyncProvider.NONE -> stringResource(Res.string.sync_none)
     // Un nom de marque ne se traduit pas.
     SyncProvider.BACKBLAZE_B2 -> "Backblaze B2"
