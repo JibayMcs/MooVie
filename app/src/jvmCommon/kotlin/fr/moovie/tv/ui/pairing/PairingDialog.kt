@@ -24,6 +24,21 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import fr.moovie.tv.data.pairing.PairingFields
+import fr.moovie.tv.ui.sync.providerLabel
+import fr.moovie.tv.resources.settings_cat_sync
+import fr.moovie.tv.resources.settings_cat_subtitles
+import fr.moovie.tv.resources.settings_cat_api
+import fr.moovie.tv.data.sync.SyncSettingsRepository
+import fr.moovie.tv.data.sync.SyncProvider
+import androidx.compose.runtime.rememberUpdatedState
+import fr.moovie.tv.data.pairing.PairingSession
+import fr.moovie.tv.resources.common_back
+import fr.moovie.tv.resources.remote_intro
+import fr.moovie.tv.resources.remote_send
+import fr.moovie.tv.resources.remote_title
+import fr.moovie.tv.resources.remote_to_remote
+import fr.moovie.tv.resources.remote_to_settings
+import fr.moovie.tv.resources.remote_type
 import fr.moovie.tv.data.pairing.PairingServer
 import fr.moovie.tv.data.pairing.PairingTexts
 import fr.moovie.tv.data.sync.providers.B2_APP_KEY
@@ -36,7 +51,6 @@ import fr.moovie.tv.resources.pairing_opened
 import fr.moovie.tv.resources.pairing_or_url
 import fr.moovie.tv.resources.pairing_page_done
 import fr.moovie.tv.resources.pairing_page_done_detail
-import fr.moovie.tv.resources.pairing_page_filled
 import fr.moovie.tv.resources.pairing_page_intro
 import fr.moovie.tv.resources.pairing_page_submit
 import fr.moovie.tv.resources.pairing_saved
@@ -69,14 +83,33 @@ import org.jetbrains.compose.resources.stringResource
  * est précisément le problème qu'on résout.
  */
 @Composable
-fun PairingDialog(onDismiss: () -> Unit) {
+fun PairingDialog(
+    onDismiss: () -> Unit,
+    /**
+     * Appelé à chaque envoi du téléphone qui a modifié quelque chose.
+     *
+     * L'écran d'installation s'en sert pour vérifier la clé TMDB et enchaîner
+     * tout seul. Les réglages ne le renseignent pas : on y est déjà configuré, et
+     * refermer la modale sous les doigts de quelqu'un qui saisit encore ses
+     * identifiants de synchro serait une surprise, pas un service.
+     */
+    onSaved: () -> Unit = {},
+    /** Message affiché sous l'état, en rouge. Vérification en cours, clé refusée… */
+    notice: String? = null,
+) {
     val texts = PairingTexts(
         title = stringResource(Res.string.pairing_title),
         intro = stringResource(Res.string.pairing_page_intro),
-        filled = stringResource(Res.string.pairing_page_filled),
         submit = stringResource(Res.string.pairing_page_submit),
         done = stringResource(Res.string.pairing_page_done),
         doneDetail = stringResource(Res.string.pairing_page_done_detail),
+        remoteTitle = stringResource(Res.string.remote_title),
+        remoteIntro = stringResource(Res.string.remote_intro),
+        remoteType = stringResource(Res.string.remote_type),
+        remoteSend = stringResource(Res.string.remote_send),
+        remoteToSettings = stringResource(Res.string.remote_to_settings),
+        remoteToRemote = stringResource(Res.string.remote_to_remote),
+        remoteBack = stringResource(Res.string.common_back),
     )
 
     // Les libellés des champs sont ceux des réglages, résolus ici : la couche
@@ -92,17 +125,39 @@ fun PairingDialog(onDismiss: () -> Unit) {
         PairingFields.SYNC_PREFIX + B2_APP_KEY to stringResource(Res.string.sync_field_b2_app_key),
     )
 
+    // Titres de sections. Le service est nommé dans le titre plutôt que laissé
+    // à deviner : « Identifiant » sous « Sous-titres · OpenSubtitles » se
+    // comprend seul, isolé il ne veut rien dire. Les marques ne se traduisent
+    // pas, d'où la composition avec la catégorie traduite.
+    val provider by remember { SyncSettingsRepository().provider }
+        .collectAsState(initial = SyncProvider.NONE)
+    val groups = mapOf(
+        PairingFields.GROUP_API to stringResource(Res.string.settings_cat_api),
+        PairingFields.GROUP_SUBTITLES to
+            "${stringResource(Res.string.settings_cat_subtitles)} · OpenSubtitles",
+        PairingFields.GROUP_SYNC to
+            "${stringResource(Res.string.settings_cat_sync)} · ${providerLabel(provider)}",
+    )
+
+    // `groups` change quand le fournisseur est connu : la fabrique du serveur
+    // doit relire la valeur courante, pas celle capturée à la composition.
+    val currentGroups by rememberUpdatedState(groups)
+    // Le serveur appartient à la session, pas à la modale : armé en
+    // télécommande, il doit survivre à sa fermeture. La session le crée au
+    // premier besoin et le rend tel quel ensuite — recréer changerait le jeton
+    // et ferait tomber en 404 la page ouverte sur le téléphone.
     val server = remember {
         val source = PairingFields()
-        PairingServer(
-            fields = { source.snapshot(labels) },
-            apply = { source.apply(it) },
-            texts = texts,
-        )
+        PairingSession.start {
+            PairingServer(
+                fields = { source.snapshot(labels, currentGroups) },
+                apply = { source.apply(it) },
+                texts = texts,
+            )
+        }
     }
     DisposableEffect(server) {
-        server.start()
-        onDispose { server.close() }
+        onDispose { PairingSession.releaseDialog() }
     }
 
     val url by server.url.collectAsState()
@@ -111,6 +166,9 @@ fun PairingDialog(onDismiss: () -> Unit) {
     val failure by server.failure.collectAsState()
     val close = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { close.requestFocus() } }
+    // `saved` ne fait que croître : chaque hausse est un envoi qui a changé
+    // quelque chose. Zéro exclu, sinon on préviendrait à l'ouverture.
+    LaunchedEffect(saved) { if (saved > 0) onSaved() }
 
     Dialog(onDismissRequest = onDismiss) {
         Column(
@@ -172,6 +230,15 @@ fun PairingDialog(onDismiss: () -> Unit) {
                         textAlign = TextAlign.Center,
                     )
                 }
+            }
+
+            notice?.let {
+                Text(
+                    it,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color(0xFFE0A0A0),
+                    textAlign = TextAlign.Center,
+                )
             }
 
             MoovieButton(

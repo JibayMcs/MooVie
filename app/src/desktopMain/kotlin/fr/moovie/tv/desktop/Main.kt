@@ -9,6 +9,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import fr.moovie.tv.data.remote.remoteWindow
+import fr.moovie.tv.data.pairing.PairingSession
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -150,6 +153,17 @@ fun main() {
                 }
             },
         ) {
+            // Cible des touches de la télécommande virtuelle. `window` vient du
+            // scope de la fenêtre : c'est notre propre fenêtre, donc rien ne
+            // part vers une autre application.
+            DisposableEffect(window) {
+                remoteWindow = window
+                onDispose {
+                    remoteWindow = null
+                    PairingSession.stop()
+                }
+            }
+
             MooVieTheme {
                 // L'animation se pose au-dessus de l'app, comme sur Android :
                 // l'accueil charge derrière et le temps d'animation est du temps

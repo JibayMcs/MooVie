@@ -1,5 +1,9 @@
 package fr.moovie.tv.data.pairing
 
+import fr.moovie.tv.data.remote.RemoteKey
+import fr.moovie.tv.data.remote.remoteAvailable
+import fr.moovie.tv.data.remote.sendRemoteKey
+import fr.moovie.tv.data.remote.sendRemoteText
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -32,8 +36,9 @@ import kotlin.random.Random
  *
  * ### Ce qui le rend acceptable
  *
- * - Il ne vit **que** pendant que l'écran d'appairage est affiché. Fermer
- *   l'écran ferme la socket.
+ * - Il ne vit **que** pendant que l'écran d'appairage est affiché — sauf si la
+ *   télécommande a été armée, auquel cas il survit le temps qu'on navigue, et
+ *   pas au-delà du premier plan. Voir [PairingSession], qui en est propriétaire.
  * - L'adresse porte un jeton tiré au hasard ; sans lui, tout est 404. Le jeton
  *   ne transite que par le QR code affiché sur le téléviseur : ne pas être
  *   devant l'écran, c'est ne pas avoir l'adresse.
@@ -114,8 +119,47 @@ class PairingServer(
 
         // Le jeton est la seule autorisation. Tout le reste — favicon, sondes,
         // curiosité — tombe ici.
-        if (request.path.trimEnd('/') != "/$token") {
+        val path = request.path.trimEnd('/')
+        if (path != "/$token" && !path.startsWith("/$token/")) {
             respond(sock.getOutputStream(), 404, "text/plain; charset=utf-8", "Not found")
+            return@use
+        }
+        val route = path.removePrefix("/$token").trimStart('/')
+
+        // --- Télécommande ---------------------------------------------------
+        //
+        // Séparée du formulaire : un appui de flèche ne doit ni recharger la
+        // page ni traverser la lecture des réglages. Réponses vides et courtes,
+        // parce qu'il y en a une par appui.
+        if (route == "remote" || route == "key" || route == "text") {
+            if (!remoteAvailable()) {
+                respond(sock.getOutputStream(), 404, "text/plain; charset=utf-8", "No remote")
+                return@use
+            }
+            when (route) {
+                "remote" -> {
+                    // Charger la page arme la session : c'est le geste explicite
+                    // qui autorise le serveur à survivre à la modale.
+                    PairingSession.armRemote()
+                    respond(sock.getOutputStream(), 200, HTML, remotePage(texts, "/$token"))
+                }
+                else -> {
+                    val length = headers["content-length"]?.toIntOrNull() ?: 0
+                    if (length !in 0..MAX_BODY_BYTES) {
+                        respond(sock.getOutputStream(), 413, "text/plain; charset=utf-8", "Too large")
+                        return@use
+                    }
+                    val form = decodeForm(String(readExactly(input, length), Charsets.UTF_8))
+                    if (route == "key") {
+                        runCatching { RemoteKey.valueOf(form["k"].orEmpty()) }
+                            .getOrNull()?.let(::sendRemoteKey)
+                    } else {
+                        form["t"]?.let(::sendRemoteText)
+                    }
+                    // 204 : rien à rendre, et le navigateur n'a rien à redessiner.
+                    respond(sock.getOutputStream(), 204, "text/plain; charset=utf-8", "")
+                }
+            }
             return@use
         }
 
@@ -153,6 +197,7 @@ class PairingServer(
 
     private fun reason(status: Int) = when (status) {
         200 -> "OK"
+        204 -> "No Content"
         404 -> "Not Found"
         413 -> "Payload Too Large"
         else -> "Error"

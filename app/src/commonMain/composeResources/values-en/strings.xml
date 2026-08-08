@@ -275,7 +275,7 @@
     <string name="backup_cancel">Cancel</string>
     <string name="backup_finish">Done</string>
     <string name="onboarding_title">Welcome to Moo-vie</string>
-    <string name="onboarding_intro">Two ways to start, depending on whether you are coming from another device or installing Moo-vie for the first time.</string>
+    <string name="onboarding_intro">Depending on whether you are coming from another device or installing Moo-vie for the first time.</string>
     <string name="onboarding_restore">I have used Moo-vie before</string>
     <string name="onboarding_restore_help">Restore your playback positions, watchlist, history and TMDB key from a backup on a USB stick.</string>
     <string name="onboarding_fresh">First install</string>
@@ -415,9 +415,19 @@
     <string name="pairing_no_network">No local network found. Check the TV connection.</string>
     <string name="pairing_no_socket">Could not start the local server.</string>
     <string name="pairing_close">Done</string>
-    <string name="pairing_page_intro">Leave a field empty to keep its current value.</string>
-    <string name="pairing_page_filled">already set</string>
+    <string name="pairing_page_intro">The TV's current values are prefilled. Clearing a field erases it.</string>
     <string name="pairing_page_submit">Save</string>
     <string name="pairing_page_done">Saved</string>
     <string name="pairing_page_done_detail">The settings are applied on the TV. You can close this page.</string>
+    <string name="onboarding_phone_help">Shows a QR code to scan with a phone on the same network. You then paste the TMDB key on a touch keyboard instead of typing it with the remote.</string>
+    <string name="pairing_key_checking">Checking the TMDB key…</string>
+    <string name="pairing_key_rejected">TMDB rejected this key. Fix it on the phone and send again.</string>
+    <string name="pairing_key_unreachable">TMDB unreachable. Check the TV connection, then send again.</string>
+    <string name="pairing_key_missing">Saved, but the TMDB key is still missing: it is required to start.</string>
+    <string name="remote_title">Remote</string>
+    <string name="remote_intro">Drives Moo-vie on the TV. It does not control the TV itself.</string>
+    <string name="remote_type">Text to type on the TV</string>
+    <string name="remote_send">Send text</string>
+    <string name="remote_to_settings">Back to settings</string>
+    <string name="remote_to_remote">Open the remote</string>
 </resources>

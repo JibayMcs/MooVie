@@ -110,8 +110,12 @@ L'extraction des sources se fait **on-device** : pas de backend, pas de compte, 
   affiche un QR code, ton téléphone ouvre une page servie par l'app elle-même sur le réseau
   local, et tu tapes au clavier tactile : clés TMDB et TheIntroDB, compte OpenSubtitles,
   identifiants de synchro et phrase secrète. Le serveur ne vit que pendant que le code est
-  affiché, son adresse porte un jeton tiré au hasard, et la page ne réaffiche jamais une
-  valeur déjà en place - elle indique seulement qu'elle existe.
+  affiché, et son adresse porte un jeton tiré au hasard. Les valeurs en place sont
+  pré-remplies : on relit ou on corrige une clé sans la retaper, et vider un champ
+  l'efface. La page sert aussi de **télécommande** - croix directionnelle, OK, retour,
+  lecture/pause, et un champ qui tape le texte sur la TV, ce qui rend une recherche
+  supportable. Elle pilote Moo-vie, pas le téléviseur : elle ne peut ni l'allumer, ni
+  changer de source.
 - **Cache disque** - réponses TMDB et liens de sources résolus mis en cache.
 - **Mises à jour intégrées** - vérification périodique des releases GitHub : bandeau sur
   l'accueil, pastille discrète pendant la lecture.

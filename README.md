@@ -99,8 +99,11 @@ and ~~iOS~~, built from a single Kotlin Multiplatform codebase. Source extractio
   letter on a grid keyboard, is the worst moment in the app. The TV shows a QR code, your
   phone opens a page served by the app itself over the local network, and you type on a
   touch keyboard: TMDB and TheIntroDB keys, OpenSubtitles account, sync credentials and
-  passphrase. The server only lives while the code is on screen, its address carries a
-  random token, and the page never shows an existing value back - only that it is set.
+  passphrase. The server only lives while the code is on screen, and its address carries
+  a random token. Existing values are prefilled, so you can reread or fix a key without
+  retyping it, and clearing a field erases it. The page doubles as a **remote** - D-pad,
+  OK, back, play/pause, and a field that types text on the TV, which makes searching
+  bearable. It drives Moo-vie, not the TV: it cannot turn it on or change its input.
 - **Offline-friendly** - TMDB responses and resolved source links are cached on disk.
 - **In-app updates** - periodic check against GitHub Releases; a banner on the home
   screen, a discreet chip during playback.

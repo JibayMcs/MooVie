@@ -120,7 +120,6 @@ class PairingProtocolTest {
     private val texts = PairingTexts(
         title = "Saisie",
         intro = "Laisser vide pour ne pas modifier.",
-        filled = "déjà renseigné",
         submit = "Enregistrer",
         done = "Enregistré",
         doneDetail = "Terminé.",
@@ -130,8 +129,8 @@ class PairingProtocolTest {
     fun `rend un champ par reglage, poste sur le jeton`() {
         val html = pairingPage(
             listOf(
-                PairingField("tmdb", "Clé API TMDB", filled = true),
-                PairingField("passphrase", "Phrase de passe", filled = false),
+                PairingField("tmdb", "Clé API TMDB", "API & Clés", "22f163f9cd"),
+                PairingField("passphrase", "Phrase de passe", "Synchro", ""),
             ),
             texts,
             "/ab3xk9zq",
@@ -139,7 +138,7 @@ class PairingProtocolTest {
         assertTrue("""name="tmdb"""" in html, html)
         assertTrue("""name="passphrase"""" in html)
         assertTrue("""action="/ab3xk9zq"""" in html)
-        assertTrue("déjà renseigné" in html)
+        assertTrue("""value="22f163f9cd"""" in html)
     }
 
     /**
@@ -149,30 +148,75 @@ class PairingProtocolTest {
      */
     @Test
     fun `desarme le clavier du telephone sur chaque champ`() {
-        val html = pairingPage(listOf(PairingField("tmdb", "Clé", false)), texts, "/t")
+        val html = pairingPage(listOf(PairingField("tmdb", "Clé", "API & Clés", "")), texts, "/t")
         assertTrue("""autocapitalize="off"""" in html)
         assertTrue("""autocorrect="off"""" in html)
         assertTrue("""spellcheck="false"""" in html)
     }
 
-    /** Une valeur déjà en place n'est jamais renvoyée au navigateur. */
+    /**
+     * Le formulaire est pré-rempli avec ce que porte le téléviseur.
+     *
+     * C'est l'inverse du premier jet, qui n'annonçait qu'un « déjà renseigné » :
+     * l'écran de réglages affiche déjà ces valeurs en clair sur la TV, les
+     * masquer ici ne protégeait rien et interdisait de relire ou de corriger une
+     * clé sans la retaper entièrement.
+     */
     @Test
-    fun `ne divulgue aucune valeur existante`() {
-        val html = pairingPage(listOf(PairingField("tmdb", "Clé", filled = true)), texts, "/t")
-        assertTrue("""value=""""" in html, html)
+    fun `pre-remplit avec la valeur du televiseur`() {
+        val html = pairingPage(listOf(PairingField("tmdb", "Clé", "API & Clés", "secret")), texts, "/t")
+        assertTrue("""value="secret"""" in html, html)
+    }
+
+    /**
+     * Un guillemet dans une phrase de passe fermerait l'attribut : la valeur
+     * serait amputée à l'affichage, puis renvoyée tronquée à l'envoi — une
+     * corruption silencieuse du secret même qui doit être identique partout.
+     */
+    @Test
+    fun `echappe un guillemet dans une valeur`() {
+        val html = pairingPage(
+            listOf(PairingField("passphrase", "Phrase", "Synchro", """mon "vrai" secret""")),
+            texts,
+            "/t",
+        )
+        assertTrue("""value="mon &quot;vrai&quot; secret"""" in html, html)
+    }
+
+    /**
+     * Les champs sont regroupés sous le service qui les réclame.
+     *
+     * « Identifiant » et « Mot de passe » ne veulent rien dire seuls au milieu
+     * d'un formulaire : c'est le titre de section qui dit de quel compte il
+     * s'agit. Une section par service, dans l'ordre de saisie.
+     */
+    @Test
+    fun `groupe les champs par service, sans dupliquer un titre`() {
+        val html = pairingPage(
+            listOf(
+                PairingField("os_user", "Identifiant", "Sous-titres · OpenSubtitles", ""),
+                PairingField("os_pass", "Mot de passe", "Sous-titres · OpenSubtitles", ""),
+                PairingField("sync.b2_key_id", "Identifiant de clé", "Synchro · Backblaze B2", ""),
+            ),
+            texts,
+            "/t",
+        )
+        assertEquals(2, Regex("<section>").findAll(html).count(), html)
+        assertEquals(1, Regex("OpenSubtitles").findAll(html).count())
+        assertTrue("<h2>Synchro · Backblaze B2</h2>" in html)
     }
 
     /** Un libellé traduit reste du texte, jamais du balisage. */
     @Test
     fun `echappe les libelles`() {
-        val html = pairingPage(listOf(PairingField("x", "<script>a&b", false)), texts, "/t")
+        val html = pairingPage(listOf(PairingField("x", "<script>a&b", "S", "")), texts, "/t")
         assertTrue("&lt;script&gt;a&amp;b" in html)
         assertTrue("<script>a&b" !in html)
     }
 
     @Test
     fun `la page est autonome`() {
-        val html = pairingPage(listOf(PairingField("tmdb", "Clé", false)), texts, "/t")
+        val html = pairingPage(listOf(PairingField("tmdb", "Clé", "API & Clés", "")), texts, "/t")
         // Rien à charger ailleurs : le téléviseur sert la page, il ne renvoie
         // pas le téléphone sur un CDN pour afficher six champs.
         assertTrue("http://" !in html && "https://" !in html, html)

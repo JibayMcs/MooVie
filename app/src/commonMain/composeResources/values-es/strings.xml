@@ -275,7 +275,7 @@
     <string name="backup_cancel">Cancelar</string>
     <string name="backup_finish">Finalizar</string>
     <string name="onboarding_title">Bienvenido a Moo-vie</string>
-    <string name="onboarding_intro">Dos formas de empezar, según si vienes de otro dispositivo o instalas Moo-vie por primera vez.</string>
+    <string name="onboarding_intro">Según se venga de otro dispositivo o se instale Moo-vie por primera vez.</string>
     <string name="onboarding_restore">Ya he usado Moo-vie</string>
     <string name="onboarding_restore_help">Restaura los puntos de reproducción, la lista, el historial y la clave TMDB desde una copia en memoria USB.</string>
     <string name="onboarding_fresh">Primera instalación</string>
@@ -415,9 +415,19 @@
     <string name="pairing_no_network">No se ha detectado ninguna red local. Comprobar la conexión del televisor.</string>
     <string name="pairing_no_socket">No se ha podido iniciar el servidor local.</string>
     <string name="pairing_close">Finalizar</string>
-    <string name="pairing_page_intro">Dejar un campo vacío para no modificarlo.</string>
-    <string name="pairing_page_filled">ya configurado</string>
+    <string name="pairing_page_intro">Los valores actuales del televisor están rellenados. Vaciar un campo lo borra.</string>
     <string name="pairing_page_submit">Guardar</string>
     <string name="pairing_page_done">Guardado</string>
     <string name="pairing_page_done_detail">Los ajustes se han aplicado en el televisor. Se puede cerrar esta página.</string>
+    <string name="onboarding_phone_help">Muestra un código QR para escanear con un teléfono de la misma red. La clave TMDB se pega entonces con el teclado táctil, en lugar de escribirla con el mando.</string>
+    <string name="pairing_key_checking">Comprobando la clave TMDB…</string>
+    <string name="pairing_key_rejected">TMDB ha rechazado esta clave. Corregirla en el teléfono y volver a enviar.</string>
+    <string name="pairing_key_unreachable">TMDB no responde. Comprobar la conexión del televisor y volver a enviar.</string>
+    <string name="pairing_key_missing">Guardado, pero sigue faltando la clave TMDB: es imprescindible para empezar.</string>
+    <string name="remote_title">Mando</string>
+    <string name="remote_intro">Controla Moo-vie en el televisor. No controla el televisor en sí.</string>
+    <string name="remote_type">Texto para escribir en la TV</string>
+    <string name="remote_send">Enviar texto</string>
+    <string name="remote_to_settings">Volver a los ajustes</string>
+    <string name="remote_to_remote">Abrir el mando</string>
 </resources>

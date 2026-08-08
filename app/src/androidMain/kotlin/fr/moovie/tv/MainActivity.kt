@@ -45,6 +45,8 @@ import fr.moovie.tv.ui.onboarding.OnboardingScreen
 import fr.moovie.tv.ui.onboarding.rememberStartScreen
 import fr.moovie.tv.data.download.DownloadQueue
 import fr.moovie.tv.data.download.localStream
+import fr.moovie.tv.data.pairing.PairingSession
+import fr.moovie.tv.data.remote.remoteTarget
 import fr.moovie.tv.data.sync.SyncCoordinator
 import fr.moovie.tv.data.sync.SyncTrigger
 import fr.moovie.tv.ui.profile.ProfileHost
@@ -442,9 +444,22 @@ class MainActivity : ComponentActivity() {
      */
     override fun onResume() {
         super.onResume()
+        // Cible des touches de la télécommande virtuelle. La poser ici et la
+        // retirer en pause borne la fonctionnalité au premier plan : c'est ce
+        // qui garantit qu'aucun serveur ne reste à l'écoute du réseau une fois
+        // Moo-vie quittée.
+        remoteTarget = this
         lifecycleScope.launch {
             SyncCoordinator.sync(SyncTrigger.FOREGROUND, System.currentTimeMillis())
         }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        remoteTarget = null
+        // Le serveur d'appairage meurt avec le premier plan, télécommande armée
+        // ou non : personne ne regarde plus l'écran qui affiche l'adresse.
+        PairingSession.stop()
     }
 
     override fun onNewIntent(intent: Intent) {

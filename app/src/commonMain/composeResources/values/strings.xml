@@ -277,7 +277,7 @@
     <string name="backup_cancel">Annuler</string>
     <string name="backup_finish">Terminer</string>
     <string name="onboarding_title">Bienvenue sur Moo-vie</string>
-    <string name="onboarding_intro">Deux façons de démarrer, selon qu'il s'agit d'un autre appareil ou d'une première installation de Moo-vie.</string>
+    <string name="onboarding_intro">Selon qu'il s'agit d'un autre appareil ou d'une première installation de Moo-vie.</string>
     <string name="onboarding_restore">J'ai déjà utilisé Moo-vie</string>
     <string name="onboarding_restore_help">Restaure les reprises de lecture, la liste, l'historique et la clé TMDB depuis une sauvegarde sur clé USB.</string>
     <string name="onboarding_fresh">Première installation</string>
@@ -417,9 +417,19 @@
     <string name="pairing_no_network">Aucun réseau local détecté. Vérifier la connexion du téléviseur.</string>
     <string name="pairing_no_socket">Impossible de démarrer le serveur local.</string>
     <string name="pairing_close">Terminer</string>
-    <string name="pairing_page_intro">Laisser un champ vide pour ne pas le modifier.</string>
-    <string name="pairing_page_filled">déjà renseigné</string>
+    <string name="pairing_page_intro">Les valeurs du téléviseur sont pré-remplies. Vider un champ l'efface.</string>
     <string name="pairing_page_submit">Enregistrer</string>
     <string name="pairing_page_done">Enregistré</string>
     <string name="pairing_page_done_detail">Les réglages sont appliqués sur le téléviseur. Cette page peut être fermée.</string>
+    <string name="onboarding_phone_help">Affiche un QR code à scanner avec un téléphone du même réseau. La clé TMDB se colle alors au clavier tactile, au lieu de se taper à la télécommande.</string>
+    <string name="pairing_key_checking">Vérification de la clé TMDB…</string>
+    <string name="pairing_key_rejected">Clé TMDB refusée par le service. Corriger la clé sur le téléphone puis renvoyer.</string>
+    <string name="pairing_key_unreachable">TMDB injoignable. Vérifier la connexion du téléviseur, puis renvoyer.</string>
+    <string name="pairing_key_missing">Enregistré, mais la clé TMDB manque toujours : elle est indispensable pour démarrer.</string>
+    <string name="remote_title">Télécommande</string>
+    <string name="remote_intro">Pilote Moo-vie sur le téléviseur. Elle ne commande pas le téléviseur lui-même.</string>
+    <string name="remote_type">Texte à saisir sur la TV</string>
+    <string name="remote_send">Envoyer le texte</string>
+    <string name="remote_to_settings">Revenir aux réglages</string>
+    <string name="remote_to_remote">Ouvrir la télécommande</string>
 </resources>
