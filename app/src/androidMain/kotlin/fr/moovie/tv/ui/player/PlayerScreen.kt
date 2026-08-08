@@ -979,6 +979,11 @@ fun PlayerScreen(
                                 title = title,
                                 subtitle = subtitle,
                                 imageUrl = posterUrl.takeIf { it.isNotBlank() },
+                                // Déduits de la clé plutôt que laissés vides :
+                                // un téléchargement sans titre d'origine ne sait
+                                // plus dire de quelle série il vient.
+                                tmdbId = parseMediaKey(mediaKey)?.tmdbId ?: 0,
+                                isTv = parseMediaKey(mediaKey)?.isTv ?: false,
                                 createdAt = System.currentTimeMillis(),
                                 sourceUrl = sourceUrl,
                                 hoster = hoster,

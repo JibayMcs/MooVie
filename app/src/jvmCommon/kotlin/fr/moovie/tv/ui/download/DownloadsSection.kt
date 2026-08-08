@@ -133,9 +133,17 @@ fun DownloadsSection(
  *
  * `tv:1396:s1e1` et `tv:1396:s1e2` partagent `tv:1396` ; un film garde sa clé
  * entière et reste donc seul dans son groupe.
+ *
+ * **Lu dans la clé, pas dans `isTv`.** Le champ est facultatif et le bouton du
+ * lecteur l'oubliait : ses téléchargements retombaient sur le défaut `false`,
+ * donc sur leur clé entière, et chaque épisode formait un groupe d'un seul —
+ * onze épisodes groupés d'un côté, quatre lignes isolées de l'autre, pour la
+ * même série. La clé, elle, est l'identité : elle ne peut pas être oubliée.
+ * C'est déjà ainsi que `WatchProgressRepository` remonte d'un épisode à son
+ * titre, et ça répare au passage les enregistrements déjà écrits.
  */
-private fun Download.groupKey(): String =
-    if (isTv) key.split(':').take(2).joinToString(":") else key
+internal fun Download.groupKey(): String =
+    if (key.startsWith("tv:")) key.split(':').take(2).joinToString(":") else key
 
 /**
  * Une série et ses épisodes, repliés sous une seule entrée.
