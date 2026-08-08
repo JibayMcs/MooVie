@@ -432,4 +432,8 @@
     <string name="remote_send">Envoyer le texte</string>
     <string name="remote_to_settings">Revenir aux réglages</string>
     <string name="remote_to_remote">Ouvrir la télécommande</string>
+    <string name="details_source_dl_queued">En attente de téléchargement</string>
+    <string name="details_source_dl_running">Téléchargement · %1$s %%</string>
+    <string name="details_source_dl_paused">Téléchargement en pause</string>
+    <string name="details_source_dl_failed">Échec du téléchargement</string>
 </resources>

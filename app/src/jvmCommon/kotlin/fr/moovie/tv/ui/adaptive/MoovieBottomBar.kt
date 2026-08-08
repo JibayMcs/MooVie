@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.Download
+import fr.moovie.tv.resources.settings_cat_downloads
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Search
@@ -52,6 +54,7 @@ private enum class NavTab(val screen: Screen, val icon: ImageVector, val label: 
     SEARCH(Screen.Search, Icons.Default.Search, Res.string.home_search),
     CATALOG(Screen.Catalog(), Icons.Default.GridView, Res.string.catalog_open),
     HISTORY(Screen.History, Icons.Default.History, Res.string.history_title),
+    DOWNLOADS(Screen.Downloads, Icons.Default.Download, Res.string.settings_cat_downloads),
     SETTINGS(Screen.Settings, Icons.Default.Settings, Res.string.home_settings),
 }
 

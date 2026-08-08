@@ -430,4 +430,8 @@
     <string name="remote_send">Enviar texto</string>
     <string name="remote_to_settings">Volver a los ajustes</string>
     <string name="remote_to_remote">Abrir el mando</string>
+    <string name="details_source_dl_queued">En espera de descarga</string>
+    <string name="details_source_dl_running">Descargando · %1$s %%</string>
+    <string name="details_source_dl_paused">Descarga en pausa</string>
+    <string name="details_source_dl_failed">Error de descarga</string>
 </resources>

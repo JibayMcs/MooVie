@@ -5,6 +5,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import fr.moovie.tv.data.download.DownloadRepository
 import androidx.compose.runtime.remember
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -37,6 +38,10 @@ fun DetailsScreen(
     val sourceQualities by viewModel.qualities.collectAsStateWithLifecycle()
     val sourceStatuses by viewModel.linkStatus.collectAsStateWithLifecycle()
     val streamLang by viewModel.streamLanguage.collectAsStateWithLifecycle()
+    // Indexés par le lien d'embed dont ils sont partis : c'est la seule façon
+    // de savoir **quelle ligne** allumer dans le panneau des sources.
+    val downloadsBySource by remember { DownloadRepository().downloads }
+        .collectAsStateWithLifecycle(initialValue = emptyList())
     val watched by viewModel.watched.collectAsStateWithLifecycle()
     val resume by viewModel.resume.collectAsStateWithLifecycle()
     val quickPlay by viewModel.quickPlay.collectAsStateWithLifecycle()
@@ -124,6 +129,7 @@ fun DetailsScreen(
         onPickSource = viewModel::play,
         onDownloadSource = viewModel::download,
         sourceStatuses = sourceStatuses,
+        downloads = downloadsBySource.associateBy { it.sourceUrl },
         sourceQualities = sourceQualities,
         onRequestQuality = viewModel::requestQuality,
         onDismissQuickPlay = viewModel::dismissQuickPlay,

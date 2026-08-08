@@ -7,6 +7,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import fr.moovie.tv.data.download.DownloadRepository
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import fr.moovie.tv.data.watch.ResumeEntry
@@ -57,6 +58,7 @@ internal fun DesktopHomeScreen(
     onOpenSettings: () -> Unit,
     onOpenSearch: () -> Unit,
     onOpenHistory: () -> Unit,
+    onOpenDownloads: () -> Unit = {},
     onOpenCatalog: () -> Unit,
     onOpenCatalogGenre: (CatalogSelection) -> Unit,
 ) {
@@ -75,6 +77,7 @@ internal fun DesktopHomeScreen(
         onOpenSettings = onOpenSettings,
         onOpenSearch = onOpenSearch,
         onOpenHistory = onOpenHistory,
+        onOpenDownloads = onOpenDownloads,
         onOpenCatalog = onOpenCatalog,
         onOpenCatalogGenre = onOpenCatalogGenre,
         onRemoveResume = vm::removeResume,
@@ -214,6 +217,10 @@ internal fun DesktopDetailsScreen(
     val sourceQualities by vm.qualities.collectAsState()
     val sourceStatuses by vm.linkStatus.collectAsState()
     val streamLang by vm.streamLanguage.collectAsState()
+    // Indexés par le lien d'embed dont ils sont partis : c'est la seule façon
+    // de savoir **quelle ligne** allumer dans le panneau des sources.
+    val downloadsBySource by remember { DownloadRepository().downloads }
+        .collectAsState(initial = emptyList())
     val watched by vm.watched.collectAsState()
     val resume by vm.resume.collectAsState()
     val quickPlay by vm.quickPlay.collectAsState()
@@ -311,6 +318,7 @@ internal fun DesktopDetailsScreen(
         onPickSource = vm::play,
         onDownloadSource = vm::download,
         sourceStatuses = sourceStatuses,
+        downloads = downloadsBySource.associateBy { it.sourceUrl },
         sourceQualities = sourceQualities,
         onRequestQuality = vm::requestQuality,
         onDismissQuickPlay = vm::dismissQuickPlay,

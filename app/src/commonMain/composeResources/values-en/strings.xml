@@ -430,4 +430,8 @@
     <string name="remote_send">Send text</string>
     <string name="remote_to_settings">Back to settings</string>
     <string name="remote_to_remote">Open the remote</string>
+    <string name="details_source_dl_queued">Queued for download</string>
+    <string name="details_source_dl_running">Downloading · %1$s %%</string>
+    <string name="details_source_dl_paused">Download paused</string>
+    <string name="details_source_dl_failed">Download failed</string>
 </resources>

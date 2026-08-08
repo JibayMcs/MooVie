@@ -18,6 +18,13 @@ sealed interface Screen {
     data object History : Screen
 
     /**
+     * La file des téléchargements. Écran de premier niveau, comme l'historique :
+     * on y va pour savoir où en est une opération longue, pas pour régler quoi
+     * que ce soit.
+     */
+    data object Downloads : Screen
+
+    /**
      * Parcours du catalogue TMDB par genre (distinct de la recherche par texte).
      *
      * [select] est le genre à ouvrir d'emblée. C'est ce que veut dire « en voir

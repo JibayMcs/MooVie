@@ -15,6 +15,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import fr.moovie.tv.data.download.Download
+import fr.moovie.tv.data.download.DownloadState
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -101,6 +103,11 @@ import fr.moovie.tv.resources.details_trying_source
 import fr.moovie.tv.resources.details_seasons
 import fr.moovie.tv.resources.details_sources
 import fr.moovie.tv.resources.details_source_download_hint
+import fr.moovie.tv.resources.details_source_dl_queued
+import fr.moovie.tv.resources.details_source_dl_running
+import fr.moovie.tv.resources.details_source_dl_paused
+import fr.moovie.tv.resources.details_source_dl_failed
+import fr.moovie.tv.resources.player_download_done
 import fr.moovie.tv.resources.details_source_dead
 import fr.moovie.tv.resources.details_source_via
 import fr.moovie.tv.resources.details_catalogue_count
@@ -227,6 +234,11 @@ fun DetailsScreenContent(
     onRequestQuality: (EmbedLink) -> Unit = {},
     /** Verdict de la sonde par URL d'embed — voir [LinkStatus]. */
     sourceStatuses: Map<String, LinkStatus> = emptyMap(),
+    /**
+     * Téléchargements en cours ou terminés, indexés par le lien d'embed dont
+     * ils sont partis. Voir [SourceRow] pour la raison de cette clé.
+     */
+    downloads: Map<String, Download> = emptyMap(),
     onDismissQuickPlay: () -> Unit,
     onBack: () -> Unit,
     // Desktop uniquement : bouton retour à l'écran (sur TV, la télécommande a
@@ -702,6 +714,7 @@ fun DetailsScreenContent(
                     onDownload = onDownloadSource,
                     qualities = sourceQualities,
                     statuses = sourceStatuses,
+                    downloads = downloads,
                     onRequestQuality = onRequestQuality,
                 )
             }
@@ -773,6 +786,7 @@ private fun SourcesSlideOver(
     onDownload: (EmbedLink) -> Unit,
     /** Verdict de la sonde par URL, rempli au fil de l'eau. */
     statuses: Map<String, LinkStatus>,
+    downloads: Map<String, Download>,
     /** Qualité mesurée par URL d'embed, remplie au fil de l'eau. */
     qualities: Map<String, String>,
     /** Demande la mesure d'un lien ; sans effet si elle est déjà connue. */
@@ -891,6 +905,7 @@ private fun SourcesSlideOver(
                             quality = qualities[link.url],
                             status = statuses[link.url] ?: LinkStatus.UNKNOWN,
                             resolving = link.url == resolvingUrl,
+                            download = downloads[link.url],
                             onClick = { onPick(link) },
                             onLongClick = { onDownload(link) },
                             modifier = Modifier
@@ -937,6 +952,20 @@ private fun SourceRow(
     status: LinkStatus,
     /** Cette source est celle qu'on est en train d'ouvrir. */
     resolving: Boolean,
+    /**
+     * Le téléchargement lancé **depuis cette source**, s'il existe.
+     *
+     * La jointure se fait sur `sourceUrl` et non sur la clé média : un
+     * `Download` appartient au titre, mais il garde le lien d'embed dont il est
+     * parti. C'est ce qui permet d'allumer la ligne qu'on a effectivement
+     * choisie — et une seule, la file refusant un second téléchargement pour le
+     * même titre.
+     *
+     * Sans lui, un appui long ne changeait **rien** à l'écran : l'action la plus
+     * longue de l'application ne disait ni qu'elle avait commencé, ni où elle en
+     * était.
+     */
+    download: Download?,
     onClick: () -> Unit,
     /**
      * Appui long = télécharger. Pas un second bouton : la ligne est déjà pleine,
@@ -949,6 +978,11 @@ private fun SourceRow(
     modifier: Modifier = Modifier,
 ) {
     val dead = status == LinkStatus.DEAD
+    // Colonne autour du bouton : la barre d'avancement se pose **sous** la
+    // ligne, pleine largeur, plutôt que de disputer la place horizontale déjà
+    // comptée — c'est la même raison qui fait que le témoin de résolution
+    // remplace la variante au lieu de s'y ajouter.
+    Column(modifier = Modifier.fillMaxWidth()) {
     MoovieButton(onClick = onClick, onLongClick = onLongClick, modifier = modifier) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
@@ -967,7 +1001,22 @@ private fun SourceRow(
             // Le verdict prime sur la qualité : savoir qu'une source ne
             // répond pas vaut mieux que de savoir en quelle définition elle ne
             // répond pas.
-            val secondary = if (dead) {
+            //
+            // Le téléchargement prime sur les deux : c'est la seule information
+            // qui répond à une action qu'on vient de déclencher, alors que la
+            // qualité et le verdict décrivent un état permanent.
+            val downloadLine = when (download?.state) {
+                DownloadState.QUEUED -> stringResource(Res.string.details_source_dl_queued)
+                DownloadState.RUNNING -> stringResource(
+                    Res.string.details_source_dl_running,
+                    (download.progress * 100).toInt().toString(),
+                )
+                DownloadState.PAUSED -> stringResource(Res.string.details_source_dl_paused)
+                DownloadState.DONE -> stringResource(Res.string.player_download_done)
+                DownloadState.FAILED -> stringResource(Res.string.details_source_dl_failed)
+                null -> null
+            }
+            val secondary = downloadLine ?: if (dead) {
                 stringResource(Res.string.details_source_dead)
             } else {
                 quality ?: link.provider?.let { stringResource(Res.string.details_source_via, it) }
@@ -977,6 +1026,9 @@ private fun SourceRow(
                     it,
                     style = MaterialTheme.typography.labelSmall,
                     color = when {
+                        download?.state == DownloadState.DONE -> Color(0xFF7DDC7D)
+                        download?.state == DownloadState.FAILED -> Color(0xFFE0A0A0)
+                        downloadLine != null -> MOOVIE_ACCENT
                         dead -> Color(0xFFE0A0A0)
                         quality != null -> Color.White.copy(alpha = 0.9f)
                         else -> Color.White.copy(alpha = 0.55f)
@@ -1006,6 +1058,17 @@ private fun SourceRow(
                 modifier = Modifier.size(16.dp),
             )
         }
+    }
+    // Déterminée dès qu'on connaît le nombre de segments. Avant, la ligne de
+    // texte dit déjà « en attente » : une barre figée à zéro se lirait comme un
+    // blocage plutôt que comme un démarrage.
+    if (download?.state == DownloadState.RUNNING && download.totalSegments > 0) {
+        MoovieProgressBar(
+            progress = download.progress,
+            trackColor = Color(0x33FFFFFF),
+            modifier = Modifier.fillMaxWidth().height(3.dp),
+        )
+    }
     }
 }
 

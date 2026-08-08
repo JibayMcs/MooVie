@@ -10,6 +10,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import fr.moovie.tv.data.remote.RemoteFocus
 import fr.moovie.tv.data.remote.remoteWindow
 import fr.moovie.tv.data.pairing.PairingSession
 import androidx.compose.runtime.LaunchedEffect
@@ -45,6 +46,8 @@ import fr.moovie.tv.ui.onboarding.rememberStartScreen
 import fr.moovie.tv.ui.adaptive.AdaptiveRoot
 import fr.moovie.tv.ui.adaptive.UiFlavor
 import fr.moovie.tv.data.download.DownloadQueue
+import fr.moovie.tv.ui.download.DownloadsScreen
+import fr.moovie.tv.ui.download.downloadPlayerScreen
 import fr.moovie.tv.data.download.localStream
 import fr.moovie.tv.data.sync.SyncCoordinator
 import fr.moovie.tv.data.sync.SyncTrigger
@@ -165,6 +168,7 @@ fun main() {
             }
 
             MooVieTheme {
+                RemoteFocus.Register()
                 // L'animation se pose au-dessus de l'app, comme sur Android :
                 // l'accueil charge derrière et le temps d'animation est du temps
                 // de chargement gagné.
@@ -270,6 +274,7 @@ private fun DesktopApp(
                 onOpenSettings = { nav.push(Screen.Settings) },
                 onOpenSearch = { nav.push(Screen.Search) },
                 onOpenHistory = { nav.push(Screen.History) },
+                onOpenDownloads = { nav.push(Screen.Downloads) },
                 onOpenCatalog = { nav.push(Screen.Catalog()) },
                 onOpenCatalogGenre = { nav.push(Screen.Catalog(it)) },
             )
@@ -279,6 +284,12 @@ private fun DesktopApp(
                 // l'écran d'installation n'aurait plus rien à proposer.
                 onReady = { nav.replace(Screen.Home) },
             )
+            Screen.Downloads -> DownloadsScreen(
+                onPlay = { d -> downloadPlayerScreen(d)?.let(nav::push) },
+                onBack = { nav.pop() },
+                showBackButton = true,
+            )
+
             Screen.Settings -> DesktopSettingsScreen(
                 onBack = { nav.pop() },
                 onPlayDownload = { download ->

@@ -44,8 +44,11 @@ import fr.moovie.tv.ui.navigation.rememberNavStack
 import fr.moovie.tv.ui.onboarding.OnboardingScreen
 import fr.moovie.tv.ui.onboarding.rememberStartScreen
 import fr.moovie.tv.data.download.DownloadQueue
+import fr.moovie.tv.ui.download.DownloadsScreen
+import fr.moovie.tv.ui.download.downloadPlayerScreen
 import fr.moovie.tv.data.download.localStream
 import fr.moovie.tv.data.pairing.PairingSession
+import fr.moovie.tv.data.remote.RemoteFocus
 import fr.moovie.tv.data.remote.remoteTarget
 import fr.moovie.tv.data.sync.SyncCoordinator
 import fr.moovie.tv.data.sync.SyncTrigger
@@ -119,6 +122,9 @@ class MainActivity : ComponentActivity() {
             // Thème tv-material (PlayerScreen) autour du thème material3 partagé.
             MooVieTvMaterialTheme {
             MooVieTheme {
+                // Repli de focus de la télécommande : le FocusManager appartient à
+                // cette composition, il ne peut être capté qu'ici.
+                RemoteFocus.Register()
                 // Fixe la couleur de contenu par défaut (sinon les Text libres
                 // héritent d'une couleur sombre sans Surface parent → invisibles).
                 CompositionLocalProvider(LocalContentColor provides Color.White) {
@@ -303,6 +309,7 @@ class MainActivity : ComponentActivity() {
                                 onOpenSettings = { nav.push(Screen.Settings) },
                                 onOpenSearch = { nav.push(Screen.Search) },
                                 onOpenHistory = { nav.push(Screen.History) },
+                                onOpenDownloads = { nav.push(Screen.Downloads) },
                                 onOpenCatalog = { nav.push(Screen.Catalog()) },
                                 onOpenCatalogGenre = { nav.push(Screen.Catalog(it)) },
                             )
@@ -313,6 +320,12 @@ class MainActivity : ComponentActivity() {
                                 // n'aurait plus rien à proposer.
                                 onReady = { nav.replace(Screen.Home) },
                             )
+                            Screen.Downloads -> DownloadsScreen(
+                                onPlay = { d -> downloadPlayerScreen(d)?.let(nav::push) },
+                                onBack = { nav.pop() },
+                                showBackButton = useBottomNav,
+                            )
+
                             Screen.Settings -> SettingsScreen(
                                 onBack = { nav.pop() },
                                 onPlayDownload = { download ->

@@ -31,6 +31,8 @@ import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.Download
+import fr.moovie.tv.resources.settings_cat_downloads
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
@@ -125,6 +127,7 @@ fun HomeScreenContent(
     onOpenSettings: () -> Unit,
     onOpenSearch: () -> Unit,
     onOpenHistory: () -> Unit,
+    onOpenDownloads: () -> Unit = {},
     onOpenCatalog: () -> Unit,
     /** « En voir plus » d'une rangée épinglée : rouvre le genre exact. */
     onOpenCatalogGenre: (CatalogSelection) -> Unit,
@@ -265,6 +268,17 @@ fun HomeScreenContent(
                         onClick = onOpenHistory,
                         icon = Icons.Default.History,
                         contentDescription = stringResource(Res.string.history_title),
+                        modifier = headerDown,
+                    )
+                    // Les téléchargements se surveillent, ils ne se règlent
+                    // pas : leur place est ici, à côté de l'historique, et non
+                    // à trois niveaux dans les réglages. Toujours visible même
+                    // à vide — la faire apparaître déplacerait le focus des
+                    // voisines au moment le plus inattendu.
+                    MoovieIconButton(
+                        onClick = onOpenDownloads,
+                        icon = Icons.Default.Download,
+                        contentDescription = stringResource(Res.string.settings_cat_downloads),
                         modifier = headerDown,
                     )
                     MoovieIconButton(
