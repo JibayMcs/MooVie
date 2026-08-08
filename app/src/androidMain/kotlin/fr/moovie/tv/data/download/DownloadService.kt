@@ -53,11 +53,25 @@ class DownloadService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // **Synchrone, et avant toute autre chose.** Android exige `startForeground`
+        // dans les cinq secondes qui suivent `startForegroundService`, sinon il tue
+        // le processus — ce qui s'est produit : plus de processus, plus de service,
+        // et un téléchargement arrêté sans un mot. La version précédente attendait
+        // un `getString` de ressource Compose, qui est suspendu : le premier plan
+        // dépendait donc d'une course.
+        //
+        // Le libellé du lanceur suffit à démarrer, il ne demande aucune ressource.
+        // Le titre traduit et le nom de canal arrivent juste après, par la mise à
+        // jour ci-dessous : un canal se renomme en le recréant sous le même
+        // identifiant.
+        val label = applicationInfo.loadLabel(packageManager).toString()
+        ensureChannel(label)
+        startInForeground(build(label, null, 0, 0))
+
         scope.launch {
             val channelName = getString(Res.string.downloads_notification_channel)
             val title = getString(Res.string.settings_cat_downloads)
             ensureChannel(channelName)
-            startInForeground(build(title, null, 0, 0))
 
             repo.downloads
                 // Ne redessiner que sur un vrai changement : la file écrit à

@@ -441,4 +441,6 @@
     <string name="details_download_season_progress">Recherche %1$s/%2$s…</string>
     <string name="downloads_group">%1$s épisodes</string>
     <string name="downloads_group_running">%1$s épisodes · %2$s en cours</string>
+    <string name="details_download_season_partial">%1$s en file · %2$s sans source</string>
+    <string name="details_download_season_queued">%1$s épisodes en file</string>
 </resources>

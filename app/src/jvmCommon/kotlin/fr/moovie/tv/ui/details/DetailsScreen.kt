@@ -111,6 +111,8 @@ import fr.moovie.tv.resources.details_source_dl_running
 import fr.moovie.tv.resources.details_source_dl_paused
 import fr.moovie.tv.resources.details_source_dl_failed
 import fr.moovie.tv.resources.player_download_done
+import fr.moovie.tv.resources.details_download_season_partial
+import fr.moovie.tv.resources.details_download_season_queued
 import fr.moovie.tv.resources.details_download_season
 import fr.moovie.tv.resources.details_download_season_progress
 import fr.moovie.tv.resources.details_source_dead
@@ -532,16 +534,40 @@ fun DetailsScreenContent(
                             // sélection réutilise le verdict du lecteur.
                             MoovieButton(onClick = { onDownloadSeason(s.season) }) {
                                 Text(
-                                    if (seasonDownload == null) {
-                                        stringResource(Res.string.details_download_season)
-                                    } else {
-                                        stringResource(
+                                    when {
+                                        seasonDownload == null ->
+                                            stringResource(Res.string.details_download_season)
+                                        // Terminé : on dit ce qui a été fait,
+                                        // **et ce qui a échoué**. « Recherche
+                                        // 8/8… » puis un retour au libellé
+                                        // d'origine laissait croire à un arrêt,
+                                        // alors que deux épisodes n'avaient
+                                        // simplement aucune source jouable — un
+                                        // compte que l'on tenait déjà sans
+                                        // jamais l'afficher.
+                                        seasonDownload.done && seasonDownload.failed > 0 ->
+                                            stringResource(
+                                                Res.string.details_download_season_partial,
+                                                seasonDownload.queued.toString(),
+                                                seasonDownload.failed.toString(),
+                                            )
+                                        seasonDownload.done ->
+                                            stringResource(
+                                                Res.string.details_download_season_queued,
+                                                seasonDownload.queued.toString(),
+                                            )
+                                        else -> stringResource(
                                             Res.string.details_download_season_progress,
                                             seasonDownload.checked.toString(),
                                             seasonDownload.total.toString(),
                                         )
                                     },
                                     style = MaterialTheme.typography.labelMedium,
+                                    color = if (seasonDownload?.done == true && seasonDownload.failed > 0) {
+                                        Color(0xFFE0B057)
+                                    } else {
+                                        Color.Unspecified
+                                    },
                                 )
                             }
                         }

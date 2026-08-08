@@ -45,7 +45,12 @@ fun PlayerDownloadButton(mediaKey: String, onEnqueue: () -> Unit) {
 
     val working = download?.state == DownloadState.RUNNING || download?.state == DownloadState.QUEUED
 
-    Box(contentAlignment = Alignment.Center) {
+    // Cible **carrée**. MoovieIconButton mesure 44 × 40 dp (icône de 20, plus un
+    // contentPadding de 12 horizontal et 10 vertical) : un cercle centré dans ce
+    // rectangle a 3 dp de jeu sur les côtés contre 1 en haut et en bas, et ne
+    // peut donc pas être concentrique à l'icône. Le problème n'était pas
+    // l'anneau, c'était qu'on posait un cercle sur un rectangle.
+    Box(contentAlignment = Alignment.Center, modifier = Modifier.size(44.dp)) {
         MoovieIconButton(
             onClick = {
                 when (download?.state) {
@@ -85,13 +90,13 @@ fun PlayerDownloadButton(mediaKey: String, onEnqueue: () -> Unit) {
                     progress = { download.progress },
                     color = MOOVIE_ACCENT,
                     strokeWidth = 2.dp,
-                    modifier = Modifier.size(38.dp),
+                    modifier = Modifier.size(40.dp),
                 )
             } else {
                 CircularProgressIndicator(
                     color = MOOVIE_ACCENT,
                     strokeWidth = 2.dp,
-                    modifier = Modifier.size(38.dp),
+                    modifier = Modifier.size(40.dp),
                 )
             }
         }
