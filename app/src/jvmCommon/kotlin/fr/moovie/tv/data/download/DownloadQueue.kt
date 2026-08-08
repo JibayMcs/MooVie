@@ -49,6 +49,10 @@ object DownloadQueue {
      */
     fun enqueue(download: Download, stream: PlayableStream) {
         if (jobs.containsKey(download.key)) return
+        // Avant de lancer quoi que ce soit : sans premier plan, Android tue ce
+        // processus au premier passage en arrière-plan et le téléchargement
+        // meurt en silence.
+        DownloadForeground.start()
         val queued = download.copy(state = DownloadState.QUEUED, error = null)
         jobs[download.key] = scope.launch {
             repo.put(queued)
@@ -56,6 +60,9 @@ object DownloadQueue {
                 serial.withLock { run(queued, stream) }
             } finally {
                 jobs.remove(download.key)
+                // Dernier travail terminé : on rend la main, ce qui retire
+                // aussi la notification. Rien ne doit rester dans le volet.
+                if (jobs.isEmpty()) DownloadForeground.stop()
             }
         }
     }

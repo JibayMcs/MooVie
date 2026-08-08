@@ -13,6 +13,7 @@ import fr.moovie.tv.core.watch.parseEpisodeKey
 import fr.moovie.tv.core.sources.port.SourceProvider
 import fr.moovie.tv.core.sources.usecase.nextLinkFor
 import fr.moovie.tv.data.download.Download
+import fr.moovie.tv.data.download.DownloadRepository
 import fr.moovie.tv.data.download.DownloadQueue
 import fr.moovie.tv.data.download.localStream
 import fr.moovie.tv.data.sources.ExtractorRegistry
@@ -1100,6 +1101,164 @@ class DetailsViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Avancement du téléchargement d'une saison entière.
+     *
+     * `checked` compte les épisodes déjà examinés, pas ceux téléchargés : la
+     * partie longue est la recherche d'une source qui marche, la mise en file
+     * est instantanée.
+     */
+    data class SeasonDownload(
+        val season: Int,
+        val checked: Int,
+        val total: Int,
+        val queued: Int,
+        val failed: Int,
+    ) {
+        val done: Boolean get() = checked >= total
+    }
+
+    private val _seasonDownload = MutableStateFlow<SeasonDownload?>(null)
+    val seasonDownload: StateFlow<SeasonDownload?> = _seasonDownload
+
+    private var seasonJob: Job? = null
+
+    /**
+     * Télécharge toute la saison affichée, en choisissant pour chaque épisode
+     * **une source que le lecteur saurait vraiment lire**.
+     *
+     * ### Pourquoi ce n'est pas « prendre la première source »
+     *
+     * Le panneau des sources en propose vingt-cinq dont la moitié répond 403,
+     * sert une page d'erreur, ou renvoie l'URL leurre de vingt secondes. Aller
+     * dans chaque fiche, ouvrir le panneau, faire un appui long et tomber sur
+     * une source morte — c'est exactement le geste que cette fonction remplace.
+     *
+     * On rejoue donc la cascade de la lecture rapide, à l'identique :
+     * [nextLinkFor] pour l'ordre (préférence de langue puis rang du
+     * catalogue), résolution, puis **[isStreamPlayable] avec la durée attendue
+     * de l'épisode**. C'est ce dernier contrôle qui écarte les leurres : un
+     * flux qui dure vingt secondes là où l'épisode en fait quarante-deux
+     * minutes n'est pas l'épisode.
+     *
+     * ### Ce qui borne le coût
+     *
+     * Chaque tentative est une résolution plus une ou deux requêtes de sonde.
+     * On s'arrête donc à [MAX_TRIES_PER_EPISODE] essais par épisode : au-delà,
+     * l'épisode est déclaré introuvable et on passe au suivant plutôt que de
+     * marteler dix hébergeurs. Un épisode déjà téléchargé est sauté sans
+     * aucune requête.
+     *
+     * La mise en file, elle, ne parallélise rien : [DownloadQueue] tient déjà
+     * un titre à la fois, et c'est ce qui rend le premier épisode regardable
+     * pendant que le deuxième se charge.
+     */
+    fun downloadSeason(season: Int) {
+        if (seasonJob?.isActive == true) return
+        val tv = _state.value as? DetailsState.Tv ?: return
+        if (tv.season != season) return
+        val episodes = tv.episodes.filter { it.episodeNumber > 0 }
+        if (episodes.isEmpty()) return
+
+        seasonJob = viewModelScope.launch {
+            val lang = settings.streamLanguage.first().name
+            val already = DownloadRepository().downloads.first().map { it.key }.toSet()
+            var checked = 0
+            var queued = 0
+            var failed = 0
+            _seasonDownload.value = SeasonDownload(season, 0, episodes.size, 0, 0)
+
+            for (ep in episodes) {
+                val key = episodeKey(season, ep.episodeNumber)
+                // Déjà sur le disque : ni requête, ni file.
+                if (key in already) {
+                    checked++
+                    _seasonDownload.value = SeasonDownload(season, checked, episodes.size, queued, failed)
+                    continue
+                }
+
+                val links = seasonLinks(tv, season, ep.episodeNumber)
+                val tried = mutableSetOf<String>()
+                var placed = false
+                repeat(MAX_TRIES_PER_EPISODE) {
+                    if (placed) return@repeat
+                    val next = nextLinkFor(links, preferred = lang, excluded = tried) ?: return@repeat
+                    tried += next.url
+                    val stream = runCatching { ExtractorRegistry.resolve(next) }.getOrNull()
+                    // Le même verdict que le lecteur, durée comprise.
+                    if (stream == null || stream.url.isBlank() ||
+                        !isStreamPlayable(stream, ep.runtime)
+                    ) {
+                        return@repeat
+                    }
+                    DownloadQueue.enqueue(
+                        Download(
+                            key = key,
+                            title = tv.details.name,
+                            subtitle = "S$season · E${ep.episodeNumber} — ${ep.name}",
+                            imageUrl = ep.stillUrl() ?: tv.details.posterUrl(),
+                            tmdbId = tmdbId,
+                            isTv = true,
+                            createdAt = System.currentTimeMillis(),
+                            sourceUrl = next.url,
+                            hoster = next.hoster,
+                            language = next.language.orEmpty(),
+                        ),
+                        stream,
+                    )
+                    placed = true
+                }
+                if (placed) queued++ else failed++
+                checked++
+                _seasonDownload.value = SeasonDownload(season, checked, episodes.size, queued, failed)
+            }
+        }
+    }
+
+    /** Annule la recherche en cours. Les téléchargements déjà en file continuent. */
+    fun cancelSeasonDownload() {
+        seasonJob?.cancel()
+        _seasonDownload.value = null
+    }
+
+    /**
+     * Les liens d'un épisode : cache d'abord, interrogation des catalogues
+     * sinon. Même chemin que [prefetchEpisodeSources], dont c'est la moitié
+     * utile — sans le garde-fou « une seule fois », puisqu'ici on veut la
+     * réponse et pas seulement la préchauffe.
+     */
+    private suspend fun seasonLinks(
+        tv: DetailsState.Tv,
+        season: Int,
+        episode: Int,
+    ): List<EmbedLink> {
+        val providers = activeProviders()
+        val key = episodeKey(season, episode)
+        sourceCache.get(key, providers.map { it.name }.toSet())?.let { return it }
+
+        val media = MediaRef.Episode(
+            tmdbId,
+            catalogTitle(tv.details.name),
+            tv.details.year,
+            season,
+            episode,
+        )
+        val answered = mutableSetOf<String>()
+        val links = coroutineScope {
+            providers.map { provider ->
+                async(Dispatchers.IO) {
+                    val result = runCatching {
+                        withTimeoutOrNull(PROVIDER_TIMEOUT_MS) { provider.sourcesFor(media) }
+                    }.getOrNull()
+                    if (result != null) answered += provider.name
+                    result.orEmpty().map { it.copy(provider = provider.name) }
+                }
+            }.awaitAll().flatten()
+        }.distinctBy { it.url }
+        if (links.isNotEmpty()) sourceCache.put(key, links, answered)
+        return links
+    }
+
     fun consumeResolved() { _resolved.value = null }
 }
 
@@ -1111,3 +1270,6 @@ class DetailsViewModel : ViewModel() {
  * sondée ne doit donc rien laisser croire.
  */
 enum class LinkStatus { UNKNOWN, CHECKING, OK, DEAD }
+
+/** Essais de sources par épisode avant d'abandonner. Voir DetailsViewModel.downloadSeason. */
+private const val MAX_TRIES_PER_EPISODE = 6

@@ -434,4 +434,7 @@
     <string name="details_source_dl_running">Descargando · %1$s %%</string>
     <string name="details_source_dl_paused">Descarga en pausa</string>
     <string name="details_source_dl_failed">Error de descarga</string>
+    <string name="downloads_notification_channel">Descargas</string>
+    <string name="details_download_season">Descargar la temporada</string>
+    <string name="details_download_season_progress">Comprobando %1$s/%2$s…</string>
 </resources>

@@ -1,5 +1,10 @@
 package fr.moovie.tv
 
+import android.Manifest
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
+import fr.moovie.tv.data.download.DownloadRepository
 import android.app.UiModeManager
 import android.content.Context
 import android.content.Intent
@@ -139,6 +144,30 @@ class MainActivity : ComponentActivity() {
                         // quand un flux casse.
                         val detailsViewModel: DetailsViewModel = viewModel()
                         val updateState by updateViewModel.state.collectAsStateWithLifecycle()
+
+                        // Permission de notification, demandée **en contexte** :
+                        // au premier téléchargement, pas au lancement. Android
+                        // 13+ seulement, et sans elle le service tourne quand
+                        // même — seule la barre de progression reste invisible,
+                        // ce qui ne justifie pas une boîte de dialogue à
+                        // quelqu'un qui n'a rien demandé.
+                        if (uiFlavor == UiFlavor.TOUCH &&
+                            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                        ) {
+                            val ask = rememberLauncherForActivityResult(
+                                ActivityResultContracts.RequestPermission(),
+                            ) { }
+                            val hasDownloads by remember { DownloadRepository().downloads }
+                                .collectAsStateWithLifecycle(initialValue = emptyList())
+                            LaunchedEffect(hasDownloads.isNotEmpty()) {
+                                if (hasDownloads.isEmpty()) return@LaunchedEffect
+                                val granted = ContextCompat.checkSelfPermission(
+                                    this@MainActivity,
+                                    Manifest.permission.POST_NOTIFICATIONS,
+                                ) == PackageManager.PERMISSION_GRANTED
+                                if (!granted) ask.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            }
+                        }
                         // Miroir du MOOVIE_TEST_STREAM desktop : ouvre le lecteur
                         // directement sur une URL donnée, pour valider la chrome
                         // sans dépendre de l'extraction d'une source réelle.

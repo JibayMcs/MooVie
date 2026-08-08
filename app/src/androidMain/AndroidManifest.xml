@@ -5,6 +5,13 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- Lecture : garde le CPU/Wi-Fi éveillés (setWakeMode) pendant le streaming -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- Téléchargement hors ligne : le service de premier plan est ce qui
+         empêche Android de tuer la file au premier passage en arrière-plan.
+         POST_NOTIFICATIONS est demandée à l'exécution sur Android 13+ ; sans
+         elle le service tourne quand même, seule la barre reste invisible. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Auto-updater : installation des APK de mise à jour téléchargés -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
@@ -92,5 +99,10 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
+
+        <service
+            android:name=".data.download.DownloadService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
     </application>
 </manifest>

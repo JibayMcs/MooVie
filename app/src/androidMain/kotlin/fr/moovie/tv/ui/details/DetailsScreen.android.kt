@@ -40,6 +40,7 @@ fun DetailsScreen(
     val streamLang by viewModel.streamLanguage.collectAsStateWithLifecycle()
     // Indexés par le lien d'embed dont ils sont partis : c'est la seule façon
     // de savoir **quelle ligne** allumer dans le panneau des sources.
+    val seasonDownload by viewModel.seasonDownload.collectAsStateWithLifecycle(initialValue = null)
     val downloadsBySource by remember { DownloadRepository().downloads }
         .collectAsStateWithLifecycle(initialValue = emptyList())
     val watched by viewModel.watched.collectAsStateWithLifecycle()
@@ -129,6 +130,8 @@ fun DetailsScreen(
         onPickSource = viewModel::play,
         onDownloadSource = viewModel::download,
         sourceStatuses = sourceStatuses,
+        onDownloadSeason = { season -> viewModel.downloadSeason(season) },
+        seasonDownload = seasonDownload,
         downloads = downloadsBySource.associateBy { it.sourceUrl },
         sourceQualities = sourceQualities,
         onRequestQuality = viewModel::requestQuality,

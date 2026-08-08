@@ -434,4 +434,7 @@
     <string name="details_source_dl_running">Downloading · %1$s %%</string>
     <string name="details_source_dl_paused">Download paused</string>
     <string name="details_source_dl_failed">Download failed</string>
+    <string name="downloads_notification_channel">Downloads</string>
+    <string name="details_download_season">Download the season</string>
+    <string name="details_download_season_progress">Checking %1$s/%2$s…</string>
 </resources>

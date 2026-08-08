@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import fr.moovie.tv.data.download.Download
 import fr.moovie.tv.data.download.DownloadState
+import androidx.compose.material.icons.filled.DownloadDone
+import androidx.compose.material3.Icon
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -108,6 +110,8 @@ import fr.moovie.tv.resources.details_source_dl_running
 import fr.moovie.tv.resources.details_source_dl_paused
 import fr.moovie.tv.resources.details_source_dl_failed
 import fr.moovie.tv.resources.player_download_done
+import fr.moovie.tv.resources.details_download_season
+import fr.moovie.tv.resources.details_download_season_progress
 import fr.moovie.tv.resources.details_source_dead
 import fr.moovie.tv.resources.details_source_via
 import fr.moovie.tv.resources.details_catalogue_count
@@ -229,6 +233,10 @@ fun DetailsScreenContent(
     onPickSource: (EmbedLink) -> Unit,
     /** Appui long sur une source : la mettre en file de téléchargement. */
     onDownloadSource: (EmbedLink) -> Unit = {},
+    /** Télécharge toute la saison affichée, source vérifiée par épisode. */
+    onDownloadSeason: (Int) -> Unit = {},
+    /** Avancement de la recherche de sources, null quand rien ne tourne. */
+    seasonDownload: DetailsViewModel.SeasonDownload? = null,
     /** Qualité vidéo mesurée par URL d'embed (voir DetailsViewModel.qualities). */
     sourceQualities: Map<String, String> = emptyMap(),
     onRequestQuality: (EmbedLink) -> Unit = {},
@@ -504,7 +512,33 @@ fun DetailsScreenContent(
                         // disparu avec elle : l'en-tête ne défile plus, il n'y a
                         // plus rien à découvrir au-dessus.
                         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(stringResource(Res.string.details_seasons), style = MaterialTheme.typography.titleMedium)
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                stringResource(Res.string.details_seasons),
+                                style = MaterialTheme.typography.titleMedium,
+                            )
+                            // Télécharger la saison entière plutôt qu'ouvrir
+                            // chaque épisode, son panneau de sources, et tomber
+                            // une fois sur deux sur un hébergeur mort. La
+                            // sélection réutilise le verdict du lecteur.
+                            MoovieButton(onClick = { onDownloadSeason(s.season) }) {
+                                Text(
+                                    if (seasonDownload == null) {
+                                        stringResource(Res.string.details_download_season)
+                                    } else {
+                                        stringResource(
+                                            Res.string.details_download_season_progress,
+                                            seasonDownload.checked.toString(),
+                                            seasonDownload.total.toString(),
+                                        )
+                                    },
+                                    style = MaterialTheme.typography.labelMedium,
+                                )
+                            }
+                        }
                         val seasonsState = rememberLazyListState()
                         MoovieRail(seasonsState) {
                             LazyRow(
@@ -629,6 +663,7 @@ fun DetailsScreenContent(
                                         Modifier
                                     },
                                     progress = resume[key]?.progress,
+                                    download = downloads.values.firstOrNull { it.key == key },
                                     // OK = fiche de l'épisode (comme un film) ;
                                     // OK long = bascule vu / non vu.
                                     onOpen = { onOpenEpisode(s.season, ep) },
@@ -1451,6 +1486,8 @@ private fun EpisodeRow(
     progress: Float?,
     onOpen: () -> Unit,
     onToggleWatched: () -> Unit,
+    /** Le téléchargement de cet épisode, s'il existe. */
+    download: Download? = null,
     /** Épisode à reprendre ou à suivre : barre accent, et cible du focus d'arrivée. */
     isNext: Boolean = false,
     modifier: Modifier = Modifier,
@@ -1489,6 +1526,28 @@ private fun EpisodeRow(
                 )
                 if (isWatched) {
                     WatchedBadge(modifier = Modifier.align(Alignment.TopEnd).padding(4.dp))
+                }
+                // Pastille « sur le disque » : elle dit ce qu'aucune autre
+                // marque ne dit — que cet épisode se regardera sans réseau.
+                if (download?.state == DownloadState.DONE) {
+                    Icon(
+                        Icons.Default.DownloadDone,
+                        contentDescription = stringResource(Res.string.player_download_done),
+                        tint = Color(0xFF7DDC7D),
+                        modifier = Modifier.align(Alignment.TopStart).padding(4.dp).size(16.dp),
+                    )
+                }
+                // En cours : barre accent en bas de la vignette. Elle occupe la
+                // même bande que la progression de lecture, qui n'a pas de sens
+                // sur un épisode qu'on n'a pas encore.
+                if (download?.state == DownloadState.RUNNING ||
+                    download?.state == DownloadState.QUEUED
+                ) {
+                    MoovieProgressBar(
+                        progress = download.progress,
+                        trackColor = Color(0x66000000),
+                        modifier = Modifier.fillMaxWidth().height(4.dp).align(Alignment.BottomCenter),
+                    )
                 }
                 // Épisode commencé : mini-barre de progression sur la vignette.
                 if (!isWatched && progress != null && progress > 0f) {

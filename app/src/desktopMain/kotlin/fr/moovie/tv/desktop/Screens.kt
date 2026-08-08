@@ -219,6 +219,7 @@ internal fun DesktopDetailsScreen(
     val streamLang by vm.streamLanguage.collectAsState()
     // Indexés par le lien d'embed dont ils sont partis : c'est la seule façon
     // de savoir **quelle ligne** allumer dans le panneau des sources.
+    val seasonDownload by vm.seasonDownload.collectAsState(initial = null)
     val downloadsBySource by remember { DownloadRepository().downloads }
         .collectAsState(initial = emptyList())
     val watched by vm.watched.collectAsState()
@@ -318,6 +319,8 @@ internal fun DesktopDetailsScreen(
         onPickSource = vm::play,
         onDownloadSource = vm::download,
         sourceStatuses = sourceStatuses,
+        onDownloadSeason = { season -> vm.downloadSeason(season) },
+        seasonDownload = seasonDownload,
         downloads = downloadsBySource.associateBy { it.sourceUrl },
         sourceQualities = sourceQualities,
         onRequestQuality = vm::requestQuality,
