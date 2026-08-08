@@ -38,6 +38,11 @@ import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import fr.moovie.tv.data.download.DownloadRepository
+import fr.moovie.tv.data.download.TitleDownloads
+import fr.moovie.tv.data.download.byTitle
+import fr.moovie.tv.ui.download.DownloadPosterBadge
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -511,6 +516,12 @@ private fun ResultsGrid(
     watchlistKeys: Set<String> = emptySet(),
     onMenu: (TmdbItem) -> Unit = {},
 ) {
+    // Une fois pour toute la grille, et pas par carte : sans réseau, savoir ce
+    // qui est disponible est la première chose qu'on cherche des yeux.
+    val downloadsByTitle by remember { DownloadRepository().downloads }
+        .collectAsState(initial = emptyList())
+        .let { state -> remember(state.value) { mutableStateOf(state.value.byTitle()) } }
+
     LazyVerticalGrid(
         // 6 colonnes, c'est calibré sur les 960 dp d'un 1080p. Sur les 448 dp
         // d'un téléphone en portrait, chaque affiche tombait à 57 dp de large —
@@ -531,6 +542,7 @@ private fun ResultsGrid(
         itemsIndexed(items, key = { _, it -> "${it.id}_${it.isTv}" }) { index, item ->
             ResultCard(
                 inWatchlist = (if (item.isTv) "tv:${item.id}" else "movie:${item.id}") in watchlistKeys,
+                downloads = downloadsByTitle[if (item.isTv) "tv:${item.id}" else "movie:${item.id}"],
                 onLongClick = { onMenu(item) },
                 item = item,
                 onClick = { onOpen(item) },
@@ -546,6 +558,8 @@ private fun ResultCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     inWatchlist: Boolean = false,
+    /** Ce que ce titre a hors ligne : la question qu'on se pose sans réseau. */
+    downloads: TitleDownloads? = null,
     onLongClick: (() -> Unit)? = null,
 ) {
     MoovieCard(onClick = onClick, onLongClick = onLongClick, modifier = modifier.fillMaxWidth()) {
@@ -578,6 +592,7 @@ private fun ResultCard(
                         )
                     }
                 }
+                DownloadPosterBadge(downloads)
             }
             MoovieMarqueeText(
                 text = item.displayTitle,

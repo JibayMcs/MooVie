@@ -322,6 +322,7 @@ internal fun DesktopDetailsScreen(
         onDownloadSeason = { season -> vm.downloadSeason(season) },
         seasonDownload = seasonDownload,
         downloads = downloadsBySource.associateBy { it.sourceUrl },
+        downloadList = downloadsBySource,
         sourceQualities = sourceQualities,
         onRequestQuality = vm::requestQuality,
         onDismissQuickPlay = vm::dismissQuickPlay,

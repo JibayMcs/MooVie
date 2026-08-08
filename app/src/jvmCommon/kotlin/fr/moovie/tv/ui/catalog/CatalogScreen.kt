@@ -33,6 +33,11 @@ import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import fr.moovie.tv.data.download.DownloadRepository
+import fr.moovie.tv.data.download.TitleDownloads
+import fr.moovie.tv.data.download.byTitle
+import fr.moovie.tv.ui.download.DownloadPosterBadge
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -466,6 +471,12 @@ private fun ResultsGrid(
         if (needsMore) onLoadMore()
     }
 
+    // Résumé des téléchargements par titre, calculé une fois pour toute la
+    // grille : chaque affiche n'a qu'à s'y indexer.
+    val downloadsByTitle by remember { DownloadRepository().downloads }
+        .collectAsState(initial = emptyList())
+        .let { state -> remember(state.value) { mutableStateOf(state.value.byTitle()) } }
+
     LazyVerticalGrid(
         state = gridState,
         // 5 colonnes tiennent sur les 960 dp d'un 1080p, pas sur les 448 dp d'un
@@ -494,6 +505,7 @@ private fun ResultsGrid(
                 item = item,
                 isWatched = key in watched,
                 inWatchlist = key in watchlistKeys,
+                downloads = downloadsByTitle[key],
                 onClick = { onOpenTitle(item.id, item.isTv) },
             )
         }
@@ -505,6 +517,8 @@ private fun PosterCard(
     item: TmdbItem,
     isWatched: Boolean,
     inWatchlist: Boolean,
+    /** Ce que ce titre a hors ligne, null s'il n'a rien. */
+    downloads: TitleDownloads?,
     onClick: () -> Unit,
 ) {
     MoovieCard(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
@@ -537,6 +551,7 @@ private fun PosterCard(
                         )
                     }
                 }
+                DownloadPosterBadge(downloads)
             }
             MoovieMarqueeText(
                 text = item.displayTitle,

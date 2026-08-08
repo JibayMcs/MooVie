@@ -16,6 +16,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import fr.moovie.tv.data.download.Download
+import fr.moovie.tv.data.download.readyInSeason
 import fr.moovie.tv.data.download.DownloadState
 import androidx.compose.material.icons.filled.DownloadDone
 import androidx.compose.material3.Icon
@@ -247,6 +248,11 @@ fun DetailsScreenContent(
      * ils sont partis. Voir [SourceRow] pour la raison de cette clé.
      */
     downloads: Map<String, Download> = emptyMap(),
+    /**
+     * Les téléchargements bruts, pour compter par saison. La carte ci-dessus est
+     * indexée par lien d'embed, ce qui ne permet pas de dénombrer.
+     */
+    downloadList: List<Download> = emptyList(),
     onDismissQuickPlay: () -> Unit,
     onBack: () -> Unit,
     // Desktop uniquement : bouton retour à l'écran (sur TV, la télécommande a
@@ -566,7 +572,29 @@ fun DetailsScreenContent(
                                             Modifier
                                         },
                                     ) {
-                                        Text("S${season.seasonNumber}")
+                                        // Compté une fois : le libellé et la couleur
+                                        // répondent à la même question.
+                                        val ready = downloadList.readyInSeason(
+                                            s.details.id,
+                                            season.seasonNumber,
+                                        )
+                                        val total = season.episodeCount
+                                        val complete = ready > 0 && ready >= total
+                                        Text(
+                                            buildString {
+                                                append("S${season.seasonNumber}")
+                                                // Ce qui manque, pas ce qu'on a :
+                                                // « 3/8 » se lit comme un reste à
+                                                // faire, alors qu'une pastille
+                                                // verte sur une saison incomplète
+                                                // serait un mensonge. Complète, on
+                                                // ne compte plus, le vert suffit.
+                                                if (ready > 0 && total > 0) {
+                                                    append(if (complete) "  ✓" else "  $ready/$total")
+                                                }
+                                            },
+                                            color = if (complete) Color(0xFF7DDC7D) else Color.Unspecified,
+                                        )
                                     }
                                 }
                             }

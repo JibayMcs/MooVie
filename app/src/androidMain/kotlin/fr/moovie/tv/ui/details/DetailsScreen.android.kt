@@ -133,6 +133,7 @@ fun DetailsScreen(
         onDownloadSeason = { season -> viewModel.downloadSeason(season) },
         seasonDownload = seasonDownload,
         downloads = downloadsBySource.associateBy { it.sourceUrl },
+        downloadList = downloadsBySource,
         sourceQualities = sourceQualities,
         onRequestQuality = viewModel::requestQuality,
         onDismissQuickPlay = viewModel::dismissQuickPlay,
