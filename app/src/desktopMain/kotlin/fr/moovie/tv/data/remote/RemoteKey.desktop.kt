@@ -37,6 +37,11 @@ actual fun sendRemoteKey(key: RemoteKey): Boolean {
             KeyEvent(target, KeyEvent.KEY_RELEASED, now, 0, code, KeyEvent.CHAR_UNDEFINED),
         )
     }
+    // AWT ne dit pas si l'événement a été consommé : on tente le déplacement de
+    // focus après coup. Compose ayant déjà bougé le focus le cas échéant, un
+    // second déplacement serait visible — d'où l'ordre, `moveFocus` d'abord et
+    // seulement si l'événement n'a rien trouvé. Voir RemoteFocus.
+    EventQueue.invokeLater { if (window.focusOwner == null) RemoteFocus.move(key) }
     return true
 }
 

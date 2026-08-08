@@ -35,7 +35,7 @@ actual fun sendRemoteKey(key: RemoteKey): Boolean {
         RemoteKey.BACK -> KeyEvent.KEYCODE_BACK
         RemoteKey.PLAY_PAUSE -> KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE
     }
-    return dispatch(activity, code)
+    return dispatch(activity, key, code)
 }
 
 actual fun sendRemoteText(text: String): Boolean {
@@ -61,11 +61,14 @@ actual fun sendRemoteText(text: String): Boolean {
  * `dispatchKeyEvent` exige le fil principal, d'où `runOnUiThread` : l'appel
  * arrive d'un fil de socket.
  */
-private fun dispatch(activity: Activity, code: Int): Boolean {
+private fun dispatch(activity: Activity, key: RemoteKey, code: Int): Boolean {
     val now = SystemClock.uptimeMillis()
     activity.runOnUiThread {
-        activity.dispatchKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_DOWN, code, 0))
+        val handled = activity.dispatchKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_DOWN, code, 0))
         activity.dispatchKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_UP, code, 0))
+        // Personne n'a consommé la touche : c'est là que `ViewRootImpl` ferait
+        // la recherche de focus sur une vraie télécommande. On la refait.
+        if (!handled) RemoteFocus.move(key)
     }
     return true
 }
