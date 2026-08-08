@@ -16,7 +16,7 @@ plugins {
 //
 // Un suffixe semver — « -rc.1 » — désigne une préversion : le tag correspondant
 // sort en pré-release GitHub et reste invisible pour les updaters intégrés.
-val appVersion = "1.16.0-rc.6"
+val appVersion = "1.16.0-rc.7"
 
 /**
  * La même version, telle que **jpackage** l'accepte : purement numérique.
@@ -185,7 +185,7 @@ android {
         applicationId = "fr.moovie.tv"
         minSdk = 23
         targetSdk = 34
-        versionCode = 39
+        versionCode = 40
         versionName = appVersion
         buildConfigField("String", "OPENSUBTITLES_API_KEY", "\"$openSubtitlesApiKey\"")
     }
