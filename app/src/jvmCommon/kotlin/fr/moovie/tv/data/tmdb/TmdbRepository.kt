@@ -6,6 +6,7 @@ import okhttp3.Cache
 import okhttp3.CacheControl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
+import retrofit2.HttpException
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
 import java.io.IOException
@@ -105,6 +106,27 @@ class TmdbRepository(
             .results
             .filter { it.posterUrl() != null }
 
+    /**
+     * Vérifie qu'une clé est acceptée par TMDB.
+     *
+     * On interroge la liste des genres : c'est la plus petite réponse du service,
+     * et une clé refusée y répond 401 comme partout ailleurs.
+     *
+     * **Refusée et injoignable sont deux verdicts distincts**, et les confondre
+     * ferait accuser la clé à chaque coupure réseau — sur un téléviseur qui vient
+     * d'être installé, c'est le scénario le plus probable des deux. Seul un 401
+     * met en cause la clé.
+     */
+    suspend fun validateKey(apiKey: String): KeyCheck = runCatching {
+        api.genres("movie", apiKey, language)
+    }.fold(
+        onSuccess = { KeyCheck.VALID },
+        onFailure = { error ->
+            if (error is HttpException && error.code() == 401) KeyCheck.REJECTED
+            else KeyCheck.UNREACHABLE
+        },
+    )
+
     /** Genres du catalogue, dans la langue de l'app (listes distinctes film / série). */
     suspend fun genres(apiKey: String, isTv: Boolean): List<Genre> =
         api.genres(if (isTv) "tv" else "movie", apiKey, language).genres
@@ -146,4 +168,22 @@ class TmdbRepository(
 
     suspend fun season(apiKey: String, id: Int, season: Int): SeasonDetails =
         api.season(id, season, apiKey, language)
+}
+
+/**
+ * Verdict d'une vérification de clé TMDB.
+ *
+ * Trois états et non deux : « pas valide » recouvrirait à la fois une clé fausse
+ * et un réseau absent, deux situations qui n'appellent pas la même action de la
+ * part de qui vient d'installer l'application.
+ */
+enum class KeyCheck {
+    /** Le service a répondu : la clé fonctionne. */
+    VALID,
+
+    /** 401 : le service refuse cette clé. */
+    REJECTED,
+
+    /** Aucune réponse exploitable — réseau, DNS, panne. La clé n'est pas en cause. */
+    UNREACHABLE,
 }

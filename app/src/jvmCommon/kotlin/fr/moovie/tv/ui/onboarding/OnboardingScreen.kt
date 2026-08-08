@@ -34,6 +34,18 @@ import fr.moovie.tv.resources.onboarding_restore
 import fr.moovie.tv.resources.onboarding_restore_help
 import fr.moovie.tv.resources.onboarding_title
 import fr.moovie.tv.ui.backup.BackupSection
+import fr.moovie.tv.ui.pairing.PairingDialog
+import fr.moovie.tv.ui.pairing.pairingOffered
+import fr.moovie.tv.resources.pairing_action
+import fr.moovie.tv.resources.onboarding_phone_help
+import androidx.compose.runtime.rememberCoroutineScope
+import fr.moovie.tv.data.tmdb.KeyCheck
+import fr.moovie.tv.data.tmdb.TmdbRepository
+import fr.moovie.tv.resources.pairing_key_checking
+import fr.moovie.tv.resources.pairing_key_missing
+import fr.moovie.tv.resources.pairing_key_rejected
+import fr.moovie.tv.resources.pairing_key_unreachable
+import kotlinx.coroutines.launch
 import fr.moovie.tv.ui.components.MoovieButton
 import fr.moovie.tv.ui.navigation.Screen
 import kotlinx.coroutines.flow.first
@@ -48,9 +60,14 @@ private val DIM = Color(0xFF9A9A9A)
  * « saisis ta clé dans les réglages » sans mentionner qu'une sauvegarde pouvait
  * tout restaurer d'un coup, clé comprise.
  *
- * Il se referme tout seul dès qu'une clé existe — qu'elle vienne d'un import ou
- * d'une saisie dans les réglages — d'où [onReady] déclenché par le flux plutôt
- * que par le bouton qui l'a provoqué.
+ * Il se referme tout seul dès qu'une clé existe — qu'elle vienne d'un import, du
+ * téléphone ou d'une saisie dans les réglages — d'où [onReady] déclenché par le
+ * flux plutôt que par le bouton qui l'a provoqué. Seul l'appairage en cours
+ * suspend cette fermeture, voir plus bas.
+ *
+ * Sur TV il propose aussi la saisie depuis un téléphone, et c'est là qu'elle vaut
+ * le plus : la toute première chose que demande l'application est une clé de 32
+ * caractères hexadécimaux, à composer à la télécommande sur un clavier en grille.
  */
 @Composable
 fun OnboardingScreen(
@@ -61,7 +78,15 @@ fun OnboardingScreen(
     val hasKey by produceState(initialValue = false) {
         repo.tmdbApiKey.collect { value = it.isNotBlank() }
     }
-    LaunchedEffect(hasKey) { if (hasKey) onReady() }
+    var pairing by remember { mutableStateOf(false) }
+    // L'écran se referme dès qu'une clé existe — **sauf** pendant l'appairage.
+    //
+    // Sans cette réserve, la clé collée depuis le téléphone ferait disparaître
+    // l'écran, donc la modale, donc le serveur, au moment précis où il doit
+    // encore répondre au téléphone : celui-ci afficherait une erreur de
+    // connexion pour un envoi qui a pourtant réussi. On laisse fermer par
+    // « Terminer », après avoir vu le compte des réglages enregistrés.
+    LaunchedEffect(hasKey, pairing) { if (hasKey && !pairing) onReady() }
 
     var restoring by remember { mutableStateOf(false) }
     // Un import qui n'apportait pas de clé laisse l'installation à moitié faite :
@@ -70,6 +95,16 @@ fun OnboardingScreen(
 
     val firstChoice = remember { FocusRequester() }
     LaunchedEffect(restoring) { if (!restoring) runCatching { firstChoice.requestFocus() } }
+
+    // Verdict de la vérification, affiché dans la modale d'appairage. Les
+    // chaînes sont résolues ici : `stringResource` est un composable, il ne peut
+    // pas être appelé depuis la coroutine qui les choisit.
+    val scope = rememberCoroutineScope()
+    var notice by remember { mutableStateOf<String?>(null) }
+    val checkingText = stringResource(Res.string.pairing_key_checking)
+    val rejectedText = stringResource(Res.string.pairing_key_rejected)
+    val unreachableText = stringResource(Res.string.pairing_key_unreachable)
+    val missingText = stringResource(Res.string.pairing_key_missing)
 
     Column(
         modifier = Modifier
@@ -114,12 +149,54 @@ fun OnboardingScreen(
                 onClick = { restoring = true },
                 modifier = Modifier.focusRequester(firstChoice),
             )
+            // Avant la saisie manuelle, parce que c'est la même situation par un
+            // meilleur chemin : sur une TV, coller la clé au clavier tactile bat
+            // toujours 32 caractères hexadécimaux à la télécommande. La saisie
+            // manuelle reste dessous, comme repli.
+            if (pairingOffered()) {
+                Choice(
+                    label = stringResource(Res.string.pairing_action),
+                    help = stringResource(Res.string.onboarding_phone_help),
+                    onClick = { pairing = true },
+                )
+            }
             Choice(
                 label = stringResource(Res.string.onboarding_fresh),
                 help = stringResource(Res.string.onboarding_fresh_help),
                 onClick = onOpenSettings,
             )
         }
+    }
+
+    if (pairing) {
+        PairingDialog(
+            onDismiss = { pairing = false },
+            notice = notice,
+            // Enchaîner ne se décide pas sur « la clé n'est pas vide » : une clé
+            // fausse laisserait l'utilisateur sur un accueil sans catalogue, sans
+            // rien pour comprendre. On la fait valider par TMDB avant de passer.
+            onSaved = {
+                scope.launch {
+                    notice = checkingText
+                    val key = repo.tmdbApiKey.first()
+                    if (key.isBlank()) {
+                        // Un envoi sans clé TMDB : le téléphone a renseigné autre
+                        // chose. Rien à reprocher, il reste juste l'essentiel.
+                        notice = missingText
+                        return@launch
+                    }
+                    notice = when (TmdbRepository().validateKey(key)) {
+                        KeyCheck.VALID -> {
+                            pairing = false
+                            onReady()
+                            null
+                        }
+                        KeyCheck.REJECTED -> rejectedText
+                        KeyCheck.UNREACHABLE -> unreachableText
+                    }
+                }
+            },
+        )
     }
 }
 
