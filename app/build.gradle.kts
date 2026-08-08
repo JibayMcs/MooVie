@@ -216,6 +216,11 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        // `java.time` demande l'API 26, et minSdk vaut 23 : sans désucrage, tout
+        // usage lève un NoClassDefFoundError sur Android 6 et 7. `MediaDate` en
+        // vit depuis toujours sans jamais planter, parce qu'il n'était appelé
+        // que par ses tests — l'afficher enfin à l'écran rend le risque réel.
+        isCoreLibraryDesugaringEnabled = true
     }
     buildFeatures {
         compose = true
@@ -547,4 +552,10 @@ val packageAppImage by tasks.registering {
         }.result.get().assertNormalExitValue()
         logger.lifecycle("AppImage écrite : ${output.absolutePath}")
     }
+}
+
+// Désucrage des bibliothèques du JDK : configuration Android, elle ne peut pas
+// vivre dans un source set KMP. Voir `isCoreLibraryDesugaringEnabled`.
+dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.3")
 }
