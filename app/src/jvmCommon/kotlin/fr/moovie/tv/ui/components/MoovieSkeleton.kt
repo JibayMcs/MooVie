@@ -16,6 +16,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ImageNotSupported
+import androidx.compose.material3.Icon
+import androidx.compose.ui.Alignment
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -110,20 +115,50 @@ fun MoovieAsyncImage(
     // `remember(model)` et non `remember` : une carte recyclée par une liste
     // paresseuse change de modèle sans être recomposée depuis zéro, et resterait
     // sinon marquée « chargée » en affichant l'image du titre précédent.
-    var loading by remember(model) { mutableStateOf(model != null) }
-    Box(modifier = modifier) {
-        if (loading) {
-            Box(modifier = Modifier.matchParentSize().moovieShimmer())
+    // Trois états, et non deux. Le scintillement disait « ça charge » ; son
+    // absence ne disait rien du tout, et le fond gris du parent apparaissait tel
+    // quel. Un carré gris se lit alors comme un chargement en panne, alors qu'il
+    // signifie souvent « cette image n'existe pas » — les épisodes d'une saison
+    // non diffusée n'ont pas de vignette chez TMDB, et une série sans affiche
+    // reste sans affiche quoi qu'on attende.
+    var state by remember(model) {
+        mutableStateOf(if (model == null) ImageState.ABSENT else ImageState.LOADING)
+    }
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+        when (state) {
+            ImageState.LOADING -> Box(modifier = Modifier.matchParentSize().moovieShimmer())
+            // Discret volontairement : c'est un état de repos, pas une erreur à
+            // signaler. Le titre à côté porte déjà l'information utile.
+            ImageState.ABSENT -> Icon(
+                imageVector = Icons.Default.ImageNotSupported,
+                contentDescription = null,
+                tint = Color.White.copy(alpha = 0.22f),
+                modifier = Modifier.size(28.dp),
+            )
+            ImageState.LOADED -> Unit
         }
-        AsyncImage(
-            model = model,
-            contentDescription = contentDescription,
-            contentScale = contentScale,
-            modifier = Modifier.matchParentSize(),
-            onState = { loading = it is AsyncImagePainter.State.Loading },
-        )
+        if (model != null) {
+            AsyncImage(
+                model = model,
+                contentDescription = contentDescription,
+                contentScale = contentScale,
+                modifier = Modifier.matchParentSize(),
+                onState = {
+                    state = when (it) {
+                        is AsyncImagePainter.State.Loading -> ImageState.LOADING
+                        is AsyncImagePainter.State.Success -> ImageState.LOADED
+                        // Erreur **et** vide tombent ici : une URL qui ne rend
+                        // rien et une URL absente sont la même chose à l'écran.
+                        else -> ImageState.ABSENT
+                    }
+                },
+            )
+        }
     }
 }
+
+/** Ce qu'une vignette a à montrer : en cours, rendue, ou rien à rendre. */
+private enum class ImageState { LOADING, LOADED, ABSENT }
 
 /** Forme rectangulaire en attente, aux coins du thème. */
 @Composable
