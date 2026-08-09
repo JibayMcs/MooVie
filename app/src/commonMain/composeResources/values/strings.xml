@@ -446,4 +446,23 @@
     <string name="details_episode_upcoming">Prévu le %1$s</string>
     <string name="player_volume">Volume : %1$d %</string>
     <string name="player_volume_value">%1$d %</string>
+    <string name="search_sort_relevance">Pertinence</string>
+    <string name="search_sort_popularity">Popularité</string>
+    <string name="search_sort_rating">Note</string>
+    <string name="search_sort_year">Année</string>
+    <string name="search_sort_title">Titre</string>
+    <string name="search_sort_desc">Décroissant</string>
+    <string name="search_sort_asc">Croissant</string>
+    <string name="search_media_all">Tout</string>
+    <string name="search_media_movies">Films</string>
+    <string name="search_media_shows">Séries</string>
+    <string name="search_rating_any">Toute note</string>
+    <string name="search_rating_min">Note %1$s et plus</string>
+    <string name="search_decade_any">Toute époque</string>
+    <string name="search_decade">Années %1$d</string>
+    <string name="search_decade_before">Avant %1$d</string>
+    <string name="search_adult_hidden">Contenu adulte masqué</string>
+    <string name="search_adult_shown">Contenu adulte affiché</string>
+    <string name="search_filters_reset">Tout effacer</string>
+    <string name="search_filters_scope">Le tri et les filtres portent sur les %1$d premiers résultats : TMDB ne sait pas trier une recherche par texte.</string>
 </resources>

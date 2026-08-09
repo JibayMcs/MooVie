@@ -33,12 +33,18 @@ interface TmdbApi {
         @Query("page") page: Int = 1,
     ): TmdbPageResult
 
+    /**
+     * `include_adult` est le **seul** filtre que cet endpoint accepte, avec la
+     * langue et la page : ni tri, ni année, ni note. Tout le reste se fait donc
+     * sur les résultats rapportés (voir `SearchFilters`).
+     */
     @GET("search/multi")
     suspend fun searchMulti(
         @Query("query") query: String,
         @Query("api_key") apiKey: String,
         @Query("language") language: String,
         @Query("page") page: Int = 1,
+        @Query("include_adult") includeAdult: Boolean = false,
     ): TmdbPageResult
 
     @GET("genre/{media}/list")

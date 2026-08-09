@@ -98,6 +98,7 @@ internal fun DesktopSearchScreen(
     val results by vm.results.collectAsState()
     val history by vm.history.collectAsState()
     val watchlistKeys by vm.watchlistKeys.collectAsState()
+    val filters by vm.filters.collectAsState()
 
     SearchScreenContent(
         query = query,
@@ -113,6 +114,8 @@ internal fun DesktopSearchScreen(
         onRemoveFromWatchlist = vm::removeFromWatchlist,
         onRemoveHistory = vm::removeHistory,
         onClearHistory = vm::clearHistory,
+        filters = filters,
+        onFiltersChange = vm::setFilters,
         onBack = onBack,
         showBackButton = true,
     )

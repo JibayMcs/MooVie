@@ -1,5 +1,7 @@
 package fr.moovie.tv.data.tmdb
 
+import fr.moovie.tv.data.search.SearchFilters
+import fr.moovie.tv.data.search.applyFilters
 import fr.moovie.tv.data.store.moovieCacheDir
 import kotlinx.serialization.json.Json
 import okhttp3.Cache
@@ -90,10 +92,40 @@ class TmdbRepository(
     suspend fun topRatedMovies(apiKey: String): List<TmdbItem> =
         api.topRated("movie", apiKey, language).results
 
-    suspend fun search(apiKey: String, query: String): List<TmdbItem> =
-        api.searchMulti(query, apiKey, language)
-            .results
+    /**
+     * Recherche texte, filtrée et triée localement.
+     *
+     * [pages] existe parce que trier la seule première page ne trie pas grand
+     * chose : « les mieux notés » deviendrait « les mieux notés parmi les vingt
+     * premiers résultats de pertinence », ce qui n'est pas ce qu'on demande.
+     * On rapporte donc plusieurs pages avant de classer, en s'arrêtant dès que
+     * TMDB n'en a plus. Une page de moins qu'annoncé n'est pas une erreur : le
+     * service coupe au-delà de 500, et une requête large les atteint.
+     */
+    suspend fun search(
+        apiKey: String,
+        query: String,
+        filters: SearchFilters = SearchFilters.DEFAULT,
+        pages: Int = 1,
+    ): List<TmdbItem> {
+        val collected = mutableListOf<TmdbItem>()
+        var totalPages = 1
+        for (page in 1..pages.coerceAtLeast(1)) {
+            if (page > totalPages) break
+            val result = runCatching {
+                api.searchMulti(query, apiKey, language, page, filters.includeAdult)
+            }.getOrNull() ?: break
+            totalPages = result.totalPages
+            collected += result.results
+        }
+        return collected
             .filter { it.mediaType == "movie" || it.mediaType == "tv" }
+            // TMDB rend parfois le même titre sur deux pages quand le
+            // classement bouge entre deux requêtes. Sans ça, la grille affiche
+            // deux fois la même affiche.
+            .distinctBy { "${it.mediaType}:${it.id}" }
+            .applyFilters(filters)
+    }
 
     /**
      * Titres recommandés à partir d'un titre déjà vu.

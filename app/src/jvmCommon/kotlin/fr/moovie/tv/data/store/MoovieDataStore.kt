@@ -28,6 +28,12 @@ const val STORE_WATCH = "moovie_watch"
 const val STORE_HOME = "moovie_home"
 
 /**
+ * Voir [STORE_WATCH] : les filtres de recherche sont une habitude, et une
+ * habitude appartient à qui l'a prise.
+ */
+const val STORE_SEARCH_FILTERS = "moovie_search_filters"
+
+/**
  * Les magasins à dupliquer par profil, et donc à effacer quand on en supprime un.
  *
  * Liste explicite plutôt que balayage du répertoire : elle rend visible, en un
@@ -35,7 +41,7 @@ const val STORE_HOME = "moovie_home"
  * ou l'ordre des hébergeurs sont des réglages de l'installation, pas de la
  * personne — ils restent globaux.
  */
-val PROFILE_SCOPED_STORES = listOf(STORE_WATCH, STORE_HOME)
+val PROFILE_SCOPED_STORES = listOf(STORE_WATCH, STORE_HOME, STORE_SEARCH_FILTERS)
 
 /**
  * Profil dont les données sont servies, lu à la construction de chaque dépôt.

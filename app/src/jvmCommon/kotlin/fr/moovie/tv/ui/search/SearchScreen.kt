@@ -39,6 +39,8 @@ import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import fr.moovie.tv.data.download.DownloadRepository
+import fr.moovie.tv.data.search.SearchFilters
+import fr.moovie.tv.resources.search_filters_scope
 import fr.moovie.tv.data.download.TitleDownloads
 import fr.moovie.tv.data.download.byTitle
 import fr.moovie.tv.ui.download.DownloadPosterBadge
@@ -112,6 +114,9 @@ import fr.moovie.tv.resources.watchlist_remove
 import androidx.compose.foundation.shape.CircleShape
 import fr.moovie.tv.resources.watchlist_added
 
+/** Résultats rapportés avant tri, à garder aligné sur `SearchViewModel.DEEP_PAGES`. */
+private const val SEARCH_SCOPE = 60
+
 /**
  * Marge horizontale de l'écran. 40 dp est un recul de salon ; sur les 448 dp
  * d'un téléphone, les deux côtés réunis mangeaient un cinquième de la largeur.
@@ -143,6 +148,9 @@ fun SearchScreenContent(
      */
     onVoiceSearch: (() -> Unit)? = null,
     onBack: () -> Unit = {},
+    /** Tri et filtres courants, et leur mise à jour. Conservés entre sessions. */
+    filters: SearchFilters = SearchFilters.DEFAULT,
+    onFiltersChange: (SearchFilters) -> Unit = {},
     // Desktop uniquement, comme pour l'historique : sur TV la télécommande a sa
     // touche Retour, et un bouton à l'écran ne ferait que voler le focus au
     // champ de saisie.
@@ -239,6 +247,18 @@ fun SearchScreenContent(
                 )
             }
         }
+        // Sous le champ, au-dessus des résultats : c'est l'ordre dans lequel on
+        // y pense, et le seul qui laisse la flèche du bas mener du champ aux
+        // filtres puis aux résultats.
+        if (query.isNotBlank()) {
+            Spacer(Modifier.height(12.dp))
+            SearchFilterBar(
+                filters = filters,
+                onChange = onFiltersChange,
+                hPad = searchHPad(),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
         Spacer(Modifier.height(24.dp))
 
         when {
@@ -264,6 +284,7 @@ fun SearchScreenContent(
             )
             results is SearchState.Empty -> Text(stringResource(Res.string.search_no_results, query), color = Color(0xFFBBBBBB), modifier = Modifier.padding(horizontal = searchHPad()))
             results is SearchState.Results -> ResultsGrid(
+                filters = filters,
                 items = results.items,
                 firstFocus = firstResultFocus,
                 onOpen = onOpen,
@@ -515,6 +536,7 @@ private fun ResultsGrid(
     onOpen: (TmdbItem) -> Unit,
     watchlistKeys: Set<String> = emptySet(),
     onMenu: (TmdbItem) -> Unit = {},
+    filters: SearchFilters = SearchFilters.DEFAULT,
 ) {
     // Une fois pour toute la grille, et pas par carte : sans réseau, savoir ce
     // qui est disponible est la première chose qu'on cherche des yeux.
@@ -522,6 +544,17 @@ private fun ResultsGrid(
         .collectAsState(initial = emptyList())
         .let { state -> remember(state.value) { mutableStateOf(state.value.byTitle()) } }
 
+    // Dit ce que le tri recouvre vraiment. Sans cette ligne, « trier par note »
+    // laisse croire à un classement de tout le catalogue, alors qu'il porte sur
+    // ce que la recherche a rapporté — TMDB ne trie pas une recherche texte.
+    if (filters.isActive) {
+        Text(
+            stringResource(Res.string.search_filters_scope, SEARCH_SCOPE),
+            style = MaterialTheme.typography.labelSmall,
+            color = Color(0xFF9A9A9A),
+            modifier = Modifier.padding(horizontal = searchHPad(), vertical = 4.dp),
+        )
+    }
     LazyVerticalGrid(
         // 6 colonnes, c'est calibré sur les 960 dp d'un 1080p. Sur les 448 dp
         // d'un téléphone en portrait, chaque affiche tombait à 57 dp de large —

@@ -29,6 +29,7 @@ fun SearchScreen(
     val results by viewModel.results.collectAsStateWithLifecycle()
     val history by viewModel.history.collectAsStateWithLifecycle()
     val watchlistKeys by viewModel.watchlistKeys.collectAsStateWithLifecycle()
+    val filters by viewModel.filters.collectAsStateWithLifecycle()
 
     val context = LocalContext.current
 
@@ -69,6 +70,8 @@ fun SearchScreen(
         onRemoveFromWatchlist = viewModel::removeFromWatchlist,
         onRemoveHistory = viewModel::removeHistory,
         onClearHistory = viewModel::clearHistory,
+        filters = filters,
+        onFiltersChange = viewModel::setFilters,
         onVoiceSearch = if (!voiceAvailable) {
             null
         } else {

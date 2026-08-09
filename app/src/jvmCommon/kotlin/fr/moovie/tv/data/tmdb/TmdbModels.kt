@@ -41,6 +41,13 @@ data class TmdbItem(
     @SerialName("backdrop_path") val backdropPath: String? = null,
     val overview: String? = null,
     @SerialName("vote_average") val voteAverage: Double = 0.0,
+    /** Score de popularité TMDB. Sans unité, seulement comparable entre titres. */
+    val popularity: Double = 0.0,
+    /**
+     * Nombre de votes derrière [voteAverage]. Indispensable pour classer : une
+     * moyenne de 10 sur trois votes n'est pas une note, c'est du bruit.
+     */
+    @SerialName("vote_count") val voteCount: Int = 0,
     @SerialName("media_type") val mediaType: String? = null,
     @SerialName("release_date") val releaseDate: String? = null,
     @SerialName("first_air_date") val firstAirDate: String? = null,

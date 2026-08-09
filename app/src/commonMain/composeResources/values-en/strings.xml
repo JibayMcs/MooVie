@@ -444,4 +444,23 @@
     <string name="details_episode_upcoming">Airs on %1$s</string>
     <string name="player_volume">Volume: %1$d%</string>
     <string name="player_volume_value">%1$d%</string>
+    <string name="search_sort_relevance">Relevance</string>
+    <string name="search_sort_popularity">Popularity</string>
+    <string name="search_sort_rating">Rating</string>
+    <string name="search_sort_year">Year</string>
+    <string name="search_sort_title">Title</string>
+    <string name="search_sort_desc">Descending</string>
+    <string name="search_sort_asc">Ascending</string>
+    <string name="search_media_all">All</string>
+    <string name="search_media_movies">Movies</string>
+    <string name="search_media_shows">Shows</string>
+    <string name="search_rating_any">Any rating</string>
+    <string name="search_rating_min">Rated %1$s and up</string>
+    <string name="search_decade_any">Any period</string>
+    <string name="search_decade">%1$ds</string>
+    <string name="search_decade_before">Before %1$d</string>
+    <string name="search_adult_hidden">Adult content hidden</string>
+    <string name="search_adult_shown">Adult content shown</string>
+    <string name="search_filters_reset">Clear all</string>
+    <string name="search_filters_scope">Sorting and filters apply to the first %1$d results: TMDB cannot sort a text search.</string>
 </resources>
