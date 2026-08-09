@@ -8,6 +8,12 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -80,6 +86,8 @@ import fr.moovie.tv.resources.player_error
 import fr.moovie.tv.resources.player_fullscreen
 import fr.moovie.tv.resources.player_fullscreen_exit
 import fr.moovie.tv.resources.player_mute
+import fr.moovie.tv.resources.player_volume
+import fr.moovie.tv.resources.player_volume_value
 import fr.moovie.tv.resources.player_next_in
 import fr.moovie.tv.resources.player_unmute
 import fr.moovie.tv.resources.player_update_chip
@@ -392,6 +400,8 @@ internal fun DesktopPlayerScreen(
     var proxy by remember(streamUrl) { mutableStateOf<LocalStreamProxy?>(null) }
     // Position en cours de drag sur la barre (null = pas de drag).
     var scrubbing by remember { mutableStateOf<Float?>(null) }
+    // 0 à 200 : libVLC amplifie au-delà de 100 %, ce qui évite d'aller toucher
+    // le mélangeur du système pour un film dont la piste est trop basse.
     var volume by remember { mutableStateOf(100) }
     var muted by remember { mutableStateOf(false) }
     // Auto-masquage : contrôles visibles à l'activité (souris/clavier), repliés
@@ -429,7 +439,9 @@ internal fun DesktopPlayerScreen(
     }
 
     fun setVolume(value: Int) {
-        volume = value.coerceIn(0, 100)
+        volume = value.coerceIn(0, MAX_VOLUME)
+        // Un volume qu'on règle est un volume qu'on veut entendre : le remonter
+        // depuis zéro doit suffire, sans avoir à décoiffer le muet à côté.
         muted = false
         player.audio().isMute = false
         player.audio().setVolume(volume)
@@ -1033,6 +1045,11 @@ internal fun DesktopPlayerScreen(
                         stringResource(Res.string.player_mute)
                     },
                 )
+                VolumeSlider(
+                    volume = volume,
+                    muted = muted,
+                    onVolume = { setVolume(it) },
+                )
                 MoovieIconButton(
                     onClick = onToggleFullscreen,
                     icon = if (isFullscreen) {
@@ -1183,3 +1200,111 @@ private fun MissingVlc(onBack: () -> Unit) {
         MoovieButton(onClick = onBack) { Text("Retour") }
     }
 }
+
+/** Plafond du volume. libVLC amplifie au-delà de 100 %, jusqu'à 200 %. */
+private const val MAX_VOLUME = 200
+
+/** Repère du 100 % sur la piste, exprimé en fraction de sa largeur. */
+private const val UNITY_FRACTION = 100f / MAX_VOLUME
+
+/**
+ * Réglage du volume propre au lecteur, de 0 à 200 %.
+ *
+ * L'icône seule ne savait que couper le son : pour un film dont la piste est
+ * trop basse il fallait sortir de l'application et remonter le mélangeur du
+ * système — qu'on redescendait ensuite, ou pas. Comme le moteur est libVLC, la
+ * plage va jusqu'à 200 %, et la partie au-delà de 100 % est **peinte
+ * autrement** : l'amplification est une correction, pas la zone normale de
+ * réglage, et elle peut saturer. Le repère à 100 % permet d'y revenir sans
+ * viser au jugé.
+ *
+ * Desktop uniquement : à la télécommande il n'y a rien à pointer, et sur
+ * téléphone le volume est celui du système.
+ */
+@OptIn(ExperimentalComposeUiApi::class)
+@Composable
+private fun VolumeSlider(
+    volume: Int,
+    muted: Boolean,
+    onVolume: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val shown = if (muted) 0 else volume
+    val trackWidth = 96.dp
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = modifier,
+    ) {
+        val label = stringResource(Res.string.player_volume, shown)
+        Box(
+            modifier = Modifier
+                .width(trackWidth)
+                .height(24.dp)
+                .semantics { contentDescription = label }
+                // La zone sensible fait 24 dp de haut pour une piste de 4 : une
+                // piste fine se pointe mal, et c'est le geste le plus fréquent.
+                .pointerInput(Unit) {
+                    fun apply(x: Float) {
+                        onVolume(((x / size.width) * MAX_VOLUME).toInt().coerceIn(0, MAX_VOLUME))
+                    }
+                    detectTapGestures { apply(it.x) }
+                }
+                .pointerInput(Unit) {
+                    detectHorizontalDragGestures { change, _ ->
+                        onVolume(
+                            ((change.position.x / size.width) * MAX_VOLUME)
+                                .toInt().coerceIn(0, MAX_VOLUME),
+                        )
+                    }
+                }
+                // La molette est le geste attendu sur un curseur de volume.
+                .onPointerEvent(PointerEventType.Scroll) { event ->
+                    val dy = event.changes.firstOrNull()?.scrollDelta?.y ?: 0f
+                    if (dy != 0f) onVolume(volume + if (dy < 0) 5 else -5)
+                },
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            Canvas(modifier = Modifier.fillMaxWidth().height(4.dp)) {
+                val h = size.height
+                val unity = size.width * UNITY_FRACTION
+                val filled = size.width * (shown.toFloat() / MAX_VOLUME)
+                // Fond : la zone d'amplification est déjà distincte à vide,
+                // sans quoi on ne sait pas qu'elle existe avant d'y entrer.
+                drawRect(Color(0x33FFFFFF), size = Size(unity, h))
+                drawRect(
+                    Color(0x22E0B057),
+                    topLeft = Offset(unity, 0f),
+                    size = Size(size.width - unity, h),
+                )
+                drawRect(
+                    MOOVIE_ACCENT,
+                    size = Size(minOf(filled, unity), h),
+                )
+                if (filled > unity) {
+                    drawRect(
+                        Color(0xFFE0B057),
+                        topLeft = Offset(unity, 0f),
+                        size = Size(filled - unity, h),
+                    )
+                }
+                // Repère du 100 % : le seul point de la piste qu'on cherche.
+                drawLine(
+                    Color.White,
+                    start = Offset(unity, -2f),
+                    end = Offset(unity, h + 2f),
+                    strokeWidth = 2f,
+                )
+            }
+        }
+        Text(
+            stringResource(Res.string.player_volume_value, shown),
+            style = MaterialTheme.typography.labelMedium,
+            color = if (shown > 100) Color(0xFFE0B057) else Color(0xFFCCCCCC),
+            // Largeur réservée : sans elle, passer de 99 à 100 décale toute la
+            // barre de contrôles d'un caractère.
+            modifier = Modifier.width(44.dp),
+        )
+    }
+}
+
