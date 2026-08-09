@@ -102,7 +102,10 @@ import fr.moovie.tv.ui.components.LocalMoovieFocusMemory
 import fr.moovie.tv.ui.catalog.CatalogSelection
 import fr.moovie.tv.ui.theme.MOOVIE_ACCENT
 import fr.moovie.tv.ui.components.MoovieButton
+import fr.moovie.tv.data.download.titleKeyOf
 import fr.moovie.tv.ui.components.MoovieAsyncImage
+import fr.moovie.tv.ui.download.DownloadPosterBadge
+import fr.moovie.tv.ui.download.ProvideTitleDownloads
 import fr.moovie.tv.ui.components.MoovieCard
 import fr.moovie.tv.ui.adaptive.useBottomNav
 import fr.moovie.tv.ui.components.MoovieIconButton
@@ -184,6 +187,9 @@ fun HomeScreenContent(
     }
     val featured = focused ?: fallback
 
+    // Abonnement unique de l'écran : les trois sortes de cartes y puisent
+    // leur pastille « hors ligne » sans que les rangées aient à la convoyer.
+    ProvideTitleDownloads {
     Box(modifier = Modifier.fillMaxSize().background(Color(0xFF0A0A0A))) {
         // Backdrop dynamique avec fondu enchaîné quand l'élément focalisé change.
         Crossfade(
@@ -385,6 +391,7 @@ fun HomeScreenContent(
                 onMarkWatched = { onMarkResumeWatched(entry.key) },
             )
         }
+    }
     }
 }
 
@@ -757,6 +764,7 @@ private fun ResumeCard(
                     trackColor = Color(0x99000000),
                     modifier = Modifier.fillMaxWidth().height(4.dp).align(Alignment.BottomCenter),
                 )
+                DownloadPosterBadge(titleKeyOf(entry.tmdbId, entry.isTv), bar = false)
             }
             Column(modifier = Modifier.padding(8.dp)) {
                 MoovieMarqueeText(
@@ -950,6 +958,7 @@ private fun PosterCard(
                         )
                     }
                 }
+                DownloadPosterBadge(titleKeyOf(item.id, item.isTv))
             }
             MoovieMarqueeText(
                 text = item.displayTitle,
@@ -1046,6 +1055,7 @@ private fun WatchlistCard(
                         modifier = Modifier.size(13.dp),
                     )
                 }
+                DownloadPosterBadge(titleKeyOf(entry.tmdbId, entry.isTv))
             }
             MoovieMarqueeText(
                 text = entry.title,

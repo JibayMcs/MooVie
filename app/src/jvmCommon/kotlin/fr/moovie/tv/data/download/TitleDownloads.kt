@@ -28,6 +28,12 @@ data class TitleDownloads(
 fun Download.titleKey(): String =
     if (key.startsWith("tv:")) key.split(':').take(2).joinToString(":") else key
 
+/**
+ * Clé de titre d'un contenu du catalogue, dans la forme que rend [titleKey].
+ * Une carte n'a que l'identifiant TMDB et la nature du titre sous la main.
+ */
+fun titleKeyOf(tmdbId: Int, isTv: Boolean): String = if (isTv) "tv:$tmdbId" else "movie:$tmdbId"
+
 /** Résumé par titre, prêt à être consulté par une grille d'affiches. */
 fun List<Download>.byTitle(): Map<String, TitleDownloads> =
     groupBy { it.titleKey() }.mapValues { (_, items) ->

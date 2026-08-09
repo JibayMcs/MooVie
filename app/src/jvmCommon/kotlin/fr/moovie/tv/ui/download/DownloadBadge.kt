@@ -13,11 +13,18 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.DownloadDone
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import fr.moovie.tv.data.download.DownloadRepository
 import fr.moovie.tv.data.download.TitleDownloads
+import fr.moovie.tv.data.download.byTitle
 import fr.moovie.tv.resources.Res
 import fr.moovie.tv.resources.player_download_done
 import fr.moovie.tv.resources.settings_cat_downloads
@@ -50,10 +57,20 @@ private val READY = Color(0xFF7DDC7D)
  * « vu » qui occupe le haut à droite.
  */
 @Composable
-fun BoxScope.DownloadPosterBadge(summary: TitleDownloads?, compact: Boolean = false) {
+fun BoxScope.DownloadPosterBadge(
+    summary: TitleDownloads?,
+    compact: Boolean = false,
+    /**
+     * Faux quand le bas de la vignette porte déjà une barre — celle de la
+     * lecture en cours, sur une carte « Reprendre ». Deux barres empilées au
+     * même endroit ne se lisent plus ni l'une ni l'autre ; l'icône suffit à
+     * dire que le titre est là.
+     */
+    bar: Boolean = true,
+) {
     if (summary == null || !summary.any) return
 
-    if (summary.active > 0) {
+    if (bar && summary.active > 0) {
         MoovieProgressBar(
             progress = summary.progress,
             trackColor = Color(0x66000000),
@@ -80,4 +97,35 @@ fun BoxScope.DownloadPosterBadge(summary: TitleDownloads?, compact: Boolean = fa
             modifier = Modifier.size(if (compact) 12.dp else 16.dp),
         )
     }
+}
+
+/**
+ * Résumé des téléchargements par titre, à disposition des cartes d'un écran.
+ *
+ * L'accueil empile écran → rangée → carte, et chacune de ses trois sortes de
+ * cartes est au bout d'un chemin différent. Faire descendre la table par les
+ * signatures demandait huit paramètres traversants pour une donnée dont aucun
+ * niveau intermédiaire n'a que faire. La recherche et le catalogue, eux, sont
+ * une grille plate : ils gardent le passage direct.
+ *
+ * Vide par défaut : une carte sortie de tout contexte n'affiche simplement
+ * aucune pastille.
+ */
+val LocalTitleDownloads = compositionLocalOf<Map<String, TitleDownloads>> { emptyMap() }
+
+/**
+ * Abonne l'écran au dépôt **une fois** et met le résumé à disposition de ses
+ * cartes. Le faire carte par carte rouvrirait le flux par affiche à l'écran.
+ */
+@Composable
+fun ProvideTitleDownloads(content: @Composable () -> Unit) {
+    val downloads by remember { DownloadRepository().downloads }.collectAsState(initial = emptyList())
+    val byTitle = remember(downloads) { downloads.byTitle() }
+    CompositionLocalProvider(LocalTitleDownloads provides byTitle, content = content)
+}
+
+/** Pastille d'une carte qui connaît sa clé de titre mais pas son résumé. */
+@Composable
+fun BoxScope.DownloadPosterBadge(mediaKey: String, compact: Boolean = false, bar: Boolean = true) {
+    DownloadPosterBadge(LocalTitleDownloads.current[mediaKey], compact, bar)
 }
