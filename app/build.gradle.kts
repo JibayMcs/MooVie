@@ -237,6 +237,10 @@ tasks.withType<Test>().configureEach {
     System.getProperty("moovie.probe")?.let { systemProperty("moovie.probe", it) }
     System.getProperty("moovie.probe.download")
         ?.let { systemProperty("moovie.probe.download", it) }
+    // Mêmes relais pour les sondes qui prennent un flux en paramètre.
+    listOf("moovie.stream", "moovie.referer", "moovie.ua", "moovie.vlcopts").forEach { key ->
+        System.getProperty(key)?.let { systemProperty(key, it) }
+    }
     // Les sondes OpenSubtitles interrogent la vraie API : sans la clé elles
     // s'abstiennent au lieu d'échouer.
     systemProperty("moovie.opensubtitles.key", openSubtitlesApiKey)

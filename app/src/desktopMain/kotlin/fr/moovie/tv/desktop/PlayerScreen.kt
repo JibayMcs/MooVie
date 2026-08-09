@@ -379,6 +379,17 @@ internal fun DesktopPlayerScreen(
     // tamponnée exploitable sur la barre : on affiche donc l'état de chargement
     // en clair, là où Android TV peut dessiner une vraie piste de tampon.
     var bufferingPercent by remember(streamUrl) { mutableStateOf(100f) }
+    // Affiché seulement si le remplissage dure : libVLC repart de 0 % à chaque
+    // seek et remonte à 100 en une seconde et demie, si bien qu'un « 0 % »
+    // clignotait à chaque saut. Vu de l'écran, l'indicateur semblait coincé en
+    // bas alors qu'il ne faisait que redémarrer.
+    var bufferingVisible by remember(streamUrl) { mutableStateOf(false) }
+    // Ce flux a-t-il jamais produit une image ? Voir l'effet de fin : c'est la
+    // seule façon de distinguer un épisode terminé d'un flux mort-né.
+    var everPlayed by remember(streamUrl) { mutableStateOf(false) }
+    // Relais des en-têtes, vivant le temps du flux. Il tient un socket et un
+    // vivier de fils : le laisser derrière soi en fuirait un par lecture.
+    var proxy by remember(streamUrl) { mutableStateOf<LocalStreamProxy?>(null) }
     // Position en cours de drag sur la barre (null = pas de drag).
     var scrubbing by remember { mutableStateOf<Float?>(null) }
     var volume by remember { mutableStateOf(100) }
@@ -408,13 +419,13 @@ internal fun DesktopPlayerScreen(
     }
 
     fun togglePause() {
-        player.controls().setPause(player.status().isPlaying)
+        controller.togglePause()
     }
 
+    // Passe par le contrôleur, jamais par libVLC en direct : lui seul compense
+    // le retard des seeks HLS, et lui seul parle à libVLC hors du fil d'UI.
     fun seekBy(deltaMs: Long) {
-        val len = player.status().length()
-        val target = (player.status().time() + deltaMs).coerceIn(0L, if (len > 0) len else Long.MAX_VALUE)
-        player.controls().setTime(target)
+        controller.seekBy(deltaMs)
     }
 
     fun setVolume(value: Int) {
@@ -432,6 +443,7 @@ internal fun DesktopPlayerScreen(
     // Démarrage : headers (UA/Referer, ce que les extracteurs exigent), reprise
     // à la position sauvée, sous-titres externes ajoutés une fois le média prêt.
     LaunchedEffect(streamUrl) {
+        controller.onMediaChanged()
         val resumeAt = if (mediaKey.isNotBlank()) progress.position(mediaKey) else 0L
         player.events().addMediaPlayerEventListener(object : MediaPlayerEventAdapter() {
             override fun mediaPlayerReady(mediaPlayer: MediaPlayer) {
@@ -486,7 +498,18 @@ internal fun DesktopPlayerScreen(
             header("User-Agent")?.let { add(":http-user-agent=$it") }
             header("Referer")?.let { add(":http-referrer=$it") }
         }
-        player.media().play(streamUrl, *options.toTypedArray())
+        // Un Referer exigé par l'hébergeur passe par le relais local : libVLC
+        // ne le transmet pas aux segments, et la lecture s'arrête à 0:00 sur
+        // une source pourtant annoncée jouable (voir LocalStreamProxy). Les
+        // options ci-dessus restent : elles couvrent le cas sans relais.
+        val played = if (header("Referer") != null && streamUrl.startsWith("http")) {
+            val relay = LocalStreamProxy(headers)
+            proxy = relay
+            relay.localUrl(streamUrl)
+        } else {
+            streamUrl
+        }
+        player.media().play(played, *options.toTypedArray())
     }
 
     /** Clé de titre (`tv:<id>`) : la préférence audio vaut pour toute la série. */
@@ -510,18 +533,37 @@ internal fun DesktopPlayerScreen(
         }
     }
 
+    LaunchedEffect(bufferingPercent < 100f) {
+        if (bufferingPercent >= 100f) {
+            bufferingVisible = false
+            return@LaunchedEffect
+        }
+        delay(700)
+        bufferingVisible = true
+    }
+
     // Suivi de l'état du lecteur + sauvegarde périodique de la position (~5 s).
     LaunchedEffect(mediaKey) {
         var ticks = 0
         var prefetchAsked = false
+        var lastRawTime = 0L
         while (true) {
             delay(500)
             isPlaying = player.status().isPlaying
-            val time = player.status().time().coerceAtLeast(0)
+            // Du contrôleur et non de libVLC : pendant un seek il rend la cible
+            // demandée, sinon la barre repart en arrière le temps que le flux
+            // se replace, ce qui se lit comme un seek qui a échoué.
+            val time = controller.positionMs()
+            val rawTime = player.status().time().coerceAtLeast(0)
             // Une horloge qui avance prouve que le flux coule : libVLC n'émet
             // pas toujours son « 100 % » final, et l'indicateur resterait
             // affiché en pleine lecture.
-            if (time > timeMs) bufferingPercent = 100f
+            // Sur l'horloge **brute** : celle du contrôleur rend la cible dès
+            // qu'un seek part, et masquerait l'indicateur au moment précis où
+            // le lecteur remplit son cache.
+            if (rawTime > lastRawTime) bufferingPercent = 100f
+            lastRawTime = rawTime
+            if (rawTime > 1_000) everPlayed = true
             timeMs = time
             lengthMs = player.status().length().coerceAtLeast(0)
             ticks++
@@ -648,6 +690,17 @@ internal fun DesktopPlayerScreen(
     // (film, fin de série) ou auto-play coupé : simple retour.
     LaunchedEffect(finished) {
         if (!finished) return@LaunchedEffect
+        // libVLC annonce « fin » aussi quand rien n'a jamais été lu. Le cas
+        // observé : un CDN qui sert la playlist mais refuse les segments (403
+        // faute de Referer, que libVLC ne transmet pas à ses sous-requêtes).
+        // Le média s'ouvre, aucune piste n'arrive, la fin tombe aussitôt — et
+        // l'épisode était marqué vu puis enchaîné sur le suivant, alors qu'on
+        // n'en avait pas vu une image. C'est un échec de source : la fiche
+        // reprend la cascade sur l'hébergeur suivant, comme pour une coupure.
+        if (!everPlayed) {
+            onPlaybackFailed()
+            return@LaunchedEffect
+        }
         markFinished()
         val hasNext = nextSeason > 0 && nextEpisode > 0
         if (!hasNext || !autoPlayNext) {
@@ -682,6 +735,9 @@ internal fun DesktopPlayerScreen(
             saveScope.launch {
                 runCatching { player.controls().stop() }
                 runCatching { player.release() }
+                // Après stop() : le relais sert encore des segments tant que le
+                // lecteur n'est pas arrêté.
+                runCatching { proxy?.shutdown() }
                 runCatching { factory.release() }
                 controller.shutdown()
             }
@@ -816,7 +872,7 @@ internal fun DesktopPlayerScreen(
         // libVLC 3 ne donnant aucune plage tamponnée (voir
         // VlcjPlayerController.bufferedMs). Sur Android TV, c'est une vraie
         // piste dessinée sur la barre de progression.
-        if (bufferingPercent < 100f && !playError) {
+        if (bufferingVisible && !playError) {
             Text(
                 stringResource(Res.string.player_buffering, bufferingPercent.toInt()),
                 style = MaterialTheme.typography.titleMedium,
