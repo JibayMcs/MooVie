@@ -67,11 +67,14 @@ class DownloadEngineTest {
         fetcher: ByteFetcher,
         resolver: StreamResolver,
         seen: MutableList<Download>,
+        /** Octets libres annoncés par le volume. Par défaut : de la place. */
+        freeSpace: (File) -> Long = { Long.MAX_VALUE },
     ) = DownloadEngine(
         fetcher = fetcher,
         progress = { seen += it },
         resolver = resolver,
         dirFor = { File(root, safeName(it)) },
+        freeSpace = freeSpace,
     )
 
     private val stream = PlayableStream(
@@ -206,5 +209,66 @@ class DownloadEngineTest {
         assertEquals(2, last.totalSegments)
         assertEquals(2, last.doneSegments)
         assertEquals(1f, last.progress)
+    }
+
+    // --- Garde d'espace disque ---------------------------------------------
+
+    @Test
+    fun `un disque plein arrête avant de télécharger quoi que ce soit`() = runTest {
+        val fetcher = FakeFetcher(mapOf(stream.url to playlist))
+
+        val outcome = engineWith(
+            fetcher,
+            StreamResolver { _, _ -> null },
+            mutableListOf(),
+            freeSpace = { 10L * 1024 * 1024 },
+        ).run(download, stream)
+
+        assertTrue(outcome is DownloadOutcome.Failed)
+        // Rien n'a été demandé au réseau : commencer pour s'arrêter aussitôt
+        // laisserait des octets inutiles sur un disque qui manque déjà.
+        assertTrue(fetcher.calls.isEmpty(), "aucune requête ne doit partir")
+    }
+
+    /**
+     * La réserve est de 500 Mo. Juste au-dessus, on télécharge : refuser là
+     * rendrait la fonctionnalité inutilisable sur un appareil peu rempli.
+     */
+    @Test
+    fun `juste au-dessus de la réserve, le téléchargement se fait`() = runTest {
+        val fetcher = FakeFetcher(mapOf(stream.url to playlist))
+
+        val outcome = engineWith(
+            fetcher,
+            StreamResolver { _, _ -> null },
+            mutableListOf(),
+            freeSpace = { 501L * 1024 * 1024 },
+        ).run(download, stream)
+
+        assertTrue(outcome is DownloadOutcome.Done)
+    }
+
+    /**
+     * Le disque se remplit **pendant** le téléchargement : on s'arrête, et les
+     * segments déjà posés restent — c'est ce qui permet à la reprise de repartir
+     * d'où elle en était une fois de la place libérée.
+     */
+    @Test
+    fun `un disque qui se remplit en cours de route garde ce qui est déjà là`() = runTest {
+        val fetcher = FakeFetcher(mapOf(stream.url to playlist))
+        var probes = 0
+
+        val outcome = engineWith(
+            fetcher,
+            StreamResolver { _, _ -> null },
+            mutableListOf(),
+            // Le premier contrôle passe (celui d'avant le départ), les suivants non.
+            freeSpace = { if (probes++ == 0) Long.MAX_VALUE else 1L },
+        ).run(download, stream)
+
+        assertTrue(outcome is DownloadOutcome.Failed)
+        assertTrue(fetcher.calls.isNotEmpty(), "le téléchargement doit avoir commencé")
+        val dir = File(root, safeName(download.key))
+        assertTrue(File(dir, PLAYLIST_NAME).exists(), "la playlist locale doit rester")
     }
 }

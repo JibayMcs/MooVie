@@ -68,10 +68,19 @@ class DownloadEngine(
      * dossier de données de la personne qui lance la suite.
      */
     private val dirFor: (String) -> File = ::downloadDir,
+    /**
+     * Espace libre du volume qui reçoit les fichiers. Injecté pour la même
+     * raison que [dirFor] : un test ne peut pas remplir un vrai disque.
+     */
+    private val freeSpace: (File) -> Long = { it.usableSpace },
 ) {
 
     suspend fun run(download: Download, stream: PlayableStream): DownloadOutcome {
         val dir = dirFor(download.key).also { it.mkdirs() }
+        // Avant d'ouvrir quoi que ce soit : commencer pour s'arrêter à mi-course
+        // laisse des octets qui ne serviront jamais, sur un disque qui manque
+        // déjà de place.
+        if (diskFull(dir)) return DownloadOutcome.Failed(DISK_FULL)
         return try {
             if (isHls(stream.url)) hls(download, stream, dir) else direct(download, stream, dir)
         } catch (e: Exception) {
@@ -136,6 +145,22 @@ class DownloadEngine(
             // On ne publie pas à chaque segment : une série en compte des
             // milliers, et chaque publication est une écriture DataStore.
             if (done % PROGRESS_EVERY == 0 || done == local.resources.size) {
+                // Contrôlé à la cadence des publications, pas à chaque segment :
+                // interroger le système de fichiers des milliers de fois coûte
+                // plus que ce que ça protège. On s'arrête proprement, et les
+                // segments déjà là restent — de la place libérée, et la reprise
+                // repart d'où elle en était.
+                if (diskFull(dir)) {
+                    publish(
+                        download.copy(
+                            state = DownloadState.RUNNING,
+                            totalSegments = local.resources.size,
+                            doneSegments = done,
+                            bytes = bytes,
+                        ),
+                    )
+                    return DownloadOutcome.Failed(DISK_FULL)
+                }
                 publish(
                     download.copy(
                         state = DownloadState.RUNNING,
@@ -196,8 +221,34 @@ class DownloadEngine(
 
     private fun isHls(url: String) = ".m3u8" in url.substringBefore('?').lowercase()
 
+    /**
+     * Reste-t-il trop peu de place pour continuer ?
+     *
+     * On garde une réserve plutôt que d'écrire jusqu'au dernier octet : un
+     * volume plein ne gêne pas que le téléchargement, il empêche le système
+     * d'écrire ses propres fichiers, et la reprise elle-même a besoin d'un peu
+     * d'air. Sans cette garde, remplir le disque arrêtait le téléchargement
+     * sans un mot — le symptôme rapporté était « ça s'est arrêté tout seul ».
+     *
+     * Une erreur de lecture ne bloque pas : mieux vaut tenter et échouer sur
+     * l'écriture que refuser un téléchargement parfaitement possible.
+     */
+    private fun diskFull(dir: File): Boolean {
+        val free = runCatching { freeSpace(dir) }.getOrDefault(Long.MAX_VALUE)
+        return free < MIN_FREE_BYTES
+    }
+
     private companion object {
         const val PROGRESS_EVERY = 10
+
+        /**
+         * Réserve à ne pas entamer, 500 Mo. Assez pour que le système respire
+         * et que la reprise ait de quoi écrire, assez peu pour ne pas rendre
+         * inutilisable un appareil qui n'a que quelques giga-octets.
+         */
+        const val MIN_FREE_BYTES = 500L * 1024 * 1024
+
+        const val DISK_FULL = "Espace de stockage insuffisant : libérez de la place, le téléchargement reprendra où il en est."
     }
 }
 
