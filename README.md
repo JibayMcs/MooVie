@@ -53,6 +53,10 @@ and ~~iOS~~, built from a single Kotlin Multiplatform codebase. Source extractio
   exact genre. Contextual hero, *Continue watching* with per-episode progress,
   trending and top-rated (TMDB), watched badges.
 - **Search** - result grid, persistent history, D-pad flow from keyboard to results.
+  Sort by relevance, popularity, rating, year or title, filter by kind, minimum
+  rating and decade; the filters are kept per profile. TMDB cannot sort a text
+  search, so the ordering is applied to the results brought back, and the screen
+  says so.
 - **Movies & shows** - cast, seasons and episodes with stills, per-episode details page,
   watched/unwatched marking (episode, whole season or movie).
 - **One-press playback** - sources load as soon as a title opens; a single

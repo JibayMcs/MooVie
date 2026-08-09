@@ -56,7 +56,10 @@ L'extraction des sources se fait **on-device** : pas de backend, pas de compte, 
   qui rouvre son genre exact. Hero contextuel, *Reprendre la lecture* avec progression
   par épisode, tendances et mieux notés (TMDB), badges vus.
 - **Recherche** - résultats en grille, historique persistant, descente au D-pad du clavier
-  vers les résultats.
+  vers les résultats. Tri par pertinence, popularité, note, année ou titre, filtres
+  par type, note minimale et décennie ; les filtres sont retenus par profil. TMDB
+  ne sait pas trier une recherche par texte : le classement porte donc sur les
+  résultats rapportés, et l'écran le dit.
 - **Films & séries** - casting, saisons et épisodes avec vignettes, page de détail par
   épisode, marquage vu/non vu (épisode, saison entière ou film).
 - **Lecture en un appui** - les sources chargent dès l'ouverture d'une fiche ; un seul
