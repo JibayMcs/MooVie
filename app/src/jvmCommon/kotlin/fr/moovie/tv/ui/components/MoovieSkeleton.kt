@@ -6,6 +6,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -33,6 +34,9 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -111,6 +115,14 @@ fun MoovieAsyncImage(
     contentDescription: String?,
     modifier: Modifier = Modifier,
     contentScale: ContentScale = ContentScale.Crop,
+    /**
+     * Visuel de repli quand [model] ne rend rien : l'affiche ou le fond du
+     * titre, rendus en gris et barrés. Un épisode non diffusé n'a pas de
+     * vignette chez TMDB, et une icône seule dans un cadre vide en dit moins
+     * qu'une image du titre marquée « pas encore ». Null = ancien
+     * comportement, l'icône discrète.
+     */
+    fallback: Any? = null,
 ) {
     // `remember(model)` et non `remember` : une carte recyclée par une liste
     // paresseuse change de modèle sans être recomposée depuis zéro, et resterait
@@ -129,12 +141,16 @@ fun MoovieAsyncImage(
             ImageState.LOADING -> Box(modifier = Modifier.matchParentSize().moovieShimmer())
             // Discret volontairement : c'est un état de repos, pas une erreur à
             // signaler. Le titre à côté porte déjà l'information utile.
-            ImageState.ABSENT -> Icon(
-                imageVector = Icons.Default.ImageNotSupported,
-                contentDescription = null,
-                tint = Color.White.copy(alpha = 0.22f),
-                modifier = Modifier.size(28.dp),
-            )
+            ImageState.ABSENT -> if (fallback != null) {
+                UnavailableArt(fallback, modifier = Modifier.matchParentSize())
+            } else {
+                Icon(
+                    imageVector = Icons.Default.ImageNotSupported,
+                    contentDescription = null,
+                    tint = Color.White.copy(alpha = 0.22f),
+                    modifier = Modifier.size(28.dp),
+                )
+            }
             ImageState.LOADED -> Unit
         }
         if (model != null) {
@@ -152,6 +168,59 @@ fun MoovieAsyncImage(
                         else -> ImageState.ABSENT
                     }
                 },
+            )
+        }
+    }
+}
+
+/**
+ * Visuel de repli d'une vignette absente : l'image du titre, désaturée,
+ * assombrie et barrée en diagonale.
+ *
+ * Les trois traitements portent chacun une part du message et aucun ne suffit
+ * seul. Le gris sort l'image du flux des vignettes réelles ; l'assombrissement
+ * l'empêche de rivaliser avec le texte posé à côté ; la barre dit ce que les
+ * deux autres laissent deviner — non pas « image manquante », mais « pas
+ * encore disponible ».
+ *
+ * La barre est doublée : un trait sombre plus large sous le trait clair. Sur
+ * une image de plein jour, un simple trait blanc disparaît.
+ */
+@Composable
+private fun UnavailableArt(model: Any, modifier: Modifier = Modifier) {
+    Box(modifier = modifier) {
+        AsyncImage(
+            model = model,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            // setToSaturation(0) : la matrice de luminance standard, donc un
+            // gris perçu et non la moyenne des canaux.
+            colorFilter = ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(0f) }),
+            modifier = Modifier.matchParentSize(),
+        )
+        Box(modifier = Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.55f)))
+        Canvas(modifier = Modifier.matchParentSize()) {
+            // Coin bas-gauche vers coin haut-droit, en retrait des bords : une
+            // diagonale qui touche les angles se confond avec le cadre.
+            val inset = size.minDimension * 0.18f
+            val start = Offset(inset, size.height - inset)
+            val end = Offset(size.width - inset, inset)
+            // Épaisseurs en dp et non en pixels : un trait de 6 px reste 6 px
+            // sur la dalle 450 dpi d'un téléphone, où il devient deux fois plus
+            // fin qu'à l'écran où il a été réglé.
+            drawLine(
+                color = Color.Black.copy(alpha = 0.5f),
+                start = start,
+                end = end,
+                strokeWidth = 3.dp.toPx(),
+                cap = StrokeCap.Round,
+            )
+            drawLine(
+                color = Color.White.copy(alpha = 0.6f),
+                start = start,
+                end = end,
+                strokeWidth = 1.5f.dp.toPx(),
+                cap = StrokeCap.Round,
             )
         }
     }

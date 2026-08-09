@@ -473,6 +473,7 @@ fun DetailsScreenContent(
                             onToggleWatched = { onToggleWatched(key) },
                             cast = s.details.credits?.cast.orEmpty(),
                             onOpenPerson = onOpenPerson,
+                            fallbackArt = s.details.backdropUrl() ?: s.details.posterUrl(),
                         )
                     } else {
                         // Deux volets plutôt qu'un empilement : l'écran fait
@@ -755,6 +756,7 @@ fun DetailsScreenContent(
                                     // OK long = bascule vu / non vu.
                                     onOpen = { onOpenEpisode(s.season, ep) },
                                     onToggleWatched = { onToggleWatched(key) },
+                                    fallbackArt = s.details.backdropUrl() ?: s.details.posterUrl(),
                                 )
                             }
                         }
@@ -1453,6 +1455,8 @@ private fun EpisodeDetail(
      */
     cast: List<CastMember> = emptyList(),
     onOpenPerson: (CastMember) -> Unit = {},
+    /** Voir [EpisodeRow]. Même repli, en grand. */
+    fallbackArt: Any? = null,
 ) {
     val compact = useBottomNav
     val hPadDp = if (compact) 16.dp else 48.dp
@@ -1473,6 +1477,7 @@ private fun EpisodeDetail(
                 contentDescription = ep.name,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
+                fallback = fallbackArt,
             )
         }
     }
@@ -1586,6 +1591,12 @@ private fun EpisodeRow(
     onToggleWatched: () -> Unit,
     /** Le téléchargement de cet épisode, s'il existe. */
     download: Download? = null,
+    /**
+     * Visuel du titre, affiché barré à la place d'une vignette absente. Le fond
+     * de la série plutôt que son affiche : la vignette est en 16:9, où une
+     * affiche 2:3 rognée ne montre qu'une bande du milieu.
+     */
+    fallbackArt: Any? = null,
     /** Épisode à reprendre ou à suivre : barre accent, et cible du focus d'arrivée. */
     isNext: Boolean = false,
     modifier: Modifier = Modifier,
@@ -1621,6 +1632,7 @@ private fun EpisodeRow(
                     contentDescription = ep.name,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),
+                    fallback = fallbackArt,
                 )
                 if (isWatched) {
                     WatchedBadge(modifier = Modifier.align(Alignment.TopEnd).padding(4.dp))
