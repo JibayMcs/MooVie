@@ -36,6 +36,7 @@ import fr.moovie.tv.resources.settings_cat_downloads
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.SettingsRemote
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -90,6 +91,7 @@ import fr.moovie.tv.resources.home_open_settings
 import fr.moovie.tv.resources.home_search
 import fr.moovie.tv.resources.home_see_more
 import fr.moovie.tv.resources.home_settings
+import fr.moovie.tv.resources.remote_title
 import fr.moovie.tv.resources.media_movie
 import fr.moovie.tv.resources.media_series
 import fr.moovie.tv.resources.mark_watched
@@ -131,6 +133,11 @@ fun HomeScreenContent(
     onOpenSearch: () -> Unit,
     onOpenHistory: () -> Unit,
     onOpenDownloads: () -> Unit = {},
+    /**
+     * Télécommande virtuelle. Null quand elle n'a pas lieu d'être : sur un
+     * téléviseur, ou tant qu'aucun téléviseur n'a été appairé.
+     */
+    onOpenRemote: (() -> Unit)? = null,
     onOpenCatalog: () -> Unit,
     /** « En voir plus » d'une rangée épinglée : rouvre le genre exact. */
     onOpenCatalogGenre: (CatalogSelection) -> Unit,
@@ -287,6 +294,19 @@ fun HomeScreenContent(
                         contentDescription = stringResource(Res.string.settings_cat_downloads),
                         modifier = headerDown,
                     )
+                    // Télécommande : **seulement au doigt, et seulement si un
+                    // téléviseur a été appairé**. Sur un téléviseur, se piloter
+                    // soi-même n'a pas de sens ; sans cible, le bouton ouvrirait
+                    // un écran vide. Les deux conditions valent mieux qu'un
+                    // bouton qui explique pourquoi il ne sert à rien.
+                    if (onOpenRemote != null) {
+                        MoovieIconButton(
+                            onClick = onOpenRemote,
+                            icon = Icons.Default.SettingsRemote,
+                            contentDescription = stringResource(Res.string.remote_title),
+                            modifier = headerDown,
+                        )
+                    }
                     MoovieIconButton(
                         onClick = onOpenSettings,
                         icon = Icons.Default.Settings,

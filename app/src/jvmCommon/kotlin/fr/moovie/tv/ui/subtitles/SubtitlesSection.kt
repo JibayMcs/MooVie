@@ -34,6 +34,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import fr.moovie.tv.ui.remote.remoteTypable
 import fr.moovie.tv.core.subtitles.model.SubtitleQuota
 import fr.moovie.tv.data.subtitles.OsLoginError
 import fr.moovie.tv.resources.Res
@@ -255,6 +256,15 @@ private fun LabelledField(
                 },
                 modifier = Modifier
                     .fillMaxWidth()
+                    // Le mot de passe est masqué à l'écran : il ne serait pas
+                    // cohérent de l'envoyer en clair au téléphone. Le champ
+                    // s'annonce, son contenu non.
+                    .remoteTypable(
+                        label = label,
+                        value = value,
+                        onValueChange = onValueChange,
+                        secret = mask,
+                    )
                     // Un champ texte avale les flèches : sans ça le D-pad ne peut
                     // plus en sortir, faute de touche Tab sur une télécommande.
                     .onPreviewKeyEvent { event ->

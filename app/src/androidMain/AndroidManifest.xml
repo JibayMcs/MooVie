@@ -5,6 +5,9 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- Lecture : garde le CPU/Wi-Fi éveillés (setWakeMode) pendant le streaming -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- Retour haptique de la télécommande virtuelle. Permission de niveau
+         normal : accordée à l'installation, rien à demander à l'exécution. -->
+    <uses-permission android:name="android.permission.VIBRATE" />
     <!-- Téléchargement hors ligne : le service de premier plan est ce qui
          empêche Android de tuer la file au premier passage en arrière-plan.
          POST_NOTIFICATIONS est demandée à l'exécution sur Android 13+ ; sans
@@ -86,6 +89,17 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- Appairage de la télécommande : la page servie par le téléviseur
+                 rebascule ici quand l'application est installée, en passant
+                 l'adresse, le port et le jeton. Schéma privé plutôt que lien
+                 web : rien de tout ceci n'existe sur Internet, et un App Link
+                 exigerait un domaine à nous. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="moovie" android:host="remote" />
             </intent-filter>
         </activity>
         <!-- Expose l'APK de mise à jour téléchargé à l'installateur système -->

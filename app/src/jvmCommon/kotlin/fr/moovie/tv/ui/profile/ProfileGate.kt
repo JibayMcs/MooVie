@@ -40,6 +40,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import fr.moovie.tv.ui.remote.remoteTypable
 import fr.moovie.tv.data.profile.Profile
 import fr.moovie.tv.data.profile.ProfileRepository
 import fr.moovie.tv.resources.Res
@@ -282,6 +283,11 @@ private fun NameForm(
                 cursorBrush = SolidColor(Color.White),
                 modifier = Modifier
                     .fillMaxWidth()
+                    .remoteTypable(
+                        label = stringResource(Res.string.profile_name_hint),
+                        value = draft,
+                        onValueChange = { draft = it },
+                    )
                     // Le champ avale les flèches : sans ça le D-pad ne peut plus
                     // en sortir, une télécommande n'ayant pas de touche Tab.
                     .onPreviewKeyEvent { event ->

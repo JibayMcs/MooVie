@@ -106,6 +106,11 @@ private fun sameTab(a: Screen, b: Screen): Boolean = a::class == b::class
  * Les cibles font 56 dp de haut et se partagent la largeur à parts égales, au-
  * dessus du seuil de 48 dp en deçà duquel une cible tactile devient difficile à
  * viser sans regarder.
+ *
+ * **Six, et pas sept.** La télécommande y a eu son onglet, le temps de constater
+ * ce que coûte un septième : sur les 448 dp d'un portrait, chaque part tombe à
+ * 64 dp et les libellés se tronquent en « Télécha… ». Elle est passée en bouton
+ * flottant, qui n'a rien à partager avec personne — voir `RemoteFab`.
  */
 @Composable
 fun MoovieBottomBar(

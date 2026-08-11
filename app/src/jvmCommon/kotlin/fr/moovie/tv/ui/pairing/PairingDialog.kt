@@ -36,10 +36,24 @@ import fr.moovie.tv.resources.common_back
 import fr.moovie.tv.resources.remote_intro
 import fr.moovie.tv.resources.remote_send
 import fr.moovie.tv.resources.remote_title
+import fr.moovie.tv.resources.remote_keyboard
+import fr.moovie.tv.resources.remote_no_haptics
+import fr.moovie.tv.resources.remote_forward
+import fr.moovie.tv.resources.remote_rewind
+import fr.moovie.tv.resources.remote_play_pause
+import fr.moovie.tv.resources.remote_back_key
+import fr.moovie.tv.resources.remote_ok
+import fr.moovie.tv.resources.remote_right
+import fr.moovie.tv.resources.remote_left
+import fr.moovie.tv.resources.remote_down
+import fr.moovie.tv.resources.remote_up
 import fr.moovie.tv.resources.remote_to_remote
 import fr.moovie.tv.resources.remote_to_settings
 import fr.moovie.tv.resources.remote_type
 import fr.moovie.tv.data.pairing.PairingServer
+import fr.moovie.tv.shared.deviceName
+import fr.moovie.tv.data.remote.RemoteBeacons
+import fr.moovie.tv.data.remote.RemoteTokenRepository
 import fr.moovie.tv.data.pairing.PairingTexts
 import fr.moovie.tv.data.sync.providers.B2_APP_KEY
 import fr.moovie.tv.data.sync.providers.B2_KEY_ID
@@ -82,21 +96,24 @@ import org.jetbrains.compose.resources.stringResource
  * infiniment moins pénible que de taper une clé B2 à la télécommande — ce qui
  * est précisément le problème qu'on résout.
  */
+/**
+ * Le serveur d'appairage, prêt à servir — textes, libellés et sections compris.
+ *
+ * Extrait de la modale parce qu'il a désormais **deux appelants** : elle, et le
+ * téléviseur qui doit écouter en permanence pour qu'une télécommande de
+ * téléphone le trouve. Les deux passent par `PairingSession`, qui rend
+ * l'instance existante plutôt que d'en créer une seconde : deux serveurs
+ * voudraient dire deux sockets, et l'annonce réseau n'en désignerait qu'une.
+ *
+ * **Rend `null`, et l'observe plutôt que de le mémoriser.** Le serveur meurt
+ * avec le premier plan alors que la composition, elle, survit : un
+ * `remember { … }` gardait une référence sur une socket fermée et personne ne
+ * recréait rien. Lire l'état de la session est ce qui fait revenir le serveur au
+ * retour dans l'application, et ce qui fait que la modale affiche « en attente »
+ * pendant la seconde où il n'existe pas encore.
+ */
 @Composable
-fun PairingDialog(
-    onDismiss: () -> Unit,
-    /**
-     * Appelé à chaque envoi du téléphone qui a modifié quelque chose.
-     *
-     * L'écran d'installation s'en sert pour vérifier la clé TMDB et enchaîner
-     * tout seul. Les réglages ne le renseignent pas : on y est déjà configuré, et
-     * refermer la modale sous les doigts de quelqu'un qui saisit encore ses
-     * identifiants de synchro serait une surprise, pas un service.
-     */
-    onSaved: () -> Unit = {},
-    /** Message affiché sous l'état, en rouge. Vérification en cours, clé refusée… */
-    notice: String? = null,
-) {
+fun rememberPairingHost(): PairingServer? {
     val texts = PairingTexts(
         title = stringResource(Res.string.pairing_title),
         intro = stringResource(Res.string.pairing_page_intro),
@@ -110,6 +127,17 @@ fun PairingDialog(
         remoteToSettings = stringResource(Res.string.remote_to_settings),
         remoteToRemote = stringResource(Res.string.remote_to_remote),
         remoteBack = stringResource(Res.string.common_back),
+        keyUp = stringResource(Res.string.remote_up),
+        keyDown = stringResource(Res.string.remote_down),
+        keyLeft = stringResource(Res.string.remote_left),
+        keyRight = stringResource(Res.string.remote_right),
+        keyOk = stringResource(Res.string.remote_ok),
+        keyBack = stringResource(Res.string.remote_back_key),
+        keyPlayPause = stringResource(Res.string.remote_play_pause),
+        keyRewind = stringResource(Res.string.remote_rewind),
+        keyForward = stringResource(Res.string.remote_forward),
+        keyKeyboard = stringResource(Res.string.remote_keyboard),
+        remoteNoHaptics = stringResource(Res.string.remote_no_haptics),
     )
 
     // Les libellés des champs sont ceux des réglages, résolus ici : la couche
@@ -142,28 +170,60 @@ fun PairingDialog(
     // `groups` change quand le fournisseur est connu : la fabrique du serveur
     // doit relire la valeur courante, pas celle capturée à la composition.
     val currentGroups by rememberUpdatedState(groups)
+    val source = remember { PairingFields() }
+
     // Le serveur appartient à la session, pas à la modale : armé en
-    // télécommande, il doit survivre à sa fermeture. La session le crée au
-    // premier besoin et le rend tel quel ensuite — recréer changerait le jeton
-    // et ferait tomber en 404 la page ouverte sur le téléphone.
-    val server = remember {
-        val source = PairingFields()
+    // télécommande ou tenu par le téléviseur, il doit survivre à sa fermeture.
+    val server by PairingSession.server.collectAsState()
+
+    // Un effet et non un `remember` : on démarre une fois par composition, sans
+    // se relancer à chaque fois que la session repasse à null — c'est ce qui
+    // arrive en arrière-plan, où il ne faut surtout **pas** rouvrir la socket.
+    // La reprise, elle, passe par `PairingSession.resume()`.
+    LaunchedEffect(Unit) {
         PairingSession.start {
             PairingServer(
                 fields = { source.snapshot(labels, currentGroups) },
                 apply = { source.apply(it) },
                 texts = texts,
+                // Le jeton vient du disque et y reste : une télécommande
+                // appairée doit répondre demain, pas seulement ce soir.
+                tokenOf = { RemoteTokenRepository().token() },
             )
         }
     }
-    DisposableEffect(server) {
+    return server
+}
+
+@Composable
+fun PairingDialog(
+    onDismiss: () -> Unit,
+    /**
+     * Appelé à chaque envoi du téléphone qui a modifié quelque chose.
+     *
+     * L'écran d'installation s'en sert pour vérifier la clé TMDB et enchaîner
+     * tout seul. Les réglages ne le renseignent pas : on y est déjà configuré, et
+     * refermer la modale sous les doigts de quelqu'un qui saisit encore ses
+     * identifiants de synchro serait une surprise, pas un service.
+     */
+    onSaved: () -> Unit = {},
+    /** Message affiché sous l'état, en rouge. Vérification en cours, clé refusée… */
+    notice: String? = null,
+) {
+    val server = rememberPairingHost()
+    // Sur `Unit` et non sur `server` : celui-ci apparaît une fraction de seconde
+    // après l'ouverture, et relâcher la modale à ce moment-là couperait la
+    // socket qu'on vient d'ouvrir.
+    DisposableEffect(Unit) {
         onDispose { PairingSession.releaseDialog() }
     }
 
-    val url by server.url.collectAsState()
-    val opened by server.opened.collectAsState()
-    val saved by server.saved.collectAsState()
-    val failure by server.failure.collectAsState()
+    // Serveur absent = même chose qu'adresse inconnue : « en attente ». Il n'y a
+    // pas d'état intermédiaire à montrer pour une seconde de lecture de disque.
+    val url = server?.url?.collectAsState()?.value
+    val opened = server?.opened?.collectAsState()?.value ?: false
+    val saved = server?.saved?.collectAsState()?.value ?: 0
+    val failure = server?.failure?.collectAsState()?.value
     val close = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { close.requestFocus() } }
     // `saved` ne fait que croître : chaque hausse est un envoi qui a changé
@@ -180,7 +240,7 @@ fun PairingDialog(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Text(texts.title, style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(Res.string.pairing_title), style = MaterialTheme.typography.titleMedium)
 
             when {
                 failure != null -> Text(
@@ -246,5 +306,37 @@ fun PairingDialog(
                 modifier = Modifier.fillMaxWidth().focusRequester(close),
             ) { Text(stringResource(Res.string.pairing_close)) }
         }
+    }
+}
+
+/**
+ * Le téléviseur se tient prêt : serveur à l'écoute et annonce sur le réseau,
+ * tant que l'application est au premier plan.
+ *
+ * Sans ça, la télécommande d'un téléphone ne fonctionnerait qu'après avoir
+ * ouvert la modale d'appairage sur la TV — c'est-à-dire après avoir pris la
+ * télécommande physique, ce qui vide la fonctionnalité de son intérêt.
+ *
+ * L'annonce ne porte **que** le nom et l'adresse. Le jeton n'y est pas : il
+ * vient du QR, donc de quelqu'un qui était devant l'écran. Diffuser le jeton
+ * reviendrait à donner la télécommande à tout ce qui partage le Wi-Fi.
+ */
+@Composable
+fun RemoteHost() {
+    // Déclaré avant tout le reste : c'est ce qui empêche la fermeture de la
+    // modale de couper l'écoute du téléviseur, et ce qui autorise
+    // `PairingSession.resume()` à la rouvrir au retour au premier plan.
+    DisposableEffect(Unit) {
+        PairingSession.retainHost()
+        onDispose { PairingSession.releaseHost() }
+    }
+
+    val server = rememberPairingHost()
+    val url = server?.url?.collectAsState()?.value
+    DisposableEffect(url) {
+        val port = url?.removePrefix("http://")?.substringAfter(':')?.substringBefore('/')
+            ?.toIntOrNull()
+        if (port != null) RemoteBeacons.advertise(deviceName, port)
+        onDispose { RemoteBeacons.stopAdvertising() }
     }
 }

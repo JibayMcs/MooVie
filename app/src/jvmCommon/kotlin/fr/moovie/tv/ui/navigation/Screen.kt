@@ -25,6 +25,13 @@ sealed interface Screen {
     data object Downloads : Screen
 
     /**
+     * Télécommande virtuelle. Atteinte depuis le téléphone uniquement — sur un
+     * téléviseur, piloter le téléviseur depuis lui-même n'a aucun sens, et
+     * l'icône qui y mène n'y est jamais affichée.
+     */
+    data object Remote : Screen
+
+    /**
      * Parcours du catalogue TMDB par genre (distinct de la recherche par texte).
      *
      * [select] est le genre à ouvrir d'emblée. C'est ce que veut dire « en voir

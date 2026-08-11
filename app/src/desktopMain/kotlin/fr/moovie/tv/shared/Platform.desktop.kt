@@ -7,3 +7,7 @@ actual val appVersionName: String = System.getProperty("moovie.version") ?: "0.0
 
 actual val openSubtitlesApiKey: String =
     System.getProperty("moovie.opensubtitles.key").orEmpty()
+
+actual val deviceName: String
+    get() = runCatching { java.net.InetAddress.getLocalHost().hostName }
+        .getOrNull()?.takeIf { it.isNotBlank() } ?: "Moo-vie"

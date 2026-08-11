@@ -31,6 +31,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.lifecycleScope
@@ -46,6 +47,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import fr.moovie.tv.ui.splash.MoovieSplash
 import fr.moovie.tv.ui.navigation.Screen
 import fr.moovie.tv.ui.navigation.rememberNavStack
+import kotlinx.coroutines.flow.MutableStateFlow
+import fr.moovie.tv.ui.remote.RemoteScreen
+import fr.moovie.tv.ui.pairing.RemoteHost
+import fr.moovie.tv.data.remote.RemoteTargetRepository
+import fr.moovie.tv.data.remote.RemotePresence
+import fr.moovie.tv.data.remote.RemoteTarget
+import fr.moovie.tv.ui.remote.RemoteFab
 import fr.moovie.tv.ui.onboarding.OnboardingScreen
 import fr.moovie.tv.ui.onboarding.rememberStartScreen
 import fr.moovie.tv.data.download.DownloadQueue
@@ -112,6 +120,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         handleKeyExtras(intent)
+        handleRemoteLink(intent)
 
         setContent {
             // L'animation de lancement se pose *au-dessus* de l'app plutôt que
@@ -203,6 +212,25 @@ class MainActivity : ComponentActivity() {
                             },
                         ) ?: return@Column
                         val nav = rememberNavStack(start)
+
+                        // Le téléviseur écoute et s'annonce tant qu'il est au
+                        // premier plan, pour qu'un téléphone le trouve sans
+                        // qu'on ait à toucher la télécommande physique.
+                        if (uiFlavor == UiFlavor.TV) RemoteHost()
+
+                        // Cible de la télécommande : c'est elle qui décide si
+                        // l'icône existe, et l'écran qu'elle ouvre.
+                        val remoteTarget by remember { RemoteTargetRepository().target }
+                            .collectAsStateWithLifecycle(initialValue = null)
+                        val openRemote by pendingRemote.collectAsStateWithLifecycle()
+                        LaunchedEffect(openRemote, remoteTarget) {
+                            // On attend que la cible soit *lue* : ouvrir avant
+                            // afficherait un écran sans téléviseur.
+                            if (openRemote && remoteTarget != null) {
+                                nav.push(Screen.Remote)
+                                pendingRemote.value = false
+                            }
+                        }
                         // Pendant la lecture, la bannière rétrécirait la vidéo :
                         // le lecteur affiche une pastille discrète à la place, et
                         // la bannière n'apparaît qu'une fois celle-ci activée.
@@ -317,7 +345,17 @@ class MainActivity : ComponentActivity() {
                         BackHandler(enabled = nav.canGoBack) { nav.pop() }
 
                         when (val s = nav.current) {
+                            // Le téléviseur appairé, ou rien : sans cible la
+                            // destination est inatteignable (l'icône qui y mène
+                            // n'existe pas), mais la composition doit rester
+                            // totale.
+                            Screen.Remote -> remoteTarget?.let {
+                                RemoteScreen(target = it, onBack = { nav.pop() })
+                            }
                             Screen.Home -> HomeScreen(
+                                onOpenRemote = remoteTarget
+                                    ?.takeIf { uiFlavor != UiFlavor.TV }
+                                    ?.let { { nav.push(Screen.Remote) } },
                                 onOpenTitle = { id, isTv -> nav.push(Screen.Details(id, isTv)) },
                                 onResume = { e ->
                                     // Pas de lecture directe : on ouvre la fiche,
@@ -456,6 +494,20 @@ class MainActivity : ComponentActivity() {
                                 },
                             )
                         }
+
+                        // Accès à la télécommande, flottant au-dessus du
+                        // contenu. Il ne s'affiche que si le téléviseur vient de
+                        // répondre — c'est `RemoteFab` qui en décide — et jamais
+                        // par-dessus le lecteur ni sur l'écran qu'il ouvre.
+                        if (useBottomNav &&
+                            !hidesBottomBar(nav.current) &&
+                            nav.current !is Screen.Remote
+                        ) {
+                            RemoteFab(
+                                onClick = { nav.push(Screen.Remote) },
+                                modifier = Modifier.align(Alignment.BottomEnd),
+                            )
+                        }
                         }
 
                         // Sous le contenu, partout sauf là où l'écran est pris
@@ -495,9 +547,22 @@ class MainActivity : ComponentActivity() {
         // qui garantit qu'aucun serveur ne reste à l'écoute du réseau une fois
         // Moo-vie quittée.
         remoteTarget = this
+        // Symétrique du `stop()` de `onPause`. Sans lui, le téléviseur cessait
+        // d'écouter au premier passage en arrière-plan : la composition survit à
+        // la pause, donc rien ne recréait la socket que la pause avait fermée.
+        PairingSession.resume()
         lifecycleScope.launch {
             SyncCoordinator.sync(SyncTrigger.FOREGROUND, System.currentTimeMillis())
         }
+        // Le téléviseur appairé est-il allumé ? C'est ce qui décide de
+        // l'existence du bouton de télécommande. Ici plutôt que dans la
+        // composition, parce que la réponse périme en arrière-plan — on éteint
+        // la télé, on rouvre l'application, le bouton doit avoir disparu.
+        //
+        // Sans cible mémorisée, `refresh` rend faux sans rien émettre sur le
+        // réseau : c'est ce qui en fait un appel sans conséquence sur un
+        // téléviseur, qui n'en a évidemment aucune.
+        lifecycleScope.launch { RemotePresence.refresh() }
     }
 
     override fun onPause() {
@@ -512,6 +577,7 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         handleKeyExtras(intent)
+        handleRemoteLink(intent)
     }
 
     /**
@@ -525,6 +591,34 @@ class MainActivity : ComponentActivity() {
      * avec des `:`, `_` et `-`, en ressort systématiquement fausse — d'où cette
      * porte d'entrée, réservée à la mise au point.
      */
+    /**
+     * Appairage de la télécommande par lien profond.
+     *
+     * `moovie://remote?h=…&p=…&t=…&n=…` — la page servie par le téléviseur y
+     * rebascule quand l'application est installée. On retient la cible ; ouvrir
+     * l'écran est ensuite le travail de la composition, qui observe le dépôt.
+     *
+     * Le jeton ne transite que par ce chemin : il vient du QR affiché à
+     * l'écran, donc de quelqu'un qui était devant le téléviseur. C'est
+     * précisément ce que l'annonce réseau ne saurait pas prouver.
+     */
+    /** Passe à vrai quand un lien d'appairage vient d'arriver : la composition ouvre alors l'écran. */
+    private val pendingRemote = MutableStateFlow(false)
+
+    private fun handleRemoteLink(intent: Intent?): Boolean {
+        val data = intent?.data ?: return false
+        if (data.scheme != "moovie" || data.host != "remote") return false
+        val host = data.getQueryParameter("h")?.takeIf { it.isNotBlank() } ?: return false
+        val port = data.getQueryParameter("p")?.toIntOrNull() ?: return false
+        val token = data.getQueryParameter("t")?.takeIf { it.isNotBlank() } ?: return false
+        val name = data.getQueryParameter("n")?.takeIf { it.isNotBlank() } ?: host
+        lifecycleScope.launch {
+            RemoteTargetRepository().remember(RemoteTarget(name, host, port, token))
+            pendingRemote.value = true
+        }
+        return true
+    }
+
     private fun handleKeyExtras(intent: Intent?) {
         val settings = SettingsRepository()
         intent?.getStringExtra("tmdb_key")?.takeIf { it.isNotBlank() }?.let { key ->

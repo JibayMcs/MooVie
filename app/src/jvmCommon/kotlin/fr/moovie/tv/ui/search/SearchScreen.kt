@@ -89,6 +89,7 @@ import fr.moovie.tv.ui.adaptive.LocalUiFlavor
 import fr.moovie.tv.ui.adaptive.isPointerUi
 import fr.moovie.tv.ui.adaptive.isTouchUi
 import fr.moovie.tv.ui.adaptive.useBottomNav
+import fr.moovie.tv.ui.remote.remoteTypable
 import fr.moovie.tv.ui.theme.MOOVIE_ACCENT
 import fr.moovie.tv.ui.components.MoovieButton
 import fr.moovie.tv.ui.components.LocalMoovieCardActive
@@ -335,6 +336,15 @@ private fun SearchField(
             keyboardActions = KeyboardActions(onSearch = { onSubmit() }),
             modifier = Modifier
                 .fillMaxWidth()
+                // Le champ que la télécommande sert le mieux : chercher un titre
+                // à la croix directionnelle est le geste que l'appairage existe
+                // pour supprimer. Le téléphone ouvre son clavier dès que ce
+                // champ prend le focus.
+                .remoteTypable(
+                    label = stringResource(Res.string.search_hint),
+                    value = value,
+                    onValueChange = onValueChange,
+                )
                 // Sans ça, le champ avale le D-pad bas : impossible d'atteindre
                 // l'historique/les résultats à la télécommande.
                 .onPreviewKeyEvent { event ->

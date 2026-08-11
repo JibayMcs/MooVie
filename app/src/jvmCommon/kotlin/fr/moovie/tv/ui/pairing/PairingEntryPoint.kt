@@ -22,6 +22,21 @@ import fr.moovie.tv.ui.adaptive.UiFlavor
 fun pairingOffered(): Boolean = LocalUiFlavor.current == UiFlavor.TV || PAIRING_FORCED
 
 /**
+ * Vrai là où la section « Télécommande » a quelque chose à dire.
+ *
+ * Plus large que [pairingOffered], parce que la télécommande a **deux bouts** et
+ * qu'un réglage existe à chacun : le téléviseur se laisse piloter (QR, révocation
+ * des jetons), le téléphone pilote (quel téléviseur, et comment l'oublier).
+ *
+ * Le pointeur en est exclu, et lui seul : un ordinateur n'est ni l'un ni l'autre
+ * — il ne sert pas de télécommande, et personne n'en pilote un depuis son
+ * canapé. Lui montrer la section reviendrait à lui proposer un réglage sans
+ * objet.
+ */
+@Composable
+fun remoteOffered(): Boolean = LocalUiFlavor.current != UiFlavor.POINTER || PAIRING_FORCED
+
+/**
  * Crochet de dev : `MOOVIE_PAIRING=1` montre l'appairage hors TV.
  *
  * Il n'existe que pour le tester. L'émulateur Android est derrière le NAT de

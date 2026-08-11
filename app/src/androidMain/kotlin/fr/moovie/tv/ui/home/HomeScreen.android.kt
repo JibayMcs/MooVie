@@ -19,6 +19,8 @@ fun HomeScreen(
     onOpenSearch: () -> Unit,
     onOpenHistory: () -> Unit,
     onOpenDownloads: () -> Unit = {},
+    /** Voir HomeScreenContent : null quand la télécommande n'a pas lieu d'être. */
+    onOpenRemote: (() -> Unit)? = null,
     onOpenCatalog: () -> Unit,
     onOpenCatalogGenre: (CatalogSelection) -> Unit,
     viewModel: HomeViewModel = viewModel(),
@@ -38,6 +40,7 @@ fun HomeScreen(
         onOpenSearch = onOpenSearch,
         onOpenHistory = onOpenHistory,
         onOpenDownloads = onOpenDownloads,
+        onOpenRemote = onOpenRemote,
         onOpenCatalog = onOpenCatalog,
         onOpenCatalogGenre = onOpenCatalogGenre,
         onRemoveResume = viewModel::removeResume,

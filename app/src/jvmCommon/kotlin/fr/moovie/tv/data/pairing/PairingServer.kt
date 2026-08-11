@@ -1,7 +1,12 @@
 package fr.moovie.tv.data.pairing
 
 import fr.moovie.tv.data.remote.RemoteKey
+import fr.moovie.tv.data.remote.RemoteNowPlaying
+import fr.moovie.tv.data.remote.RemoteState
+import fr.moovie.tv.data.remote.RemoteTyping
+import kotlinx.serialization.encodeToString
 import fr.moovie.tv.data.remote.remoteAvailable
+import fr.moovie.tv.shared.deviceName
 import fr.moovie.tv.data.remote.sendRemoteKey
 import fr.moovie.tv.data.remote.sendRemoteText
 import kotlinx.coroutines.CoroutineScope
@@ -20,7 +25,6 @@ import java.net.NetworkInterface
 import java.net.ServerSocket
 import java.net.Socket
 import java.net.URLDecoder
-import kotlin.random.Random
 
 /**
  * Serveur d'appairage : une page, servie sur le réseau local, le temps de la
@@ -45,6 +49,11 @@ import kotlin.random.Random
  * - La page **n'affiche jamais une valeur existante**, seulement si elle est
  *   renseignée. La commodité de saisie ne doit pas devenir une fuite.
  *
+ * Le jeton n'est plus tiré ici mais **fourni** ([tokenOf]), parce qu'il doit
+ * durer : voir [fr.moovie.tv.data.remote.RemoteTokenRepository]. Un fournisseur
+ * suspendu plutôt qu'une valeur, pour que sa lecture — qui touche le disque —
+ * se fasse dans la coroutine de [start] et laisse la construction synchrone.
+ *
  * Il n'y a pas de TLS : un certificat auto-signé ferait afficher au téléphone un
  * avertissement de sécurité, ce qui apprendrait exactement le mauvais réflexe
  * pour protéger un échange qui ne quitte pas le domicile.
@@ -53,10 +62,40 @@ class PairingServer(
     private val fields: suspend () -> List<PairingField>,
     private val apply: suspend (Map<String, String>) -> Int,
     private val texts: PairingTexts,
+    private val tokenOf: suspend () -> String,
 ) {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val token = randomToken()
+
+    /**
+     * `@Volatile` parce que [start] l'écrit sur sa coroutine et que [handle] le
+     * lit sur celles des connexions. Aucune requête ne peut arriver avant
+     * l'écriture — la socket n'existe pas encore — mais la visibilité entre
+     * threads, elle, ne se déduit pas de l'ordre du code.
+     */
+    @Volatile
+    private var token: String = ""
+
+    /**
+     * Lien qui rebascule le téléphone vers l'application, jeton compris.
+     *
+     * Vide tant que l'adresse n'est pas connue : la page reste alors une page,
+     * ce qu'elle doit de toute façon rester pour un téléphone sans Moo-vie.
+     */
+    private fun appLink(): String {
+        val url = _url.value ?: return ""
+        val authority = url.removePrefix("http://").substringBefore('/')
+        val host = authority.substringBefore(':')
+        val port = authority.substringAfter(':', "")
+        if (host.isBlank() || port.isBlank()) return ""
+        val name = java.net.URLEncoder.encode(deviceName, "UTF-8")
+        val target = "remote?h=$host&p=$port&t=$token&n=$name"
+        // `S.browser_fallback_url` ramène ici quand l'application est absente,
+        // au lieu de la page d'erreur d'un schéma inconnu.
+        val fallback = java.net.URLEncoder.encode(url + "/remote", "UTF-8")
+        return "intent://$target#Intent;scheme=moovie;package=fr.moovie.tv;" +
+            "S.browser_fallback_url=$fallback;end"
+    }
     private var socket: ServerSocket? = null
 
     private val _url = MutableStateFlow<String?>(null)
@@ -84,6 +123,17 @@ class PairingServer(
                 _failure.value = "no-network"
                 return@launch
             }
+            // Avant la socket : sans jeton il n'y a pas d'adresse à publier, et
+            // écouter sans savoir quoi autoriser reviendrait à tout ouvrir. Le
+            // `runCatching` est là parce qu'une exception nue sur ce `launch`
+            // remonterait au gestionnaire par défaut du thread, c'est-à-dire à
+            // un arrêt de l'application pour une lecture de préférences.
+            val fresh = runCatching { tokenOf() }.getOrNull()
+            if (fresh.isNullOrBlank()) {
+                _failure.value = "no-socket"
+                return@launch
+            }
+            token = fresh
             val server = runCatching { ServerSocket(PREFERRED_PORT) }
                 .recoverCatching { ServerSocket(0) } // port occupé : n'importe lequel fera l'affaire
                 .getOrNull()
@@ -101,6 +151,24 @@ class PairingServer(
                 launch { runCatching { handle(client) } }
             }
         }
+    }
+
+    /**
+     * Relit le jeton et réécrit l'adresse, sans couper l'écoute.
+     *
+     * C'est ce qui donne son effet à « Oublier les télécommandes » : le dépôt a
+     * déjà tiré un jeton neuf, il reste à ce que le serveur en vive. Tout ce qui
+     * était appairé tombe alors en 404, et le QR affiché à côté montre la
+     * nouvelle adresse — celle qu'il faut rescanner.
+     *
+     * Sans effet tant que le serveur n'écoute pas : il lira le nouveau jeton de
+     * lui-même à son démarrage.
+     */
+    suspend fun refreshToken() {
+        val authority = _url.value?.removePrefix("http://")?.substringBefore('/') ?: return
+        val fresh = runCatching { tokenOf() }.getOrNull()?.takeIf { it.isNotBlank() } ?: return
+        token = fresh
+        _url.value = "http://$authority/$fresh"
     }
 
     /** Ferme la socket et arrête tout. Appelable plusieurs fois. */
@@ -126,22 +194,80 @@ class PairingServer(
         }
         val route = path.removePrefix("/$token").trimStart('/')
 
+        // --- Sonde ----------------------------------------------------------
+        //
+        // « Le téléviseur est-il là, et mon jeton vaut-il encore ? » Les deux
+        // d'un coup, puisqu'un jeton périmé est déjà tombé en 404 au-dessus.
+        //
+        // Une route à elle, plutôt que de charger `/remote` : cette dernière
+        // **arme la session**, ce qui fait survivre le serveur à la modale.
+        // Sonder ne doit rien changer à l'état du téléviseur, sans quoi le
+        // simple fait de regarder si la télécommande est joignable la
+        // maintiendrait allumée.
+        if (route == "ping") {
+            respond(sock.getOutputStream(), 204, "text/plain; charset=utf-8", "")
+            return@use
+        }
+
         // --- Télécommande ---------------------------------------------------
         //
         // Séparée du formulaire : un appui de flèche ne doit ni recharger la
         // page ni traverser la lecture des réglages. Réponses vides et courtes,
         // parce qu'il y en a une par appui.
-        if (route == "remote" || route == "key" || route == "text") {
+        if (route == "remote" || route == "key" || route == "text" ||
+            route == "state" || route == "seek"
+        ) {
             if (!remoteAvailable()) {
                 respond(sock.getOutputStream(), 404, "text/plain; charset=utf-8", "No remote")
                 return@use
             }
             when (route) {
+                // Tout ce que le téléviseur raconte de lui : ce qui joue, et le
+                // champ qui attend une saisie. Toujours 200, même quand les deux
+                // sont vides — « rien en cours » est une réponse, et le
+                // téléphone doit pouvoir la distinguer d'un silence. Les
+                // confondre faisait clignoter son mini-lecteur au premier
+                // paquet perdu.
+                "state" -> {
+                    val state = RemoteState(
+                        now = RemoteNowPlaying.state.value,
+                        typing = RemoteTyping.field.value,
+                    )
+                    respond(sock.getOutputStream(), 200, JSON_TYPE, JSON.encodeToString(state))
+                }
+
+                // Déplacement absolu, en millisecondes. Absolu et non relatif :
+                // le doigt vise un endroit de la barre, pas un décalage — et un
+                // relatif calculé sur une position vieille d'une seconde
+                // atterrirait à côté.
+                "seek" -> {
+                    val length = headers["content-length"]?.toIntOrNull() ?: 0
+                    if (length !in 0..MAX_BODY_BYTES) {
+                        respond(sock.getOutputStream(), 413, "text/plain; charset=utf-8", "Too large")
+                        return@use
+                    }
+                    val form = decodeForm(String(readExactly(input, length), Charsets.UTF_8))
+                    val target = form["p"]?.toLongOrNull()
+                    val done = target != null && RemoteNowPlaying.seek(target)
+                    // 409 plutôt que 404 : l'adresse est bonne, c'est l'état qui
+                    // ne s'y prête pas — le lecteur n'est pas ouvert.
+                    respond(
+                        sock.getOutputStream(),
+                        if (done) 204 else 409,
+                        "text/plain; charset=utf-8",
+                        "",
+                    )
+                }
                 "remote" -> {
                     // Charger la page arme la session : c'est le geste explicite
                     // qui autorise le serveur à survivre à la modale.
                     PairingSession.armRemote()
-                    respond(sock.getOutputStream(), 200, HTML, remotePage(texts, "/$token"))
+                    respond(
+                        sock.getOutputStream(),
+                        200,
+                        HTML,
+                        remotePage(texts, "/$token", appLink()),
+                    )
                 }
                 else -> {
                     val length = headers["content-length"]?.toIntOrNull() ?: 0
@@ -154,7 +280,14 @@ class PairingServer(
                         runCatching { RemoteKey.valueOf(form["k"].orEmpty()) }
                             .getOrNull()?.let(::sendRemoteKey)
                     } else {
-                        form["t"]?.let(::sendRemoteText)
+                        // Écrire dans le champ annoncé si l'écran s'est prêté au
+                        // jeu, sinon taper les caractères. La différence n'est
+                        // pas cosmétique : l'injection clavier **ajoute** à la
+                        // fin, si bien que renvoyer un texte corrigé depuis le
+                        // téléphone le concaténait à celui déjà saisi.
+                        form["t"]?.let { text ->
+                            if (!RemoteTyping.write(text)) sendRemoteText(text)
+                        }
                     }
                     // 204 : rien à rendre, et le navigateur n'a rien à redessiner.
                     respond(sock.getOutputStream(), 204, "text/plain; charset=utf-8", "")
@@ -185,8 +318,9 @@ class PairingServer(
             append("HTTP/1.1 $status ${reason(status)}\r\n")
             append("Content-Type: $type\r\n")
             append("Content-Length: ${bytes.size}\r\n")
-            // Rien de ce qui est servi ici ne doit survivre à l'appairage : le
-            // jeton change à chaque ouverture, une page en cache serait morte.
+            // Rien de ce qui est servi ici ne doit être gardé : la page reflète
+            // des réglages qui viennent de changer, et le jeton de l'adresse
+            // peut être révoqué d'un instant à l'autre.
             append("Cache-Control: no-store\r\n")
             append("Connection: close\r\n\r\n")
         }
@@ -205,6 +339,16 @@ class PairingServer(
 
     private companion object {
         const val HTML = "text/html; charset=utf-8"
+        const val JSON_TYPE = "application/json; charset=utf-8"
+
+        /**
+         * `encodeDefaults` : sans lui, un champ resté à sa valeur par défaut —
+         * une lecture à la position 0, un titre vide — serait **absent** du
+         * corps. Le téléphone le relirait comme sa propre valeur par défaut,
+         * ce qui tombe juste ici par chance, mais cesserait de tomber juste au
+         * premier champ dont le défaut diffère d'un bout à l'autre.
+         */
+        val JSON = kotlinx.serialization.json.Json { encodeDefaults = true }
 
         /**
          * Port tenté d'abord, pour que l'adresse de repli reste courte à recopier
@@ -329,12 +473,3 @@ internal fun localAddress(): String? = runCatching {
 /** Ponts et tunnels : Docker, libvirt, VMware, VPN, Tailscale/ZeroTier. */
 private val VIRTUAL_INTERFACE =
     Regex("""^(docker|br-|veth|virbr|vmnet|vboxnet|tun|tap|wg|zt|utun)""", RegexOption.IGNORE_CASE)
-
-/**
- * Jeton d'adresse. Huit caractères sans ambiguïté visuelle — ni `0`/`O`, ni
- * `1`/`l` — parce qu'il arrive qu'on le recopie depuis l'écran.
- */
-private fun randomToken(): String {
-    val alphabet = "abcdefghijkmnpqrstuvwxyz23456789"
-    return (1..8).map { alphabet[Random.nextInt(alphabet.length)] }.joinToString("")
-}

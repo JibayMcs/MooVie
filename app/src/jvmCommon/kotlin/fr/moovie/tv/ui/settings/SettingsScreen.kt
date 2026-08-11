@@ -52,6 +52,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import fr.moovie.tv.ui.remote.remoteTypable
 import fr.moovie.tv.ui.theme.MoovieShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusDirection
@@ -157,6 +158,22 @@ import fr.moovie.tv.ui.home.HomeLayoutSection
 import fr.moovie.tv.ui.adaptive.LocalUiFlavor
 import fr.moovie.tv.resources.pairing_title
 import fr.moovie.tv.resources.pairing_scan
+import androidx.compose.material.icons.filled.SettingsRemote
+import androidx.compose.runtime.rememberCoroutineScope
+import fr.moovie.tv.data.pairing.PairingSession
+import fr.moovie.tv.data.remote.RemotePresence
+import fr.moovie.tv.data.remote.RemoteTargetRepository
+import fr.moovie.tv.ui.pairing.remoteOffered
+import fr.moovie.tv.resources.remote_none
+import fr.moovie.tv.resources.remote_none_help
+import fr.moovie.tv.resources.remote_paired_help
+import fr.moovie.tv.resources.remote_forget_target
+import fr.moovie.tv.resources.settings_cat_remote
+import fr.moovie.tv.resources.remote_forget
+import fr.moovie.tv.resources.remote_forget_action
+import fr.moovie.tv.resources.remote_forget_done
+import fr.moovie.tv.resources.remote_forget_help
+import kotlinx.coroutines.launch
 import fr.moovie.tv.resources.pairing_action
 import fr.moovie.tv.ui.pairing.PairingDialog
 import fr.moovie.tv.ui.pairing.pairingOffered
@@ -177,8 +194,12 @@ private val NAV_WIDTH = 260.dp
 /** Sections de l'écran, dans l'ordre d'affichage du volet gauche. */
 
 private enum class SettingsSection {
-    PROFILES, API, HOME, PLAYBACK, INTRO, SUBTITLES, HISTORY, SCREENSAVER, UPDATE, DNS, SOURCES,
-    BACKUP, SYNC, DOWNLOADS,
+    // REMOTE juste après PROFILES : les deux répondent à « qui, et avec quoi »,
+    // avant tout ce qui touche au contenu. L'appairage était dans API & Clés
+    // parce qu'il n'y servait qu'à saisir des clés ; depuis qu'il porte aussi la
+    // télécommande, il n'a plus rien à faire dans une section de secrets.
+    PROFILES, REMOTE, API, HOME, PLAYBACK, INTRO, SUBTITLES, HISTORY, SCREENSAVER, UPDATE, DNS,
+    SOURCES, BACKUP, SYNC, DOWNLOADS,
 }
 
 /**
@@ -199,6 +220,7 @@ private val RAIL_WIDTH = 68.dp
  */
 private fun sectionIcon(section: SettingsSection): ImageVector = when (section) {
     SettingsSection.PROFILES -> Icons.Default.Person
+    SettingsSection.REMOTE -> Icons.Default.SettingsRemote
     SettingsSection.API -> Icons.Default.Key
     SettingsSection.HOME -> Icons.Default.ViewList
     SettingsSection.PLAYBACK -> Icons.Default.PlayArrow
@@ -218,6 +240,7 @@ private fun sectionIcon(section: SettingsSection): ImageVector = when (section) 
 private fun sectionLabel(section: SettingsSection): String = stringResource(
     when (section) {
         SettingsSection.PROFILES -> Res.string.settings_cat_profiles
+        SettingsSection.REMOTE -> Res.string.settings_cat_remote
         SettingsSection.API -> Res.string.settings_cat_api
         SettingsSection.HOME -> Res.string.settings_cat_home
         SettingsSection.PLAYBACK -> Res.string.settings_cat_playback
@@ -363,8 +386,13 @@ fun SettingsScreenContent(
             // éteint déjà l'écran tout seul, et personne ne laisse un film en
             // pause sur un appareil qu'il tient en main. La section disparaît
             // plutôt que de rester là, inutile.
+            // La télécommande, elle, n'a de sens qu'aux deux bouts du salon :
+            // le téléviseur qu'on pilote et le téléphone qui pilote. Sur un
+            // ordinateur, la section n'aurait aucune ligne à afficher.
+            val remote = remoteOffered()
             val sections = SettingsSection.entries.filterNot {
-                compact && it == SettingsSection.SCREENSAVER
+                (compact && it == SettingsSection.SCREENSAVER) ||
+                    (!remote && it == SettingsSection.REMOTE)
             }
             sections.forEachIndexed { index, entry ->
                 MoovieButton(
@@ -441,17 +469,9 @@ fun SettingsScreenContent(
             if (pairing) PairingDialog(onDismiss = { pairing = false })
 
             when (section) {
+                SettingsSection.REMOTE -> RemoteSection(onPair = { pairing = true })
+
                 SettingsSection.API -> {
-                    if (pairingOffered()) {
-                        SettingRow(
-                            label = stringResource(Res.string.pairing_title),
-                            help = stringResource(Res.string.pairing_scan),
-                        ) {
-                            MoovieButton(onClick = { pairing = true }) {
-                                Text(stringResource(Res.string.pairing_action))
-                            }
-                        }
-                    }
                     SettingRow(
                         label = stringResource(Res.string.settings_tmdb_key),
                         help = stringResource(Res.string.settings_tmdb_help),
@@ -691,6 +711,103 @@ private fun ProfilesSection() {
 }
 
 /**
+ * Section « Télécommande ».
+ *
+ * ### Elle a deux faces, et l'appareil décide laquelle
+ *
+ * - **Le téléviseur se laisse piloter** : il affiche le QR qui donne l'adresse
+ *   et le jeton, et il peut tout révoquer d'un coup.
+ * - **Le téléphone pilote** : il se souvient d'un téléviseur, et il faut pouvoir
+ *   l'oublier depuis un endroit stable. Le bandeau « ne répond pas » de l'écran
+ *   de télécommande le propose aussi, mais il suppose d'y arriver — or une cible
+ *   fausse est précisément ce qui empêche d'y arriver.
+ *
+ * Les deux tiennent dans la même section parce que c'est le même sujet vu des
+ * deux bouts, et parce qu'un appareil ne voit jamais que sa moitié.
+ *
+ * ### Pourquoi elle n'est plus dans « API & Clés »
+ *
+ * Elle y était née, du temps où l'appairage ne servait qu'à taper une clé B2 sans
+ * clavier. Depuis qu'il porte la télécommande, ranger « Oublier les
+ * télécommandes » sous les clés d'API ne dit plus rien de ce que fait le
+ * réglage — et surtout, sur un téléphone, la section des clés n'avait aucune
+ * raison de parler du téléviseur du salon.
+ */
+@Composable
+private fun RemoteSection(onPair: () -> Unit) {
+    val scope = rememberCoroutineScope()
+
+    // --- Ce téléviseur, piloté depuis un téléphone -------------------------
+    if (pairingOffered()) {
+        SettingRow(
+            label = stringResource(Res.string.pairing_title),
+            help = stringResource(Res.string.pairing_scan),
+        ) {
+            MoovieButton(onClick = onPair) {
+                Text(stringResource(Res.string.pairing_action))
+            }
+        }
+        // La contrepartie d'un jeton qui dure : sans elle, un téléphone appairé
+        // une fois garde la main sur le téléviseur pour toujours. C'est ce que
+        // l'ancien jeton de session faisait tout seul en périmant — et c'est
+        // aussi ce qui rendait la télécommande inutilisable le lendemain.
+        var renewed by remember { mutableStateOf(false) }
+        SettingRow(
+            label = stringResource(Res.string.remote_forget),
+            help = stringResource(
+                if (renewed) Res.string.remote_forget_done else Res.string.remote_forget_help,
+            ),
+        ) {
+            MoovieButton(
+                onClick = {
+                    scope.launch {
+                        PairingSession.renewToken()
+                        renewed = true
+                    }
+                },
+            ) { Text(stringResource(Res.string.remote_forget_action)) }
+        }
+    }
+
+    // --- Le téléviseur que cet appareil pilote -----------------------------
+    val targets = remember { RemoteTargetRepository() }
+    val target by targets.target.collectAsState(initial = null)
+    target?.let {
+        SettingRow(
+            label = it.name,
+            help = stringResource(Res.string.remote_paired_help),
+        ) {
+            MoovieButton(
+                onClick = {
+                    scope.launch {
+                        targets.forget()
+                        // La présence est ce qui fait exister le bouton flottant :
+                        // la laisser à vrai après un oubli le maintiendrait à
+                        // l'écran, menant à un écran sans téléviseur.
+                        RemotePresence.lost()
+                    }
+                },
+            ) { Text(stringResource(Res.string.remote_forget_target)) }
+        }
+    }
+
+    // Rien à piloter, et pas de QR à montrer : il ne reste qu'à dire par où on
+    // commence. Un téléviseur, lui, n'a pas à s'entendre dire qu'aucun
+    // téléviseur n'est appairé.
+    if (target == null && !pairingOffered()) {
+        Text(
+            stringResource(Res.string.remote_none),
+            style = MaterialTheme.typography.titleMedium,
+        )
+        Text(
+            stringResource(Res.string.remote_none_help),
+            style = MaterialTheme.typography.bodySmall,
+            color = Color(0xFF9A9A9A),
+        )
+    }
+}
+
+/**
  * Ligne de réglage : libellé (et aide) à gauche, contrôle à droite.
  *
  * **Sur téléphone, tout passe en une seule colonne** : libellé, aide, puis le
@@ -925,6 +1042,19 @@ internal fun ApiKeyField(value: String, hint: String, onValueChange: (String) ->
                 },
                 modifier = Modifier
                     .fillMaxWidth()
+                    // Le cas d'usage d'origine de l'appairage : une clé de 31
+                    // caractères à taper à la télécommande. `secret` annonce le
+                    // champ sans annoncer son contenu — la clé déjà saisie n'a
+                    // aucune raison de traverser le réseau local.
+                    .remoteTypable(
+                        label = hint,
+                        value = draft,
+                        onValueChange = {
+                            draft = it
+                            onValueChange(it)
+                        },
+                        secret = true,
+                    )
                     .onFocusChanged { focused = it.isFocused }
                     // Le champ texte avale les flèches par défaut : sans ça le D-pad
                     // ne peut plus en sortir (pas de touche Tab sur une télécommande).

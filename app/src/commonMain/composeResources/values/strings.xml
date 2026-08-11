@@ -465,4 +465,26 @@
     <string name="search_adult_shown">Contenu adulte affiché</string>
     <string name="search_filters_reset">Tout effacer</string>
     <string name="search_filters_scope">Le tri et les filtres portent sur les %1$d premiers résultats : TMDB ne sait pas trier une recherche par texte.</string>
+    <string name="remote_up">Haut</string>
+    <string name="remote_down">Bas</string>
+    <string name="remote_left">Gauche</string>
+    <string name="remote_right">Droite</string>
+    <string name="remote_ok">Valider</string>
+    <string name="remote_back_key">Retour</string>
+    <string name="remote_play_pause">Lecture ou pause</string>
+    <string name="remote_rewind">Reculer</string>
+    <string name="remote_forward">Avancer</string>
+    <string name="remote_keyboard">Clavier</string>
+    <string name="remote_no_haptics">Retour haptique non pris en charge par ce navigateur.</string>
+    <string name="remote_forget">Oublier les télécommandes</string>
+    <string name="remote_forget_help">Renouvelle le jeton d'accès. Les téléphones déjà appairés cessent de fonctionner et doivent rescanner le QR code.</string>
+    <string name="remote_forget_action">Oublier</string>
+    <string name="remote_forget_done">Jeton renouvelé. Rescanner le QR code pour réappairer.</string>
+    <string name="remote_offline">Le téléviseur ne répond pas</string>
+    <string name="remote_offline_help">Il est peut-être éteint, ou sur un autre réseau. L'oublier permet de le réappairer en scannant à nouveau son QR code.</string>
+    <string name="remote_forget_target">Oublier ce téléviseur</string>
+    <string name="settings_cat_remote">Télécommande</string>
+    <string name="remote_paired_help">Le téléviseur piloté depuis cet appareil.</string>
+    <string name="remote_none">Aucun téléviseur appairé</string>
+    <string name="remote_none_help">Sur le téléviseur, ouvrir Réglages puis Télécommande, et scanner le QR code affiché.</string>
 </resources>

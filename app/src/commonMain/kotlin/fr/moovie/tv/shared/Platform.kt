@@ -24,3 +24,12 @@ expect val appVersionName: String
  * l'utilisateur ici, c'est son compte, et lui seul.
  */
 expect val openSubtitlesApiKey: String
+
+/**
+ * Nom de l'appareil tel qu'il s'annonce aux autres — « Mi Box 4 », « Pixel 8 ».
+ *
+ * Sert deux fois : à nommer le téléviseur dans l'annonce réseau, et à le nommer
+ * dans la télécommande du téléphone. Rien de personnel n'y transite, c'est le
+ * modèle que le constructeur a écrit.
+ */
+expect val deviceName: String

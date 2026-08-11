@@ -257,6 +257,10 @@ private fun DesktopApp(
         )
 
         when (val s = nav.current) {
+            // La télécommande pilote un téléviseur depuis un téléphone : sur un
+            // poste de travail elle n'a pas de sens, et rien n'y mène. La
+            // branche existe parce que la destination est partagée.
+            Screen.Remote -> Unit
             Screen.Home -> DesktopHomeScreen(
                 onOpenTitle = { id, isTv -> nav.push(Screen.Details(id, isTv)) },
                 onResume = { e ->

@@ -463,4 +463,26 @@
     <string name="search_adult_shown">Contenido adulto visible</string>
     <string name="search_filters_reset">Borrar todo</string>
     <string name="search_filters_scope">La ordenación y los filtros se aplican a los primeros %1$d resultados: TMDB no puede ordenar una búsqueda por texto.</string>
+    <string name="remote_up">Arriba</string>
+    <string name="remote_down">Abajo</string>
+    <string name="remote_left">Izquierda</string>
+    <string name="remote_right">Derecha</string>
+    <string name="remote_ok">Aceptar</string>
+    <string name="remote_back_key">Atrás</string>
+    <string name="remote_play_pause">Reproducir o pausar</string>
+    <string name="remote_rewind">Retroceder</string>
+    <string name="remote_forward">Avanzar</string>
+    <string name="remote_keyboard">Teclado</string>
+    <string name="remote_no_haptics">Este navegador no admite la respuesta háptica.</string>
+    <string name="remote_forget">Olvidar los mandos</string>
+    <string name="remote_forget_help">Renueva el token de acceso. Los teléfonos ya emparejados dejan de funcionar y deben volver a escanear el código QR.</string>
+    <string name="remote_forget_action">Olvidar</string>
+    <string name="remote_forget_done">Token renovado. Volver a escanear el código QR para emparejar.</string>
+    <string name="remote_offline">El televisor no responde</string>
+    <string name="remote_offline_help">Puede estar apagado o en otra red. Olvidarlo permite volver a emparejarlo escaneando su código QR.</string>
+    <string name="remote_forget_target">Olvidar este televisor</string>
+    <string name="settings_cat_remote">Mando</string>
+    <string name="remote_paired_help">El televisor que controla este dispositivo.</string>
+    <string name="remote_none">Ningún televisor emparejado</string>
+    <string name="remote_none_help">En el televisor, abrir Ajustes y luego Mando, y escanear el código QR que aparece.</string>
 </resources>
