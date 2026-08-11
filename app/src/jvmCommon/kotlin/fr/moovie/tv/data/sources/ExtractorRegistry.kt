@@ -39,6 +39,11 @@ object ExtractorRegistry {
 
     private val resolution = StreamResolution(
         extractors = listOf(
+            // **Avant** DirectStream, et pas par préférence : les liens
+            // SwiftFlow sont des `.mp4`, donc DirectStream les revendiquerait le
+            // premier et repartirait sans le `Referer` que le CDN exige — 403
+            // garanti. Voir SwiftFlowExtractor.
+            SwiftFlowExtractor(),
             // En tête : un lien déjà jouable ne doit traverser aucune autre
             // règle, et la reconnaissance ne coûte qu'un test d'extension.
             DirectStreamExtractor(),
@@ -72,6 +77,10 @@ object ExtractorRegistry {
  */
 object ProviderRegistry {
     val all: List<SourceProvider> = listOf(
+        // En tête : c'est le seul catalogue qui rend le fichier lui-même plutôt
+        // qu'un embed à désobfusquer. Rien à casser au prochain changement de
+        // format, donc le candidat le plus sûr à essayer en premier.
+        SwiftFlowProvider(ExtractorRegistry.gateway),
         FstreamProvider(ExtractorRegistry.http),
         AnimeSamaProvider(ExtractorRegistry.http),
         CoflixProvider(ExtractorRegistry.http),
