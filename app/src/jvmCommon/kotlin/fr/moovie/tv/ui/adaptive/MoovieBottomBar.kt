@@ -48,6 +48,7 @@ import fr.moovie.tv.resources.home_search
 import fr.moovie.tv.resources.home_settings
 import fr.moovie.tv.resources.nav_home
 import fr.moovie.tv.ui.navigation.Screen
+import fr.moovie.tv.ui.theme.MoovieShape
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 
@@ -120,8 +121,8 @@ private fun sameTab(a: Screen, b: Screen): Boolean = a::class == b::class
  * service, et il salit une rangée qu'on lit d'un coup d'œil.
  *
  * Le libellé n'est pas perdu pour autant : il devient la description de l'icône
- * (accessibilité), et la sélection se lit désormais sur une pastille pleine
- * plutôt que sur une nuance de gris.
+ * (accessibilité), et la sélection se lit sur un fond plein plutôt que sur une
+ * nuance de gris.
  */
 @Composable
 fun MoovieBottomBar(
@@ -183,24 +184,33 @@ private fun NavTabItem(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        // Pastille de sélection. Sans libellé, la seule teinte ne suffit plus à
-        // dire où l'on est : elle demande de comparer six icônes entre elles
-        // pour trouver celle qui est colorée. Un fond franc se voit du coin de
-        // l'œil, ce qui est exactement l'usage qu'on fait d'une barre d'onglets.
-        Box(
-            modifier = Modifier
-                .clip(CircleShape)
-                .background(
-                    if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
-                    else Color.Transparent,
-                )
-                .padding(horizontal = 14.dp, vertical = 5.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            // La pastille de compteur se pose **sur** l'icône plutôt qu'à côté :
-            // elle ne doit pas élargir l'onglet, sinon les six se décalent dès
-            // qu'un téléchargement démarre — sous le pouce, au pire moment.
-            Box(contentAlignment = Alignment.TopEnd) {
+        // Conteneur **non découpé**, et c'est tout l'enjeu : le compteur déborde
+        // volontairement de l'icône, or un enfant ne peut pas sortir d'un parent
+        // sur lequel on a posé un `clip`. Le fond de sélection étant découpé, y
+        // laisser le compteur le rognait — le chiffre s'y coupait en deux dès
+        // que l'onglet était sélectionné. Ce n'est pas une histoire d'ordre de
+        // dessin : aucun z-index ne fait sortir d'une zone de découpe.
+        Box(contentAlignment = Alignment.Center) {
+            // Fond de sélection. Sans libellé, la seule teinte ne suffit plus à
+            // dire où l'on est : elle demande de comparer six icônes entre elles
+            // pour trouver celle qui est colorée. Un fond franc se voit du coin
+            // de l'œil, ce qui est l'usage qu'on fait d'une barre d'onglets.
+            //
+            // `MoovieShape` et non un cercle : c'est le jeton de forme de
+            // l'application, celui qu'utilise déjà la sélection du rail des
+            // réglages. Un `CircleShape` sur une zone plus large que haute ne
+            // rend pas un rond mais un ovale, qui n'appartient à aucun autre
+            // écran.
+            Box(
+                modifier = Modifier
+                    .clip(MoovieShape)
+                    .background(
+                        if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+                        else Color.Transparent,
+                    )
+                    .padding(horizontal = 14.dp, vertical = 6.dp),
+                contentAlignment = Alignment.Center,
+            ) {
                 Icon(
                     imageVector = tab.icon,
                     // Le libellé a disparu de l'écran, pas du sens. Il devient
@@ -211,17 +221,24 @@ private fun NavTabItem(
                     tint = tint,
                     modifier = Modifier.size(26.dp),
                 )
-                if (badge > 0) {
-                    Text(
-                        text = badge.toString(),
-                        color = Color.White,
-                        style = MaterialTheme.typography.labelSmall,
-                        modifier = Modifier
-                            .offset(x = 9.dp, y = (-6).dp)
-                            .background(MOOVIE_ACCENT, CircleShape)
-                            .padding(horizontal = 5.dp),
-                    )
-                }
+            }
+
+            // Le compteur se pose **sur** l'icône plutôt qu'à côté : il ne doit
+            // pas élargir l'onglet, sinon les six se décalent dès qu'un
+            // téléchargement démarre — sous le pouce, au pire moment. Un
+            // `offset` ne participe pas à la mesure, donc la largeur ne bouge
+            // pas non plus quand le chiffre passe à deux caractères.
+            if (badge > 0) {
+                Text(
+                    text = badge.toString(),
+                    color = Color.White,
+                    style = MaterialTheme.typography.labelSmall,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .offset(x = 4.dp, y = (-2).dp)
+                        .background(MOOVIE_ACCENT, CircleShape)
+                        .padding(horizontal = 5.dp),
+                )
             }
         }
     }
