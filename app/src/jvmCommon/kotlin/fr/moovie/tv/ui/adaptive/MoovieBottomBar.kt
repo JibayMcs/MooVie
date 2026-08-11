@@ -36,6 +36,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
@@ -108,9 +109,19 @@ private fun sameTab(a: Screen, b: Screen): Boolean = a::class == b::class
  * viser sans regarder.
  *
  * **Six, et pas sept.** La télécommande y a eu son onglet, le temps de constater
- * ce que coûte un septième : sur les 448 dp d'un portrait, chaque part tombe à
- * 64 dp et les libellés se tronquent en « Télécha… ». Elle est passée en bouton
- * flottant, qui n'a rien à partager avec personne — voir `RemoteFab`.
+ * ce que coûte un septième. Elle est passée en bouton flottant, qui n'a rien à
+ * partager avec personne — voir `RemoteFab`.
+ *
+ * ### Des icônes seules, sans libellé
+ *
+ * Six parts sur les 448 dp d'un portrait font 74 dp chacune. « Téléchargements »
+ * en demande le double : il s'affichait « Téléchargeme », coupé net. Un mot
+ * tronqué n'aide personne — il occupe la place d'une aide sans en rendre le
+ * service, et il salit une rangée qu'on lit d'un coup d'œil.
+ *
+ * Le libellé n'est pas perdu pour autant : il devient la description de l'icône
+ * (accessibilité), et la sélection se lit désormais sur une pastille pleine
+ * plutôt que sur une nuance de gris.
  */
 @Composable
 fun MoovieBottomBar(
@@ -172,35 +183,46 @@ private fun NavTabItem(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        // La pastille se pose **sur** l'icône plutôt qu'à côté : elle ne doit
-        // pas élargir l'onglet, sinon les six se décalent dès qu'un
-        // téléchargement démarre — sous le pouce, au pire moment.
-        Box(contentAlignment = Alignment.TopEnd) {
-            Icon(
-                imageVector = tab.icon,
-                contentDescription = null,
-                tint = tint,
-                modifier = Modifier.size(24.dp),
-            )
-            if (badge > 0) {
-                Text(
-                    text = badge.toString(),
-                    color = Color.White,
-                    style = MaterialTheme.typography.labelSmall,
-                    modifier = Modifier
-                        .offset(x = 8.dp, y = (-6).dp)
-                        .background(MOOVIE_ACCENT, CircleShape)
-                        .padding(horizontal = 5.dp),
+        // Pastille de sélection. Sans libellé, la seule teinte ne suffit plus à
+        // dire où l'on est : elle demande de comparer six icônes entre elles
+        // pour trouver celle qui est colorée. Un fond franc se voit du coin de
+        // l'œil, ce qui est exactement l'usage qu'on fait d'une barre d'onglets.
+        Box(
+            modifier = Modifier
+                .clip(CircleShape)
+                .background(
+                    if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+                    else Color.Transparent,
                 )
+                .padding(horizontal = 14.dp, vertical = 5.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            // La pastille de compteur se pose **sur** l'icône plutôt qu'à côté :
+            // elle ne doit pas élargir l'onglet, sinon les six se décalent dès
+            // qu'un téléchargement démarre — sous le pouce, au pire moment.
+            Box(contentAlignment = Alignment.TopEnd) {
+                Icon(
+                    imageVector = tab.icon,
+                    // Le libellé a disparu de l'écran, pas du sens. Il devient
+                    // la description de l'icône, sans quoi la barre entière
+                    // serait muette pour un lecteur d'écran — six boutons sans
+                    // nom, et plus aucun moyen de naviguer.
+                    contentDescription = stringResource(tab.label),
+                    tint = tint,
+                    modifier = Modifier.size(26.dp),
+                )
+                if (badge > 0) {
+                    Text(
+                        text = badge.toString(),
+                        color = Color.White,
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier
+                            .offset(x = 9.dp, y = (-6).dp)
+                            .background(MOOVIE_ACCENT, CircleShape)
+                            .padding(horizontal = 5.dp),
+                    )
+                }
             }
         }
-        Spacer(Modifier.height(2.dp))
-        Text(
-            text = stringResource(tab.label),
-            color = tint,
-            style = MaterialTheme.typography.labelSmall,
-            textAlign = TextAlign.Center,
-            maxLines = 1,
-        )
     }
 }
