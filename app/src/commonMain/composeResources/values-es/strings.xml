@@ -495,4 +495,42 @@
     <string name="settings_sources_cache_help">Los enlaces encontrados se guardan 6 h para volver a una ficha al instante. Vaciarlo fuerza una nueva búsqueda, útil cuando un sitio acaba de cambiar.</string>
     <string name="settings_sources_cache_done">Caché vaciado. La próxima ficha que se abra volverá a buscar.</string>
     <string name="settings_sources_cache_action">Vaciar</string>
+
+    <!-- Tráiler -->
+    <string name="details_trailer">Tráiler</string>
+    <!-- Pestaña «Más información» -->
+    <string name="details_tab_overview">Sinopsis</string>
+    <string name="details_tab_info">Más información</string>
+    <string name="info_original_title">Título original</string>
+    <string name="info_director">Dirección</string>
+    <string name="info_creator">Creación</string>
+    <string name="info_writers">Guion</string>
+    <string name="info_music">Música</string>
+    <string name="info_studios">Producción</string>
+    <string name="info_network">Emisión</string>
+    <string name="info_country">País</string>
+    <string name="info_language">Idioma original</string>
+    <string name="info_budget">Presupuesto</string>
+    <string name="info_revenue">Recaudación</string>
+    <string name="info_status">Estado</string>
+    <string name="info_certification">Clasificación</string>
+    <string name="info_next_episode">Próximo episodio</string>
+    <string name="info_episodes">Episodios</string>
+    <string name="info_seasons_count">Temporadas</string>
+    <string name="info_runtime">Duración</string>
+    <string name="info_rating">Puntuación</string>
+    <string name="info_rating_votes">%1$s / 10 con %2$s votos</string>
+    <string name="info_first_air">Primera emisión</string>
+    <string name="info_last_air">Última emisión</string>
+    <string name="info_release">Estreno</string>
+    <string name="info_none">No disponible</string>
+    <string name="status_returning">En emisión</string>
+    <string name="status_ended">Finalizada</string>
+    <string name="status_canceled">Cancelada</string>
+    <string name="status_in_production">En producción</string>
+    <string name="status_planned">Anunciada</string>
+    <string name="status_released">Estrenado</string>
+    <string name="status_post_production">Posproducción</string>
+    <string name="settings_trailer_autoplay">Tráiler automático</string>
+    <string name="settings_trailer_autoplay_help">Reproduce el tráiler sin sonido en el fondo de la ficha tras unos segundos. El botón «Tráiler» sigue disponible aunque esté desactivado.</string>
 </resources>

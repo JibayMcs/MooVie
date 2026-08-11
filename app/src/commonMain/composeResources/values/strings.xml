@@ -497,4 +497,42 @@
     <string name="settings_sources_cache_help">Les liens trouvés sont gardés 6 h pour un retour instantané sur une fiche. Les vider force une nouvelle recherche, utile quand un site vient de changer.</string>
     <string name="settings_sources_cache_done">Cache vidé. La prochaine ouverture d'une fiche relancera la recherche.</string>
     <string name="settings_sources_cache_action">Vider</string>
+
+    <!-- Bande-annonce -->
+    <string name="details_trailer">Bande-annonce</string>
+    <!-- Onglet « En savoir plus » -->
+    <string name="details_tab_overview">Résumé</string>
+    <string name="details_tab_info">En savoir plus</string>
+    <string name="info_original_title">Titre original</string>
+    <string name="info_director">Réalisation</string>
+    <string name="info_creator">Création</string>
+    <string name="info_writers">Scénario</string>
+    <string name="info_music">Musique</string>
+    <string name="info_studios">Production</string>
+    <string name="info_network">Diffusion</string>
+    <string name="info_country">Pays</string>
+    <string name="info_language">Langue originale</string>
+    <string name="info_budget">Budget</string>
+    <string name="info_revenue">Recettes</string>
+    <string name="info_status">Statut</string>
+    <string name="info_certification">Classification</string>
+    <string name="info_next_episode">Prochain épisode</string>
+    <string name="info_episodes">Épisodes</string>
+    <string name="info_seasons_count">Saisons</string>
+    <string name="info_runtime">Durée</string>
+    <string name="info_rating">Note</string>
+    <string name="info_rating_votes">%1$s / 10 sur %2$s votes</string>
+    <string name="info_first_air">Première diffusion</string>
+    <string name="info_last_air">Dernière diffusion</string>
+    <string name="info_release">Sortie</string>
+    <string name="info_none">Non renseigné</string>
+    <string name="status_returning">En cours</string>
+    <string name="status_ended">Terminée</string>
+    <string name="status_canceled">Annulée</string>
+    <string name="status_in_production">En production</string>
+    <string name="status_planned">Annoncée</string>
+    <string name="status_released">Sorti</string>
+    <string name="status_post_production">Post-production</string>
+    <string name="settings_trailer_autoplay">Bande-annonce automatique</string>
+    <string name="settings_trailer_autoplay_help">Lance la bande-annonce en sourdine dans le fond de la fiche après quelques secondes. Le bouton « Bande-annonce » reste disponible même désactivée.</string>
 </resources>

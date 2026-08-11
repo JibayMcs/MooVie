@@ -12,10 +12,23 @@ data class MovieDetails(
     @SerialName("poster_path") val posterPath: String? = null,
     @SerialName("backdrop_path") val backdropPath: String? = null,
     @SerialName("vote_average") val voteAverage: Double = 0.0,
+    @SerialName("vote_count") val voteCount: Int = 0,
     @SerialName("release_date") val releaseDate: String? = null,
     val runtime: Int? = null,
     val genres: List<Genre> = emptyList(),
     val credits: Credits? = null,
+    val videos: VideoList? = null,
+    // ── Onglet « En savoir plus » ────────────────────────────────────────────
+    val tagline: String = "",
+    val status: String = "",
+    val budget: Long = 0,
+    val revenue: Long = 0,
+    val homepage: String = "",
+    @SerialName("original_language") val originalLanguage: String = "",
+    @SerialName("production_companies") val companies: List<ProductionCompany> = emptyList(),
+    @SerialName("production_countries") val countries: List<ProductionCountry> = emptyList(),
+    @SerialName("spoken_languages") val spokenLanguages: List<SpokenLanguage> = emptyList(),
+    @SerialName("release_dates") val releaseDates: ReleaseDateResults? = null,
 ) {
     val year: String? get() = releaseDate?.take(4)?.ifBlank { null }
     fun backdropUrl() = backdropPath?.let { "https://image.tmdb.org/t/p/w1280$it" }
@@ -31,16 +44,95 @@ data class TvDetails(
     @SerialName("poster_path") val posterPath: String? = null,
     @SerialName("backdrop_path") val backdropPath: String? = null,
     @SerialName("vote_average") val voteAverage: Double = 0.0,
+    @SerialName("vote_count") val voteCount: Int = 0,
     @SerialName("first_air_date") val firstAirDate: String? = null,
     @SerialName("number_of_seasons") val numberOfSeasons: Int = 0,
     val genres: List<Genre> = emptyList(),
     val seasons: List<SeasonSummary> = emptyList(),
     val credits: Credits? = null,
+    val videos: VideoList? = null,
+    // ── Onglet « En savoir plus » ────────────────────────────────────────────
+    val tagline: String = "",
+    /** "Returning Series", "Ended", "Canceled"… traduit à l'affichage. */
+    val status: String = "",
+    val homepage: String = "",
+    @SerialName("original_language") val originalLanguage: String = "",
+    @SerialName("number_of_episodes") val numberOfEpisodes: Int = 0,
+    @SerialName("episode_run_time") val episodeRunTime: List<Int> = emptyList(),
+    @SerialName("last_air_date") val lastAirDate: String? = null,
+    @SerialName("in_production") val inProduction: Boolean = false,
+    @SerialName("origin_country") val originCountry: List<String> = emptyList(),
+    @SerialName("created_by") val createdBy: List<CreatedBy> = emptyList(),
+    val networks: List<ProductionCompany> = emptyList(),
+    @SerialName("production_companies") val companies: List<ProductionCompany> = emptyList(),
+    /**
+     * Prochain épisode annoncé. C'est l'information qu'on vient chercher sur une
+     * série en cours, et TMDB la donne — on ne la lisait simplement pas.
+     */
+    @SerialName("next_episode_to_air") val nextEpisode: AiringEpisode? = null,
+    @SerialName("content_ratings") val contentRatings: ContentRatingResults? = null,
 ) {
     val year: String? get() = firstAirDate?.take(4)?.ifBlank { null }
     fun backdropUrl() = backdropPath?.let { "https://image.tmdb.org/t/p/w1280$it" }
     fun posterUrl() = posterPath?.let { "https://image.tmdb.org/t/p/w342$it" }
 }
+
+@Serializable
+data class CreatedBy(val id: Int = 0, val name: String = "")
+
+@Serializable
+data class ProductionCompany(
+    val id: Int = 0,
+    val name: String = "",
+    @SerialName("logo_path") val logoPath: String? = null,
+) {
+    fun logoUrl() = logoPath?.let { "https://image.tmdb.org/t/p/w185$it" }
+}
+
+@Serializable
+data class ProductionCountry(
+    @SerialName("iso_3166_1") val code: String = "",
+    val name: String = "",
+)
+
+@Serializable
+data class SpokenLanguage(
+    @SerialName("iso_639_1") val code: String = "",
+    val name: String = "",
+    @SerialName("english_name") val englishName: String = "",
+)
+
+@Serializable
+data class AiringEpisode(
+    @SerialName("air_date") val airDate: String? = null,
+    @SerialName("episode_number") val episodeNumber: Int = 0,
+    @SerialName("season_number") val seasonNumber: Int = 0,
+    val name: String = "",
+)
+
+@Serializable
+data class ContentRatingResults(val results: List<ContentRating> = emptyList())
+
+@Serializable
+data class ContentRating(
+    @SerialName("iso_3166_1") val country: String = "",
+    val rating: String = "",
+)
+
+@Serializable
+data class ReleaseDateResults(val results: List<ReleaseDateCountry> = emptyList())
+
+@Serializable
+data class ReleaseDateCountry(
+    @SerialName("iso_3166_1") val country: String = "",
+    @SerialName("release_dates") val dates: List<ReleaseDateEntry> = emptyList(),
+)
+
+@Serializable
+data class ReleaseDateEntry(
+    val certification: String = "",
+    val type: Int = 0,
+)
 
 @Serializable
 data class SeasonSummary(
@@ -86,7 +178,37 @@ data class Episode(
 data class Genre(val id: Int, val name: String = "")
 
 @Serializable
-data class Credits(val cast: List<CastMember> = emptyList())
+data class Credits(
+    val cast: List<CastMember> = emptyList(),
+    val crew: List<CrewMember> = emptyList(),
+) {
+    /**
+     * Réalisateur(s). Plusieurs sont possibles et c'est la règle, pas
+     * l'exception (les Wachowski, les Coen, les Russo) : rendre le premier
+     * amputerait la moitié d'un duo.
+     */
+    val directors: List<String>
+        get() = crew.filter { it.job == "Director" }.map { it.name }.distinct()
+
+    val writers: List<String>
+        get() = crew.filter { it.job in WRITING }.map { it.name }.distinct()
+
+    val composers: List<String>
+        get() = crew.filter { it.job == "Original Music Composer" }.map { it.name }.distinct()
+
+    private companion object {
+        val WRITING = setOf("Screenplay", "Writer", "Story", "Novel")
+    }
+}
+
+@Serializable
+data class CrewMember(
+    val id: Int = 0,
+    val name: String = "",
+    val job: String = "",
+    val department: String = "",
+    @SerialName("profile_path") val profilePath: String? = null,
+)
 
 @Serializable
 data class CastMember(

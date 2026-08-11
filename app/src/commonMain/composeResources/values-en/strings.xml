@@ -495,4 +495,42 @@
     <string name="settings_sources_cache_help">Found links are kept for 6 h so returning to a title is instant. Clearing forces a fresh search, useful when a site has just changed.</string>
     <string name="settings_sources_cache_done">Cache cleared. The next title you open will search again.</string>
     <string name="settings_sources_cache_action">Clear</string>
+
+    <!-- Trailer -->
+    <string name="details_trailer">Trailer</string>
+    <!-- "More info" tab -->
+    <string name="details_tab_overview">Overview</string>
+    <string name="details_tab_info">More info</string>
+    <string name="info_original_title">Original title</string>
+    <string name="info_director">Director</string>
+    <string name="info_creator">Created by</string>
+    <string name="info_writers">Writers</string>
+    <string name="info_music">Music</string>
+    <string name="info_studios">Production</string>
+    <string name="info_network">Network</string>
+    <string name="info_country">Country</string>
+    <string name="info_language">Original language</string>
+    <string name="info_budget">Budget</string>
+    <string name="info_revenue">Revenue</string>
+    <string name="info_status">Status</string>
+    <string name="info_certification">Rating</string>
+    <string name="info_next_episode">Next episode</string>
+    <string name="info_episodes">Episodes</string>
+    <string name="info_seasons_count">Seasons</string>
+    <string name="info_runtime">Runtime</string>
+    <string name="info_rating">Score</string>
+    <string name="info_rating_votes">%1$s / 10 from %2$s votes</string>
+    <string name="info_first_air">First aired</string>
+    <string name="info_last_air">Last aired</string>
+    <string name="info_release">Released</string>
+    <string name="info_none">Not available</string>
+    <string name="status_returning">Returning</string>
+    <string name="status_ended">Ended</string>
+    <string name="status_canceled">Canceled</string>
+    <string name="status_in_production">In production</string>
+    <string name="status_planned">Planned</string>
+    <string name="status_released">Released</string>
+    <string name="status_post_production">Post-production</string>
+    <string name="settings_trailer_autoplay">Autoplay trailer</string>
+    <string name="settings_trailer_autoplay_help">Plays the trailer muted behind the title page after a few seconds. The "Trailer" button stays available even when this is off.</string>
 </resources>
