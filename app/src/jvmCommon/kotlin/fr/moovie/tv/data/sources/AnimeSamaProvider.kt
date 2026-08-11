@@ -35,12 +35,21 @@ class AnimeSamaProvider(private val http: OkHttpClient) : SourceProvider {
 
         // (nom, chemin) ; on ne garde que les vraies entrées (chemin saisonX/lang ou film/lang).
         val panels = PANEL.findAll(page).map { it.groupValues[1] to it.groupValues[2] }.toList()
-        val wanted = panels.filter { it.second.startsWith("$seasonPrefix/") }
+
+        // Les panneaux servent à savoir **si la saison existe**, pas dans quelle
+        // langue : la page n'en annonce généralement qu'une, le VOSTFR, alors
+        // que la VF est là, en chemin frère, sans être listée nulle part.
+        //
+        // Mesuré sur anime-sama : `naruto/saison1/vf/episodes.js` rend 660 URL
+        // quand la page ne montre que `saison1/vostfr`. Idem pour Frieren,
+        // Fullmetal Alchemist, One Piece, Demon Slayer — tous doublés, tous
+        // invisibles. Lire les panneaux revenait donc à ne jamais proposer de VF
+        // sur le seul catalogue d'animés de l'application.
+        if (panels.none { it.second.startsWith("$seasonPrefix/") }) return emptyList()
 
         val links = mutableListOf<EmbedLink>()
-        for ((_, path) in wanted) {
-            val lang = if (path.substringAfterLast('/').equals("vf", true)) "VF" else "VOSTFR"
-            val js = get("$catalogueUrl$path/episodes.js") ?: continue
+        for ((suffix, lang) in LANGS) {
+            val js = get("$catalogueUrl$seasonPrefix/$suffix/episodes.js") ?: continue
             for (arr in parseEpsArrays(js)) {
                 arr.getOrNull(episode - 1)?.let { url ->
                     links += EmbedLink(url = url, hoster = hosterOf(url), language = lang)
@@ -104,6 +113,26 @@ class AnimeSamaProvider(private val http: OkHttpClient) : SourceProvider {
          * reste vraie quel que soit le domaine du jour.
          */
         private val CATALOGUE_HREF = Regex("""href="(?:https?://[^"/]+)?(/catalogue/[^"]+)"""")
+        /**
+         * Les chemins de langue à sonder, et l'étiquette qu'ils portent.
+         *
+         * La VF d'abord : c'est ce que l'application privilégie, et l'ordre
+         * décide de ce qui est proposé en premier à qualité égale.
+         *
+         * `vf1` et `vf2` viennent du portage de Movix, qui connaît neuf
+         * identifiants de langue. Ils rendent 404 sur tout ce qu'on a mesuré,
+         * mais ils ne coûtent qu'un aller-retour sur un fichier de quelques
+         * kilo-octets — et un doublage qui existe sous ce nom vaut mieux qu'une
+         * requête épargnée. Les langues non francophones (`vosteng`, `vj`…) sont
+         * volontairement laissées de côté : rien dans l'application ne sait quoi
+         * en faire.
+         */
+        private val LANGS = listOf(
+            "vf" to "VF",
+            "vf1" to "VF",
+            "vf2" to "VF",
+            "vostfr" to "VOSTFR",
+        )
         private val PANEL = Regex("""panneauAnime\("([^"]+)",\s*"([^"]+)"\)""")
         private val EPS = Regex("""var\s+eps\w+\s*=\s*\[([\s\S]*?)\]""")
         private val URL = Regex("""'([^']+)'""")

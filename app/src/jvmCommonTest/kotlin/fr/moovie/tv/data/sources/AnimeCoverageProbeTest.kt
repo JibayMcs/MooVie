@@ -54,6 +54,7 @@ class AnimeCoverageProbeTest {
         Anime(95479, "Jujutsu Kaisen", 1, 1),
         Anime(65930, "My Hero Academia", 1, 1),
         Anime(30984, "Bleach", 1, 1),
+        Anime(31911, "Fullmetal Alchemist Brotherhood", 1, 1),
         Anime(209867, "Frieren", 1, 1),
         Anime(240411, "Dandadan", 1, 1),
     )
@@ -67,7 +68,7 @@ class AnimeCoverageProbeTest {
 
         runBlocking {
             val gate = Semaphore(4)
-            println("%-26s %-38s %s".format("titre", "catalogues", "1er lien jouable"))
+            println("%-26s %-38s %s".format("titre", "catalogues VF", "1er lien VF jouable"))
             println("─".repeat(100))
 
             var couverts = 0
@@ -88,7 +89,8 @@ class AnimeCoverageProbeTest {
                     }.awaitAll().flatten()
                 }
 
-                val parCatalogue = liens.groupingBy { it.provider ?: "?" }.eachCount()
+                val vf = liens.filter { it.language.equals("VF", true) }
+                val parCatalogue = vf.groupingBy { it.provider ?: "?" }.eachCount()
                     .entries.sortedByDescending { it.value }
                     .joinToString(" ") { "${it.key}:${it.value}" }
                     .ifBlank { "—" }
@@ -97,7 +99,7 @@ class AnimeCoverageProbeTest {
                 // l'utilisateur obtiendrait en appuyant sur Lire.
                 var jouable: String? = null
                 var jouables = 0
-                for (lien in liens) {
+                for (lien in vf) {
                     val flux = runCatching { ExtractorRegistry.resolve(lien) }.getOrNull() ?: continue
                     if (!runCatching { isStreamPlayable(flux) }.getOrDefault(false)) continue
                     jouables++
@@ -116,14 +118,14 @@ class AnimeCoverageProbeTest {
                     "%-26s %-38s %s".format(
                         etiquette.take(26),
                         parCatalogue.take(38),
-                        if (jouable != null) "✅ $jouable" else "⛔ aucun",
+                        if (jouable != null) "✅ $jouable" else "⛔ aucune VF (${liens.size} liens toutes langues)",
                     ),
                 )
             }
 
             println()
             println("════════ SYNTHÈSE ════════")
-            println("couverture      : $couverts / ${panier.size}")
+            println("couverture VF   : $couverts / ${panier.size}")
             println("sans redondance : $fragiles / ${panier.size}  (0 ou 1 lien jouable)")
             println("qui fournit le lien retenu :")
             fournisseurs.entries.sortedByDescending { it.value }
