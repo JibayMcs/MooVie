@@ -11,6 +11,7 @@ import fr.moovie.tv.data.download.DownloadRepository
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import fr.moovie.tv.data.watch.ResumeEntry
+import fr.moovie.tv.data.settings.tmdbCountry
 import fr.moovie.tv.ui.details.DetailsScreenContent
 import fr.moovie.tv.ui.details.DetailsState
 import fr.moovie.tv.ui.details.DetailsViewModel
@@ -156,6 +157,7 @@ internal fun DesktopSettingsScreen(
     val skipIntroOutro by vm.skipIntroOutro.collectAsState()
     val autoPlayNext by vm.autoPlayNext.collectAsState()
     val playerClock by vm.playerClock.collectAsState()
+    val settingsTrailerAutoplay by vm.trailerAutoplay.collectAsState()
     val hideHistoryWidgets by vm.hideHistoryWidgets.collectAsState()
     val splashAnimation by vm.splashAnimation.collectAsState()
     val updateCheck by Vm.update.checkStatus.collectAsState()
@@ -169,6 +171,7 @@ internal fun DesktopSettingsScreen(
         skipIntroOutro = skipIntroOutro,
         autoPlayNext = autoPlayNext,
         playerClock = playerClock,
+        trailerAutoplay = settingsTrailerAutoplay,
         hideHistoryWidgets = hideHistoryWidgets,
         splashAnimation = splashAnimation,
         updateCheck = updateCheck,
@@ -183,6 +186,7 @@ internal fun DesktopSettingsScreen(
         onSetSkipIntroOutro = vm::setSkipIntroOutro,
         onSetAutoPlayNext = vm::setAutoPlayNext,
         onSetPlayerClock = vm::setPlayerClock,
+        onSetTrailerAutoplay = vm::setTrailerAutoplay,
         onSetHideHistoryWidgets = vm::setHideHistoryWidgets,
         onSetSplashAnimation = vm::setSplashAnimation,
         onCheckUpdates = Vm.update::checkNow,
@@ -230,6 +234,9 @@ internal fun DesktopDetailsScreen(
     val quickPlay by vm.quickPlay.collectAsState()
     val panelVisible by vm.panelVisible.collectAsState()
     val selectedEpisode by vm.selectedEpisode.collectAsState()
+    val trailer by vm.trailer.collectAsState()
+    val trailerStream by vm.trailerStream.collectAsState()
+    val trailerAutoplay by vm.trailerAutoplay.collectAsState()
     // Reprise depuis l'accueil : lance la lecture directe une seule fois.
     val autoConsumed = remember { mutableStateOf(false) }
 
@@ -275,6 +282,23 @@ internal fun DesktopDetailsScreen(
                 )
             }
             vm.consumeResolved()
+        }
+    }
+    // Bande-annonce : pas de `mediaKey` (ni reprise ni historique), pas
+    // d'épisode suivant, pas de durée attendue — voir le pendant Android.
+    LaunchedEffect(trailerStream) {
+        trailerStream?.let { s ->
+            if (s.url.isNotBlank()) {
+                onPlay(
+                    Screen.Player(
+                        streamUrl = s.url,
+                        headers = s.headers,
+                        title = vm.trailerTitle,
+                        subtitle = vm.playbackTitle,
+                    ),
+                )
+            }
+            vm.consumeTrailerStream()
         }
     }
     // Échap ferme d'abord le panneau des sources, puis la fiche d'épisode.
@@ -328,6 +352,11 @@ internal fun DesktopDetailsScreen(
         downloadList = downloadsBySource,
         sourceQualities = sourceQualities,
         onRequestQuality = vm::requestQuality,
+        trailer = trailer,
+        onPlayTrailer = vm::playTrailer,
+        trailerPreview = { stream, mod -> TrailerPreview(stream, mod) },
+        trailerAutoplay = trailerAutoplay,
+        country = tmdbCountry(),
         onDismissQuickPlay = vm::dismissQuickPlay,
         onBack = onBack,
         showBackButton = true,

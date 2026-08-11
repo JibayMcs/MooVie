@@ -28,6 +28,14 @@ data class HttpRequest(
     /** Corps de formulaire pour [HttpMethod.POST]. */
     val form: Map<String, String>? = null,
     /**
+     * Corps JSON brut pour [HttpMethod.POST], exclusif avec [form].
+     *
+     * Les hébergeurs de la cascade postent tous des formulaires ; l'API interne
+     * de YouTube, elle, n'accepte que du JSON. Le corps arrive déjà sérialisé
+     * parce que sa forme dépend du client usurpé, pas de la requête.
+     */
+    val json: String? = null,
+    /**
      * Suivre les redirections. À passer à false quand la chaîne doit être
      * déroulée à la main : VOE fait rebondir le client sur 28 alias successifs,
      * bien au-delà du plafond de 20 codé en dur dans OkHttp.

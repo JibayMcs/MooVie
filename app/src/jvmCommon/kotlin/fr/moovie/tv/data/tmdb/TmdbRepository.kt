@@ -227,6 +227,39 @@ class TmdbRepository(
 
     suspend fun season(apiKey: String, id: Int, season: Int): SeasonDetails =
         api.season(id, season, apiKey, language)
+
+    /**
+     * Meilleure bande-annonce d'un titre, langue de l'utilisateur d'abord.
+     *
+     * [appended] est la liste déjà arrivée avec la fiche (`append_to_response`),
+     * donc gratuite. TMDB l'a filtrée sur `language` : sur un titre qui n'a pas
+     * de bande-annonce française elle est **vide**, ce qui n'est pas la même
+     * chose que « ce titre n'a pas de bande-annonce ». D'où la seconde requête,
+     * en anglais, déclenchée seulement dans ce cas — la plupart des titres
+     * doublés n'en auront jamais besoin.
+     *
+     * Rend null quand il n'y a rien de jouable : l'appelant n'affiche alors pas
+     * le bouton, plutôt que d'en afficher un qui échoue.
+     */
+    suspend fun bestTrailer(
+        apiKey: String,
+        id: Int,
+        isTv: Boolean,
+        appended: List<TmdbVideo>,
+    ): TmdbVideo? {
+        appended.bestTrailer(language)?.let { return it }
+        return runCatching {
+            api.videos(if (isTv) "tv" else "movie", id, apiKey, FALLBACK_LANGUAGE).results
+        }.getOrNull()?.bestTrailer(language)
+    }
+
+    private companion object {
+        /**
+         * Anglais : c'est la langue dans laquelle TMDB a une bande-annonce quand
+         * il n'en a qu'une, parce que c'est celle que les studios déposent.
+         */
+        const val FALLBACK_LANGUAGE = "en-US"
+    }
 }
 
 /**

@@ -9,6 +9,7 @@ import fr.moovie.tv.data.download.DownloadRepository
 import androidx.compose.runtime.remember
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import fr.moovie.tv.data.settings.tmdbCountry
 import fr.moovie.tv.ui.navigation.Screen
 
 /**
@@ -46,6 +47,9 @@ fun DetailsScreen(
     val watched by viewModel.watched.collectAsStateWithLifecycle()
     val resume by viewModel.resume.collectAsStateWithLifecycle()
     val quickPlay by viewModel.quickPlay.collectAsStateWithLifecycle()
+    val trailer by viewModel.trailer.collectAsStateWithLifecycle()
+    val trailerStream by viewModel.trailerStream.collectAsStateWithLifecycle()
+    val trailerAutoplay by viewModel.trailerAutoplay.collectAsStateWithLifecycle()
     val panelVisible by viewModel.panelVisible.collectAsStateWithLifecycle()
     val selectedEpisode by viewModel.selectedEpisode.collectAsStateWithLifecycle()
     // Reprise depuis l'accueil : lance la lecture directe une seule fois, dès que la fiche est chargée.
@@ -96,6 +100,27 @@ fun DetailsScreen(
         }
     }
 
+    // Bande-annonce : même départ vers le lecteur, mais sans rien de ce qui
+    // suit une vraie lecture — pas de `mediaKey` (donc pas de reprise ni de
+    // ligne dans l'historique), pas d'épisode à enchaîner, et pas de durée
+    // attendue : le garde-fou du lecteur rejetterait deux minutes de promotion
+    // là où il attend deux heures de film.
+    LaunchedEffect(trailerStream) {
+        trailerStream?.let { s ->
+            if (s.url.isNotBlank()) {
+                onPlay(
+                    Screen.Player(
+                        streamUrl = s.url,
+                        headers = s.headers,
+                        title = viewModel.trailerTitle,
+                        subtitle = viewModel.playbackTitle,
+                    ),
+                )
+            }
+            viewModel.consumeTrailerStream()
+        }
+    }
+
     // Retour : ferme d'abord le panneau des sources, puis la fiche d'épisode,
     // et seulement ensuite remonte à l'accueil (BackHandler de MainActivity).
     BackHandler(enabled = panelVisible || selectedEpisode != null) {
@@ -136,6 +161,11 @@ fun DetailsScreen(
         downloadList = downloadsBySource,
         sourceQualities = sourceQualities,
         onRequestQuality = viewModel::requestQuality,
+        trailer = trailer,
+        onPlayTrailer = viewModel::playTrailer,
+        trailerPreview = { stream, mod -> TrailerPreview(stream, mod) },
+        trailerAutoplay = trailerAutoplay,
+        country = tmdbCountry(),
         onDismissQuickPlay = viewModel::dismissQuickPlay,
         onBack = onBack,
     )

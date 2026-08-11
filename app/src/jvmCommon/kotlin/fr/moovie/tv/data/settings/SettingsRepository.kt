@@ -124,6 +124,21 @@ class SettingsRepository {
     suspend fun setPlayerClock(value: Boolean) =
         store.edit { it[PLAYER_CLOCK] = value }
 
+    /**
+     * Bande-annonce lancée d'elle-même dans le fond de la fiche.
+     *
+     * Activée par défaut, mais coupable : elle démarre une lecture que personne
+     * n'a demandée, et sur une box de 2017 comme sur une connexion partagée,
+     * c'est un coût qu'il faut pouvoir refuser. Le bouton « Bande-annonce »,
+     * lui, reste là quel que soit ce réglage — c'est l'automatisme qu'on
+     * désactive, pas la fonctionnalité.
+     */
+    val trailerAutoplay: Flow<Boolean> =
+        store.data.map { it[TRAILER_AUTOPLAY] ?: true }
+
+    suspend fun setTrailerAutoplay(value: Boolean) =
+        store.edit { it[TRAILER_AUTOPLAY] = value }
+
     suspend fun setDohEnabled(value: Boolean) =
         store.edit { it[DOH_ENABLED] = value }
 
@@ -254,6 +269,7 @@ class SettingsRepository {
         val SPLASH_ANIMATION = booleanPreferencesKey("splash_animation")
         val AUTO_PLAY_NEXT = booleanPreferencesKey("auto_play_next")
         val PLAYER_CLOCK = booleanPreferencesKey("player_clock")
+        val TRAILER_AUTOPLAY = booleanPreferencesKey("trailer_autoplay")
         val UPDATE_INTERVAL = stringPreferencesKey("update_interval")
         val SCREENSAVER_DELAY = stringPreferencesKey("screensaver_delay")
         val INTRODB_API_KEY = stringPreferencesKey("introdb_api_key")

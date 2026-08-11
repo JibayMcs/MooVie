@@ -30,6 +30,7 @@ import fr.moovie.tv.ui.format.upcomingDate
 import fr.moovie.tv.data.tmdb.Episode
 import fr.moovie.tv.data.tmdb.TmdbRepository
 import fr.moovie.tv.data.tmdb.TvDetails
+import fr.moovie.tv.data.trailer.YoutubeTrailerExtractor
 import fr.moovie.tv.data.watch.ResumeEntry
 import fr.moovie.tv.data.watch.TitleMeta
 import fr.moovie.tv.data.watch.WatchProgressRepository
@@ -160,6 +161,34 @@ class DetailsViewModel : ViewModel() {
     /** Message transitoire si un lecteur choisi n'a pas pu être résolu. */
     private val _resolveError = MutableStateFlow<String?>(null)
     val resolveError: StateFlow<String?> = _resolveError
+
+    // ── Bande-annonce ────────────────────────────────────────────────────────
+
+    private val trailerExtractor = YoutubeTrailerExtractor(ExtractorRegistry.gateway)
+
+    private val _trailer = MutableStateFlow<TrailerState>(TrailerState.None)
+    val trailer: StateFlow<TrailerState> = _trailer
+
+    /**
+     * Flux de la bande-annonce, prêt à ouvrir le lecteur.
+     *
+     * Distinct de [_resolved] : une bande-annonce ne se reprend pas, ne compte
+     * pas comme vue et n'enchaîne pas sur l'épisode suivant. Les faire passer
+     * par le même canal l'aurait inscrite dans « Reprendre la lecture », où
+     * personne ne veut retrouver deux minutes de promotion.
+     */
+    private val _trailerStream = MutableStateFlow<PlayableStream?>(null)
+    val trailerStream: StateFlow<PlayableStream?> = _trailerStream
+
+    /** Titre affiché par le lecteur pendant la bande-annonce. */
+    var trailerTitle: String = ""
+        private set
+
+    /** Réglage : l'aperçu du hero se lance-t-il tout seul. */
+    val trailerAutoplay: StateFlow<Boolean> = settings.trailerAutoplay
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+
+    private var trailerJob: Job? = null
 
     /**
      * URL de la source en cours de résolution, ou null.
@@ -345,6 +374,12 @@ class DetailsViewModel : ViewModel() {
         // Le ViewModel est partagé entre fiches (scope Activity) : purge l'état
         // de la fiche précédente (panneau sources, erreurs) avant de charger.
         quickPlayJob?.cancel()
+        // Même raison que pour la lecture : le ViewModel vit à l'échelle de la
+        // fenêtre, donc la bande-annonce du titre précédent resterait affichée
+        // sous le hero du nouveau — et son bouton la lancerait.
+        trailerJob?.cancel()
+        _trailer.value = TrailerState.None
+        _trailerStream.value = null
         resolveGen++ // invalide toute résolution en vol de la fiche précédente
         _quickPlay.value = QuickPlayState.Idle
         _panelVisible.value = false
@@ -453,6 +488,7 @@ class DetailsViewModel : ViewModel() {
                 // Fiche film : sources chargées immédiatement en arrière-plan
                 // pour que le bouton « Lire » soit prêt sans ouvrir le panneau.
                 if (it is DetailsState.Movie) loadMovieSources()
+                loadTrailer(repo, apiKey, it)
             }.onFailure { _state.value = DetailsState.Error(getString(Res.string.details_tmdb_error, it.message ?: "")) }
         }
     }
@@ -478,6 +514,63 @@ class DetailsViewModel : ViewModel() {
                     )
                 }
         }
+    }
+
+    // ── Bande-annonce ────────────────────────────────────────────────────────
+
+    /**
+     * Trouve la bande-annonce **et résout son flux**, en tâche de fond.
+     *
+     * La résolution est faite ici plutôt qu'au clic parce que c'est elle qui
+     * décide de l'affichage : ni le bouton ni l'aperçu du hero ne doivent
+     * apparaître sur une bande-annonce dont on ne sait pas encore si elle est
+     * jouable. Voir [TrailerState] pour ce que ce choix coûte et rapporte.
+     */
+    private fun loadTrailer(repo: TmdbRepository, apiKey: String, state: DetailsState) {
+        val (id, isTv, videos) = when (state) {
+            is DetailsState.Movie ->
+                Triple(state.details.id, false, state.details.videos?.results.orEmpty())
+            is DetailsState.Tv ->
+                Triple(state.details.id, true, state.details.videos?.results.orEmpty())
+            else -> return
+        }
+        val gen = resolveGen
+        trailerJob = viewModelScope.launch {
+            val best = runCatching { repo.bestTrailer(apiKey, id, isTv, videos) }.getOrNull()
+                ?: return@launch
+            // Le titre a pu changer pendant la requête : sans ce garde-fou, la
+            // bande-annonce du film précédent s'afficherait sur la fiche
+            // suivante. Même règle que `resolveGen` pour les sources.
+            if (gen != resolveGen) return@launch
+
+            val langue = currentTmdbLanguage().take(2).lowercase()
+            val resolved = runCatching { trailerExtractor.resolveDetailed(best.key, langue) }
+                .getOrNull() ?: return@launch
+            if (gen != resolveGen) return@launch
+
+            trailerTitle = best.name.ifBlank { playbackTitle }
+            _trailer.value = TrailerState.Ready(
+                video = best,
+                stream = resolved.stream,
+                durationSeconds = resolved.durationSeconds,
+            )
+        }
+    }
+
+    /**
+     * Envoie la bande-annonce au lecteur plein écran.
+     *
+     * Rien à résoudre ici : le flux est déjà là, sans quoi le bouton ne serait
+     * pas affiché. L'appui est donc instantané.
+     */
+    fun playTrailer() {
+        val ready = _trailer.value as? TrailerState.Ready ?: return
+        _trailerStream.value = ready.stream
+    }
+
+    /** À appeler une fois le lecteur ouvert, comme [consumeResolved]. */
+    fun consumeTrailerStream() {
+        _trailerStream.value = null
     }
 
     /** Ouvre la fiche détaillée d'un épisode (clic / OK sur sa carte). */

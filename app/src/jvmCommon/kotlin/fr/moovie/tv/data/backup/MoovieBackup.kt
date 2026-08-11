@@ -180,6 +180,8 @@ data class BackupSettings(
     val skipIntroOutro: Boolean? = null,
     val autoPlayNext: Boolean? = null,
     val playerClock: Boolean? = null,
+    /** Nul dans les sauvegardes d'avant la bande-annonce : le réglage garde alors sa valeur. */
+    val trailerAutoplay: Boolean? = null,
     val hideHistoryWidgets: Boolean? = null,
     val updateInterval: String? = null,
     val screensaverDelay: String? = null,

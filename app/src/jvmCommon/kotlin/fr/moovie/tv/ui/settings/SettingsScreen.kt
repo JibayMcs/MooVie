@@ -132,6 +132,8 @@ import fr.moovie.tv.resources.settings_history_widgets
 import fr.moovie.tv.resources.settings_move_down
 import fr.moovie.tv.resources.settings_move_up
 import fr.moovie.tv.resources.settings_player_clock
+import fr.moovie.tv.resources.settings_trailer_autoplay
+import fr.moovie.tv.resources.settings_trailer_autoplay_help
 import fr.moovie.tv.resources.settings_player_clock_help
 import fr.moovie.tv.resources.settings_screensaver_delay
 import fr.moovie.tv.resources.settings_screensaver_help
@@ -288,6 +290,8 @@ fun SettingsScreenContent(
     skipIntroOutro: Boolean,
     autoPlayNext: Boolean,
     playerClock: Boolean,
+    trailerAutoplay: Boolean,
+    onSetTrailerAutoplay: (Boolean) -> Unit,
     hideHistoryWidgets: Boolean,
     splashAnimation: Boolean,
     updateInterval: UpdateInterval,
@@ -533,6 +537,12 @@ fun SettingsScreenContent(
                         help = stringResource(Res.string.settings_player_clock_help),
                     ) {
                         OnOff(value = playerClock, onChange = onSetPlayerClock)
+                    }
+                    SettingRow(
+                        label = stringResource(Res.string.settings_trailer_autoplay),
+                        help = stringResource(Res.string.settings_trailer_autoplay_help),
+                    ) {
+                        OnOff(value = trailerAutoplay, onChange = onSetTrailerAutoplay)
                     }
                 }
 

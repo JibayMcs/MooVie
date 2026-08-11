@@ -8,8 +8,12 @@ import fr.moovie.tv.core.sources.port.NetworkProfile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.FormBody
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+
+private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
 
 /**
  * Implémentation OkHttp de [HttpGateway].
@@ -38,9 +42,14 @@ class OkHttpGateway(private val client: OkHttpClient) : HttpGateway {
             HttpMethod.GET -> builder.get()
             HttpMethod.HEAD -> builder.head()
             HttpMethod.POST -> {
-                val form = FormBody.Builder()
-                request.form.orEmpty().forEach { (k, v) -> form.add(k, v) }
-                builder.post(form.build())
+                val json = request.json
+                if (json != null) {
+                    builder.post(json.toRequestBody(JSON_MEDIA_TYPE))
+                } else {
+                    val form = FormBody.Builder()
+                    request.form.orEmpty().forEach { (k, v) -> form.add(k, v) }
+                    builder.post(form.build())
+                }
             }
         }
 

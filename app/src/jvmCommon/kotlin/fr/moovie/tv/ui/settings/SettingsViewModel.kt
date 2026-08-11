@@ -53,6 +53,13 @@ class SettingsViewModel : ViewModel() {
         viewModelScope.launch { repo.setPlayerClock(value) }
     }
 
+    val trailerAutoplay: StateFlow<Boolean> =
+        repo.trailerAutoplay.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+
+    fun setTrailerAutoplay(value: Boolean) {
+        viewModelScope.launch { repo.setTrailerAutoplay(value) }
+    }
+
     fun setAutoPlayNext(value: Boolean) {
         viewModelScope.launch { repo.setAutoPlayNext(value) }
     }

@@ -82,12 +82,21 @@ interface TmdbApi {
         @Query("first_air_date.lte") tvTo: String? = null,
     ): TmdbPageResult
 
+    /**
+     * `append_to_response` porte maintenant `videos` : les bandes-annonces
+     * arrivent **dans la réponse de la fiche**, sans requête supplémentaire.
+     * TMDB les filtre alors sur `language`, d'où le repli de [videos] quand la
+     * langue de l'utilisateur n'en déclare aucune — cas courant, la plupart des
+     * titres n'ont qu'une bande-annonce en anglais.
+     */
     @GET("movie/{id}")
     suspend fun movieDetails(
         @Path("id") id: Int,
         @Query("api_key") apiKey: String,
         @Query("language") language: String,
-        @Query("append_to_response") append: String = "credits",
+        // `release_dates` porte la classification par pays (-12, -16) : elle
+        // n'existe nulle part ailleurs dans la fiche.
+        @Query("append_to_response") append: String = "credits,videos,release_dates",
     ): MovieDetails
 
     @GET("tv/{id}")
@@ -95,8 +104,18 @@ interface TmdbApi {
         @Path("id") id: Int,
         @Query("api_key") apiKey: String,
         @Query("language") language: String,
-        @Query("append_to_response") append: String = "credits",
+        /** `content_ratings` est l'équivalent séries de `release_dates`. */
+        @Query("append_to_response") append: String = "credits,videos,content_ratings",
     ): TvDetails
+
+    /** Vidéos d'un titre dans une langue donnée. Sert de repli, voir ci-dessus. */
+    @GET("{media}/{id}/videos")
+    suspend fun videos(
+        @Path("media") media: String, // "movie" | "tv"
+        @Path("id") id: Int,
+        @Query("api_key") apiKey: String,
+        @Query("language") language: String,
+    ): VideoList
 
     /**
      * Filmographie d'une personne, films **et** séries en une requête.

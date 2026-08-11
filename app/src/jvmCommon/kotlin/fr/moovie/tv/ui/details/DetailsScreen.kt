@@ -44,7 +44,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material.icons.filled.Theaters
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.CircularProgressIndicator
@@ -84,6 +87,7 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import fr.moovie.tv.data.settings.StreamLanguage
 import fr.moovie.tv.core.sources.model.EmbedLink
+import fr.moovie.tv.core.sources.model.PlayableStream
 import fr.moovie.tv.data.tmdb.CastMember
 import fr.moovie.tv.data.tmdb.Episode
 import fr.moovie.tv.data.tmdb.MovieDetails
@@ -105,6 +109,9 @@ import fr.moovie.tv.resources.details_searching_source
 import fr.moovie.tv.resources.details_trying_source
 import fr.moovie.tv.resources.details_seasons
 import fr.moovie.tv.resources.details_sources
+import fr.moovie.tv.resources.details_tab_info
+import fr.moovie.tv.resources.details_tab_overview
+import fr.moovie.tv.resources.details_trailer
 import fr.moovie.tv.resources.details_source_download_hint
 import fr.moovie.tv.resources.details_source_dl_queued
 import fr.moovie.tv.resources.details_source_dl_running
@@ -163,6 +170,17 @@ private val SERIES_PANE_WIDTH = 380.dp
  * remettre le défilement à zéro sans attendre se ferait écraser juste après.
  */
 private const val SCROLL_SETTLE_MS = 120L
+
+/**
+ * Temps passé sur une fiche avant que sa bande-annonce ne démarre d'elle-même.
+ *
+ * Trois secondes : assez pour que traverser des fiches n'en lance aucune, assez
+ * court pour que s'arrêter sur un titre donne l'impression que l'app répond.
+ */
+private const val HERO_PREVIEW_DELAY_MS = 3_000L
+
+/** Fondu d'apparition de l'aperçu : il remplace une affiche, il ne surgit pas. */
+private const val HERO_PREVIEW_FADE_MS = 800
 
 /**
  * Largeur d'une vignette du casting.
@@ -266,6 +284,26 @@ fun DetailsScreenContent(
      * indexée par lien d'embed, ce qui ne permet pas de dénombrer.
      */
     downloadList: List<Download> = emptyList(),
+    /** Bande-annonce du titre. [TrailerState.None] = aucun bouton affiché. */
+    trailer: TrailerState = TrailerState.None,
+    onPlayTrailer: () -> Unit = {},
+    /**
+     * Aperçu muet de la bande-annonce dans le fond de la fiche, fourni par la
+     * plateforme — ExoPlayer côté Android, libVLC côté desktop. Le lecteur ne
+     * peut pas vivre dans `jvmCommon` : il n'y a pas de moteur vidéo commun aux
+     * deux, et c'est exactement le genre de chose que ce projet garde dans
+     * `androidMain` / `desktopMain`.
+     *
+     * Null = pas d'aperçu, la fiche garde son image de fond.
+     */
+    trailerPreview: (@Composable (stream: PlayableStream, modifier: Modifier) -> Unit)? = null,
+    /** Réglage utilisateur : l'aperçu se lance-t-il tout seul. */
+    trailerAutoplay: Boolean = true,
+    /**
+     * Pays de l'utilisateur (`FR`), pour choisir la bonne classification d'âge
+     * dans le panneau « En savoir plus ».
+     */
+    country: String = "FR",
     onDismissQuickPlay: () -> Unit,
     onBack: () -> Unit,
     // Desktop uniquement : bouton retour à l'écran (sur TV, la télécommande a
@@ -368,6 +406,35 @@ fun DetailsScreenContent(
     val backdrop = (state as? DetailsState.Movie)?.details?.backdropUrl()
         ?: (state as? DetailsState.Tv)?.details?.backdropUrl()
 
+    // Aperçu du hero : la bande-annonce prend la place de l'image de fond au
+    // bout de quelques secondes, puis lui rend la place à la fin.
+    //
+    // Le délai n'est pas cosmétique : sans lui, traverser une rangée de la
+    // recherche déclencherait une lecture par fiche effleurée. On attend le
+    // temps qu'il faut pour dire qu'on s'est arrêté sur ce titre.
+    // Panneau « En savoir plus ». Remis à plat au changement de titre : ouvrir
+    // une fiche doit toujours montrer la fiche, pas la vue technique qu'on
+    // consultait sur la précédente.
+    var infoVisible by remember(state.titleKey()) { mutableStateOf(false) }
+
+    val ready = trailer as? TrailerState.Ready
+    var previewPlaying by remember(ready?.video?.key) { mutableStateOf(false) }
+    LaunchedEffect(ready?.video?.key, trailerAutoplay, trailerPreview != null) {
+        previewPlaying = false
+        if (ready == null || !trailerAutoplay || trailerPreview == null) return@LaunchedEffect
+        delay(HERO_PREVIEW_DELAY_MS)
+        previewPlaying = true
+        // On rend la main à l'affiche à la fin plutôt que de laisser une image
+        // figée : `durationSeconds` vient de YouTube, et le lecteur d'aperçu n'a
+        // pas de rappel de fin à nous donner. Zéro (durée inconnue) laisse
+        // simplement l'aperçu courir.
+        val duree = ready.durationSeconds
+        if (duree > 0) {
+            delay(duree * 1000L)
+            previewPlaying = false
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         backdrop?.let { url ->
             MoovieAsyncImage(
@@ -376,6 +443,18 @@ fun DetailsScreenContent(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize().blur(40.dp),
             )
+        }
+        // Au-dessus de l'affiche, et non à sa place : elle reste dessous pendant
+        // le fondu, et pendant la seconde ou deux que le flux met à afficher sa
+        // première image. Sans elle on verrait du noir.
+        if (previewPlaying && ready != null && trailerPreview != null) {
+            AnimatedVisibility(
+                visible = true,
+                enter = fadeIn(animationSpec = tween(HERO_PREVIEW_FADE_MS)),
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                trailerPreview(ready.stream, Modifier.fillMaxSize())
+            }
         }
         Box(
             modifier = Modifier.fillMaxSize().background(
@@ -471,6 +550,8 @@ fun DetailsScreenContent(
                             }
                         }
                         MoovieButton(onClick = onOpenPanel) { Text(stringResource(Res.string.details_sources)) }
+                        TrailerButton(trailer, onPlayTrailer)
+                        InfoToggleButton(infoVisible) { infoVisible = !infoVisible }
                         // Œil = marquer vu / non vu (outline verte quand vu).
                         MoovieIconButton(
                             onClick = { onToggleWatched(movieKey) },
@@ -501,10 +582,20 @@ fun DetailsScreenContent(
                             modifier = hPad,
                         )
                     }
-                    // Casting sous les boutons, comme sur la fiche d'épisode : la
-                    // descente au D-pad atteint d'abord Lire, pas une vignette
-                    // d'acteur.
-                    CastRow(s.details.credits?.cast.orEmpty(), hPadDp, onOpenPerson)
+                    // « En savoir plus » prend la place du casting plutôt que de
+                    // s'ajouter sous lui : c'est ce qui rend le retour immédiat.
+                    if (infoVisible) {
+                        MovieInfoPanel(
+                            details = s.details,
+                            country = country,
+                            modifier = hPad.fillMaxWidth(),
+                        )
+                    } else {
+                        // Casting sous les boutons, comme sur la fiche d'épisode :
+                        // la descente au D-pad atteint d'abord Lire, pas une
+                        // vignette d'acteur.
+                        CastRow(s.details.credits?.cast.orEmpty(), hPadDp, onOpenPerson)
+                    }
                 }
                 is DetailsState.Tv -> {
                     val selected = selectedEpisode
@@ -715,6 +806,8 @@ fun DetailsScreenContent(
                         // bord, donc introuvables. Ici elles sont toujours au
                         // même endroit, à un appui vers le bas.
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            TrailerButton(trailer, onPlayTrailer)
+                            InfoToggleButton(infoVisible) { infoVisible = !infoVisible }
                             MoovieIconButton(
                                 onClick = onToggleSeasonWatched,
                                 icon = if (seasonAllWatched) Icons.Default.VisibilityOff else Icons.Default.Visibility,
@@ -732,6 +825,23 @@ fun DetailsScreenContent(
                         }
                         }
                         }
+                        // Volet droit : « En savoir plus » y prend la place de la
+                        // liste des épisodes. C'est le cas qui a dicté la
+                        // conception — on consulte la date du prochain épisode,
+                        // puis on veut ses épisodes, sans avoir à défiler.
+                        if (infoVisible) {
+                            TvInfoPanel(
+                                details = s.details,
+                                country = country,
+                                modifier = listModifier.padding(
+                                    if (compact) {
+                                        PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                                    } else {
+                                        PaddingValues(end = 48.dp, bottom = 24.dp)
+                                    },
+                                ),
+                            )
+                        } else {
                         // Volet droit : la liste occupe toute la hauteur.
                         //
                         // LazyColumn et non Column défilante : c'est ce qui donne
@@ -829,6 +939,7 @@ fun DetailsScreenContent(
                             }
                         }
                         }
+                        } // fin du `else` : liste des épisodes ou « En savoir plus »
                         }
                         // Le casting d'une série est en queue de la liste des
                         // épisodes (voir plus haut), pas ici : sous les volets il
@@ -1350,6 +1461,69 @@ private fun WatchedBadge(modifier: Modifier = Modifier) {
  * ligne de texte. Même gabarit des deux côtés, à une différence près : une
  * affiche est au format 2:3 là où une vignette d'épisode est en 16:9.
  */
+/**
+ * Bouton « Bande-annonce ».
+ *
+ * N'apparaît que sur un flux **déjà résolu** — il n'a donc ni état de
+ * chargement ni état d'échec : les deux se produisent avant qu'il n'existe. Sur
+ * un titre sans bande-annonce jouable il ne rend rien du tout, plutôt qu'un
+ * bouton grisé qui prendrait une place que la rangée n'a pas et ajouterait un
+ * arrêt au D-pad ne menant nulle part.
+ *
+ * **Icône seule**, comme l'œil et le signet qui la suivent. En toutes lettres
+ * elle mesurait cent quarante points de plus, et sur un portrait de 448 dp
+ * c'était le signet « à regarder plus tard » qui sortait de la rangée — un
+ * bouton existant rendu invisible par un bouton neuf. Le libellé n'est pas
+ * perdu : [MoovieIconButton] en fait une infobulle au survol, donc au bureau,
+ * et le `contentDescription` partout ailleurs.
+ *
+ * `Theaters` plutôt qu'un triangle de lecture : « Lire » en porte déjà un, et
+ * deux triangles voisins dans la même rangée ne se distingueraient pas.
+ */
+/**
+ * Bascule du panneau « En savoir plus ».
+ *
+ * Un seul bouton pour aller **et** revenir : c'est ce qui permet de consulter
+ * une date de diffusion puis de retomber sur ses épisodes d'un appui. Deux
+ * entrées séparées auraient demandé de chercher par où sortir.
+ *
+ * **L'état est porté par l'icône**, pleine quand le panneau est ouvert et
+ * évidée sinon — comme le signet (`Bookmark` / `BookmarkBorder`) et l'œil juste
+ * à côté. Le seul `selected` n'y suffisait pas : `moovieSurface` dessine le même
+ * soulignement pour la sélection (alpha 0,65) et pour le focus ou le survol
+ * (alpha 1,0), si bien qu'un bouton éteint mais survolé paraît **plus** allumé
+ * qu'un bouton allumé. Tant que le pointeur restait dessus — c'est-à-dire juste
+ * après l'avoir cliqué — les deux états étaient indiscernables.
+ */
+@Composable
+private fun InfoToggleButton(visible: Boolean, onClick: () -> Unit) {
+    MoovieIconButton(
+        onClick = onClick,
+        icon = if (visible) Icons.Filled.Info else Icons.Outlined.Info,
+        contentDescription = stringResource(
+            if (visible) Res.string.details_tab_overview else Res.string.details_tab_info,
+        ),
+        selected = visible,
+    )
+}
+
+/** Clé d'identité du titre affiché, pour remettre les vues locales à plat. */
+private fun DetailsState.titleKey(): String = when (this) {
+    is DetailsState.Movie -> "movie:${details.id}"
+    is DetailsState.Tv -> "tv:${details.id}"
+    else -> ""
+}
+
+@Composable
+private fun TrailerButton(trailer: TrailerState, onClick: () -> Unit) {
+    if (trailer !is TrailerState.Ready) return
+    MoovieIconButton(
+        onClick = onClick,
+        icon = Icons.Default.Theaters,
+        contentDescription = stringResource(Res.string.details_trailer),
+    )
+}
+
 @Composable
 private fun MovieHeader(
     details: MovieDetails,

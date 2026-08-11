@@ -1,8 +1,10 @@
 package fr.moovie.tv.ui.details
 
 import fr.moovie.tv.core.sources.model.EmbedLink
+import fr.moovie.tv.core.sources.model.PlayableStream
 import fr.moovie.tv.data.tmdb.Episode
 import fr.moovie.tv.data.tmdb.MovieDetails
+import fr.moovie.tv.data.tmdb.TmdbVideo
 import fr.moovie.tv.data.tmdb.TvDetails
 
 sealed interface DetailsState {
@@ -33,6 +35,34 @@ sealed interface DetailsState {
         val seasonAirDate: String? = null,
     ) : DetailsState
     data class Error(val message: String) : DetailsState
+}
+
+/**
+ * État de la bande-annonce d'un titre.
+ *
+ * Deux états seulement, et c'est une décision : **on n'affiche rien tant que le
+ * flux n'est pas résolu**. Le bouton et l'aperçu du hero ne doivent pas exister
+ * sur la foi de ce que TMDB déclare — TMDB dit qu'une clé YouTube existe, pas
+ * qu'elle est jouable, et les deux divergent (vidéo retirée, restreinte par
+ * région, ou client InnerTube bloqué ce jour-là).
+ *
+ * Le prix est un aller-retour réseau à l'ouverture de la fiche, en tâche de
+ * fond. Ce qu'on achète, c'est qu'un bouton visible marche toujours — plutôt
+ * qu'un bouton qui, une fois sur dix, tourne puis s'excuse.
+ */
+sealed interface TrailerState {
+    /** Pas de bande-annonce, ou pas encore résolue : rien à l'écran. */
+    data object None : TrailerState
+
+    /**
+     * Flux résolu et jouable. [durationSeconds] sert à l'aperçu du hero, qui
+     * doit savoir quand se rendre.
+     */
+    data class Ready(
+        val video: TmdbVideo,
+        val stream: PlayableStream,
+        val durationSeconds: Int,
+    ) : TrailerState
 }
 
 /** Statut de chargement d'un provider donné. */
