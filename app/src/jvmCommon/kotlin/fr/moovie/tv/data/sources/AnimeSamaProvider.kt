@@ -60,7 +60,7 @@ class AnimeSamaProvider(private val http: OkHttpClient) : SourceProvider {
         val html = runCatching {
             http.newCall(req).execute().use { if (it.isSuccessful) it.body?.string() else null }
         }.getOrNull() ?: return null
-        val href = CATALOGUE_HREF.find(html)?.groupValues?.get(1) ?: return null
+        val href = cataloguePath(html) ?: return null
         return "$BASE$href".let { if (it.endsWith("/")) it else "$it/" }
     }
 
@@ -78,7 +78,32 @@ class AnimeSamaProvider(private val http: OkHttpClient) : SourceProvider {
 
     companion object {
         const val BASE = "https://anime-sama.to"
-        private val CATALOGUE_HREF = Regex("""href="(/catalogue/[^"]+)"""")
+
+        /**
+         * Le chemin de la première fiche d'une page de résultats, ou null.
+         *
+         * Isolée et visible pour être testable sans réseau : c'est la ligne qui
+         * a rendu tout le catalogue animé silencieux, et elle ne se voyait
+         * qu'en mesurant la couverture.
+         */
+        internal fun cataloguePath(html: String): String? =
+            CATALOGUE_HREF.find(html)?.groupValues?.get(1)
+        /**
+         * Le lien de la fiche, dans les résultats de recherche.
+         *
+         * Le domaine est **facultatif** : anime-sama rendait des liens relatifs
+         * (`/catalogue/…`) et rend désormais des liens absolus
+         * (`https://anime-sama.to/catalogue/…`). N'accepter que la première
+         * forme ne faisait pas échouer le provider — il rendait une liste vide,
+         * ce qui se confond avec « ce titre n'est pas au catalogue ». Le seul
+         * catalogue spécialisé de l'application ne fournissait donc plus **aucun
+         * lien, sur aucun animé**, sans que rien ne le signale ; c'est une sonde
+         * de couverture qui l'a montré, pas un test ni un rapport d'erreur.
+         *
+         * On ne capture que le chemin, pour que la reconstruction avec [BASE]
+         * reste vraie quel que soit le domaine du jour.
+         */
+        private val CATALOGUE_HREF = Regex("""href="(?:https?://[^"/]+)?(/catalogue/[^"]+)"""")
         private val PANEL = Regex("""panneauAnime\("([^"]+)",\s*"([^"]+)"\)""")
         private val EPS = Regex("""var\s+eps\w+\s*=\s*\[([\s\S]*?)\]""")
         private val URL = Regex("""'([^']+)'""")
