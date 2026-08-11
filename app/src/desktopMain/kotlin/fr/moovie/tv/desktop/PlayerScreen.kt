@@ -77,6 +77,7 @@ import fr.moovie.tv.data.intro.IntroDbRepository
 import fr.moovie.tv.data.intro.IntroMedia
 import fr.moovie.tv.data.settings.ScreensaverDelay
 import fr.moovie.tv.data.settings.SettingsRepository
+import fr.moovie.tv.ui.format.formatNowDateTime
 import fr.moovie.tv.data.watch.WatchProgressRepository
 import fr.moovie.tv.data.watch.nextUpEntry
 import fr.moovie.tv.resources.Res
@@ -312,6 +313,7 @@ internal fun DesktopPlayerScreen(
     val settings = remember { SettingsRepository() }
     val autoPlayNext by settings.autoPlayNext.collectAsState(initial = true)
     val skipEnabled by settings.skipIntroOutro.collectAsState(initial = true)
+    val clockEnabled by settings.playerClock.collectAsState(initial = true)
     val introRepo = remember { IntroDbRepository() }
     val screensaverDelay by settings.screensaverDelay.collectAsState(initial = ScreensaverDelay.M15)
     val saveScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.IO) }
@@ -408,6 +410,29 @@ internal fun DesktopPlayerScreen(
     // après 3 s d'inactivité pendant la lecture, toujours visibles en pause.
     var controlsVisible by remember { mutableStateOf(true) }
     var activityTick by remember { mutableStateOf(0) }
+
+    // Horloge du bandeau, comme sur Android. Le réglage existait des deux côtés
+    // et n'était lu que par un seul : la case se cochait sur desktop sans que
+    // rien n'apparaisse jamais, ce qui se lit comme un réglage cassé plutôt que
+    // comme un oubli de portage.
+    //
+    // Rafraîchie à la minute, et seulement contrôles visibles : un film dure
+    // deux heures, réveiller la composition pour une horloge cachée ne sert à
+    // rien. Le calage sur le changement de minute évite que l'heure affichée
+    // traîne jusqu'à soixante secondes.
+    var clock by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(clockEnabled, controlsVisible) {
+        if (!clockEnabled || !controlsVisible) {
+            clock = null
+            return@LaunchedEffect
+        }
+        while (true) {
+            val now = System.currentTimeMillis()
+            clock = formatNowDateTime(now)
+            delay(60_000 - now % 60_000)
+        }
+    }
+
     // Secondes restantes du décompte d'enchaînement (null = pas de décompte).
     var autoNextSeconds by remember(streamUrl) { mutableStateOf<Int?>(null) }
     // Fenêtre d'apparition initiale de la pastille de mise à jour.
@@ -864,7 +889,7 @@ internal fun DesktopPlayerScreen(
             exit = fadeOut(),
             modifier = Modifier.align(Alignment.TopCenter),
         ) {
-            PlayerTitleOverlay(title = title, subtitle = subtitle)
+            PlayerTitleOverlay(title = title, subtitle = subtitle, clock = clock)
             // Au pointeur, marquer se fait au clic : pas de touche à deviner.
             ReportMarkingBanner(
                 step = reportStep,
@@ -907,7 +932,11 @@ internal fun DesktopPlayerScreen(
                     controller.pause()
                     onUpdateSelected()
                 },
-                modifier = Modifier.align(Alignment.TopEnd).padding(end = 48.dp, top = 32.dp),
+                // L'horloge occupe ce même coin : la pastille se pose alors
+                // *sous* elle, sinon les deux se superposent et deviennent
+                // illisibles. Même règle que sur Android.
+                modifier = Modifier.align(Alignment.TopEnd)
+                    .padding(end = 48.dp, top = if (clock != null) 76.dp else 32.dp),
             )
         }
 
