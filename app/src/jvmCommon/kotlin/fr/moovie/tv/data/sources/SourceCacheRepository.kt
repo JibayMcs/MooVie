@@ -22,6 +22,15 @@ private const val ENTRY_PREFIX = "sources:"
  */
 private const val TTL_MS = 6L * 60 * 60 * 1000
 
+/**
+ * L'entrée vient-elle de la version qui tourne ?
+ *
+ * Isolée pour être vérifiable sans magasin — les tests unitaires Android n'ont
+ * pas de DataStore, et l'invariant qui compte est cette comparaison, pas la
+ * mécanique de lecture autour.
+ */
+internal fun writtenByRunningVersion(version: String): Boolean = version == appVersionName
+
 /** Nombre max d'entrées conservées (purge des plus anciennes au-delà). */
 private const val MAX_ENTRIES = 80
 
@@ -87,7 +96,7 @@ class SourceCacheRepository {
         if (System.currentTimeMillis() - entry.savedAt > TTL_MS) return null
         // Écrite par une autre version : le code qui a produit ces liens n'est
         // plus celui qui tourne.
-        if (entry.version != appVersionName) return null
+        if (!writtenByRunningVersion(entry.version)) return null
         if (!isCacheComplete(entry.providers, expectedProviders)) return null
         return entry.links.ifEmpty { null }
     }
