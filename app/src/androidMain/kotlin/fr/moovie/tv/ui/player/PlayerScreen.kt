@@ -20,6 +20,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.rememberCoroutineScope
+import fr.moovie.tv.data.remote.NowPlaying
+import fr.moovie.tv.data.remote.RemoteNowPlaying
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -95,6 +98,23 @@ private val RESUME_KEYS = setOf(
 
 /** Touches de validation : OK de la télécommande, Entrée d'un clavier. */
 private val CONFIRM_KEYS = setOf(Key.DirectionCenter, Key.Enter, Key.NumPadEnter)
+
+/**
+ * Touches qui basculent lecture/pause, **quel que soit l'état de la barre**.
+ *
+ * Elles n'étaient traitées que barre masquée. Barre visible, l'événement
+ * redescendait vers le bouton focalisé — qui n'écoute qu'Entrée, jamais
+ * `MediaPlayPause`. Une touche média ne faisait donc rien, et comme la barre
+ * reste affichée tant que la lecture est en pause, le premier appui mettait en
+ * pause et **plus aucun ne relançait**. Le défaut existait pour une vraie
+ * télécommande aussi ; il ne se voyait pas parce qu'on s'y sert d'OK.
+ */
+private val MEDIA_TOGGLE_KEYS = setOf(
+    Key.MediaPlayPause,
+    Key.MediaPlay,
+    Key.MediaPause,
+    Key.Spacebar,
+)
 
 /**
  * Lecteur natif Media3/ExoPlayer.
@@ -335,13 +355,43 @@ fun PlayerScreen(
     }
 
     // Suivi de la position pour la barre de progression (~2 rafraîchissements/s).
+    //
+    // La même boucle nourrit le mini-lecteur du téléphone : elle relève déjà
+    // tout ce qu'il affiche, et deux minuteurs à cadences voisines auraient fini
+    // par se désynchroniser — la barre d'ici et celle de là-bas ne montrant pas
+    // la même seconde du même film.
     LaunchedEffect(Unit) {
         while (true) {
             positionMs = controller.positionMs()
             durationMs = controller.durationMs()
             bufferedMs = controller.bufferedMs()
+            RemoteNowPlaying.publish(
+                NowPlaying(
+                    title = title,
+                    subtitle = subtitle,
+                    artwork = posterUrl,
+                    positionMs = positionMs,
+                    durationMs = durationMs,
+                    playing = controller.isPlaying,
+                ),
+            )
             delay(500)
         }
+    }
+
+    // Le téléphone peut déplacer la lecture, et seulement tant que le lecteur
+    // est à l'écran. Le saut est réenvoyé sur ce fil-ci : l'appel arrive d'une
+    // socket, et le lecteur n'accepte d'ordres que du fil principal.
+    val seekScope = rememberCoroutineScope()
+    DisposableEffect(Unit) {
+        RemoteNowPlaying.attachSeek { target ->
+            seekScope.launch { controller.seekTo(target) }
+        }
+        // Sans cet effacement, le téléphone garderait à l'écran un mini-lecteur
+        // figé sur l'épisode qu'on vient de quitter — pire que de n'afficher
+        // rien, parce qu'il invite à appuyer sur des boutons qui ne font plus
+        // rien.
+        onDispose { RemoteNowPlaying.clear() }
     }
 
     /** Clé de titre (`tv:<id>`) : la préférence audio vaut pour toute la série. */
@@ -803,6 +853,15 @@ fun PlayerScreen(
                     positionMs = controller.positionMs()
                     return@onPreviewKeyEvent true
                 }
+                // Une touche média dit ce qu'elle veut, et le dit seule : elle
+                // se traite donc **avant** la question de la barre. Elle réveille
+                // les contrôles au passage, parce qu'on veut voir ce qu'on vient
+                // de faire.
+                if (event.key in MEDIA_TOGGLE_KEYS) {
+                    controller.togglePause()
+                    wake()
+                    return@onPreviewKeyEvent true
+                }
                 if (!controlsVisible) {
                     // Exception au réveil : le bouton « Passer » est fait pour
                     // être utilisé barre masquée, et le focus lui est donné
@@ -825,23 +884,20 @@ fun PlayerScreen(
                     // contrôles, elle n'est pas transmise aux boutons — sinon on
                     // déclencherait une action invisible pour l'utilisateur.
                     //
-                    // Deux exceptions, où l'intention ne fait aucun doute : les
-                    // touches média, et **OK**. Sur une télécommande de TV, OK
-                    // devant une image sans contrôles veut dire « mets en
-                    // pause » ; obliger à un premier appui pour révéler la barre
-                    // puis à un second pour agir fait payer deux gestes ce que
-                    // l'utilisateur demandait au premier.
-                    val confirm = event.key in CONFIRM_KEYS
-                    if (confirm || event.key == Key.MediaPlayPause ||
-                        event.key == Key.MediaPlay || event.key == Key.MediaPause ||
-                        event.key == Key.Spacebar
-                    ) {
+                    // Une exception, où l'intention ne fait aucun doute : **OK**.
+                    // Sur une télécommande de TV, OK devant une image sans
+                    // contrôles veut dire « mets en pause » ; obliger à un
+                    // premier appui pour révéler la barre puis à un second pour
+                    // agir fait payer deux gestes ce que l'utilisateur demandait
+                    // au premier. (Les touches média, elles, sont traitées plus
+                    // haut — elles n'ont pas à dépendre de la barre.)
+                    if (event.key in CONFIRM_KEYS) {
                         controller.togglePause()
                         // OK va donner le focus au bouton Lecture en réveillant
                         // la barre, et le KeyUp — qui n'est pas consommé —
                         // l'atteindrait : la pause serait aussitôt annulée. Même
                         // piège que pour « Passer l'intro » juste au-dessus.
-                        if (confirm) swallowUntilRelease = true
+                        swallowUntilRelease = true
                     }
                     wake()
                     return@onPreviewKeyEvent true
