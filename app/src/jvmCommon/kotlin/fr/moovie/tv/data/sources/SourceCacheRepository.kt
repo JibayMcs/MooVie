@@ -8,6 +8,7 @@ import fr.moovie.tv.data.store.preferencesStore
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
+import fr.moovie.tv.shared.appVersionName
 import kotlinx.serialization.json.Json
 
 private const val ENTRY_PREFIX = "sources:"
@@ -37,6 +38,25 @@ private data class CachedSources(
      * version. Vide = entrée d'une version antérieure, à refaire.
      */
     val providers: List<String> = emptyList(),
+    /**
+     * Version de l'application qui a écrit l'entrée.
+     *
+     * Le champ [providers] couvre le catalogue **ajouté** ; celui-ci couvre le
+     * catalogue **corrigé**, qui est le cas le plus fréquent et que rien ne
+     * rattrapait. Une entrée reste « complète » quand un provider se met à
+     * rendre autre chose : mêmes catalogues interrogés, donc resservie telle
+     * quelle pendant six heures.
+     *
+     * Constaté sur anime-sama : la VF venait d'être débloquée, la sonde la
+     * voyait, et l'application affichait encore « Aucune source en VF » sur les
+     * fiches déjà visitées. Le correctif était bon, le cache le masquait — et
+     * rien ne permettait de forcer la relecture.
+     *
+     * Vide = entrée d'avant ce champ, à refaire. Une version qui change est un
+     * signal bien plus sûr qu'une durée : c'est exactement le moment où le code
+     * d'extraction a pu changer.
+     */
+    val version: String = "",
 )
 
 /**
@@ -65,6 +85,9 @@ class SourceCacheRepository {
         val raw = store.data.first()[stringPreferencesKey(ENTRY_PREFIX + key)] ?: return null
         val entry = runCatching { json.decodeFromString<CachedSources>(raw) }.getOrNull() ?: return null
         if (System.currentTimeMillis() - entry.savedAt > TTL_MS) return null
+        // Écrite par une autre version : le code qui a produit ces liens n'est
+        // plus celui qui tourne.
+        if (entry.version != appVersionName) return null
         if (!isCacheComplete(entry.providers, expectedProviders)) return null
         return entry.links.ifEmpty { null }
     }
@@ -80,7 +103,7 @@ class SourceCacheRepository {
         if (key.isBlank() || links.isEmpty()) return
         store.edit { prefs ->
             prefs[stringPreferencesKey(ENTRY_PREFIX + key)] = json.encodeToString(
-                CachedSources(links, System.currentTimeMillis(), providers.sorted()),
+                CachedSources(links, System.currentTimeMillis(), providers.sorted(), appVersionName),
             )
             prune(prefs)
         }
