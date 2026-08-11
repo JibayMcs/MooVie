@@ -34,6 +34,16 @@ const val STORE_HOME = "moovie_home"
 const val STORE_SEARCH_FILTERS = "moovie_search_filters"
 
 /**
+ * Les filtres du catalogue, dans **leur propre** magasin.
+ *
+ * Séparés de ceux de la recherche à dessein : ce sont deux gestes différents.
+ * « Je cherche un titre précis » et « je regarde ce qui existe en science-
+ * fiction » n'appellent pas le même tri, et poser un plancher de note dans l'un
+ * pour le retrouver dans l'autre serait une surprise, pas une commodité.
+ */
+const val STORE_CATALOG_FILTERS = "moovie_catalog_filters"
+
+/**
  * Les magasins à dupliquer par profil, et donc à effacer quand on en supprime un.
  *
  * Liste explicite plutôt que balayage du répertoire : elle rend visible, en un
@@ -41,7 +51,8 @@ const val STORE_SEARCH_FILTERS = "moovie_search_filters"
  * ou l'ordre des hébergeurs sont des réglages de l'installation, pas de la
  * personne — ils restent globaux.
  */
-val PROFILE_SCOPED_STORES = listOf(STORE_WATCH, STORE_HOME, STORE_SEARCH_FILTERS)
+val PROFILE_SCOPED_STORES =
+    listOf(STORE_WATCH, STORE_HOME, STORE_SEARCH_FILTERS, STORE_CATALOG_FILTERS)
 
 /**
  * Profil dont les données sont servies, lu à la construction de chaque dépôt.

@@ -20,6 +20,11 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.drop
+import fr.moovie.tv.data.store.STORE_CATALOG_FILTERS
+import fr.moovie.tv.data.search.SortBy
+import fr.moovie.tv.data.search.SearchFiltersRepository
+import fr.moovie.tv.data.search.SearchFilters
 
 /** Une entrée du volet gauche : un intitulé de section, ou un genre atteignable. */
 sealed interface CatalogEntry {
@@ -83,6 +88,28 @@ class CatalogViewModel : ViewModel() {
         .map { list -> list.map { it.key }.toSet() }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
 
+    private val filtersRepo = SearchFiltersRepository(STORE_CATALOG_FILTERS)
+
+    /**
+     * Tri et filtres du catalogue, retenus d'une session à l'autre.
+     *
+     * La pertinence est ramenée à la popularité en lecture : elle n'a de sens
+     * que face à un texte à comparer, et c'est la valeur par défaut du modèle
+     * partagé avec la recherche. Sans cette correction, un catalogue neuf
+     * afficherait « Pertinence » sur un tri que `discover` n'applique pas.
+     */
+    val filters: StateFlow<SearchFilters> = filtersRepo.filters
+        .map { if (it.sortBy == SortBy.RELEVANCE) it.copy(sortBy = SortBy.POPULARITY) else it }
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5000),
+            SearchFilters.DEFAULT.copy(sortBy = SortBy.POPULARITY),
+        )
+
+    fun setFilters(next: SearchFilters) {
+        viewModelScope.launch { filtersRepo.set(next) }
+    }
+
     /** Page TMDB déjà chargée pour la sélection courante. */
     private var page = 1
 
@@ -100,6 +127,12 @@ class CatalogViewModel : ViewModel() {
     private var generation = 0
 
     init {
+        // Un filtre qui change relance le genre courant. `drop(1)` écarte la
+        // valeur initiale : elle arrive avant qu'un genre soit choisi, et
+        // relancer sur rien afficherait un chargement qui ne finit pas.
+        viewModelScope.launch {
+            filters.drop(1).collect { if (_selection.value != null) restart() }
+        }
         viewModelScope.launch {
             val apiKey = settings.tmdbApiKey.first()
             if (apiKey.isBlank()) {
@@ -152,13 +185,25 @@ class CatalogViewModel : ViewModel() {
         if (_selection.value == next) return
 
         _selection.value = next
+        restart()
+        viewModelScope.launch { historyRepo.setLastExplore(ExploreChoice(isTv, genreId)) }
+    }
+
+    /**
+     * Repart de la première page sur la sélection courante.
+     *
+     * Changer un filtre change **ce que le service renvoie**, y compris pour
+     * les pages déjà chargées : garder la grille et n'appliquer le tri qu'aux
+     * pages suivantes donnerait une liste mi-triée, ce qui est pire que de
+     * recharger.
+     */
+    private fun restart() {
         generation++
         page = 1
         hasMore = true
         _items.value = emptyList()
         _state.value = CatalogState.Loading
         loadNextPage()
-        viewModelScope.launch { historyRepo.setLastExplore(ExploreChoice(isTv, genreId)) }
     }
 
     /**
@@ -184,7 +229,7 @@ class CatalogViewModel : ViewModel() {
             }
             val fetched = runCatching {
                 TmdbRepository(currentTmdbLanguage())
-                    .discover(apiKey, selection.isTv, selection.genreId, page)
+                    .discover(apiKey, selection.isTv, selection.genreId, page, filters.value)
             }.getOrDefault(emptyList())
 
             // Genre changé pendant la requête : ce lot ne concerne plus l'écran.

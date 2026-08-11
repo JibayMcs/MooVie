@@ -22,9 +22,15 @@ import kotlinx.coroutines.flow.map
  * clés d'API et le réseau. Il suit le profil actif comme les autres — chaque
  * profil a ses habitudes de recherche.
  */
-class SearchFiltersRepository {
+class SearchFiltersRepository(storeName: String = STORE_SEARCH_FILTERS) {
 
-    private val store = preferencesStore(STORE_SEARCH_FILTERS)
+    /**
+     * Le magasin est un paramètre : la recherche et le catalogue partagent le
+     * même modèle de filtres et la même mécanique, mais pas les mêmes valeurs.
+     * Dupliquer ce dépôt pour changer une constante aurait garanti que les deux
+     * copies divergent à la première correction.
+     */
+    private val store = preferencesStore(storeName)
 
     val filters: Flow<SearchFilters> = store.data.map { prefs ->
         SearchFilters(

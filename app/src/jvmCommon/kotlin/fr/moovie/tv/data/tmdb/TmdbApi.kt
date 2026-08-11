@@ -63,6 +63,23 @@ interface TmdbApi {
         @Query("with_genres") genreId: Int,
         @Query("sort_by") sortBy: String = "popularity.desc",
         @Query("page") page: Int = 1,
+        /**
+         * Plancher de note. **Filtré par le service**, contrairement à la
+         * recherche texte où il faut rapporter plusieurs pages et trancher
+         * soi-même : `discover` sait le faire, et le fait sur tout le catalogue
+         * plutôt que sur les soixante premiers résultats.
+         */
+        @Query("vote_average.gte") minRating: Double? = null,
+        /**
+         * Bornes d'année. Deux jeux de paramètres parce que TMDB nomme la date
+         * différemment selon le média — un film a une sortie, une série une
+         * première diffusion. Ceux qui ne concernent pas le média demandé
+         * restent nuls, et Retrofit les omet de l'URL.
+         */
+        @Query("primary_release_date.gte") movieFrom: String? = null,
+        @Query("primary_release_date.lte") movieTo: String? = null,
+        @Query("first_air_date.gte") tvFrom: String? = null,
+        @Query("first_air_date.lte") tvTo: String? = null,
     ): TmdbPageResult
 
     @GET("movie/{id}")

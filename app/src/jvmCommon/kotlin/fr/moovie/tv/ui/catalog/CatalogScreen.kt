@@ -81,6 +81,9 @@ import fr.moovie.tv.ui.components.MoovieCard
 import fr.moovie.tv.ui.components.MoovieIconButton
 import fr.moovie.tv.ui.components.MoovieMarqueeText
 import org.jetbrains.compose.resources.stringResource
+import fr.moovie.tv.ui.search.SearchFilterBar
+import fr.moovie.tv.data.search.SearchFilters
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 
 /**
  * Largeur du volet des genres. Reprend celle des réglages : en 1080p l'écran ne
@@ -124,6 +127,9 @@ fun CatalogScreenContent(
     onSelectGenre: (isTv: Boolean, genreId: Int) -> Unit,
     onLoadMore: () -> Unit,
     onOpenTitle: (tmdbId: Int, isTv: Boolean) -> Unit,
+    /** Tri et filtres du catalogue, conservés entre sessions. */
+    filters: SearchFilters = SearchFilters.DEFAULT,
+    onFiltersChange: (SearchFilters) -> Unit = {},
     /** Disposition de l'accueil : les repères proposés par la modale d'épinglage. */
     layout: List<HomeLayoutEntry> = emptyList(),
     /** Clés (`movie:28`) des genres déjà épinglés — pastille et action inverse. */
@@ -191,6 +197,8 @@ fun CatalogScreenContent(
                 watched = watched,
                 watchlistKeys = watchlistKeys,
                 onLoadMore = onLoadMore,
+                filters = filters,
+                onFiltersChange = onFiltersChange,
                 onOpenTitle = onOpenTitle,
             )
         }
@@ -455,6 +463,14 @@ private fun ResultsGrid(
     watchlistKeys: Set<String>,
     onLoadMore: () -> Unit,
     onOpenTitle: (tmdbId: Int, isTv: Boolean) -> Unit,
+    /**
+     * Tri et filtres, **sans valeur par défaut** : ce composable en a besoin
+     * pour rendre la barre, et un défaut ici laissait l'écran oublier de les
+     * transmettre sans que rien ne le signale. Les boutons affichaient alors
+     * l'état d'origine et leurs clics partaient dans une lambda vide.
+     */
+    filters: SearchFilters,
+    onFiltersChange: (SearchFilters) -> Unit,
 ) {
     val gridState = rememberLazyGridState()
 
@@ -499,6 +515,28 @@ private fun ResultsGrid(
             vertical = 12.dp,
         ),
     ) {
+        // La barre de filtres occupe une ligne entière, **dans** la grille.
+        //
+        // Posée au-dessus, elle aurait demandé de restructurer la page ; posée
+        // ici elle défile avec les affiches, ce qui la fait disparaître dès
+        // qu'on descend — et au D-pad, elle se retrouve naturellement au-dessus
+        // de la première rangée, donc atteignable d'une flèche vers le haut.
+        item(span = { GridItemSpan(maxLineSpan) }) {
+            SearchFilterBar(
+                filters = filters,
+                onChange = onFiltersChange,
+                // Les marges sont déjà portées par le `contentPadding` de la
+                // grille : les cumuler décalerait la barre par rapport aux
+                // affiches qu'elle surplombe.
+                hPad = 0.dp,
+                // Le type est déjà décidé par le genre choisi, et la pertinence
+                // n'existe pas sans texte à comparer.
+                showMedia = false,
+                allowRelevance = false,
+                modifier = Modifier.padding(bottom = 4.dp),
+            )
+        }
+
         itemsIndexed(items, key = { _, it -> "${it.id}_${it.isTv}" }) { _, item ->
             val key = if (item.isTv) "tv:${item.id}" else "movie:${item.id}"
             PosterCard(

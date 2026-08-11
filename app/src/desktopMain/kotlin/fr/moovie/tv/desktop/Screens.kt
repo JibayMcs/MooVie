@@ -355,7 +355,10 @@ internal fun DesktopCatalogScreen(
     // parcouru, que l'init du ViewModel restaure sinon.
     LaunchedEffect(select) { select?.let(vm::openAt) }
 
+    val catalogFilters by vm.filters.collectAsState()
     CatalogScreenContent(
+        filters = catalogFilters,
+        onFiltersChange = vm::setFilters,
         entries = entries,
         selection = selection,
         state = state,

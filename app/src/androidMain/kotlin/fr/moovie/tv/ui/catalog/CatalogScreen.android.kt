@@ -25,6 +25,7 @@ fun CatalogScreen(
     val items by viewModel.items.collectAsStateWithLifecycle()
     val watched by viewModel.watched.collectAsStateWithLifecycle()
     val watchlistKeys by viewModel.watchlistKeys.collectAsStateWithLifecycle()
+    val filters by viewModel.filters.collectAsStateWithLifecycle()
     val layout by viewModel.layout.collectAsStateWithLifecycle()
     val pinnedKeys by viewModel.pinnedKeys.collectAsStateWithLifecycle()
 
@@ -33,6 +34,8 @@ fun CatalogScreen(
     LaunchedEffect(select) { select?.let(viewModel::openAt) }
 
     CatalogScreenContent(
+        filters = filters,
+        onFiltersChange = viewModel::setFilters,
         entries = entries,
         selection = selection,
         state = state,

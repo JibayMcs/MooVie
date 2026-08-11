@@ -59,6 +59,18 @@ fun SearchFilterBar(
     onChange: (SearchFilters) -> Unit,
     hPad: Dp,
     modifier: Modifier = Modifier,
+    /**
+     * Faux sur le catalogue : le type est **déjà** choisi là-bas, en entrant
+     * dans un genre de la liste « Films » ou de la liste « Séries ». Un bouton
+     * qui permettrait de le contredire ne pourrait que produire une grille vide.
+     */
+    showMedia: Boolean = true,
+    /**
+     * Faux sur le catalogue : la pertinence n'a de sens que face à un texte à
+     * comparer. Sans requête, `discover` retombe sur la popularité — le bouton
+     * annoncerait donc un tri que le service n'applique pas.
+     */
+    allowRelevance: Boolean = true,
 ) {
     Row(
         modifier = modifier.horizontalScroll(rememberScrollState()),
@@ -73,7 +85,7 @@ fun SearchFilterBar(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             MoovieButton(
-                onClick = { onChange(filters.copy(sortBy = filters.sortBy.next())) },
+                onClick = { onChange(filters.copy(sortBy = filters.sortBy.next(allowRelevance))) },
                 selected = filters.sortBy != SearchFilters.DEFAULT.sortBy,
             ) {
                 Text(sortLabel(filters.sortBy), style = MaterialTheme.typography.labelMedium)
@@ -93,20 +105,22 @@ fun SearchFilterBar(
                 }
             }
 
-            MoovieButton(
-                onClick = { onChange(filters.copy(media = filters.media.next())) },
-                selected = filters.media != SearchFilters.DEFAULT.media,
-            ) {
-                Text(
-                    stringResource(
-                        when (filters.media) {
-                            MediaFilter.ALL -> Res.string.search_media_all
-                            MediaFilter.MOVIE -> Res.string.search_media_movies
-                            MediaFilter.TV -> Res.string.search_media_shows
-                        },
-                    ),
-                    style = MaterialTheme.typography.labelMedium,
-                )
+            if (showMedia) {
+                MoovieButton(
+                    onClick = { onChange(filters.copy(media = filters.media.next())) },
+                    selected = filters.media != SearchFilters.DEFAULT.media,
+                ) {
+                    Text(
+                        stringResource(
+                            when (filters.media) {
+                                MediaFilter.ALL -> Res.string.search_media_all
+                                MediaFilter.MOVIE -> Res.string.search_media_movies
+                                MediaFilter.TV -> Res.string.search_media_shows
+                            },
+                        ),
+                        style = MaterialTheme.typography.labelMedium,
+                    )
+                }
             }
 
             MoovieButton(
@@ -217,7 +231,18 @@ private fun nextRating(current: Double): Double = when {
     else -> 0.0
 }
 
-private fun SortBy.next(): SortBy = SortBy.entries[(ordinal + 1) % SortBy.entries.size]
+/**
+ * Valeur suivante du cycle, en sautant la pertinence là où elle ne veut rien
+ * dire. La laisser dans le cycle du catalogue ferait passer par un tri que le
+ * service n'applique pas — un appui pour rien, et un libellé qui ment.
+ */
+private fun SortBy.next(allowRelevance: Boolean): SortBy {
+    var candidate = SortBy.entries[(ordinal + 1) % SortBy.entries.size]
+    if (!allowRelevance && candidate == SortBy.RELEVANCE) {
+        candidate = SortBy.entries[(candidate.ordinal + 1) % SortBy.entries.size]
+    }
+    return candidate
+}
 
 private fun MediaFilter.next(): MediaFilter =
     MediaFilter.entries[(ordinal + 1) % MediaFilter.entries.size]

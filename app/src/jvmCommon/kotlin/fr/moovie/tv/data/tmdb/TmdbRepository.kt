@@ -164,14 +164,41 @@ class TmdbRepository(
         api.genres(if (isTv) "tv" else "movie", apiKey, language).genres
 
     /** Titres d'un genre, les plus populaires d'abord. */
-    suspend fun discover(apiKey: String, isTv: Boolean, genreId: Int, page: Int = 1): List<TmdbItem> =
-        api.discover(
+    /**
+     * Parcours d'un genre, tri et filtres compris.
+     *
+     * Tout part **au service**, et c'est la différence de fond avec la recherche
+     * par texte : là-bas TMDB n'accepte aucun critère, il faut donc rapporter
+     * plusieurs pages et trier soi-même — d'où l'avertissement « le tri porte
+     * sur les N premiers résultats ». Ici le tri et les filtres portent sur le
+     * catalogue entier, et la pagination reste juste.
+     */
+    suspend fun discover(
+        apiKey: String,
+        isTv: Boolean,
+        genreId: Int,
+        page: Int = 1,
+        filters: SearchFilters = SearchFilters.DEFAULT,
+    ): List<TmdbItem> {
+        // Bornes en dates complètes : TMDB compare des dates, pas des années.
+        val from = filters.minYear?.let { "$it-01-01" }
+        val to = filters.maxYear?.let { "$it-12-31" }
+        return api.discover(
             media = if (isTv) "tv" else "movie",
             apiKey = apiKey,
             language = language,
             genreId = genreId,
+            // La pertinence n'existe pas sans texte à comparer : `discover`
+            // retombe alors sur son propre défaut, la popularité décroissante.
+            sortBy = filters.discoverSort() ?: "popularity.desc",
             page = page,
+            minRating = filters.minRating.takeIf { it > 0.0 },
+            movieFrom = from.takeUnless { isTv },
+            movieTo = to.takeUnless { isTv },
+            tvFrom = from.takeIf { isTv },
+            tvTo = to.takeIf { isTv },
         ).results
+    }
 
     /**
      * Ce qu'une personne a joué, du plus récent au plus ancien.
