@@ -297,6 +297,32 @@ fun DetailsScreenContent(
     // et l'arrivée sur une fiche aussi — faute de quoi l'en-tête reste hors
     // cadre (voir juste en dessous, et plus bas).
     val pageScroll = rememberScrollState()
+    val topScope = rememberCoroutineScope()
+
+    /**
+     * Le bouton principal, **et** la remontée de page qui va avec.
+     *
+     * Atteindre le premier élément d'une fiche, c'est en atteindre le haut : sur
+     * une télécommande il n'y a pas de défilement libre, seulement du focus qui
+     * se déplace. Or `bringIntoView` ne défile que le strict nécessaire, et le
+     * bouton reste visible dans la page décalée — descendre au casting puis
+     * remonter laissait donc l'en-tête hors cadre, définitivement.
+     *
+     * Lier la remontée au focus plutôt qu'à l'arrivée couvre les deux cas d'un
+     * coup : la première prise de focus comme toutes les suivantes.
+     *
+     * L'attente laisse passer le `bringIntoView`, qui s'exécute sur les images
+     * suivantes et écraserait un défilement posé trop tôt.
+     */
+    val primaryModifier = Modifier
+        .focusRequester(primaryFocus)
+        .onFocusChanged { focus ->
+            if (!focus.isFocused) return@onFocusChanged
+            topScope.launch {
+                delay(SCROLL_SETTLE_MS)
+                runCatching { pageScroll.animateScrollTo(0) }
+            }
+        }
 
     // Le focus est aussi replacé quand on entre/sort d'une fiche d'épisode :
     // le bouton porteur de `primaryFocus` change de nœud à ce moment-là.
@@ -318,9 +344,12 @@ fun DetailsScreenContent(
             }
         }
         if (state is DetailsState.Movie || state is DetailsState.Tv) {
+            // La remontée est portée par `primaryModifier`, qui réagit à la
+            // prise de focus — donc ici comme à chaque retour sur le bouton.
             runCatching { primaryFocus.requestFocus() }
 
-            // Puis on rend la page à son sommet.
+            // Repli pour le cas où le bouton n'existe pas encore : la demande de
+            // focus échoue alors en silence, et personne ne remonterait la page.
             //
             // Donner le focus déclenche un `bringIntoView` : la page défile pour
             // amener l'élément visé dans le cadre, et mange la marge haute. On
@@ -331,12 +360,6 @@ fun DetailsScreenContent(
             // puisque la cible est déjà visible. Le décalage était donc collant
             // pour toute la durée de la fiche.
             //
-            // Agrandir la page n'aurait pas suffi : un synopsis un peu long la
-            // fait déborder de toute façon. Ce qui doit être vrai, c'est qu'on
-            // *arrive* en haut.
-            //
-            // Le défilement a lieu sur les images suivantes, d'où l'attente :
-            // remettre à zéro immédiatement se ferait écraser juste après.
             delay(SCROLL_SETTLE_MS)
             runCatching { pageScroll.scrollTo(0) }
         }
@@ -420,7 +443,7 @@ fun DetailsScreenContent(
                                 // démarrera dès qu'une source arrive.
                                 if (prefReady || loadingSources) onQuickPlayMovie()
                             },
-                            modifier = Modifier.focusRequester(primaryFocus),
+                            modifier = primaryModifier,
                         ) {
                             when {
                                 searching -> {
@@ -498,7 +521,7 @@ fun DetailsScreenContent(
                             isWatched = key in watched,
                             hasResume = resume.containsKey(key),
                             searching = quickPlay is QuickPlayState.Searching,
-                            primaryFocus = primaryFocus,
+                            primaryModifier = primaryModifier,
                             onPlay = { onQuickPlayEpisode(selected.season, ep.episodeNumber) },
                             onOpenSources = { onOpenEpisodePanel(selected.season, ep.episodeNumber) },
                             onToggleWatched = { onToggleWatched(key) },
@@ -643,11 +666,7 @@ fun DetailsScreenContent(
                                         // Et le focus arrive sur elle, pas sur S1 —
                                         // sinon on remonte des saisons pour se
                                         // retrouver au début d'une série qu'on suit.
-                                        modifier = if (isCurrent) {
-                                            Modifier.focusRequester(primaryFocus)
-                                        } else {
-                                            Modifier
-                                        },
+                                        modifier = if (isCurrent) primaryModifier else Modifier,
                                     ) {
                                         // Compté une fois : le libellé et la couleur
                                         // répondent à la même question.
@@ -1475,7 +1494,8 @@ private fun EpisodeDetail(
     isWatched: Boolean,
     hasResume: Boolean,
     searching: Boolean,
-    primaryFocus: FocusRequester,
+    /** Porte le focus d'entrée **et** ramène la page en haut. Voir son origine. */
+    primaryModifier: Modifier,
     onPlay: () -> Unit,
     onOpenSources: () -> Unit,
     onToggleWatched: () -> Unit,
@@ -1579,7 +1599,7 @@ private fun EpisodeDetail(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        MoovieButton(onClick = onPlay, modifier = Modifier.focusRequester(primaryFocus)) {
+        MoovieButton(onClick = onPlay, modifier = primaryModifier) {
             if (searching) {
                 CircularProgressIndicator(
                     color = Color.White,
