@@ -92,6 +92,20 @@ data class MoovieBackup(
      * Dupliquer n'aurait acheté que deux états à garder d'accord.
      */
     val profiles: List<BackupProfile> = emptyList(),
+
+    /**
+     * Profils supprimés, et quand : identifiant vers l'instant du retrait.
+     *
+     * Sans ces dates, supprimer un profil ne tenait pas une synchro. Le fichier
+     * distant contenait encore le profil, la fusion faisait l'union, et il
+     * réapparaissait au relancement suivant. Une absence ne dit pas si l'on a
+     * supprimé ou si l'on n'a pas encore reçu — seule une date le dit.
+     *
+     * Même règle que `resumeRemovedAt` et `watchlistRemovedAt` : la décision la
+     * plus récente gagne, et un profil recréé après son retrait l'emporte sur
+     * lui.
+     */
+    val profilesRemovedAt: Map<String, Long> = emptyMap(),
 ) {
     companion object {
         /**
@@ -117,6 +131,15 @@ data class BackupProfile(
     /** Vide pour le profil d'origine, qui porte le libellé traduit. */
     val name: String = "",
     val colorIndex: Int = 0,
+    /**
+     * Instant de création, qui voyage avec le profil.
+     *
+     * Sans lui, un profil restauré vaudrait zéro ici, et **n'importe quelle**
+     * pierre tombale serait postérieure : le profil disparaîtrait pour de bon au
+     * lieu de revenir. C'est ce qui rend comparable « quand il a été créé » et
+     * « quand il a été supprimé », donc ce qui permet de trancher.
+     */
+    val createdAt: Long = 0,
 
     val resume: List<ResumeEntry> = emptyList(),
     val watchlist: List<WatchlistEntry> = emptyList(),

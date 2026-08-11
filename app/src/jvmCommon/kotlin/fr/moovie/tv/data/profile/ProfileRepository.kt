@@ -37,6 +37,22 @@ class ProfileRepository {
     val profiles: Flow<List<Profile>> = store.data.map { prefs -> complete(decode(prefs[PROFILES])) }
 
     /**
+     * Suppressions datées : identifiant de profil vers l'instant du retrait.
+     *
+     * **Une suppression sans date ne peut pas se fusionner.** Sans elle, un
+     * profil supprimé n'est qu'une absence, et une absence est indistinguable de
+     * « pas encore synchronisé » : la fusion doit alors faire l'union, et le
+     * profil ressuscite au premier import. C'est exactement ce que `seenat:` et
+     * `resumeat:` règlent pour les épisodes démarqués ; les profils avaient été
+     * oubliés.
+     *
+     * On garde l'instant, pas un simple drapeau, parce que la règle est « la
+     * décision la plus récente gagne » : un profil recréé après coup doit
+     * pouvoir l'emporter sur son propre retrait.
+     */
+    val deletedAt: Flow<Map<String, Long>> = store.data.map { prefs -> decodeTombstones(prefs[DELETED]) }
+
+    /**
      * L'identifiant actif, ramené au profil d'origine si celui qu'on avait
      * retenu n'existe plus — un profil supprimé depuis un autre appareil, ou une
      * donnée abîmée, ne doit pas laisser l'app pointer dans le vide.
@@ -136,12 +152,48 @@ class ProfileRepository {
      * On bascule d'abord si c'était l'actif, pour qu'aucun flux ne lise les
      * données au moment où elles sont vidées.
      */
-    suspend fun delete(id: String) {
+    suspend fun delete(id: String, now: Long = System.currentTimeMillis()) {
         if (id == DEFAULT_PROFILE_ID) return
         if (activeId.first() == id) setActive(DEFAULT_PROFILE_ID)
         write(profiles.first().filterNot { it.id == id })
+        // La pierre tombale part avec la synchro : c'est elle qui apprend le
+        // retrait aux autres appareils, et qui empêche le fichier distant — qui
+        // contient encore le profil — de le réécrire ici au prochain import.
+        rememberDeletion(id, now)
         clearProfileStores(id)
     }
+
+    /** Date un retrait, en gardant la décision la plus récente. */
+    suspend fun rememberDeletion(id: String, now: Long) {
+        if (id == DEFAULT_PROFILE_ID) return
+        val merged = deletedAt.first().toMutableMap()
+        if ((merged[id] ?: 0L) < now) merged[id] = now
+        store.edit { it[DELETED] = json.encodeToString(merged) }
+    }
+
+    /**
+     * Fusionne des retraits venus d'ailleurs, et applique ceux qui gagnent.
+     *
+     * Un profil dont le retrait est **postérieur** à sa création disparaît : la
+     * suppression faite sur un autre appareil se propage ici. À égalité, ou sur
+     * des données d'avant l'horodatage, on garde le profil — un vieux fichier ne
+     * doit rien effacer.
+     */
+    suspend fun mergeDeletions(incoming: Map<String, Long>) {
+        if (incoming.isEmpty()) return
+        val merged = deletedAt.first().toMutableMap()
+        incoming.forEach { (id, at) ->
+            if (id != DEFAULT_PROFILE_ID && (merged[id] ?: 0L) < at) merged[id] = at
+        }
+        store.edit { it[DELETED] = json.encodeToString(merged) }
+
+        val doomed = profiles.first().filter { !it.isDefault && isDeleted(it, merged) }
+        doomed.forEach { delete(it.id, merged.getValue(it.id)) }
+    }
+
+    /** Vrai si le retrait de ce profil est plus récent que sa création. */
+    fun isDeleted(profile: Profile, tombstones: Map<String, Long>): Boolean =
+        !profile.isDefault && (tombstones[profile.id] ?: 0L) > profile.createdAt
 
     private suspend fun write(list: List<Profile>) {
         // Le profil d'origine est déduit, pas stocké : ne persister que ce qui
@@ -150,6 +202,11 @@ class ProfileRepository {
         val stored = list.filterNot { it == Profile.Default }
         store.edit { it[PROFILES] = json.encodeToString(stored) }
     }
+
+    private fun decodeTombstones(raw: String?): Map<String, Long> =
+        raw?.takeIf { it.isNotBlank() }
+            ?.let { runCatching { json.decodeFromString<Map<String, Long>>(it) }.getOrNull() }
+            .orEmpty()
 
     private fun decode(raw: String?): List<Profile> =
         raw?.takeIf { it.isNotBlank() }
@@ -173,6 +230,7 @@ class ProfileRepository {
 
     private companion object {
         val PROFILES = stringPreferencesKey("profiles")
+        val DELETED = stringPreferencesKey("profiles_deleted_at")
         val ACTIVE = stringPreferencesKey("active_profile")
     }
 }

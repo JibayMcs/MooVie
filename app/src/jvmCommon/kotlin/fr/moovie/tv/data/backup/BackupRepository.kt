@@ -45,6 +45,7 @@ class BackupRepository(
         // l'utilisateur croit ses données à l'abri, et découvre le manque le jour
         // où il restaure.
         profiles = allProfiles(),
+        profilesRemovedAt = profileRepo.deletedAt.first(),
         tmdbApiKey = settingsRepo.tmdbApiKey.first().takeIf { includeApiKey && it.isNotBlank() },
         introDbApiKey = settingsRepo.introDbApiKey.first().takeIf { includeApiKey && it.isNotBlank() },
         settings = currentSettings(),
@@ -58,6 +59,7 @@ class BackupRepository(
             val layout = HomeLayoutRepository(profile.id)
             BackupProfile(
                 id = profile.id,
+                createdAt = profile.createdAt,
                 name = profile.name,
                 colorIndex = profile.colorIndex,
                 resume = watch.continueWatching.first(),
@@ -109,10 +111,25 @@ class BackupRepository(
      */
     private suspend fun importProfiles(backup: MoovieBackup, mode: ImportMode): ImportReport {
         var total = ImportReport(0, 0, 0, 0, 0, 0)
+
+        // Les retraits **avant** les profils. Ils décident lesquels ont encore
+        // le droit d'exister : le fichier distant contient toujours les profils
+        // supprimés depuis, et les recréer sans poser la question est ce qui les
+        // faisait ressusciter au lancement suivant.
+        profileRepo.mergeDeletions(backup.profilesRemovedAt)
+        val tombstones = profileRepo.deletedAt.first()
+
         for (entry in backup.profiles) {
-            profileRepo.upsert(
-                Profile(id = entry.id, name = entry.name, colorIndex = entry.colorIndex),
+            val profile = Profile(
+                id = entry.id,
+                name = entry.name,
+                colorIndex = entry.colorIndex,
+                createdAt = entry.createdAt,
             )
+            // Retrait postérieur à la création : la suppression est la décision
+            // la plus récente, on ne réécrit rien — ni le profil, ni ses données.
+            if (profileRepo.isDeleted(profile, tombstones)) continue
+            profileRepo.upsert(profile)
             val watch = WatchProgressRepository(entry.id)
             val layout = HomeLayoutRepository(entry.id)
             val current = WatchState(
