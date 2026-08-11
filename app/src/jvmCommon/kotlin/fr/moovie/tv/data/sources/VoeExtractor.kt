@@ -38,9 +38,24 @@ class VoeExtractor(private val http: HttpGateway) : SourceExtractor {
 
     override val hoster = "voe"
 
+    /**
+     * VOE tourne ses domaines de sortie environ une fois par mois, et les alias
+     * ne contiennent pas « voe » — d'où une liste explicite, forcément en
+     * retard sur la réalité.
+     *
+     * `voe\.` plutôt que `voe\.sx` : la famille se décline sur tous les TLD, et
+     * ne reconnaître qu'un seul faisait perdre les autres en silence. Trois
+     * lettres suivies d'un point sont assez spécifiques pour ne pas ramasser de
+     * faux positifs — le reniflage attrape de toute façon ce que la liste rate,
+     * puisque VOE se reconnaît aussi à sa charge utile.
+     */
     private val hostPattern = Regex(
-        """voe\.sx|voe-un-block|robertordercharacterbetter|jefferycontrolmodel|""" +
-            """jessicayeahcatch|bryantenunder|jessicachoosemake|matthewhotelscience""",
+        """voe\.|voe-un-block|robertordercharacter|jefferycontrolmodel|""" +
+            """jessicayeahcatch|bryantenunder|jessicachoosemake|matthewhotelscience|""" +
+            // Relevés côté Movix, sur des redirections 302 observées.
+            """ralphysuccessfull|claudiosepulchral|anthonysaline|auraleanline|""" +
+            """letsupload|prepareddare|preferciseaccurate|conscientiousedu|""" +
+            """effortlessexperim|timmaybealready""",
         RegexOption.IGNORE_CASE,
     )
 

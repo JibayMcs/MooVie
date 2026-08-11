@@ -83,7 +83,19 @@ class SeekStreamingExtractor(private val http: HttpGateway) : SourceExtractor {
     companion object {
         private val KEY = "kiemtienmua911ca".toByteArray(Charsets.UTF_8)
         private val IV = "1234567890oiuytr".toByteArray(Charsets.UTF_8)
-        private val HOST = Regex("""embed4me|embedseek|seekstreaming""", RegexOption.IGNORE_CASE)
+        /**
+         * Les domaines de la famille SeekStreaming.
+         *
+         * Cinq de plus que la liste d'origine, relevés dans le registre de
+         * Movix : le même hébergeur se présente sous des noms qui n'ont rien à
+         * voir entre eux, et un domaine non reconnu n'échoue pas bruyamment —
+         * il rend simplement une source de moins, ce qui ne se remarque pas.
+         */
+        private val HOST = Regex(
+            """embed4me|embedseek|seekstreaming|servicecatalog|technicalcatalog|""" +
+                """seekplayer|seeks\.cloud|seekplays""",
+            RegexOption.IGNORE_CASE,
+        )
         private val DOMAIN = Regex("""^https?://([^/]+)""")
     }
 }
