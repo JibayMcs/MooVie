@@ -70,7 +70,7 @@ class RemoteClient(private val target: RemoteTarget) {
      * c'est à l'écran de décider combien de silences de suite valent un oubli.
      */
     suspend fun status(): RemoteStatus = withContext(Dispatchers.IO) {
-        runCatching {
+        attempt {
             http.newCall(Request.Builder().url(target.base() + "/state").build())
                 .execute().use { response ->
                     if (response.code != 200) return@use RemoteStatus.Unreachable
@@ -78,7 +78,7 @@ class RemoteClient(private val target: RemoteTarget) {
                     if (body.isBlank()) RemoteStatus.Unreachable
                     else RemoteStatus.Known(JSON.decodeFromString<RemoteState>(body))
                 }
-        }.getOrDefault(RemoteStatus.Unreachable)
+        } ?: RemoteStatus.Unreachable
     }
 
     /**
@@ -114,20 +114,39 @@ class RemoteClient(private val target: RemoteTarget) {
      * changer à son état.
      */
     suspend fun ping(): Boolean = withContext(Dispatchers.IO) {
-        runCatching {
+        attempt {
             http.newCall(Request.Builder().url(target.base() + "/ping").build())
                 .execute().use { it.isSuccessful }
-        }.getOrDefault(false)
+        } ?: false
     }
 
     private suspend fun post(route: String, body: String): Boolean = withContext(Dispatchers.IO) {
-        runCatching {
+        attempt {
             val request = Request.Builder()
                 .url("${target.base()}/$route")
                 .post(body.toRequestBody(FORM))
                 .build()
             http.newCall(request).execute().use { it.isSuccessful }
-        }.getOrDefault(false)
+        } ?: false
+    }
+
+    /**
+     * Exécute [block], ou rend null si le réseau a échoué — **mais laisse
+     * passer l'annulation**.
+     *
+     * `runCatching` attrape tout, y compris la `CancellationException` que Kotlin
+     * lève pour démonter une coroutine. Quitter l'écran de télécommande annule
+     * ses appels en vol, et chacun ressortait alors en « échec réseau » : le
+     * téléphone en concluait que le téléviseur ne répondait plus et effaçait sa
+     * présence. Le bouton flottant disparaissait donc **parce qu'on avait fermé
+     * la télécommande**, ce qui ne ressemble en rien à sa cause.
+     */
+    private inline fun <T> attempt(block: () -> T): T? = try {
+        block()
+    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+        throw cancelled
+    } catch (failed: Exception) {
+        null
     }
 
     private companion object {

@@ -485,4 +485,10 @@
     <string name="remote_paired_help">The TV this device controls.</string>
     <string name="remote_none">No TV paired</string>
     <string name="remote_none_help">On the TV, open Settings then Remote, and scan the QR code it shows.</string>
+    <string name="remote_reconnect">Reconnect to the TV</string>
+    <string name="remote_reconnect_help">Checks that the TV answers. Useful right after turning it back on.</string>
+    <string name="remote_reconnect_running">Looking for it…</string>
+    <string name="remote_reconnect_ok">The TV answers.</string>
+    <string name="remote_reconnect_failed">Still no answer. Check that it is on and on the same network.</string>
+    <string name="remote_reconnect_action">Reconnect</string>
 </resources>

@@ -167,6 +167,12 @@ import fr.moovie.tv.ui.pairing.remoteOffered
 import fr.moovie.tv.resources.remote_none
 import fr.moovie.tv.resources.remote_none_help
 import fr.moovie.tv.resources.remote_paired_help
+import fr.moovie.tv.resources.remote_reconnect
+import fr.moovie.tv.resources.remote_reconnect_action
+import fr.moovie.tv.resources.remote_reconnect_failed
+import fr.moovie.tv.resources.remote_reconnect_help
+import fr.moovie.tv.resources.remote_reconnect_ok
+import fr.moovie.tv.resources.remote_reconnect_running
 import fr.moovie.tv.resources.remote_forget_target
 import fr.moovie.tv.resources.settings_cat_remote
 import fr.moovie.tv.resources.remote_forget
@@ -773,6 +779,38 @@ private fun RemoteSection(onPair: () -> Unit) {
     val targets = remember { RemoteTargetRepository() }
     val target by targets.target.collectAsState(initial = null)
     target?.let {
+        // Reconnexion à la main. Le contrôle périodique répare tout seul, mais
+        // il attend jusqu'à vingt-cinq secondes : quelqu'un qui vient de
+        // rallumer son téléviseur veut pouvoir forcer la vérification plutôt
+        // que de regarder un bouton absent en se demandant si c'est cassé.
+        //
+        // C'est aussi le seul recours si le contrôle s'arrête — il vit dans le
+        // bouton flottant, donc pas sur le lecteur ni pendant l'installation.
+        var probing by remember { mutableStateOf(false) }
+        var reached by remember { mutableStateOf<Boolean?>(null) }
+        SettingRow(
+            label = stringResource(Res.string.remote_reconnect),
+            help = stringResource(
+                when {
+                    probing -> Res.string.remote_reconnect_running
+                    reached == true -> Res.string.remote_reconnect_ok
+                    reached == false -> Res.string.remote_reconnect_failed
+                    else -> Res.string.remote_reconnect_help
+                },
+            ),
+        ) {
+            MoovieButton(
+                enabled = !probing,
+                onClick = {
+                    scope.launch {
+                        probing = true
+                        reached = RemotePresence.refresh()
+                        probing = false
+                    }
+                },
+            ) { Text(stringResource(Res.string.remote_reconnect_action)) }
+        }
+
         SettingRow(
             label = it.name,
             help = stringResource(Res.string.remote_paired_help),

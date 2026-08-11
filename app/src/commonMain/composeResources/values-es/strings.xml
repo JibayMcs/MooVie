@@ -485,4 +485,10 @@
     <string name="remote_paired_help">El televisor que controla este dispositivo.</string>
     <string name="remote_none">Ningún televisor emparejado</string>
     <string name="remote_none_help">En el televisor, abrir Ajustes y luego Mando, y escanear el código QR que aparece.</string>
+    <string name="remote_reconnect">Reconectar el televisor</string>
+    <string name="remote_reconnect_help">Comprueba que el televisor responde. Útil si acaba de encenderse.</string>
+    <string name="remote_reconnect_running">Buscando…</string>
+    <string name="remote_reconnect_ok">El televisor responde.</string>
+    <string name="remote_reconnect_failed">Sigue sin responder. Comprobar que está encendido y en la misma red.</string>
+    <string name="remote_reconnect_action">Reconectar</string>
 </resources>

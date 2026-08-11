@@ -11,6 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.SettingsRemote
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -23,6 +24,7 @@ import fr.moovie.tv.data.remote.RemotePresence
 import fr.moovie.tv.resources.Res
 import fr.moovie.tv.resources.remote_title
 import fr.moovie.tv.ui.theme.MoovieGradient
+import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -50,6 +52,27 @@ import org.jetbrains.compose.resources.stringResource
 @Composable
 fun RemoteFab(onClick: () -> Unit, modifier: Modifier = Modifier) {
     val present by RemotePresence.found.collectAsState()
+
+    // Contrôle périodique, **avant le retour anticipé** : c'est ce qui permet au
+    // bouton de revenir tout seul.
+    //
+    // La présence ne se réparait qu'au retour au premier plan, `onResume` étant
+    // le seul endroit qui la sondait. Une absence — un paquet perdu, le
+    // téléviseur en veille une minute — effaçait donc le bouton jusqu'à ce qu'on
+    // quitte et rouvre l'application, ce qui vide la télécommande de son usage.
+    //
+    // Deux cadences plutôt qu'une : quand la TV répond, une requête par minute
+    // suffit pour remarquer qu'elle s'est éteinte. Quand elle ne répond pas, on
+    // insiste un peu plus — c'est le moment où l'utilisateur attend que ça
+    // revienne. `refresh` ne sonde le réseau que s'il y a un téléviseur en
+    // mémoire, et se sérialise lui-même.
+    LaunchedEffect(present) {
+        while (true) {
+            delay(if (present) ALIVE_POLL_MS else RETRY_POLL_MS)
+            RemotePresence.refresh()
+        }
+    }
+
     if (!present) return
 
     Box(
@@ -70,3 +93,9 @@ fun RemoteFab(onClick: () -> Unit, modifier: Modifier = Modifier) {
         )
     }
 }
+
+/** Le téléviseur répond : une vérification par minute suffit à noter son extinction. */
+private const val ALIVE_POLL_MS = 60_000L
+
+/** Il ne répond pas : on insiste, c'est le moment où l'on attend qu'il revienne. */
+private const val RETRY_POLL_MS = 25_000L

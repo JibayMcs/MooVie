@@ -487,4 +487,10 @@
     <string name="remote_paired_help">Le téléviseur piloté depuis cet appareil.</string>
     <string name="remote_none">Aucun téléviseur appairé</string>
     <string name="remote_none_help">Sur le téléviseur, ouvrir Réglages puis Télécommande, et scanner le QR code affiché.</string>
+    <string name="remote_reconnect">Reconnecter le téléviseur</string>
+    <string name="remote_reconnect_help">Vérifie que le téléviseur répond. Utile s'il vient d'être rallumé.</string>
+    <string name="remote_reconnect_running">Recherche en cours…</string>
+    <string name="remote_reconnect_ok">Le téléviseur répond.</string>
+    <string name="remote_reconnect_failed">Toujours aucune réponse. Vérifier qu'il est allumé et sur le même réseau.</string>
+    <string name="remote_reconnect_action">Reconnecter</string>
 </resources>
