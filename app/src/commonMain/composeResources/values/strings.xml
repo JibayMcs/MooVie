@@ -493,4 +493,8 @@
     <string name="remote_reconnect_ok">Le téléviseur répond.</string>
     <string name="remote_reconnect_failed">Toujours aucune réponse. Vérifier qu'il est allumé et sur le même réseau.</string>
     <string name="remote_reconnect_action">Reconnecter</string>
+    <string name="settings_sources_cache">Cache des sources</string>
+    <string name="settings_sources_cache_help">Les liens trouvés sont gardés 6 h pour un retour instantané sur une fiche. Les vider force une nouvelle recherche, utile quand un site vient de changer.</string>
+    <string name="settings_sources_cache_done">Cache vidé. La prochaine ouverture d'une fiche relancera la recherche.</string>
+    <string name="settings_sources_cache_action">Vider</string>
 </resources>

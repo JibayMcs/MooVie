@@ -137,6 +137,11 @@ import fr.moovie.tv.resources.settings_screensaver_delay
 import fr.moovie.tv.resources.settings_screensaver_help
 import fr.moovie.tv.resources.settings_skip_intro
 import fr.moovie.tv.resources.settings_sources_help
+import fr.moovie.tv.resources.settings_sources_cache
+import fr.moovie.tv.resources.settings_sources_cache_action
+import fr.moovie.tv.resources.settings_sources_cache_done
+import fr.moovie.tv.resources.settings_sources_cache_help
+import fr.moovie.tv.data.sources.SourceCacheRepository
 import fr.moovie.tv.resources.settings_stream_lang
 import fr.moovie.tv.resources.settings_title
 import fr.moovie.tv.resources.settings_tmdb_help
@@ -669,6 +674,37 @@ fun SettingsScreenContent(
                             onMoveDown = { onMoveProviderDown(provider.name) },
                             onToggle = { onToggleProvider(provider.name, !provider.enabled) },
                         )
+                    }
+
+                    // Vider le cache des sources, à la main.
+                    //
+                    // Les liens trouvés sont gardés six heures pour que revenir
+                    // sur une fiche soit instantané. Le revers est qu'un site
+                    // qui change de format — ou un correctif qu'on vient
+                    // d'installer — reste invisible pendant tout ce temps sur
+                    // les titres déjà ouverts, sans aucun moyen d'insister.
+                    //
+                    // La version de l'application invalide déjà les entrées à
+                    // chaque mise à jour ; ce bouton couvre l'autre cas, celui
+                    // où c'est le **site** qui a bougé et pas nous.
+                    val cacheScope = rememberCoroutineScope()
+                    var cleared by remember { mutableStateOf(false) }
+                    SettingRow(
+                        label = stringResource(Res.string.settings_sources_cache),
+                        help = stringResource(
+                            if (cleared) Res.string.settings_sources_cache_done
+                            else Res.string.settings_sources_cache_help,
+                        ),
+                    ) {
+                        MoovieButton(
+                            enabled = !cleared,
+                            onClick = {
+                                cacheScope.launch {
+                                    SourceCacheRepository().clear()
+                                    cleared = true
+                                }
+                            },
+                        ) { Text(stringResource(Res.string.settings_sources_cache_action)) }
                     }
                 }
 

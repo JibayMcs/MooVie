@@ -491,4 +491,8 @@
     <string name="remote_reconnect_ok">The TV answers.</string>
     <string name="remote_reconnect_failed">Still no answer. Check that it is on and on the same network.</string>
     <string name="remote_reconnect_action">Reconnect</string>
+    <string name="settings_sources_cache">Source cache</string>
+    <string name="settings_sources_cache_help">Found links are kept for 6 h so returning to a title is instant. Clearing forces a fresh search, useful when a site has just changed.</string>
+    <string name="settings_sources_cache_done">Cache cleared. The next title you open will search again.</string>
+    <string name="settings_sources_cache_action">Clear</string>
 </resources>
