@@ -48,6 +48,7 @@ import fr.moovie.tv.ui.splash.MoovieSplash
 import fr.moovie.tv.ui.navigation.Screen
 import fr.moovie.tv.ui.navigation.rememberNavStack
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import fr.moovie.tv.ui.remote.RemoteScreen
 import fr.moovie.tv.ui.pairing.RemoteHost
 import fr.moovie.tv.data.remote.RemoteTargetRepository
@@ -613,8 +614,26 @@ class MainActivity : ComponentActivity() {
         val token = data.getQueryParameter("t")?.takeIf { it.isNotBlank() } ?: return false
         val name = data.getQueryParameter("n")?.takeIf { it.isNotBlank() } ?: host
         lifecycleScope.launch {
-            RemoteTargetRepository().remember(RemoteTarget(name, host, port, token))
-            pendingRemote.value = true
+            val repo = RemoteTargetRepository()
+            val known = repo.target.first()
+            repo.remember(RemoteTarget(name, host, port, token))
+
+            // **Seulement pour un appairage neuf.**
+            //
+            // L'intent qui a créé la tâche est rejoué à chaque recréation de
+            // l'Activity — retour depuis le lanceur après que le système a tué
+            // le processus, notamment. Sans cette garde, scanner le QR une seule
+            // fois faisait démarrer l'application sur la télécommande, pour
+            // toujours : on ouvrait Moo-vie et on tombait sur un pavé
+            // directionnel au lieu de l'accueil, ce qui ressemble à une
+            // application qui ne s'est pas lancée.
+            //
+            // On compare le **jeton** plutôt qu'un drapeau dans l'intent :
+            // `setIntent` ne met à jour que la copie locale, celle du système
+            // reste intacte et revient telle quelle à la recréation suivante.
+            // Le dépôt, lui, survit au processus — et c'est exactement la
+            // question qu'on pose : « ce lien m'apprend-il quelque chose ? »
+            if (known?.token != token) pendingRemote.value = true
         }
         return true
     }
