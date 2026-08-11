@@ -55,6 +55,17 @@ suspend fun isStreamPlayable(
  * variantes d'un même média ont la même durée.
  */
 private suspend fun hlsDurationSeconds(http: HttpGateway, stream: PlayableStream): Double? {
+    // **Avant de télécharger quoi que ce soit.** Le corps est lu en entier, en
+    // mémoire, pour vérifier ces sept caractères — anodin sur une playlist de
+    // quelques kilo-octets, fatal sur un fichier. Un MP4 progressif de 1,24 Go a
+    // tué l'application sur la box : `OutOfMemoryError` après avoir rempli les
+    // 500 Mo du tas, pendant l'ouverture du lecteur.
+    //
+    // Le format était déjà la bonne garde — la fonction s'appelle « hls » et sa
+    // documentation dit que la durée n'est mesurable que là — mais elle n'était
+    // écrite nulle part. `streamQuality`, juste en dessous, la pose au même
+    // endroit et pour la même raison.
+    if (stream.format != StreamFormat.HLS) return null
     val body = http.getBody(stream.url, stream.headers) ?: return null
     if (!body.startsWith("#EXTM3U")) return null
 
