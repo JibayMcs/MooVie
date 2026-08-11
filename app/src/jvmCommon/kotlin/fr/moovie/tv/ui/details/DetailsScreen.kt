@@ -156,6 +156,15 @@ import org.jetbrains.compose.resources.stringResource
 private val SERIES_PANE_WIDTH = 380.dp
 
 /**
+ * Délai laissé au `bringIntoView` déclenché par la prise de focus avant de
+ * ramener la page en haut.
+ *
+ * Il s'exécute sur les images qui suivent la demande de focus, pas pendant :
+ * remettre le défilement à zéro sans attendre se ferait écraser juste après.
+ */
+private const val SCROLL_SETTLE_MS = 120L
+
+/**
  * Largeur d'une vignette du casting.
  *
  * Une seule constante pour la carte *et* le portrait qu'elle contient : c'est ce
@@ -284,6 +293,11 @@ fun DetailsScreenContent(
     val seriesId = (state as? DetailsState.Tv)?.details?.id
     var autoFocusDone by remember(seriesId) { mutableStateOf(false) }
 
+    // État nommé : la rangée des saisons doit pouvoir ramener la page en haut,
+    // et l'arrivée sur une fiche aussi — faute de quoi l'en-tête reste hors
+    // cadre (voir juste en dessous, et plus bas).
+    val pageScroll = rememberScrollState()
+
     // Le focus est aussi replacé quand on entre/sort d'une fiche d'épisode :
     // le bouton porteur de `primaryFocus` change de nœud à ce moment-là.
     LaunchedEffect(state, selectedEpisode) {
@@ -305,6 +319,26 @@ fun DetailsScreenContent(
         }
         if (state is DetailsState.Movie || state is DetailsState.Tv) {
             runCatching { primaryFocus.requestFocus() }
+
+            // Puis on rend la page à son sommet.
+            //
+            // Donner le focus déclenche un `bringIntoView` : la page défile pour
+            // amener l'élément visé dans le cadre, et mange la marge haute. On
+            // arrivait sur une fiche dont la ligne de genres et l'affiche
+            // étaient **coupées en deux**, sans aucun moyen de remonter — le
+            // bouton est le premier élément focalisable, la flèche haut n'a
+            // nulle part où aller, et redescendre puis remonter ne redéfile pas
+            // puisque la cible est déjà visible. Le décalage était donc collant
+            // pour toute la durée de la fiche.
+            //
+            // Agrandir la page n'aurait pas suffi : un synopsis un peu long la
+            // fait déborder de toute façon. Ce qui doit être vrai, c'est qu'on
+            // *arrive* en haut.
+            //
+            // Le défilement a lieu sur les images suivantes, d'où l'attente :
+            // remettre à zéro immédiatement se ferait écraser juste après.
+            delay(SCROLL_SETTLE_MS)
+            runCatching { pageScroll.scrollTo(0) }
         }
     }
 
@@ -339,9 +373,6 @@ fun DetailsScreenContent(
         // Marge haute agrandie sur desktop pour que le titre passe sous le
         // bouton retour en overlay (sinon ils se chevauchent).
         val topPad = if (showBackButton) 96.dp else 48.dp
-        // État nommé : la rangée des saisons doit pouvoir ramener la page en
-        // haut, faute de quoi l'en-tête reste hors cadre (voir plus bas).
-        val pageScroll = rememberScrollState()
         val pageScope = rememberCoroutineScope()
         // Sur la liste des épisodes d'une série, la page ne défile pas en bloc :
         // l'en-tête et les saisons restent posés, seuls les épisodes défilent
