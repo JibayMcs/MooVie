@@ -381,6 +381,13 @@ internal fun DesktopPlayerScreen(
     val autoNextFocus = remember { FocusRequester() }
 
     var isPlaying by remember { mutableStateOf(true) }
+
+    // Tant que ça joue, la machine ne s'endort pas. Regarder une vidéo n'est pas
+    // une activité utilisateur pour le système : sans clavier ni souris, le
+    // compteur d'inactivité court et Windows finissait par mettre l'ordinateur
+    // en veille en pleine lecture. Lié à la lecture et non à l'écran du lecteur,
+    // comme le `keepScreenOn` d'Android : en pause, on rend la main.
+    KeepAwakeWhile(isPlaying)
     var timeMs by remember { mutableStateOf(0L) }
     var lengthMs by remember { mutableStateOf(0L) }
     var finished by remember { mutableStateOf(false) }
