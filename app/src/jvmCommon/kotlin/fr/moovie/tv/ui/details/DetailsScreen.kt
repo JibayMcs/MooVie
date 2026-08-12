@@ -148,6 +148,15 @@ import fr.moovie.tv.ui.components.MoovieMarqueeText
 import fr.moovie.tv.ui.components.MoovieProgressBar
 import fr.moovie.tv.ui.components.MoovieRail
 import fr.moovie.tv.ui.components.SkeletonDetails
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerEventPass
+import fr.moovie.tv.ui.adaptive.isPointerUi
+import fr.moovie.tv.ui.player.MooviePlayerController
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.pluralStringResource
@@ -181,6 +190,25 @@ private const val HERO_PREVIEW_DELAY_MS = 3_000L
 
 /** Fondu d'apparition de l'aperçu : il remplace une affiche, il ne surgit pas. */
 private const val HERO_PREVIEW_FADE_MS = 800
+
+/**
+ * Temps sans mouvement de souris avant que l'interface ne s'efface.
+ *
+ * Trois secondes, comme le délai de l'aperçu lui-même : assez pour ne pas
+ * clignoter quand on traverse la fenêtre, assez court pour que rester immobile
+ * soit visiblement récompensé.
+ */
+private const val CINEMA_IDLE_MS = 3_000L
+
+/** L'interface s'efface doucement — c'est un fondu, pas une disparition. */
+private const val CINEMA_UI_FADE_MS = 600
+
+/**
+ * Le son monte plus lentement que l'image ne s'efface, et redescend d'autant.
+ * Un son qui apparaît d'un coup s'entend comme un défaut ; un fondu s'entend
+ * comme une intention.
+ */
+private const val CINEMA_SOUND_FADE_MS = 1_200
 
 /**
  * Largeur d'une vignette du casting.
@@ -296,9 +324,24 @@ fun DetailsScreenContent(
      *
      * Null = pas d'aperçu, la fiche garde son image de fond.
      */
-    trailerPreview: (@Composable (stream: PlayableStream, modifier: Modifier) -> Unit)? = null,
+    trailerPreview: (
+        @Composable (
+            stream: PlayableStream,
+            volume: Float,
+            onController: (MooviePlayerController?) -> Unit,
+            modifier: Modifier,
+        ) -> Unit
+    )? = null,
+    /**
+     * La bande-annonce est-elle au premier plan, contrôles visibles. Elle ne
+     * change pas d'écran : c'est l'aperçu du fond qui reçoit les contrôles.
+     */
+    trailerExpanded: Boolean = false,
+    onCloseTrailer: () -> Unit = {},
     /** Réglage utilisateur : l'aperçu se lance-t-il tout seul. */
     trailerAutoplay: Boolean = true,
+    /** Réglage utilisateur : le son de l'aperçu monte-t-il en mode cinéma. */
+    trailerSound: Boolean = false,
     /**
      * Pays de l'utilisateur (`FR`), pour choisir la bonne classification d'âge
      * dans le panneau « En savoir plus ».
@@ -419,9 +462,101 @@ fun DetailsScreenContent(
 
     val ready = trailer as? TrailerState.Ready
     var previewPlaying by remember(ready?.video?.key) { mutableStateOf(false) }
-    LaunchedEffect(ready?.video?.key, trailerAutoplay, trailerPreview != null) {
-        previewPlaying = false
-        if (ready == null || !trailerAutoplay || trailerPreview == null) return@LaunchedEffect
+
+    // ── Mode cinéma ─────────────────────────────────────────────────────────
+    //
+    // L'interface s'efface, le son monte, et la bande-annonce a l'écran pour
+    // elle. Le moindre mouvement de souris la rend : on est revenu, on veut
+    // ses boutons.
+    //
+    // **Au pointeur seulement.** Le signal d'activité est le mouvement de
+    // souris, qui n'existe ni sur un téléviseur ni sur un téléphone ; sans lui
+    // l'interface disparaîtrait sans aucun moyen de la rappeler. L'aperçu y
+    // reste donc muet, sous une interface visible, ce qu'il était déjà.
+    val cinemaCapable = isPointerUi && trailerPreview != null
+    var cinema by remember(ready?.video?.key) { mutableStateOf(false) }
+
+    // Le lecteur du fond, prêté par la plateforme. C'est *lui* que les contrôles
+    // pilotent : il n'y a pas de second lecteur pour la bande-annonce.
+    var trailerController by remember(ready?.video?.key) {
+        mutableStateOf<MooviePlayerController?>(null)
+    }
+    // Le réglage donne l'état de départ, l'utilisateur garde la main ensuite.
+    var trailerMuted by remember(trailerExpanded) { mutableStateOf(!trailerSound) }
+
+    // L'activité passe par un flux et **non par un état Compose** : une souris
+    // émet des dizaines d'événements par seconde, et un `mutableStateOf`
+    // incrémenté à chacun recomposerait toute la fiche pendant qu'on la
+    // traverse. Ici rien ne recompose tant que `cinema` ne change pas.
+    val pointerActivity = remember {
+        MutableSharedFlow<Unit>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+    }
+
+    // Suspendue tant que la bande-annonce est au premier plan : là, un mouvement
+    // de souris sert à viser un bouton, pas à réclamer l'interface de la fiche.
+    LaunchedEffect(previewPlaying, cinemaCapable, trailerExpanded) {
+        if (!previewPlaying || !cinemaCapable || trailerExpanded) {
+            cinema = false
+            return@LaunchedEffect
+        }
+        while (true) {
+            // Le mode s'arme après un temps sans mouvement…
+            while (withTimeoutOrNull(CINEMA_IDLE_MS) { pointerActivity.first() } != null) Unit
+            cinema = true
+            // …et se désarme au premier mouvement suivant, puis se réarme :
+            // c'est la boucle qui fait le va-et-vient, sans horloge à lire.
+            pointerActivity.first()
+            cinema = false
+        }
+    }
+
+    // Les deux états qui découvrent la bande-annonce, et la seule différence
+    // entre eux est la présence des contrôles.
+    val trailerInFront = trailerExpanded || cinema
+    val soundWanted = when {
+        trailerExpanded -> !trailerMuted
+        // Le mode cinéma s'arme tout seul : il obéit au réglage, sans discuter.
+        cinema -> trailerSound
+        else -> false
+    }
+
+    val volume by animateFloatAsState(
+        targetValue = if (soundWanted) 1f else 0f,
+        animationSpec = tween(CINEMA_SOUND_FADE_MS),
+        label = "trailerVolume",
+    )
+    val uiAlpha by animateFloatAsState(
+        targetValue = if (trailerInFront) 0f else 1f,
+        animationSpec = tween(CINEMA_UI_FADE_MS),
+        label = "detailsUiAlpha",
+    )
+
+    LaunchedEffect(ready?.video?.key, trailerAutoplay, trailerPreview != null, trailerExpanded) {
+        if (ready == null || trailerPreview == null) {
+            previewPlaying = false
+            return@LaunchedEffect
+        }
+        // Une demande explicite passe devant le délai **et** devant le réglage :
+        // le bouton doit répondre tout de suite, y compris autoplay désactivé,
+        // sans quoi il paraîtrait cassé chez qui l'a coupé.
+        if (trailerExpanded) {
+            previewPlaying = true
+            return@LaunchedEffect
+        }
+        // Autoplay coupé : refermer les contrôles rend le réglage à sa place et
+        // l'affiche au hero. Le bouton reste une exception ponctuelle, il ne
+        // laisse pas une lecture derrière lui.
+        if (!trailerAutoplay) {
+            previewPlaying = false
+            return@LaunchedEffect
+        }
+        // **Déjà en cours : on n'y touche pas.** Cet effet se relance à chaque
+        // ouverture *et fermeture* des contrôles ; remettre l'aperçu à zéro en
+        // sortant le faisait recharger le même manifeste dans un second
+        // lecteur, ce que googlevideo sanctionne d'un 403 — le défaut qui avait
+        // déjà valu un plantage. Fermer les contrôles doit rendre l'interface,
+        // rien d'autre.
+        if (previewPlaying) return@LaunchedEffect
         delay(HERO_PREVIEW_DELAY_MS)
         previewPlaying = true
         // On rend la main à l'affiche à la fin plutôt que de laisser une image
@@ -435,7 +570,25 @@ fun DetailsScreenContent(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(
+        modifier = Modifier.fillMaxSize().then(
+            if (!cinemaCapable) {
+                Modifier
+            } else {
+                // Passe **Initial** : on observe le pointeur sans lui prendre
+                // ses événements. Un bouton survolé doit continuer de réagir
+                // pendant que l'interface se rallume.
+                Modifier.pointerInput(Unit) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            awaitPointerEvent(PointerEventPass.Initial)
+                            pointerActivity.tryEmit(Unit)
+                        }
+                    }
+                }
+            },
+        ),
+    ) {
         backdrop?.let { url ->
             MoovieAsyncImage(
                 model = url,
@@ -453,13 +606,22 @@ fun DetailsScreenContent(
                 enter = fadeIn(animationSpec = tween(HERO_PREVIEW_FADE_MS)),
                 modifier = Modifier.fillMaxSize(),
             ) {
-                trailerPreview(ready.stream, Modifier.fillMaxSize())
+                trailerPreview(
+                    ready.stream,
+                    volume,
+                    { trailerController = it },
+                    Modifier.fillMaxSize(),
+                )
             }
         }
+        // Le voile s'efface avec l'interface qu'il sert à rendre lisible : le
+        // garder en mode cinéma assombrirait la bande-annonce pour rien.
         Box(
-            modifier = Modifier.fillMaxSize().background(
-                Brush.verticalGradient(listOf(Color(0xAA0A0A0A), Color(0xE00A0A0A))),
-            ),
+            modifier = Modifier.fillMaxSize()
+                .graphicsLayer { alpha = uiAlpha }
+                .background(
+                    Brush.verticalGradient(listOf(Color(0xAA0A0A0A), Color(0xE00A0A0A))),
+                ),
         )
 
         // Scroll pleine largeur + marges portées par les enfants : les éléments
@@ -483,6 +645,10 @@ fun DetailsScreenContent(
         val seriesList = state is DetailsState.Tv && selectedEpisode == null
         Column(
             modifier = Modifier.fillMaxSize()
+                // Effacée, pas démontée : la page garde sa position de
+                // défilement et son focus, et revient telle qu'on l'a laissée
+                // au premier mouvement de souris.
+                .graphicsLayer { alpha = uiAlpha }
                 .then(if (seriesList) Modifier else Modifier.verticalScroll(pageScroll))
                 .padding(top = topPad, bottom = 48.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -958,9 +1124,28 @@ fun DetailsScreenContent(
             }
         }
 
+        // Contrôles de la bande-annonce, tout en haut de la pile : ils se posent
+        // sur l'aperçu **et** sur l'interface effacée, qui reste composée
+        // dessous pour garder sa position de défilement et son focus.
+        AnimatedVisibility(
+            visible = trailerExpanded && previewPlaying,
+            enter = fadeIn(animationSpec = tween(CINEMA_UI_FADE_MS)),
+            exit = fadeOut(animationSpec = tween(CINEMA_UI_FADE_MS)),
+            modifier = Modifier.align(Alignment.BottomCenter),
+        ) {
+            TrailerControls(
+                controller = trailerController,
+                title = (trailer as? TrailerState.Ready)?.video?.name.orEmpty(),
+                muted = trailerMuted,
+                onToggleMute = { trailerMuted = !trailerMuted },
+                onClose = onCloseTrailer,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+
         // Bouton retour desktop, en overlay haut-gauche (masqué quand le panneau
         // des sources est ouvert : Échap/clic-extérieur le ferme d'abord).
-        if (showBackButton && !panelVisible) {
+        if (showBackButton && !panelVisible && !trailerExpanded) {
             MoovieIconButton(
                 onClick = onBack,
                 icon = Icons.AutoMirrored.Filled.ArrowBack,

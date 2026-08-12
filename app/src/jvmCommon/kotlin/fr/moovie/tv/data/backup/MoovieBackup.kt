@@ -182,6 +182,7 @@ data class BackupSettings(
     val playerClock: Boolean? = null,
     /** Nul dans les sauvegardes d'avant la bande-annonce : le réglage garde alors sa valeur. */
     val trailerAutoplay: Boolean? = null,
+    val trailerSound: Boolean? = null,
     val hideHistoryWidgets: Boolean? = null,
     val updateInterval: String? = null,
     val screensaverDelay: String? = null,

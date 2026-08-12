@@ -62,6 +62,7 @@ fun SettingsScreen(
     val autoPlayNext by viewModel.autoPlayNext.collectAsStateWithLifecycle()
     val playerClock by viewModel.playerClock.collectAsStateWithLifecycle()
     val trailerAutoplay by viewModel.trailerAutoplay.collectAsStateWithLifecycle()
+    val trailerSound by viewModel.trailerSound.collectAsStateWithLifecycle()
     val hideHistoryWidgets by viewModel.hideHistoryWidgets.collectAsStateWithLifecycle()
     val splashAnimation by viewModel.splashAnimation.collectAsStateWithLifecycle()
     // Même instance que MainActivity (scope Activity) : une version trouvée ici
@@ -79,6 +80,7 @@ fun SettingsScreen(
         autoPlayNext = autoPlayNext,
         playerClock = playerClock,
         trailerAutoplay = trailerAutoplay,
+        trailerSound = trailerSound,
         hideHistoryWidgets = hideHistoryWidgets,
         splashAnimation = splashAnimation,
         updateCheck = updateCheck,
@@ -94,6 +96,7 @@ fun SettingsScreen(
         onSetAutoPlayNext = viewModel::setAutoPlayNext,
         onSetPlayerClock = viewModel::setPlayerClock,
         onSetTrailerAutoplay = viewModel::setTrailerAutoplay,
+        onSetTrailerSound = viewModel::setTrailerSound,
         onSetHideHistoryWidgets = viewModel::setHideHistoryWidgets,
         onSetSplashAnimation = viewModel::setSplashAnimation,
         onCheckUpdates = updateViewModel::checkNow,

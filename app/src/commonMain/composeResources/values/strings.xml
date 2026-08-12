@@ -535,4 +535,9 @@
     <string name="status_post_production">Post-production</string>
     <string name="settings_trailer_autoplay">Bande-annonce automatique</string>
     <string name="settings_trailer_autoplay_help">Lance la bande-annonce en sourdine dans le fond de la fiche après quelques secondes. Le bouton « Bande-annonce » reste disponible même désactivée.</string>
+    <string name="settings_trailer_sound">Son de la bande-annonce</string>
+    <string name="settings_trailer_sound_help">Monte le son progressivement quand la bande-annonce prend le fond de la fiche, et le coupe dès que la souris bouge. Sans effet sur téléviseur et sur téléphone, où l'aperçu reste muet.</string>
+    <string name="common_close">Fermer</string>
+    <string name="trailer_mute">Couper le son</string>
+    <string name="trailer_unmute">Rétablir le son</string>
 </resources>

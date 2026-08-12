@@ -170,23 +170,27 @@ class DetailsViewModel : ViewModel() {
     val trailer: StateFlow<TrailerState> = _trailer
 
     /**
-     * Flux de la bande-annonce, prêt à ouvrir le lecteur.
+     * La bande-annonce est-elle passée au premier plan.
      *
-     * Distinct de [_resolved] : une bande-annonce ne se reprend pas, ne compte
-     * pas comme vue et n'enchaîne pas sur l'épisode suivant. Les faire passer
-     * par le même canal l'aurait inscrite dans « Reprendre la lecture », où
-     * personne ne veut retrouver deux minutes de promotion.
+     * Elle ne change pas d'écran et ne crée aucun lecteur : c'est **celui qui
+     * joue déjà en fond** qui reçoit les contrôles. D'où un simple booléen
+     * plutôt qu'un flux à consommer — il n'y a rien à transporter ailleurs,
+     * seulement une vue à découvrir.
+     *
+     * Dans le ViewModel et non dans l'écran parce que le bouton Retour doit
+     * pouvoir la refermer, et que le retour est géré par plateforme.
      */
-    private val _trailerStream = MutableStateFlow<PlayableStream?>(null)
-    val trailerStream: StateFlow<PlayableStream?> = _trailerStream
+    private val _trailerExpanded = MutableStateFlow(false)
+    val trailerExpanded: StateFlow<Boolean> = _trailerExpanded
 
-    /** Titre affiché par le lecteur pendant la bande-annonce. */
-    var trailerTitle: String = ""
-        private set
 
     /** Réglage : l'aperçu du hero se lance-t-il tout seul. */
     val trailerAutoplay: StateFlow<Boolean> = settings.trailerAutoplay
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+
+    /** Réglage : le son de l'aperçu monte-t-il quand l'interface s'efface. */
+    val trailerSound: StateFlow<Boolean> = settings.trailerSound
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     private var trailerJob: Job? = null
 
@@ -379,7 +383,7 @@ class DetailsViewModel : ViewModel() {
         // sous le hero du nouveau — et son bouton la lancerait.
         trailerJob?.cancel()
         _trailer.value = TrailerState.None
-        _trailerStream.value = null
+        _trailerExpanded.value = false
         resolveGen++ // invalide toute résolution en vol de la fiche précédente
         _quickPlay.value = QuickPlayState.Idle
         _panelVisible.value = false
@@ -548,7 +552,6 @@ class DetailsViewModel : ViewModel() {
                 .getOrNull() ?: return@launch
             if (gen != resolveGen) return@launch
 
-            trailerTitle = best.name.ifBlank { playbackTitle }
             _trailer.value = TrailerState.Ready(
                 video = best,
                 stream = resolved.stream,
@@ -558,19 +561,21 @@ class DetailsViewModel : ViewModel() {
     }
 
     /**
-     * Envoie la bande-annonce au lecteur plein écran.
+     * Passe la bande-annonce au premier plan.
      *
-     * Rien à résoudre ici : le flux est déjà là, sans quoi le bouton ne serait
-     * pas affiché. L'appui est donc instantané.
+     * Rien à résoudre ni à lancer : le flux est déjà là — sans quoi le bouton
+     * ne serait pas affiché — et l'aperçu joue déjà, ou démarrera à l'instant
+     * puisque la demande est explicite. L'appui est donc instantané, et la
+     * lecture ne repart pas de zéro.
      */
-    fun playTrailer() {
-        val ready = _trailer.value as? TrailerState.Ready ?: return
-        _trailerStream.value = ready.stream
+    fun openTrailer() {
+        if (_trailer.value !is TrailerState.Ready) return
+        _trailerExpanded.value = true
     }
 
-    /** À appeler une fois le lecteur ouvert, comme [consumeResolved]. */
-    fun consumeTrailerStream() {
-        _trailerStream.value = null
+    /** Referme les contrôles ; l'aperçu, lui, continue en fond. */
+    fun closeTrailer() {
+        _trailerExpanded.value = false
     }
 
     /** Ouvre la fiche détaillée d'un épisode (clic / OK sur sa carte). */

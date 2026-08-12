@@ -158,6 +158,7 @@ internal fun DesktopSettingsScreen(
     val autoPlayNext by vm.autoPlayNext.collectAsState()
     val playerClock by vm.playerClock.collectAsState()
     val settingsTrailerAutoplay by vm.trailerAutoplay.collectAsState()
+    val settingsTrailerSound by vm.trailerSound.collectAsState()
     val hideHistoryWidgets by vm.hideHistoryWidgets.collectAsState()
     val splashAnimation by vm.splashAnimation.collectAsState()
     val updateCheck by Vm.update.checkStatus.collectAsState()
@@ -172,6 +173,7 @@ internal fun DesktopSettingsScreen(
         autoPlayNext = autoPlayNext,
         playerClock = playerClock,
         trailerAutoplay = settingsTrailerAutoplay,
+        trailerSound = settingsTrailerSound,
         hideHistoryWidgets = hideHistoryWidgets,
         splashAnimation = splashAnimation,
         updateCheck = updateCheck,
@@ -187,6 +189,7 @@ internal fun DesktopSettingsScreen(
         onSetAutoPlayNext = vm::setAutoPlayNext,
         onSetPlayerClock = vm::setPlayerClock,
         onSetTrailerAutoplay = vm::setTrailerAutoplay,
+        onSetTrailerSound = vm::setTrailerSound,
         onSetHideHistoryWidgets = vm::setHideHistoryWidgets,
         onSetSplashAnimation = vm::setSplashAnimation,
         onCheckUpdates = Vm.update::checkNow,
@@ -235,8 +238,9 @@ internal fun DesktopDetailsScreen(
     val panelVisible by vm.panelVisible.collectAsState()
     val selectedEpisode by vm.selectedEpisode.collectAsState()
     val trailer by vm.trailer.collectAsState()
-    val trailerStream by vm.trailerStream.collectAsState()
+    val trailerExpanded by vm.trailerExpanded.collectAsState()
     val trailerAutoplay by vm.trailerAutoplay.collectAsState()
+    val trailerSound by vm.trailerSound.collectAsState()
     // Reprise depuis l'accueil : lance la lecture directe une seule fois.
     val autoConsumed = remember { mutableStateOf(false) }
 
@@ -284,30 +288,16 @@ internal fun DesktopDetailsScreen(
             vm.consumeResolved()
         }
     }
-    // Bande-annonce : pas de `mediaKey` (ni reprise ni historique), pas
-    // d'épisode suivant, pas de durée attendue — voir le pendant Android.
-    LaunchedEffect(trailerStream) {
-        trailerStream?.let { s ->
-            if (s.url.isNotBlank()) {
-                onPlay(
-                    Screen.Player(
-                        streamUrl = s.url,
-                        headers = s.headers,
-                        title = vm.trailerTitle,
-                        subtitle = vm.playbackTitle,
-                    ),
-                )
-            }
-            vm.consumeTrailerStream()
-        }
-    }
     // Échap ferme d'abord le panneau des sources, puis la fiche d'épisode.
     // Quand il n'y a plus rien à fermer on enregistre `null` : la fenêtre dépile
     // alors la pile de navigation. Enregistrer `onBack` ici masquait la pile et
     // ramenait à l'accueil en sautant la fiche de la série.
-    DisposableEffect(panelVisible, selectedEpisode) {
+    DisposableEffect(panelVisible, selectedEpisode, trailerExpanded) {
         onRegisterBack(
             when {
+                // La bande-annonce d'abord : elle recouvre tout le reste, donc
+                // c'est elle qu'Échap doit refermer en premier.
+                trailerExpanded -> vm::closeTrailer
                 panelVisible -> vm::closePanel
                 selectedEpisode != null -> vm::closeEpisode
                 else -> null
@@ -353,9 +343,12 @@ internal fun DesktopDetailsScreen(
         sourceQualities = sourceQualities,
         onRequestQuality = vm::requestQuality,
         trailer = trailer,
-        onPlayTrailer = vm::playTrailer,
-        trailerPreview = { stream, mod -> TrailerPreview(stream, mod) },
+        onPlayTrailer = vm::openTrailer,
+        trailerExpanded = trailerExpanded,
+        onCloseTrailer = vm::closeTrailer,
+        trailerPreview = { stream, vol, onCtl, mod -> TrailerPreview(stream, vol, onCtl, mod) },
         trailerAutoplay = trailerAutoplay,
+        trailerSound = trailerSound,
         country = tmdbCountry(),
         onDismissQuickPlay = vm::dismissQuickPlay,
         onBack = onBack,

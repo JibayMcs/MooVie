@@ -16,6 +16,8 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import fr.moovie.tv.core.sources.model.PlayableStream
+import fr.moovie.tv.ui.player.ExoPlayerController
+import fr.moovie.tv.ui.player.MooviePlayerController
 
 /**
  * Aperçu muet de la bande-annonce dans le fond de la fiche, sur Android.
@@ -29,8 +31,11 @@ import fr.moovie.tv.core.sources.model.PlayableStream
  * Trois partis pris, tous pour la même raison — c'est un **fond**, pas une
  * lecture :
  *
- * - **muet**. Du son qui démarre seul en parcourant un catalogue est une
- *   nuisance, et l'utilisateur n'a rien demandé.
+ * - **muet en pratique**. Le paramètre existe pour partager la signature avec
+ *   le desktop, mais la fiche n'envoie un volume qu'au pointeur : ni la
+ *   télécommande ni le doigt ne donnent le signal d'activité sur lequel repose
+ *   le fondu, et du son qui démarre seul sans moyen de le rendre serait une
+ *   nuisance.
  * - **recadré** (`RESIZE_MODE_ZOOM`), comme l'affiche qu'il remplace : des
  *   bandes noires trahiraient une vidéo posée là, au lieu d'un décor.
  * - **sans contrôles ni focus**. La télécommande doit continuer d'atteindre les
@@ -38,7 +43,12 @@ import fr.moovie.tv.core.sources.model.PlayableStream
  */
 @OptIn(UnstableApi::class)
 @Composable
-fun TrailerPreview(stream: PlayableStream, modifier: Modifier = Modifier) {
+fun TrailerPreview(
+    stream: PlayableStream,
+    volume: Float,
+    onController: (MooviePlayerController?) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val context = LocalContext.current
 
     val player = remember(stream.url) {
@@ -57,11 +67,20 @@ fun TrailerPreview(stream: PlayableStream, modifier: Modifier = Modifier) {
             .build()
             .apply {
                 setMediaItem(MediaItem.fromUri(stream.url))
-                volume = 0f
+                this.volume = volume.coerceIn(0f, 1f)
                 repeatMode = Player.REPEAT_MODE_OFF
                 playWhenReady = true
                 prepare()
             }
+    }
+
+    // Le même lecteur, vu comme un contrôleur : c'est lui que les contrôles de
+    // la fiche pilotent. `ExoPlayerController` n'est qu'une façade — aucune
+    // machinerie de reprise n'y est branchée, la bande-annonce reste hors de
+    // l'historique.
+    DisposableEffect(player) {
+        onController(ExoPlayerController(player))
+        onDispose { onController(null) }
     }
 
     // Libération liée à l'URL, pas à la seule sortie d'écran : changer de fiche

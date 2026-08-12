@@ -60,6 +60,13 @@ class SettingsViewModel : ViewModel() {
         viewModelScope.launch { repo.setTrailerAutoplay(value) }
     }
 
+    val trailerSound: StateFlow<Boolean> =
+        repo.trailerSound.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    fun setTrailerSound(value: Boolean) {
+        viewModelScope.launch { repo.setTrailerSound(value) }
+    }
+
     fun setAutoPlayNext(value: Boolean) {
         viewModelScope.launch { repo.setAutoPlayNext(value) }
     }

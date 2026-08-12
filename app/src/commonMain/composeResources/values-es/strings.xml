@@ -533,4 +533,9 @@
     <string name="status_post_production">Posproducción</string>
     <string name="settings_trailer_autoplay">Tráiler automático</string>
     <string name="settings_trailer_autoplay_help">Reproduce el tráiler sin sonido en el fondo de la ficha tras unos segundos. El botón «Tráiler» sigue disponible aunque esté desactivado.</string>
+    <string name="settings_trailer_sound">Sonido del tráiler</string>
+    <string name="settings_trailer_sound_help">Sube el sonido gradualmente cuando el tráiler ocupa el fondo de la ficha, y lo corta en cuanto se mueve el ratón. Sin efecto en televisor ni en teléfono, donde la vista previa permanece en silencio.</string>
+    <string name="common_close">Cerrar</string>
+    <string name="trailer_mute">Silenciar</string>
+    <string name="trailer_unmute">Activar el sonido</string>
 </resources>

@@ -139,6 +139,29 @@ class SettingsRepository {
     suspend fun setTrailerAutoplay(value: Boolean) =
         store.edit { it[TRAILER_AUTOPLAY] = value }
 
+    /**
+     * Son de l'aperçu, distinct de l'aperçu lui-même.
+     *
+     * Deux réglages parce que ce sont deux gênes différentes : l'image qui
+     * bouge coûte du décodage, le son qui démarre seul se remarque dans une
+     * pièce. On peut vouloir garder le décor animé en silence, et c'est le
+     * reproche le plus courant fait à ce genre d'interface.
+     *
+     * Sans effet hors du bureau : l'aperçu reste muet à la télécommande et au
+     * doigt, où rien ne signale qu'on est là pour l'entendre.
+     *
+     * **Inactif par défaut**, contrairement à l'aperçu lui-même. Une image qui
+     * s'anime dans un fond se remarque à peine ; du son qui part tout seul
+     * s'entend dans toute la pièce, et se subit — d'autant qu'on peut être en
+     * train d'écouter autre chose. Qui le veut l'active ; l'inverse imposait la
+     * surprise à tout le monde une fois.
+     */
+    val trailerSound: Flow<Boolean> =
+        store.data.map { it[TRAILER_SOUND] ?: false }
+
+    suspend fun setTrailerSound(value: Boolean) =
+        store.edit { it[TRAILER_SOUND] = value }
+
     suspend fun setDohEnabled(value: Boolean) =
         store.edit { it[DOH_ENABLED] = value }
 
@@ -270,6 +293,7 @@ class SettingsRepository {
         val AUTO_PLAY_NEXT = booleanPreferencesKey("auto_play_next")
         val PLAYER_CLOCK = booleanPreferencesKey("player_clock")
         val TRAILER_AUTOPLAY = booleanPreferencesKey("trailer_autoplay")
+        val TRAILER_SOUND = booleanPreferencesKey("trailer_sound")
         val UPDATE_INTERVAL = stringPreferencesKey("update_interval")
         val SCREENSAVER_DELAY = stringPreferencesKey("screensaver_delay")
         val INTRODB_API_KEY = stringPreferencesKey("introdb_api_key")

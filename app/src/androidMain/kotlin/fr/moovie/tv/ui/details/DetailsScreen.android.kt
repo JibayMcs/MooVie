@@ -48,8 +48,9 @@ fun DetailsScreen(
     val resume by viewModel.resume.collectAsStateWithLifecycle()
     val quickPlay by viewModel.quickPlay.collectAsStateWithLifecycle()
     val trailer by viewModel.trailer.collectAsStateWithLifecycle()
-    val trailerStream by viewModel.trailerStream.collectAsStateWithLifecycle()
+    val trailerExpanded by viewModel.trailerExpanded.collectAsStateWithLifecycle()
     val trailerAutoplay by viewModel.trailerAutoplay.collectAsStateWithLifecycle()
+    val trailerSound by viewModel.trailerSound.collectAsStateWithLifecycle()
     val panelVisible by viewModel.panelVisible.collectAsStateWithLifecycle()
     val selectedEpisode by viewModel.selectedEpisode.collectAsStateWithLifecycle()
     // Reprise depuis l'accueil : lance la lecture directe une seule fois, dès que la fiche est chargée.
@@ -100,31 +101,17 @@ fun DetailsScreen(
         }
     }
 
-    // Bande-annonce : même départ vers le lecteur, mais sans rien de ce qui
-    // suit une vraie lecture — pas de `mediaKey` (donc pas de reprise ni de
-    // ligne dans l'historique), pas d'épisode à enchaîner, et pas de durée
-    // attendue : le garde-fou du lecteur rejetterait deux minutes de promotion
-    // là où il attend deux heures de film.
-    LaunchedEffect(trailerStream) {
-        trailerStream?.let { s ->
-            if (s.url.isNotBlank()) {
-                onPlay(
-                    Screen.Player(
-                        streamUrl = s.url,
-                        headers = s.headers,
-                        title = viewModel.trailerTitle,
-                        subtitle = viewModel.playbackTitle,
-                    ),
-                )
-            }
-            viewModel.consumeTrailerStream()
-        }
-    }
 
     // Retour : ferme d'abord le panneau des sources, puis la fiche d'épisode,
     // et seulement ensuite remonte à l'accueil (BackHandler de MainActivity).
-    BackHandler(enabled = panelVisible || selectedEpisode != null) {
-        if (panelVisible) viewModel.closePanel() else viewModel.closeEpisode()
+    // La bande-annonce en premier : elle recouvre le reste, c'est elle que
+    // Retour doit refermer avant le panneau ou la fiche d'épisode.
+    BackHandler(enabled = trailerExpanded || panelVisible || selectedEpisode != null) {
+        when {
+            trailerExpanded -> viewModel.closeTrailer()
+            panelVisible -> viewModel.closePanel()
+            else -> viewModel.closeEpisode()
+        }
     }
 
     DetailsScreenContent(
@@ -162,9 +149,12 @@ fun DetailsScreen(
         sourceQualities = sourceQualities,
         onRequestQuality = viewModel::requestQuality,
         trailer = trailer,
-        onPlayTrailer = viewModel::playTrailer,
-        trailerPreview = { stream, mod -> TrailerPreview(stream, mod) },
+        onPlayTrailer = viewModel::openTrailer,
+        trailerExpanded = trailerExpanded,
+        onCloseTrailer = viewModel::closeTrailer,
+        trailerPreview = { stream, vol, onCtl, mod -> TrailerPreview(stream, vol, onCtl, mod) },
         trailerAutoplay = trailerAutoplay,
+        trailerSound = trailerSound,
         country = tmdbCountry(),
         onDismissQuickPlay = viewModel::dismissQuickPlay,
         onBack = onBack,

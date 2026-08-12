@@ -133,6 +133,8 @@ import fr.moovie.tv.resources.settings_move_down
 import fr.moovie.tv.resources.settings_move_up
 import fr.moovie.tv.resources.settings_player_clock
 import fr.moovie.tv.resources.settings_trailer_autoplay
+import fr.moovie.tv.resources.settings_trailer_sound
+import fr.moovie.tv.resources.settings_trailer_sound_help
 import fr.moovie.tv.resources.settings_trailer_autoplay_help
 import fr.moovie.tv.resources.settings_player_clock_help
 import fr.moovie.tv.resources.settings_screensaver_delay
@@ -292,6 +294,8 @@ fun SettingsScreenContent(
     playerClock: Boolean,
     trailerAutoplay: Boolean,
     onSetTrailerAutoplay: (Boolean) -> Unit,
+    trailerSound: Boolean,
+    onSetTrailerSound: (Boolean) -> Unit,
     hideHistoryWidgets: Boolean,
     splashAnimation: Boolean,
     updateInterval: UpdateInterval,
@@ -543,6 +547,16 @@ fun SettingsScreenContent(
                         help = stringResource(Res.string.settings_trailer_autoplay_help),
                     ) {
                         OnOff(value = trailerAutoplay, onChange = onSetTrailerAutoplay)
+                    }
+                    // Sous l'aperçu, et non ailleurs : c'est son son. Le
+                    // laisser actif quand l'aperçu est coupé n'a pas de sens,
+                    // mais on n'en grise pas la ligne — un réglage grisé se
+                    // lit mal, et le texte d'aide dit déjà ce qu'il commande.
+                    SettingRow(
+                        label = stringResource(Res.string.settings_trailer_sound),
+                        help = stringResource(Res.string.settings_trailer_sound_help),
+                    ) {
+                        OnOff(value = trailerSound, onChange = onSetTrailerSound)
                     }
                 }
 
