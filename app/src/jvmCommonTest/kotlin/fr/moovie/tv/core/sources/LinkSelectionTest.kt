@@ -2,6 +2,7 @@ package fr.moovie.tv.core.sources
 
 import fr.moovie.tv.core.sources.model.EmbedLink
 import fr.moovie.tv.core.sources.usecase.nextLinkFor
+import fr.moovie.tv.core.sources.usecase.orderedLinksFor
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -64,5 +65,69 @@ class LinkSelectionTest {
     @Test
     fun `sans lien il n y a rien a jouer`() {
         assertNull(nextLinkFor(emptyList(), preferred = "VO"))
+    }
+}
+
+/**
+ * Classement par qualité mesurée. Pur, donc testé sans réseau — c'est la moitié
+ * de la promesse « la meilleure qualité qui marche » ; l'autre moitié est le
+ * repli de la cascade, qui descend simplement cette liste.
+ */
+class LinkQualityOrderTest {
+
+    private fun lien(url: String, lang: String = "VF") =
+        EmbedLink(url = url, hoster = url, language = lang)
+
+    private val liens = listOf(lien("a"), lien("b"), lien("c"))
+
+    @Test
+    fun `sans aucune mesure l'ordre des providers est intact`() {
+        // Fiche à peine ouverte : rien n'est mesuré, on ne change rien.
+        assertEquals(listOf("a", "b", "c"), orderedLinksFor(liens, "VF").map { it.url })
+        assertEquals("a", nextLinkFor(liens, "VF")?.url)
+    }
+
+    @Test
+    fun `la definition la plus haute passe devant`() {
+        val h = mapOf("a" to 480, "b" to 1080, "c" to 720)
+        assertEquals(listOf("b", "c", "a"), orderedLinksFor(liens, "VF", heights = h).map { it.url })
+        assertEquals("b", nextLinkFor(liens, "VF", heights = h)?.url)
+    }
+
+    @Test
+    fun `un lien non mesure ne passe pas derriere un mauvais lien mesure`() {
+        // « a » est mesuré à 360p, « b » et « c » ne sont pas encore mesurés :
+        // les reléguer ferait dégringoler le meilleur catalogue pour la seule
+        // raison qu'on ne l'a pas encore interrogé.
+        val h = mapOf("a" to 360)
+        assertEquals(listOf("b", "c", "a"), orderedLinksFor(liens, "VF", heights = h).map { it.url })
+    }
+
+    @Test
+    fun `une definition superieure a l'ordinaire promeut le lien`() {
+        // Le pendant du test précédent : la mesure doit servir à *monter*,
+        // sinon elle ne sert à rien.
+        val h = mapOf("c" to 1080)
+        assertEquals(listOf("c", "a", "b"), orderedLinksFor(liens, "VF", heights = h).map { it.url })
+    }
+
+    @Test
+    fun `a definition egale la priorite des providers departage`() {
+        val h = mapOf("a" to 720, "b" to 720, "c" to 720)
+        assertEquals(listOf("a", "b", "c"), orderedLinksFor(liens, "VF", heights = h).map { it.url })
+    }
+
+    @Test
+    fun `un lien ecarte ne revient pas, meme s'il est le meilleur`() {
+        // C'est le repli : la cascade exclut ce qui vient d'échouer et redescend.
+        val h = mapOf("a" to 480, "b" to 1080)
+        val suite = orderedLinksFor(liens, "VF", excluded = setOf("b"), heights = h)
+        assertEquals(listOf("c", "a"), suite.map { it.url })
+    }
+
+    @Test
+    fun `le classement ne franchit jamais la barriere des langues`() {
+        val melange = listOf(lien("vf", "VF"), lien("vo1080", "VO"))
+        assertEquals(listOf("vf"), orderedLinksFor(melange, "VF", heights = mapOf("vo1080" to 1080)).map { it.url })
     }
 }

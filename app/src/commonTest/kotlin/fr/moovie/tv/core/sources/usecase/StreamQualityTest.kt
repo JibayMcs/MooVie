@@ -61,3 +61,47 @@ class StreamQualityTest {
         assertNull(qualityLabel(120))
     }
 }
+
+class HlsHeightsTest {
+
+    private val master = """
+        #EXTM3U
+        #EXT-X-STREAM-INF:BANDWIDTH=800000,RESOLUTION=640x360
+        360.m3u8
+        #EXT-X-STREAM-INF:BANDWIDTH=2400000,RESOLUTION=1280x720
+        720.m3u8
+        #EXT-X-STREAM-INF:BANDWIDTH=4800000,RESOLUTION=1920x1080
+        1080.m3u8
+    """.trimIndent()
+
+    @Test
+    fun `les definitions sortent de la plus haute a la plus basse`() {
+        assertEquals(listOf(1080, 720, 360), hlsHeights(master))
+    }
+
+    @Test
+    fun `hlsHeight reste la meilleure des variantes`() {
+        assertEquals(1080, hlsHeight(master))
+    }
+
+    @Test
+    fun `une meme definition a plusieurs debits ne compte qu'une fois`() {
+        // Cas réel : trois lignes « 1080p » à 4, 6 et 8 Mb/s donneraient trois
+        // entrées de menu que rien ne distingue à l'écran.
+        val doublons = """
+            #EXT-X-STREAM-INF:BANDWIDTH=4000000,RESOLUTION=1920x1080
+            a.m3u8
+            #EXT-X-STREAM-INF:BANDWIDTH=6000000,RESOLUTION=1920x1080
+            b.m3u8
+            #EXT-X-STREAM-INF:BANDWIDTH=2400000,RESOLUTION=1280x720
+            c.m3u8
+        """.trimIndent()
+        assertEquals(listOf(1080, 720), hlsHeights(doublons))
+    }
+
+    @Test
+    fun `une playlist sans resolution ne rend rien`() {
+        assertEquals(emptyList(), hlsHeights("#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=800000\na.m3u8"))
+        assertNull(hlsHeight("#EXTM3U"))
+    }
+}

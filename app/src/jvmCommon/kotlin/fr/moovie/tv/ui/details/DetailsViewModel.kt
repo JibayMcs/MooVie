@@ -11,6 +11,7 @@ import fr.moovie.tv.core.watch.EpisodeRef
 import fr.moovie.tv.core.watch.episodeToResume
 import fr.moovie.tv.core.watch.parseEpisodeKey
 import fr.moovie.tv.core.sources.port.SourceProvider
+import fr.moovie.tv.core.sources.usecase.UNKNOWN_HEIGHT
 import fr.moovie.tv.core.sources.usecase.nextLinkFor
 import fr.moovie.tv.data.download.Download
 import fr.moovie.tv.data.download.DownloadRepository
@@ -19,7 +20,8 @@ import fr.moovie.tv.data.download.localStream
 import fr.moovie.tv.data.sources.ExtractorRegistry
 import fr.moovie.tv.core.sources.model.PlayableStream
 import fr.moovie.tv.data.sources.isStreamPlayable
-import fr.moovie.tv.data.sources.streamQuality
+import fr.moovie.tv.core.sources.usecase.qualityLabel
+import fr.moovie.tv.data.sources.streamHeights
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
@@ -27,6 +29,7 @@ import kotlinx.coroutines.sync.withPermit
 import fr.moovie.tv.data.sources.ProviderRegistry
 import fr.moovie.tv.data.sources.SourceCacheRepository
 import fr.moovie.tv.ui.format.upcomingDate
+import fr.moovie.tv.ui.navigation.AltSource
 import fr.moovie.tv.data.tmdb.Episode
 import fr.moovie.tv.data.tmdb.TmdbRepository
 import fr.moovie.tv.data.tmdb.TvDetails
@@ -93,6 +96,23 @@ class DetailsViewModel : ViewModel() {
     val qualities: StateFlow<Map<String, String>> = _qualities
 
     /**
+     * Hauteur d'image mesurée, par URL de lien.
+     *
+     * Doublon apparent de [_qualities], qui n'en est pas un : celui-ci porte un
+     * libellé fait pour être lu, celui-là un nombre fait pour être comparé. Le
+     * classement des sources au lancement s'appuie sur le second.
+     */
+    private val _heights = MutableStateFlow<Map<String, Int>>(emptyMap())
+    val heights: StateFlow<Map<String, Int>> = _heights
+
+    /**
+     * Toutes les définitions d'un lien, pas seulement la meilleure : c'est ce
+     * que le menu « Qualité » du lecteur propose, en croisant les sources.
+     */
+    private val _variants = MutableStateFlow<Map<String, List<Int>>>(emptyMap())
+    val variants: StateFlow<Map<String, List<Int>>> = _variants
+
+    /**
      * Verdict de la sonde, par URL d'embed.
      *
      * L'information existait déjà : mesurer la qualité oblige à résoudre le
@@ -135,7 +155,7 @@ class DetailsViewModel : ViewModel() {
                     if (stream == null || !isStreamPlayable(stream, playbackMinutes)) {
                         null
                     } else {
-                        stream to streamQuality(stream)
+                        stream to streamHeights(stream)
                     }
                 }
             }.getOrNull()
@@ -150,7 +170,18 @@ class DetailsViewModel : ViewModel() {
                 return@launch
             }
             _linkStatus.value = _linkStatus.value + (link.url to LinkStatus.OK)
-            outcome.second?.let { _qualities.value = _qualities.value + (link.url to it) }
+            // La hauteur **et** le libellé : la première sert au classement des
+            // sources et au menu du lecteur, le second à l'affichage. Déduire
+            // l'une de l'autre après coup, c'est trier « 1080p » et « 720p »
+            // comme des chaînes de caractères.
+            val hauteurs = outcome.second
+            hauteurs.firstOrNull()?.let { haut ->
+                _heights.value = _heights.value + (link.url to haut)
+                qualityLabel(haut)?.let { _qualities.value = _qualities.value + (link.url to it) }
+            }
+            if (hauteurs.isNotEmpty()) {
+                _variants.value = _variants.value + (link.url to hauteurs)
+            }
         }
     }
 
@@ -630,6 +661,27 @@ class DetailsViewModel : ViewModel() {
         private set
 
     /**
+     * Les autres sources de la langue en cours, pour le menu « Qualité » du
+     * lecteur — celle qui joue exclue, elle n'est pas une alternative à
+     * elle-même.
+     *
+     * Calculé à la demande plutôt que mémorisé : les mesures de définition
+     * continuent d'arriver pendant qu'on regarde la fiche, et une liste figée à
+     * l'ouverture serait plus pauvre que ce qu'on sait au moment de lancer.
+     */
+    fun playbackAlternatives(): List<AltSource> {
+        val active = _sources.value as? SourcesState.Active ?: return emptyList()
+        val lang = playingLink?.language ?: return emptyList()
+        val hauteurs = _heights.value
+        return active.links
+            .filter { it.language == lang && it.url != playingLink?.url }
+            .map { AltSource(url = it.url, hoster = it.hoster, height = hauteurs[it.url] ?: 0) }
+            // La meilleure d'abord : c'est l'ordre dans lequel le menu les
+            // proposera, et celui dans lequel on veut les lire.
+            .sortedByDescending { it.height }
+    }
+
+    /**
      * Épisode suivant : le numéro d'après dans la saison courante, sinon le
      * premier épisode de la saison suivante si elle existe. On se fie à
      * `episodeCount` de TMDB, disponible pour toutes les saisons — la liste
@@ -937,7 +989,7 @@ class DetailsViewModel : ViewModel() {
         // conclurait « plus rien à tenter » devant des liens qu'elle jouerait.
         val lang = streamLanguage.value.name
         val hasAlternative = active.anyLoading ||
-            nextLinkFor(active.links, preferred = lang, excluded = rejectedLinks) != null
+            nextLinkFor(active.links, preferred = lang, excluded = rejectedLinks, heights = _heights.value) != null
         if (!hasAlternative) {
             // Plus rien à tenter : sans ce retour, l'utilisateur revenait à la
             // fiche sans la moindre explication. On ouvre le panneau, qui liste
@@ -1063,7 +1115,7 @@ class DetailsViewModel : ViewModel() {
                     _quickPlay.value = QuickPlayState.Idle
                     return@launch
                 }
-                val next = nextLinkFor(active.links, preferred = lang, excluded = tried)
+                val next = nextLinkFor(active.links, preferred = lang, excluded = tried, heights = _heights.value)
                 if (next != null) {
                     tried += next.url
                     // Affiche l'hébergeur en cours d'essai : la cascade devient
@@ -1301,10 +1353,14 @@ class DetailsViewModel : ViewModel() {
 
                 val links = seasonLinks(tv, season, ep.episodeNumber)
                 val tried = mutableSetOf<String>()
-                var placed = false
+                // Le meilleur candidat rencontré : lien, flux résolu, définition.
+                var best: Triple<EmbedLink, PlayableStream, Int>? = null
                 repeat(MAX_TRIES_PER_EPISODE) {
-                    if (placed) return@repeat
-                    val next = nextLinkFor(links, preferred = lang, excluded = tried) ?: return@repeat
+                    // On s'arrête dès qu'on tient une définition qu'on ne battra
+                    // pas : continuer coûterait des requêtes pour rien.
+                    if ((best?.third ?: 0) >= ENOUGH_HEIGHT) return@repeat
+                    val next = nextLinkFor(links, preferred = lang, excluded = tried, heights = _heights.value)
+                        ?: return@repeat
                     tried += next.url
                     val stream = runCatching { ExtractorRegistry.resolve(next) }.getOrNull()
                     // Le même verdict que le lecteur, durée comprise.
@@ -1313,6 +1369,17 @@ class DetailsViewModel : ViewModel() {
                     ) {
                         return@repeat
                     }
+                    // Le flux est déjà résolu et sondé : en lire la définition ne
+                    // coûte qu'une requête de plus, et c'est ce qui permet de
+                    // garder le meilleur au lieu du premier venu. Non mesurable
+                    // (MP4 progressif) vaut le même pivot qu'ailleurs, voir
+                    // UNKNOWN_HEIGHT.
+                    val hauteur = streamHeights(stream).firstOrNull() ?: UNKNOWN_HEIGHT
+                    if (hauteur > (best?.third ?: -1)) best = Triple(next, stream, hauteur)
+                }
+                val retenu = best
+                if (retenu != null) {
+                    val (lien, flux, _) = retenu
                     DownloadQueue.enqueue(
                         Download(
                             key = key,
@@ -1322,15 +1389,16 @@ class DetailsViewModel : ViewModel() {
                             tmdbId = tmdbId,
                             isTv = true,
                             createdAt = System.currentTimeMillis(),
-                            sourceUrl = next.url,
-                            hoster = next.hoster,
-                            language = next.language.orEmpty(),
+                            sourceUrl = lien.url,
+                            hoster = lien.hoster,
+                            language = lien.language.orEmpty(),
                         ),
-                        stream,
+                        flux,
                     )
-                    placed = true
+                    queued++
+                } else {
+                    failed++
                 }
-                if (placed) queued++ else failed++
                 checked++
                 _seasonDownload.value = SeasonDownload(season, checked, episodes.size, queued, failed)
             }
@@ -1395,3 +1463,13 @@ enum class LinkStatus { UNKNOWN, CHECKING, OK, DEAD }
 
 /** Essais de sources par épisode avant d'abandonner. Voir DetailsViewModel.downloadSeason. */
 private const val MAX_TRIES_PER_EPISODE = 6
+
+/**
+ * Définition au-delà de laquelle chercher mieux ne vaut plus les requêtes.
+ *
+ * Un téléchargement se garde : sa qualité compte davantage que la seconde qu'on
+ * met à la choisir, et c'est pourquoi la recherche ne s'arrête plus au premier
+ * flux jouable. Elle doit tout de même s'arrêter — 1080p est le plafond réel de
+ * ces catalogues, et le budget de [MAX_TRIES_PER_EPISODE] borne le reste.
+ */
+private const val ENOUGH_HEIGHT = 1080

@@ -10,10 +10,27 @@ package fr.moovie.tv.core.sources.usecase
  * On retient la **plus haute** variante : un flux adaptatif en liste plusieurs,
  * et c'est celle que le lecteur choisira sur une bonne connexion.
  */
-fun hlsHeight(playlist: String): Int? =
+fun hlsHeight(playlist: String): Int? = hlsHeights(playlist).firstOrNull()
+
+/**
+ * **Toutes** les définitions annoncées, de la plus haute à la plus basse et sans
+ * doublon.
+ *
+ * C'est la liste que le menu « Qualité » propose. [hlsHeight] n'en garde que la
+ * première parce qu'il répond à une autre question — « que vaut cette source ? »
+ * — et qu'un flux adaptatif est aussi bon que sa meilleure variante.
+ *
+ * Dédoublonnée sur la hauteur : une master playlist liste souvent la même
+ * définition à plusieurs débits, ce qui donnerait trois lignes « 1080p »
+ * impossibles à départager à l'écran.
+ */
+fun hlsHeights(playlist: String): List<Int> =
     RESOLUTION.findAll(playlist)
         .mapNotNull { it.groupValues[2].toIntOrNull() }
-        .maxOrNull()
+        .filter { it > 0 }
+        .distinct()
+        .sortedDescending()
+        .toList()
 
 private val RESOLUTION = Regex("""RESOLUTION=(\d+)x(\d+)""")
 

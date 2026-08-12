@@ -102,5 +102,25 @@ sealed interface Screen {
         val sourceUrl: String = "",
         val hoster: String = "",
         val language: String = "",
+        /**
+         * Les autres sources de la même langue, avec la définition qu'on leur
+         * connaît. Elles alimentent le menu « Qualité » : quand l'hébergeur
+         * courant ne sert que du 480p et qu'un autre a du 1080p, il faut bien
+         * que le lecteur sache que l'autre existe.
+         *
+         * Portées par la navigation plutôt que relues depuis un dépôt : le
+         * lecteur ne connaît ni TMDB ni les catalogues, et c'est très bien
+         * ainsi. Vide quand la lecture vient du disque.
+         */
+        val alternatives: List<AltSource> = emptyList(),
     ) : Screen
 }
+
+/**
+ * Une source de rechange, telle que le lecteur la voit : un lien d'embed, le nom
+ * de qui le sert, et la hauteur d'image mesurée.
+ *
+ * [height] vaut zéro quand la source n'a pas encore été mesurée — elle est alors
+ * proposée sans promesse de définition, ce qui reste plus utile que de la taire.
+ */
+data class AltSource(val url: String, val hoster: String, val height: Int = 0)

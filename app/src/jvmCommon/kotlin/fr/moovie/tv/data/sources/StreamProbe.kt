@@ -7,7 +7,7 @@ import fr.moovie.tv.core.sources.port.HttpRequest
 import fr.moovie.tv.core.sources.port.getBody
 import fr.moovie.tv.core.sources.usecase.isDurationAcceptable
 import fr.moovie.tv.core.sources.model.StreamFormat
-import fr.moovie.tv.core.sources.usecase.hlsHeight
+import fr.moovie.tv.core.sources.usecase.hlsHeights
 import fr.moovie.tv.core.sources.usecase.qualityLabel
 
 /**
@@ -99,10 +99,25 @@ private val EXTINF = Regex("""#EXTINF:\s*([\d.]+)""")
 suspend fun streamQuality(
     stream: PlayableStream,
     http: HttpGateway = ExtractorRegistry.gateway,
-): String? {
-    if (stream.format != StreamFormat.HLS) return null
-    val body = http.getBody(stream.url, stream.headers) ?: return null
-    return qualityLabel(hlsHeight(body))
+): String? = qualityLabel(streamHeights(stream, http).firstOrNull())
+
+/**
+ * Les définitions annoncées par un flux, de la plus haute à la plus basse.
+ *
+ * La **hauteur** et non le seul libellé : c'est elle qui permet de comparer deux
+ * sources — « 1080p » et « 720p » ne se trient pas comme des chaînes — et c'est
+ * la liste entière, parce que le menu « Qualité » du lecteur les propose toutes.
+ *
+ * Vide hors HLS : un MP4 progressif n'annonce rien avant d'être ouvert, et un
+ * manifeste DASH n'est pas dans le chemin des sources.
+ */
+suspend fun streamHeights(
+    stream: PlayableStream,
+    http: HttpGateway = ExtractorRegistry.gateway,
+): List<Int> {
+    if (stream.format != StreamFormat.HLS) return emptyList()
+    val body = http.getBody(stream.url, stream.headers) ?: return emptyList()
+    return hlsHeights(body)
 }
 
 /** Retourne null quand la méthode elle-même est refusée (à réessayer autrement). */
