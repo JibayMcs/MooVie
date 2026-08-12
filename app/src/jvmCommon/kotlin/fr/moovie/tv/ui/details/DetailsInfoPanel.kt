@@ -73,12 +73,16 @@ import org.jetbrains.compose.resources.stringResource
  * personne. Le panneau se contente donc de ce qui existe, quitte à être court.
  */
 @Composable
-fun MovieInfoPanel(details: MovieDetails, country: String, modifier: Modifier = Modifier) {
+fun MovieInfoPanel(
+    details: MovieDetails,
+    country: String,
+    modifier: Modifier = Modifier,
+    scrollable: Boolean = false,
+) {
     val credits = details.credits
     InfoList(
         modifier = modifier,
-        // La page du film défile déjà en bloc : voir InfoList.
-        scrollable = false,
+        scrollable = scrollable,
         entries = listOf(
             // Le titre original n'est montré que s'il diffère : le répéter à
             // l'identique sous le titre affiché n'apprend rien.
@@ -102,7 +106,12 @@ fun MovieInfoPanel(details: MovieDetails, country: String, modifier: Modifier = 
 }
 
 @Composable
-fun TvInfoPanel(details: TvDetails, country: String, modifier: Modifier = Modifier) {
+fun TvInfoPanel(
+    details: TvDetails,
+    country: String,
+    modifier: Modifier = Modifier,
+    scrollable: Boolean = false,
+) {
     val credits = details.credits
     val prochain = details.nextEpisode?.let { ep ->
         val date = formatDate(ep.airDate) ?: return@let null
@@ -115,8 +124,7 @@ fun TvInfoPanel(details: TvDetails, country: String, modifier: Modifier = Modifi
     }
     InfoList(
         modifier = modifier,
-        // Il remplace la liste des épisodes, seul élément défilant de la fiche.
-        scrollable = true,
+        scrollable = scrollable,
         entries = listOf(
             Res.string.info_original_title to
                 details.originalName.takeIf { it.isNotBlank() && it != details.name },
@@ -143,11 +151,14 @@ fun TvInfoPanel(details: TvDetails, country: String, modifier: Modifier = Modifi
 /**
  * @param scrollable **jamais vrai sous un parent qui défile déjà.** Deux
  *   défilements verticaux imbriqués mesurent l'enfant avec une hauteur infinie,
- *   et Compose lève `IllegalStateException` : l'application tombait à l'ouverture
- *   du panneau sur une fiche de film, dont la page défile en bloc. La fiche de
- *   série est l'inverse — sa page est figée et seul le volet droit défile, donc
- *   le panneau qui remplace la liste des épisodes doit porter son propre
- *   défilement.
+ *   et Compose lève `IllegalStateException`.
+ *
+ *   C'est une propriété de **l'endroit où l'on pose le panneau**, pas du
+ *   panneau : le même `TvInfoPanel` doit défiler quand il remplace la liste des
+ *   épisodes — seul élément défilant d'une fiche de série — et ne pas défiler
+ *   sur la fiche d'un épisode, dont la page défile en bloc. L'avoir fixé dans
+ *   le composable a fait tomber l'application deux fois, la seconde en
+ *   réutilisant le panneau ailleurs. C'est à l'appelant de le dire.
  */
 @Composable
 private fun InfoList(

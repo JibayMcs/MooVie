@@ -239,6 +239,7 @@ internal fun DesktopDetailsScreen(
     val selectedEpisode by vm.selectedEpisode.collectAsState()
     val trailer by vm.trailer.collectAsState()
     val trailerExpanded by vm.trailerExpanded.collectAsState()
+    val downloadSearching by vm.downloadSearching.collectAsState()
     val trailerAutoplay by vm.trailerAutoplay.collectAsState()
     val trailerSound by vm.trailerSound.collectAsState()
     // Reprise depuis l'accueil : lance la lecture directe une seule fois.
@@ -347,6 +348,8 @@ internal fun DesktopDetailsScreen(
         onPlayTrailer = vm::openTrailer,
         trailerExpanded = trailerExpanded,
         onCloseTrailer = vm::closeTrailer,
+        onDownloadBest = vm::downloadBest,
+        downloadSearching = downloadSearching,
         trailerPreview = { stream, vol, onCtl, mod -> TrailerPreview(stream, vol, onCtl, mod) },
         trailerAutoplay = trailerAutoplay,
         trailerSound = trailerSound,

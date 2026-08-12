@@ -540,4 +540,5 @@
     <string name="trailer_unmute">Unmute</string>
     <string name="player_quality">Quality</string>
     <string name="player_quality_auto">Automatic</string>
+    <string name="details_download_best">Download in best quality</string>
 </resources>

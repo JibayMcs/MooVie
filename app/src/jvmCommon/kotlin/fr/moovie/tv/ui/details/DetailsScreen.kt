@@ -44,6 +44,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.filled.BookmarkBorder
@@ -108,6 +110,7 @@ import fr.moovie.tv.resources.details_searching
 import fr.moovie.tv.resources.details_searching_source
 import fr.moovie.tv.resources.details_trying_source
 import fr.moovie.tv.resources.details_seasons
+import fr.moovie.tv.resources.details_download_best
 import fr.moovie.tv.resources.details_sources
 import fr.moovie.tv.resources.details_tab_info
 import fr.moovie.tv.resources.details_tab_overview
@@ -338,6 +341,10 @@ fun DetailsScreenContent(
      */
     trailerExpanded: Boolean = false,
     onCloseTrailer: () -> Unit = {},
+    /** Télécharge le titre affiché dans la meilleure définition trouvable. */
+    onDownloadBest: () -> Unit = {},
+    /** Recherche de la meilleure source en cours : le bouton tourne. */
+    downloadSearching: Boolean = false,
     /** Réglage utilisateur : l'aperçu se lance-t-il tout seul. */
     trailerAutoplay: Boolean = true,
     /** Réglage utilisateur : le son de l'aperçu monte-t-il en mode cinéma. */
@@ -716,8 +723,12 @@ fun DetailsScreenContent(
                             }
                         }
                         MoovieButton(onClick = onOpenPanel) { Text(stringResource(Res.string.details_sources)) }
-                        TrailerButton(trailer, onPlayTrailer)
-                        InfoToggleButton(infoVisible) { infoVisible = !infoVisible }
+                        // Bande-annonce et « En savoir plus » ne sont plus ici :
+                        // ils vivent en haut à droite de la fiche. La rangée
+                        // d'actions retrouve de l'air, et ces deux-là ne sont
+                        // pas des actions sur le titre — l'un ouvre une vidéo,
+                        // l'autre change de vue.
+                        DownloadBestButton(downloadSearching, onDownloadBest)
                         // Œil = marquer vu / non vu (outline verte quand vu).
                         MoovieIconButton(
                             onClick = { onToggleWatched(movieKey) },
@@ -755,6 +766,8 @@ fun DetailsScreenContent(
                             details = s.details,
                             country = country,
                             modifier = hPad.fillMaxWidth(),
+                            // La page du film défile déjà en bloc.
+                            scrollable = false,
                         )
                     } else {
                         // Casting sous les boutons, comme sur la fiche d'épisode :
@@ -772,6 +785,19 @@ fun DetailsScreenContent(
                         val ep = selected.episode
                         val key = episodeKey(selected.season, ep.episodeNumber)
                         EpisodeDetail(
+                            infoVisible = infoVisible,
+                            infoPanel = {
+                                TvInfoPanel(
+                                    details = s.details,
+                                    country = country,
+                                    modifier = hPad.fillMaxWidth(),
+                                    // Fiche d'épisode : la page défile en bloc,
+                                    // comme celle d'un film.
+                                    scrollable = false,
+                                )
+                            },
+                            onDownloadBest = onDownloadBest,
+                            downloadSearching = downloadSearching,
                             showName = s.details.name,
                             season = selected.season,
                             ep = ep,
@@ -972,8 +998,6 @@ fun DetailsScreenContent(
                         // bord, donc introuvables. Ici elles sont toujours au
                         // même endroit, à un appui vers le bas.
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            TrailerButton(trailer, onPlayTrailer)
-                            InfoToggleButton(infoVisible) { infoVisible = !infoVisible }
                             MoovieIconButton(
                                 onClick = onToggleSeasonWatched,
                                 icon = if (seasonAllWatched) Icons.Default.VisibilityOff else Icons.Default.Visibility,
@@ -999,6 +1023,9 @@ fun DetailsScreenContent(
                             TvInfoPanel(
                                 details = s.details,
                                 country = country,
+                                // Il remplace la liste des épisodes, seul
+                                // élément défilant de la fiche de série.
+                                scrollable = true,
                                 modifier = listModifier.padding(
                                     if (compact) {
                                         PaddingValues(horizontal = 16.dp, vertical = 8.dp)
@@ -1141,6 +1168,46 @@ fun DetailsScreenContent(
                 onClose = onCloseTrailer,
                 modifier = Modifier.fillMaxWidth(),
             )
+        }
+
+        // Bande-annonce et « En savoir plus », en haut à droite.
+        //
+        // Sortis de la rangée d'actions, où ils s'entassaient avec Lire,
+        // Sources, l'œil et le signet : sur un portrait de 448 dp la ligne
+        // débordait, et c'est ce qui avait déjà fait disparaître le signet.
+        // Ils n'y avaient de toute façon pas leur place — cette rangée agit sur
+        // le titre (le lire, le marquer, le mettre de côté), là où ces deux-là
+        // ouvrent une vidéo et changent de vue.
+        //
+        // Masqués quand la bande-annonce est au premier plan ou que le panneau
+        // des sources est ouvert : ils recouvriraient l'un comme l'autre.
+        if (!trailerExpanded && !panelVisible && state !is DetailsState.Loading) {
+            Row(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(horizontal = hPadDp, vertical = 24.dp)
+                    .graphicsLayer { alpha = uiAlpha }
+                    // Redescendre, explicitement.
+                    //
+                    // Ces boutons sont seuls en haut à droite : sous eux, le
+                    // faisceau vertical de la recherche de focus ne rencontre
+                    // rien — le contenu de la fiche est à gauche. Compose ne
+                    // trouve donc aucune cible et le focus reste coincé là,
+                    // sans aucun moyen de revenir à la télécommande.
+                    //
+                    // C'est le même piège que la descente en-tête → contenu
+                    // déjà câblée sur les rangées : quand la géométrie ne
+                    // porte pas le chemin, il faut l'écrire.
+                    .onPreviewKeyEvent { event ->
+                        event.type == KeyEventType.KeyDown &&
+                            event.key == Key.DirectionDown &&
+                            runCatching { primaryFocus.requestFocus() }.isSuccess
+                    },
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                TrailerButton(trailer, onPlayTrailer)
+                InfoToggleButton(infoVisible) { infoVisible = !infoVisible }
+            }
         }
 
         // Bouton retour desktop, en overlay haut-gauche (masqué quand le panneau
@@ -1699,6 +1766,26 @@ private fun DetailsState.titleKey(): String = when (this) {
     else -> ""
 }
 
+/**
+ * Télécharge le titre affiché, dans la meilleure définition trouvable.
+ *
+ * Icône seule, comme ses voisins de rangée. Il tourne pendant la recherche :
+ * celle-ci résout et sonde plusieurs sources, ce qui prend quelques secondes,
+ * et sans rien à l'écran l'appui semblerait n'avoir rien fait.
+ *
+ * Distinct de l'appui long sur une source du panneau, qui reste le moyen de
+ * choisir un hébergeur précis : ici on ne désigne rien, on demande le meilleur.
+ */
+@Composable
+private fun DownloadBestButton(searching: Boolean, onClick: () -> Unit) {
+    MoovieIconButton(
+        onClick = { if (!searching) onClick() },
+        icon = if (searching) Icons.Default.HourglassEmpty else Icons.Default.Download,
+        contentDescription = stringResource(Res.string.details_download_best),
+        selected = searching,
+    )
+}
+
 @Composable
 private fun TrailerButton(trailer: TrailerState, onClick: () -> Unit) {
     if (trailer !is TrailerState.Ready) return
@@ -1847,6 +1934,16 @@ private fun MovieMeta(
  */
 @Composable
 private fun EpisodeDetail(
+    /**
+     * « En savoir plus » sur une fiche d'épisode montre les métadonnées de la
+     * **série** : c'est d'elle qu'on veut la chaîne, le statut ou la date du
+     * prochain épisode. Sans ce paramètre le bouton basculait un état que
+     * personne ne lisait, et paraissait mort.
+     */
+    infoVisible: Boolean = false,
+    infoPanel: @Composable () -> Unit = {},
+    onDownloadBest: () -> Unit = {},
+    downloadSearching: Boolean = false,
     showName: String,
     season: Int,
     ep: Episode,
@@ -1972,6 +2069,7 @@ private fun EpisodeDetail(
             }
         }
         MoovieButton(onClick = onOpenSources) { Text(stringResource(Res.string.details_sources)) }
+        DownloadBestButton(downloadSearching, onDownloadBest)
         MoovieIconButton(
             onClick = onToggleWatched,
             icon = if (isWatched) Icons.Default.VisibilityOff else Icons.Default.Visibility,
@@ -1987,9 +2085,13 @@ private fun EpisodeDetail(
             modifier = hPad,
         )
     }
-    // Sous les boutons, comme sur un film : la descente au D-pad atteint
-    // d'abord Lire, pas une vignette d'acteur.
-    CastRow(cast, hPadDp, onOpenPerson)
+    if (infoVisible) {
+        infoPanel()
+    } else {
+        // Sous les boutons, comme sur un film : la descente au D-pad atteint
+        // d'abord Lire, pas une vignette d'acteur.
+        CastRow(cast, hPadDp, onOpenPerson)
+    }
 }
 
 @Composable

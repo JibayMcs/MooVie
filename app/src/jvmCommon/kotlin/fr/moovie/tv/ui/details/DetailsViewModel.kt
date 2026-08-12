@@ -39,6 +39,7 @@ import fr.moovie.tv.data.watch.TitleMeta
 import fr.moovie.tv.data.watch.WatchProgressRepository
 import fr.moovie.tv.data.watch.WatchlistEntry
 import fr.moovie.tv.resources.Res
+import fr.moovie.tv.resources.details_lang_unavailable
 import fr.moovie.tv.resources.details_needs_key
 import fr.moovie.tv.resources.details_no_player
 import fr.moovie.tv.resources.details_resolve_error
@@ -1294,6 +1295,113 @@ class DetailsViewModel : ViewModel() {
     private var seasonJob: Job? = null
 
     /**
+     * Cherche-t-on en ce moment la meilleure source à télécharger.
+     *
+     * Un booléen et non une URL, contrairement à [_resolving] : ici on ne
+     * désigne aucune ligne du panneau, on cherche parmi toutes. Le bouton s'en
+     * sert pour tourner — la recherche prend plusieurs secondes, et sans rien à
+     * l'écran l'appui semble n'avoir rien fait.
+     */
+    private val _downloadSearching = MutableStateFlow(false)
+    val downloadSearching: StateFlow<Boolean> = _downloadSearching
+
+    /**
+     * Télécharge le film ou l'épisode affiché, **dans la meilleure définition
+     * trouvable**.
+     *
+     * C'est le pendant de « Télécharger la saison » pour un titre seul, et il
+     * comblait un trou : jusqu'ici un film ne pouvait être téléchargé qu'en
+     * désignant une source à la main, ou en lançant la lecture — deux chemins
+     * qui donnent ce qu'on a sous la main, pas le meilleur. Une saison était
+     * donc mieux servie qu'un film.
+     *
+     * Sans effet si les sources ne sont pas encore chargées : il n'y aurait rien
+     * à départager.
+     */
+    fun downloadBest() {
+        if (_downloadSearching.value) return
+        val active = _sources.value as? SourcesState.Active ?: return
+        val meta = pendingMeta ?: return
+        val minutes = _selectedEpisode.value?.episode?.runtime ?: playbackMinutes
+
+        _resolveError.value = null
+        _downloadSearching.value = true
+        viewModelScope.launch {
+            val lang = settings.streamLanguage.first().name
+            val retenu = runCatching { bestDownloadCandidate(active.links, lang, minutes) }.getOrNull()
+            _downloadSearching.value = false
+            if (retenu == null) {
+                // Aucune source jouable : on le dit, plutôt que de laisser la
+                // file échouer en silence deux minutes plus tard.
+                _resolveError.value = getString(Res.string.details_lang_unavailable, lang)
+                return@launch
+            }
+            val (lien, flux) = retenu
+            DownloadQueue.enqueue(
+                Download(
+                    key = meta.key,
+                    title = meta.title,
+                    subtitle = meta.episodeLabel.orEmpty(),
+                    imageUrl = meta.imageUrl,
+                    tmdbId = meta.tmdbId,
+                    isTv = meta.isTv,
+                    createdAt = System.currentTimeMillis(),
+                    sourceUrl = lien.url,
+                    hoster = lien.hoster,
+                    language = lien.language.orEmpty(),
+                ),
+                flux,
+            )
+        }
+    }
+
+    /**
+     * La meilleure source téléchargeable parmi les candidats, ou null.
+     *
+     * ### Pourquoi on ne s'arrête pas au premier qui marche
+     *
+     * Un téléchargement se garde : sa définition compte davantage que la
+     * seconde qu'on met à la choisir — c'est l'inverse du compromis de la
+     * lecture, où l'on part vite avec ce qu'on sait déjà. On descend donc les
+     * candidats, on les résout, on les sonde, **et on lit leur définition au
+     * passage** : le flux étant déjà résolu et sondé, cela ne coûte qu'une
+     * requête de plus, et c'est ce qui permet de garder le meilleur plutôt que
+     * le premier venu.
+     *
+     * Deux bornes empêchent l'emballement : on s'arrête dès [ENOUGH_HEIGHT],
+     * qu'on ne battra pas sur ces catalogues, et le budget de
+     * [MAX_TRIES_PER_EPISODE] plafonne le reste. Un flux non mesurable — MP4
+     * progressif, qui n'annonce rien avant d'être ouvert — vaut le même pivot
+     * qu'ailleurs, voir [UNKNOWN_HEIGHT].
+     *
+     * @param expectedMinutes durée attendue, qui écarte les leurres : un flux
+     *   de vingt secondes là où l'épisode en fait quarante-deux minutes n'est
+     *   pas l'épisode.
+     */
+    private suspend fun bestDownloadCandidate(
+        links: List<EmbedLink>,
+        lang: String,
+        expectedMinutes: Int?,
+    ): Pair<EmbedLink, PlayableStream>? {
+        val tried = mutableSetOf<String>()
+        var best: Triple<EmbedLink, PlayableStream, Int>? = null
+        repeat(MAX_TRIES_PER_EPISODE) {
+            if ((best?.third ?: 0) >= ENOUGH_HEIGHT) return@repeat
+            val next = nextLinkFor(links, preferred = lang, excluded = tried, heights = _heights.value)
+                ?: return@repeat
+            tried += next.url
+            val stream = runCatching { ExtractorRegistry.resolve(next) }.getOrNull()
+            // Le même verdict que le lecteur, durée comprise.
+            if (stream == null || stream.url.isBlank() || !isStreamPlayable(stream, expectedMinutes)) {
+                return@repeat
+            }
+            val hauteur = streamHeights(stream).firstOrNull() ?: UNKNOWN_HEIGHT
+            if (hauteur > (best?.third ?: -1)) best = Triple(next, stream, hauteur)
+        }
+        return best?.let { it.first to it.second }
+    }
+
+    /**
      * Télécharge toute la saison affichée, en choisissant pour chaque épisode
      * **une source que le lecteur saurait vraiment lire**.
      *
@@ -1352,34 +1460,9 @@ class DetailsViewModel : ViewModel() {
                 }
 
                 val links = seasonLinks(tv, season, ep.episodeNumber)
-                val tried = mutableSetOf<String>()
-                // Le meilleur candidat rencontré : lien, flux résolu, définition.
-                var best: Triple<EmbedLink, PlayableStream, Int>? = null
-                repeat(MAX_TRIES_PER_EPISODE) {
-                    // On s'arrête dès qu'on tient une définition qu'on ne battra
-                    // pas : continuer coûterait des requêtes pour rien.
-                    if ((best?.third ?: 0) >= ENOUGH_HEIGHT) return@repeat
-                    val next = nextLinkFor(links, preferred = lang, excluded = tried, heights = _heights.value)
-                        ?: return@repeat
-                    tried += next.url
-                    val stream = runCatching { ExtractorRegistry.resolve(next) }.getOrNull()
-                    // Le même verdict que le lecteur, durée comprise.
-                    if (stream == null || stream.url.isBlank() ||
-                        !isStreamPlayable(stream, ep.runtime)
-                    ) {
-                        return@repeat
-                    }
-                    // Le flux est déjà résolu et sondé : en lire la définition ne
-                    // coûte qu'une requête de plus, et c'est ce qui permet de
-                    // garder le meilleur au lieu du premier venu. Non mesurable
-                    // (MP4 progressif) vaut le même pivot qu'ailleurs, voir
-                    // UNKNOWN_HEIGHT.
-                    val hauteur = streamHeights(stream).firstOrNull() ?: UNKNOWN_HEIGHT
-                    if (hauteur > (best?.third ?: -1)) best = Triple(next, stream, hauteur)
-                }
-                val retenu = best
+                val retenu = bestDownloadCandidate(links, lang, ep.runtime)
                 if (retenu != null) {
-                    val (lien, flux, _) = retenu
+                    val (lien, flux) = retenu
                     DownloadQueue.enqueue(
                         Download(
                             key = key,

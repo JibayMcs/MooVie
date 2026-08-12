@@ -49,6 +49,7 @@ fun DetailsScreen(
     val quickPlay by viewModel.quickPlay.collectAsStateWithLifecycle()
     val trailer by viewModel.trailer.collectAsStateWithLifecycle()
     val trailerExpanded by viewModel.trailerExpanded.collectAsStateWithLifecycle()
+    val downloadSearching by viewModel.downloadSearching.collectAsStateWithLifecycle()
     val trailerAutoplay by viewModel.trailerAutoplay.collectAsStateWithLifecycle()
     val trailerSound by viewModel.trailerSound.collectAsStateWithLifecycle()
     val panelVisible by viewModel.panelVisible.collectAsStateWithLifecycle()
@@ -153,6 +154,8 @@ fun DetailsScreen(
         onPlayTrailer = viewModel::openTrailer,
         trailerExpanded = trailerExpanded,
         onCloseTrailer = viewModel::closeTrailer,
+        onDownloadBest = viewModel::downloadBest,
+        downloadSearching = downloadSearching,
         trailerPreview = { stream, vol, onCtl, mod -> TrailerPreview(stream, vol, onCtl, mod) },
         trailerAutoplay = trailerAutoplay,
         trailerSound = trailerSound,
