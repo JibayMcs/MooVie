@@ -126,6 +126,7 @@ import fr.moovie.tv.ui.navigation.AltSource
 import fr.moovie.tv.ui.player.QualityChoice
 import fr.moovie.tv.ui.player.qualityOptions
 import fr.moovie.tv.ui.player.qualitySection
+import fr.moovie.tv.ui.player.bestDownloadStream
 import fr.moovie.tv.ui.player.resolveAlternative
 import fr.moovie.tv.ui.player.audioSection
 import fr.moovie.tv.ui.player.speedSection
@@ -884,6 +885,79 @@ internal fun DesktopPlayerScreen(
             )
         }
 
+        // ── Qualité ──────────────────────────────────────────────────────
+        //
+        // libVLC 3 ne sait pas changer de variante en cours de route : il
+        // n'expose que la piste courante, jamais la liste. Les deux actions du
+        // menu passent donc par une **réouverture à la position** — plafonner
+        // le flux courant se fait avec `:adaptive-maxheight`, une option
+        // d'ouverture ; changer de source, avec une autre URL. Une brève
+        // coupure, sur une action explicite.
+        var quality by remember(streamUrl) { mutableStateOf<QualityChoice>(QualityChoice.Auto) }
+        var currentHeights by remember(streamUrl) { mutableStateOf(emptyList<Int>()) }
+        var playedUrl by remember(streamUrl) { mutableStateOf(streamUrl) }
+        var playedHeaders by remember(streamUrl) { mutableStateOf(headers) }
+        val qualityScope = rememberCoroutineScope()
+
+        // Les variantes se lisent dans la master playlist : seule source
+        // d'information ici, libVLC ne les exposant pas.
+        LaunchedEffect(playedUrl, playedHeaders) {
+            currentHeights = runCatching {
+                streamHeights(PlayableStream(playedUrl, StreamFormat.HLS, playedHeaders))
+            }.getOrDefault(emptyList())
+        }
+
+        fun reopen(url: String, hdrs: Map<String, String>, maxHeight: Int?) {
+            val at = controller.positionMs()
+            qualityScope.launch {
+                fun h(name: String) = hdrs.entries.firstOrNull { it.key.equals(name, true) }?.value
+                val opts = buildList {
+                    add(":network-caching=1500")
+                    h("User-Agent")?.let { add(":http-user-agent=$it") }
+                    h("Referer")?.let { add(":http-referrer=$it") }
+                    maxHeight?.let { add(":adaptive-maxheight=$it") }
+                }
+                // Jamais depuis le thread UI : `media().play` prend un verrou
+                // natif. C'est la règle de tout ce fichier.
+                withContext(Dispatchers.IO) {
+                    runCatching { player.media().play(url, *opts.toTypedArray()) }
+                }
+                // Se recaler **après** l'ouverture : la position n'existe pas
+                // tant que le média n'est pas monté, et la demander trop tôt ne
+                // fait rien du tout — la lecture repartirait du début.
+                if (at > 0) {
+                    delay(REOPEN_SEEK_DELAY_MS)
+                    runCatching { controller.seekTo(at) }
+                }
+            }
+        }
+
+        fun applyQuality(choice: QualityChoice) {
+            when (choice) {
+                is QualityChoice.Auto -> {
+                    quality = choice
+                    reopen(playedUrl, playedHeaders, null)
+                }
+                is QualityChoice.Height -> {
+                    quality = choice
+                    reopen(playedUrl, playedHeaders, choice.height)
+                }
+                is QualityChoice.Source -> {
+                    val alt = alternatives.firstOrNull { it.url == choice.url } ?: return
+                    qualityScope.launch {
+                        val stream = resolveAlternative(alt.url, alt.hoster, language)
+                        // Échec : on garde le flux en cours plutôt que de casser
+                        // une lecture qui marche pour une qualité non obtenue.
+                        if (stream == null || stream.url.isBlank()) return@launch
+                        playedUrl = stream.url
+                        playedHeaders = stream.headers
+                        quality = choice
+                        reopen(stream.url, stream.headers, null)
+                    }
+                }
+            }
+        }
+
         // Barre de contrôles : la même que sur TV, avec en plus le volume et le
         // plein écran, qui n'ont pas d'équivalent à la télécommande.
         AnimatedVisibility(
@@ -932,6 +1006,24 @@ internal fun DesktopPlayerScreen(
                 },
                 onDownload = if (mediaKey.isNotBlank() && sourceUrl.isNotBlank()) {
                     {
+                        // On cherche mieux avant de mettre en file : le fichier
+                        // se garde, contrairement à la lecture qu'on a lancée
+                        // vite. Voir bestDownloadStream — le flux en cours sert
+                        // de repli si rien de meilleur ne répond.
+                        qualityScope.launch {
+                        val (dlUrl, dlHoster, dlStream) = bestDownloadStream(
+                            playingUrl = sourceUrl,
+                            playingHoster = hoster,
+                            playingStream = PlayableStream(
+                                url = streamUrl,
+                                format = StreamFormat.UNKNOWN,
+                                headers = headers,
+                            ),
+                            playingHeight = currentHeights.firstOrNull() ?: 0,
+                            alternatives = alternatives,
+                            language = language,
+                            expectedMinutes = expectedMinutes.takeIf { it > 0 },
+                        )
                         DownloadQueue.enqueue(
                             Download(
                                 key = mediaKey,
@@ -944,20 +1036,13 @@ internal fun DesktopPlayerScreen(
                                 tmdbId = parseMediaKey(mediaKey)?.tmdbId ?: 0,
                                 isTv = parseMediaKey(mediaKey)?.isTv ?: false,
                                 createdAt = System.currentTimeMillis(),
-                                sourceUrl = sourceUrl,
-                                hoster = hoster,
+                                sourceUrl = dlUrl,
+                                hoster = dlHoster,
                                 language = language,
                             ),
-                            // Le flux en cours de lecture : déjà résolu, déjà
-                            // vérifié jouable. Le re-résoudre pour télécharger
-                            // ferait perdre du temps et pourrait rendre un autre
-                            // hébergeur.
-                            PlayableStream(
-                                url = streamUrl,
-                                format = StreamFormat.UNKNOWN,
-                                headers = headers,
-                            ),
+                            dlStream,
                         )
+                        }
                     }
                 } else {
                     null
@@ -1042,79 +1127,6 @@ val subsViewModel = remember { PlayerSubtitlesViewModel() }
         LaunchedEffect(dialog) {
             if (dialog == PlayerDialogKind.SUBTITLES && subsState.candidates.isEmpty()) {
                 subsViewModel.load(mediaKey, title, controller.videoFps())
-            }
-        }
-
-        // ── Qualité ──────────────────────────────────────────────────────
-        //
-        // libVLC 3 ne sait pas changer de variante en cours de route : il
-        // n'expose que la piste courante, jamais la liste. Les deux actions du
-        // menu passent donc par une **réouverture à la position** — plafonner
-        // le flux courant se fait avec `:adaptive-maxheight`, une option
-        // d'ouverture ; changer de source, avec une autre URL. Une brève
-        // coupure, sur une action explicite.
-        var quality by remember(streamUrl) { mutableStateOf<QualityChoice>(QualityChoice.Auto) }
-        var currentHeights by remember(streamUrl) { mutableStateOf(emptyList<Int>()) }
-        var playedUrl by remember(streamUrl) { mutableStateOf(streamUrl) }
-        var playedHeaders by remember(streamUrl) { mutableStateOf(headers) }
-        val qualityScope = rememberCoroutineScope()
-
-        // Les variantes se lisent dans la master playlist : seule source
-        // d'information ici, libVLC ne les exposant pas.
-        LaunchedEffect(playedUrl, playedHeaders) {
-            currentHeights = runCatching {
-                streamHeights(PlayableStream(playedUrl, StreamFormat.HLS, playedHeaders))
-            }.getOrDefault(emptyList())
-        }
-
-        fun reopen(url: String, hdrs: Map<String, String>, maxHeight: Int?) {
-            val at = controller.positionMs()
-            qualityScope.launch {
-                fun h(name: String) = hdrs.entries.firstOrNull { it.key.equals(name, true) }?.value
-                val opts = buildList {
-                    add(":network-caching=1500")
-                    h("User-Agent")?.let { add(":http-user-agent=$it") }
-                    h("Referer")?.let { add(":http-referrer=$it") }
-                    maxHeight?.let { add(":adaptive-maxheight=$it") }
-                }
-                // Jamais depuis le thread UI : `media().play` prend un verrou
-                // natif. C'est la règle de tout ce fichier.
-                withContext(Dispatchers.IO) {
-                    runCatching { player.media().play(url, *opts.toTypedArray()) }
-                }
-                // Se recaler **après** l'ouverture : la position n'existe pas
-                // tant que le média n'est pas monté, et la demander trop tôt ne
-                // fait rien du tout — la lecture repartirait du début.
-                if (at > 0) {
-                    delay(REOPEN_SEEK_DELAY_MS)
-                    runCatching { controller.seekTo(at) }
-                }
-            }
-        }
-
-        fun applyQuality(choice: QualityChoice) {
-            when (choice) {
-                is QualityChoice.Auto -> {
-                    quality = choice
-                    reopen(playedUrl, playedHeaders, null)
-                }
-                is QualityChoice.Height -> {
-                    quality = choice
-                    reopen(playedUrl, playedHeaders, choice.height)
-                }
-                is QualityChoice.Source -> {
-                    val alt = alternatives.firstOrNull { it.url == choice.url } ?: return
-                    qualityScope.launch {
-                        val stream = resolveAlternative(alt.url, alt.hoster, language)
-                        // Échec : on garde le flux en cours plutôt que de casser
-                        // une lecture qui marche pour une qualité non obtenue.
-                        if (stream == null || stream.url.isBlank()) return@launch
-                        playedUrl = stream.url
-                        playedHeaders = stream.headers
-                        quality = choice
-                        reopen(stream.url, stream.headers, null)
-                    }
-                }
             }
         }
 

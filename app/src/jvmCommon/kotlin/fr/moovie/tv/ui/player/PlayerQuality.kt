@@ -4,6 +4,7 @@ import fr.moovie.tv.core.sources.model.EmbedLink
 import fr.moovie.tv.core.sources.model.PlayableStream
 import fr.moovie.tv.core.sources.usecase.qualityLabel
 import fr.moovie.tv.data.sources.ExtractorRegistry
+import fr.moovie.tv.data.sources.isStreamPlayable
 import fr.moovie.tv.ui.navigation.AltSource
 
 /**
@@ -132,3 +133,51 @@ suspend fun resolveAlternative(url: String, hoster: String, language: String): P
     runCatching {
         ExtractorRegistry.resolve(EmbedLink(url = url, hoster = hoster, language = language))
     }.getOrNull()
+
+/**
+ * Ce qu'il faut télécharger : le flux qui joue, ou une source de rechange qui
+ * fait mieux.
+ *
+ * Le bouton du lecteur mettait en file **la source en cours**. Elle a été
+ * choisie pour démarrer vite — la cascade ne se sert que des définitions déjà
+ * mesurées et n'en mesure aucune, pour ne pas retarder la lecture. Le bon
+ * compromis n'est pas le même une fois qu'on télécharge : le fichier se garde,
+ * et quelques secondes de recherche valent mieux qu'un film en 480p.
+ *
+ * On ne tente que les sources **annoncées meilleures**, et [MAX_UPGRADE_TRIES]
+ * au plus : c'est un bonus, pas une nouvelle cascade. Le premier flux jouable
+ * l'emporte, puisqu'elles sont déjà classées par définition décroissante.
+ *
+ * Rend toujours quelque chose : à défaut de mieux, le flux qui joue. On ne
+ * renonce pas à télécharger sous prétexte qu'on n'a pas trouvé mieux.
+ */
+suspend fun bestDownloadStream(
+    playingUrl: String,
+    playingHoster: String,
+    playingStream: PlayableStream,
+    playingHeight: Int,
+    alternatives: List<AltSource>,
+    language: String,
+    expectedMinutes: Int?,
+): Triple<String, String, PlayableStream> {
+    val meilleures = alternatives
+        .filter { it.height > playingHeight }
+        .sortedByDescending { it.height }
+        .take(MAX_UPGRADE_TRIES)
+
+    for (alt in meilleures) {
+        val stream = resolveAlternative(alt.url, alt.hoster, language) ?: continue
+        if (stream.url.isBlank()) continue
+        // Le même verdict que le lecteur, durée comprise : un leurre de vingt
+        // secondes ne remplace pas le film qu'on regarde.
+        if (!isStreamPlayable(stream, expectedMinutes)) continue
+        return Triple(alt.url, alt.hoster, stream)
+    }
+    return Triple(playingUrl, playingHoster, playingStream)
+}
+
+/**
+ * Deux essais : au-delà, l'attente se voit plus que le gain. Les candidats sont
+ * classés, donc les deux premiers sont les meilleurs connus.
+ */
+private const val MAX_UPGRADE_TRIES = 2

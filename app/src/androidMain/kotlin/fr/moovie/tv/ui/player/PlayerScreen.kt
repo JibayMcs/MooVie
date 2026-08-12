@@ -63,6 +63,7 @@ import fr.moovie.tv.ui.navigation.AltSource
 import fr.moovie.tv.ui.player.QualityChoice
 import fr.moovie.tv.ui.player.qualityOptions
 import fr.moovie.tv.ui.player.qualitySection
+import fr.moovie.tv.ui.player.bestDownloadStream
 import fr.moovie.tv.ui.player.resolveAlternative
 import fr.moovie.tv.ui.format.formatNowDateTime
 import fr.moovie.tv.core.player.matchAudioTrack
@@ -1085,6 +1086,24 @@ fun PlayerScreen(
                 onOpenSettings = { dialog = PlayerDialogKind.SETTINGS },
                 onDownload = if (mediaKey.isNotBlank() && sourceUrl.isNotBlank()) {
                     {
+                        // On cherche mieux avant de mettre en file : le fichier
+                        // se garde, contrairement à la lecture qu'on a lancée
+                        // vite. Voir bestDownloadStream — quelques secondes au
+                        // plus, et le flux en cours sert de repli.
+                        qualityScope.launch {
+                        val (dlUrl, dlHoster, dlStream) = bestDownloadStream(
+                            playingUrl = sourceUrl,
+                            playingHoster = hoster,
+                            playingStream = PlayableStream(
+                                url = streamUrl,
+                                format = StreamFormat.UNKNOWN,
+                                headers = headers,
+                            ),
+                            playingHeight = player.videoHeights().firstOrNull() ?: 0,
+                            alternatives = alternatives,
+                            language = language,
+                            expectedMinutes = expectedMinutes.takeIf { it > 0 },
+                        )
                         DownloadQueue.enqueue(
                             Download(
                                 key = mediaKey,
@@ -1097,20 +1116,13 @@ fun PlayerScreen(
                                 tmdbId = parseMediaKey(mediaKey)?.tmdbId ?: 0,
                                 isTv = parseMediaKey(mediaKey)?.isTv ?: false,
                                 createdAt = System.currentTimeMillis(),
-                                sourceUrl = sourceUrl,
-                                hoster = hoster,
+                                sourceUrl = dlUrl,
+                                hoster = dlHoster,
                                 language = language,
                             ),
-                            // Le flux en cours de lecture : déjà résolu, déjà
-                            // vérifié jouable. Le re-résoudre pour télécharger
-                            // ferait perdre du temps et pourrait rendre un autre
-                            // hébergeur.
-                            PlayableStream(
-                                url = streamUrl,
-                                format = StreamFormat.UNKNOWN,
-                                headers = headers,
-                            ),
+                            dlStream,
                         )
+                        }
                     }
                 } else {
                     null
