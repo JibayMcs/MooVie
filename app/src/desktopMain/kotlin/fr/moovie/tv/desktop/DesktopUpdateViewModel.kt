@@ -3,6 +3,7 @@ package fr.moovie.tv.desktop
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import fr.moovie.tv.data.settings.SettingsRepository
+import kotlinx.coroutines.flow.first
 import fr.moovie.tv.data.settings.UpdateInterval
 import fr.moovie.tv.data.update.UpdateRepository
 import fr.moovie.tv.resources.Res
@@ -117,7 +118,10 @@ class DesktopUpdateViewModel : ViewModel() {
      * trouvée : c'est la bannière qui le dit.
      */
     private suspend fun check(): UpdateCheck {
-        val release = repo.latestRelease() ?: return UpdateCheck.FAILED
+        // Le canal est relu à chaque vérification, pas mémorisé : basculer le
+        // réglage doit prendre effet sans relancer l'application.
+        val canal = settings.updatePrereleases.first()
+        val release = repo.latestRelease(prereleases = canal) ?: return UpdateCheck.FAILED
         if (release.draft || release.prerelease) return UpdateCheck.UP_TO_DATE
         if (!repo.isNewer(release.tagName, currentVersion)) return UpdateCheck.UP_TO_DATE
         val version = release.tagName.removePrefix("v")

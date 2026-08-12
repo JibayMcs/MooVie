@@ -97,6 +97,29 @@ class SettingsRepository {
     suspend fun setUpdateInterval(value: UpdateInterval) =
         store.edit { it[UPDATE_INTERVAL] = value.name }
 
+    /**
+     * Recevoir aussi les préversions (« release candidates »).
+     *
+     * **Inactif par défaut**, et ce n'est pas de la timidité : une rc est
+     * publiée précisément parce qu'elle n'a pas encore été éprouvée sur du
+     * vrai matériel. L'activer, c'est accepter d'être celui qui l'éprouve.
+     *
+     * Sans lui, tester une préversion imposait de la télécharger et de
+     * l'installer à la main sur chaque appareil — au point qu'on était tenté de
+     * publier une version finale rien que pour pouvoir l'essayer, ce qui la
+     * mettait chez tout le monde avant le moindre test. C'est ce nœud-là que ce
+     * réglage dénoue.
+     *
+     * Repasser au canal stable ne désinstalle rien : on garde la préversion en
+     * place jusqu'à ce que la version définitive la dépasse, ce que la
+     * comparaison de versions sait faire.
+     */
+    val updatePrereleases: Flow<Boolean> =
+        store.data.map { it[UPDATE_PRERELEASES] ?: false }
+
+    suspend fun setUpdatePrereleases(value: Boolean) =
+        store.edit { it[UPDATE_PRERELEASES] = value }
+
     /** Délai avant l'écran de veille en pause (15 min par défaut). */
     val screensaverDelay: Flow<ScreensaverDelay> =
         store.data.map {
@@ -294,6 +317,7 @@ class SettingsRepository {
         val PLAYER_CLOCK = booleanPreferencesKey("player_clock")
         val TRAILER_AUTOPLAY = booleanPreferencesKey("trailer_autoplay")
         val TRAILER_SOUND = booleanPreferencesKey("trailer_sound")
+        val UPDATE_PRERELEASES = booleanPreferencesKey("update_prereleases")
         val UPDATE_INTERVAL = stringPreferencesKey("update_interval")
         val SCREENSAVER_DELAY = stringPreferencesKey("screensaver_delay")
         val INTRODB_API_KEY = stringPreferencesKey("introdb_api_key")

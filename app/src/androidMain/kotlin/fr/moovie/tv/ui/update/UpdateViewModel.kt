@@ -11,6 +11,7 @@ import androidx.lifecycle.viewModelScope
 import fr.moovie.tv.BuildConfig
 import fr.moovie.tv.R
 import fr.moovie.tv.data.settings.SettingsRepository
+import kotlinx.coroutines.flow.first
 import fr.moovie.tv.data.settings.UpdateInterval
 import fr.moovie.tv.data.update.UpdateRepository
 import kotlinx.coroutines.delay
@@ -73,7 +74,10 @@ class UpdateViewModel(app: Application) : AndroidViewModel(app) {
         if (_state.value is UpdateState.Downloading || _state.value is UpdateState.Error) {
             return UpdateCheck.IDLE
         }
-        val release = repo.latestRelease() ?: return UpdateCheck.FAILED
+        // Le canal est relu à chaque vérification, pas mémorisé : basculer le
+        // réglage doit prendre effet sans relancer l'application.
+        val canal = settings.updatePrereleases.first()
+        val release = repo.latestRelease(prereleases = canal) ?: return UpdateCheck.FAILED
         if (release.draft || release.prerelease) return UpdateCheck.UP_TO_DATE
         val apk = release.assets.firstOrNull { it.name.endsWith(".apk") }
             ?: return UpdateCheck.UP_TO_DATE

@@ -541,4 +541,6 @@
     <string name="player_quality">Quality</string>
     <string name="player_quality_auto">Automatic</string>
     <string name="details_download_best">Download in best quality</string>
+    <string name="settings_update_prereleases">Receive pre-releases</string>
+    <string name="settings_update_prereleases_help">Also offers test builds ("rc"), published before the final version so they can be tried out. They may contain defects; when off, only final versions are offered.</string>
 </resources>

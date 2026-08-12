@@ -159,6 +159,7 @@ internal fun DesktopSettingsScreen(
     val playerClock by vm.playerClock.collectAsState()
     val settingsTrailerAutoplay by vm.trailerAutoplay.collectAsState()
     val settingsTrailerSound by vm.trailerSound.collectAsState()
+    val updatePrereleases by vm.updatePrereleases.collectAsState()
     val hideHistoryWidgets by vm.hideHistoryWidgets.collectAsState()
     val splashAnimation by vm.splashAnimation.collectAsState()
     val updateCheck by Vm.update.checkStatus.collectAsState()
@@ -190,6 +191,8 @@ internal fun DesktopSettingsScreen(
         onSetPlayerClock = vm::setPlayerClock,
         onSetTrailerAutoplay = vm::setTrailerAutoplay,
         onSetTrailerSound = vm::setTrailerSound,
+        updatePrereleases = updatePrereleases,
+        onSetUpdatePrereleases = vm::setUpdatePrereleases,
         onSetHideHistoryWidgets = vm::setHideHistoryWidgets,
         onSetSplashAnimation = vm::setSplashAnimation,
         onCheckUpdates = Vm.update::checkNow,

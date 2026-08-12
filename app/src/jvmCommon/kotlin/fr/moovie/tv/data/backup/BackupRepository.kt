@@ -228,6 +228,7 @@ class BackupRepository(
         playerClock = settingsRepo.playerClock.first(),
         trailerAutoplay = settingsRepo.trailerAutoplay.first(),
         trailerSound = settingsRepo.trailerSound.first(),
+        updatePrereleases = settingsRepo.updatePrereleases.first(),
         hideHistoryWidgets = settingsRepo.hideHistoryWidgets.first(),
         updateInterval = settingsRepo.updateInterval.first().name,
         screensaverDelay = settingsRepo.screensaverDelay.first().name,
@@ -266,6 +267,7 @@ class BackupRepository(
         s.playerClock?.let { settingsRepo.setPlayerClock(it) }
         s.trailerAutoplay?.let { settingsRepo.setTrailerAutoplay(it) }
         s.trailerSound?.let { settingsRepo.setTrailerSound(it) }
+        s.updatePrereleases?.let { settingsRepo.setUpdatePrereleases(it) }
         s.hideHistoryWidgets?.let { settingsRepo.setHideHistoryWidgets(it) }
         s.splashAnimation?.let { settingsRepo.setSplashAnimation(it) }
         // Vide = le fichier n'en parle pas. Écraser les langues de l'appareil par

@@ -153,6 +153,8 @@ import fr.moovie.tv.resources.settings_tmdb_hint
 import fr.moovie.tv.resources.settings_tmdb_key
 import fr.moovie.tv.resources.settings_update_help
 import fr.moovie.tv.resources.settings_update_interval
+import fr.moovie.tv.resources.settings_update_prereleases
+import fr.moovie.tv.resources.settings_update_prereleases_help
 import fr.moovie.tv.resources.settings_check_now
 import fr.moovie.tv.resources.settings_check_now_help
 import fr.moovie.tv.resources.settings_check_running
@@ -296,6 +298,8 @@ fun SettingsScreenContent(
     onSetTrailerAutoplay: (Boolean) -> Unit,
     trailerSound: Boolean,
     onSetTrailerSound: (Boolean) -> Unit,
+    updatePrereleases: Boolean,
+    onSetUpdatePrereleases: (Boolean) -> Unit,
     hideHistoryWidgets: Boolean,
     splashAnimation: Boolean,
     updateInterval: UpdateInterval,
@@ -615,6 +619,14 @@ fun SettingsScreenContent(
                             label = { updateIntervalLabel(it) },
                             onSelect = onSetUpdateInterval,
                         )
+                    }
+                    // Juste sous la fréquence : les deux disent *quand* et *quoi*
+                    // on ira chercher, et se lisent ensemble.
+                    SettingRow(
+                        label = stringResource(Res.string.settings_update_prereleases),
+                        help = stringResource(Res.string.settings_update_prereleases_help),
+                    ) {
+                        OnOff(value = updatePrereleases, onChange = onSetUpdatePrereleases)
                     }
                     // Vérification immédiate : sans elle, installer une version
                     // tout juste publiée imposait d'attendre le prochain tour de

@@ -541,4 +541,6 @@
     <string name="player_quality">Calidad</string>
     <string name="player_quality_auto">Automática</string>
     <string name="details_download_best">Descargar en la mejor calidad</string>
+    <string name="settings_update_prereleases">Recibir preversiones</string>
+    <string name="settings_update_prereleases_help">Propone también las versiones de prueba («rc»), publicadas antes de la versión definitiva para ponerlas a prueba. Pueden contener fallos; desactivado, solo se proponen las versiones finales.</string>
 </resources>

@@ -67,6 +67,13 @@ class SettingsViewModel : ViewModel() {
         viewModelScope.launch { repo.setTrailerSound(value) }
     }
 
+    val updatePrereleases: StateFlow<Boolean> =
+        repo.updatePrereleases.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    fun setUpdatePrereleases(value: Boolean) {
+        viewModelScope.launch { repo.setUpdatePrereleases(value) }
+    }
+
     fun setAutoPlayNext(value: Boolean) {
         viewModelScope.launch { repo.setAutoPlayNext(value) }
     }
