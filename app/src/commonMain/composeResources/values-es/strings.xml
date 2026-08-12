@@ -538,4 +538,6 @@
     <string name="common_close">Cerrar</string>
     <string name="trailer_mute">Silenciar</string>
     <string name="trailer_unmute">Activar el sonido</string>
+    <string name="player_quality">Calidad</string>
+    <string name="player_quality_auto">Automática</string>
 </resources>

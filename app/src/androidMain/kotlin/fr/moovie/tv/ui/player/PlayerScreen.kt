@@ -59,6 +59,11 @@ import androidx.media3.session.MediaSession
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import fr.moovie.tv.ui.adaptive.isTouchUi
+import fr.moovie.tv.ui.navigation.AltSource
+import fr.moovie.tv.ui.player.QualityChoice
+import fr.moovie.tv.ui.player.qualityOptions
+import fr.moovie.tv.ui.player.qualitySection
+import fr.moovie.tv.ui.player.resolveAlternative
 import fr.moovie.tv.ui.format.formatNowDateTime
 import fr.moovie.tv.core.player.matchAudioTrack
 import fr.moovie.tv.data.intro.IntroDbRepository
@@ -177,6 +182,8 @@ fun PlayerScreen(
     sourceUrl: String = "",
     hoster: String = "",
     language: String = "",
+    /** Autres sources de la même langue, pour le menu « Qualité ». */
+    alternatives: List<AltSource> = emptyList(),
     onBack: () -> Unit,
     onNextEpisode: (tmdbId: Int, season: Int, episode: Int) -> Unit = { _, _, _ -> },
     /** Appelé une fois quand l'épisode approche de sa fin (voir PREFETCH_AT). */
@@ -199,10 +206,16 @@ fun PlayerScreen(
         initialValue = ScreensaverDelay.M15,
     )
 
-    val player = remember {
-        val httpFactory = DefaultHttpDataSource.Factory().apply {
+    // Hissée hors du lecteur : changer de source, c'est changer d'hébergeur, donc
+    // de `Referer`. La fabrique est mutable et ses propriétés s'appliquent aux
+    // sources de données créées **ensuite** — les poser avant de monter le
+    // nouveau média suffit, sans reconstruire le lecteur.
+    val httpFactory = remember {
+        DefaultHttpDataSource.Factory().apply {
             if (headers.isNotEmpty()) setDefaultRequestProperties(headers)
         }
+    }
+    val player = remember {
         ExoPlayer.Builder(context)
             // `DefaultDataSource` aiguille selon le schéma de l'URI ; `httpFactory`
             // seule ne sait ouvrir que du http(s). Les sous-titres externes vivent
@@ -352,6 +365,49 @@ fun PlayerScreen(
         if (resumeAt > 0) player.seekTo(resumeAt)
         player.prepare()
         player.playWhenReady = true
+    }
+
+    // ── Qualité ──────────────────────────────────────────────────────────
+    //
+    // Deux mécaniques derrière un seul menu : plafonner le flux courant, ce
+    // qu'ExoPlayer fait à chaud et sans coupure ; ou changer de source, ce qui
+    // impose de remonter un média et de se recaler.
+    var quality by remember(streamUrl) { mutableStateOf<QualityChoice>(QualityChoice.Auto) }
+    val qualityScope = rememberCoroutineScope()
+
+    fun applyQuality(choice: QualityChoice) {
+        when (choice) {
+            is QualityChoice.Auto -> {
+                player.trackSelectionParameters =
+                    player.trackSelectionParameters.buildUpon().clearVideoSizeConstraints().build()
+                quality = choice
+            }
+            is QualityChoice.Height -> {
+                // Un plafond, pas un verrou : sous une définition donnée le
+                // flux reste adaptatif, et une connexion qui faiblit peut
+                // toujours descendre. Verrouiller ferait caler la lecture.
+                player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+                    .setMaxVideoSize(Int.MAX_VALUE, choice.height)
+                    .build()
+                quality = choice
+            }
+            is QualityChoice.Source -> {
+                val alt = alternatives.firstOrNull { it.url == choice.url } ?: return
+                qualityScope.launch {
+                    val stream = resolveAlternative(alt.url, alt.hoster, language)
+                    // Échec : on garde le flux en cours. On ne casse pas une
+                    // lecture qui marche pour une qualité qu'on n'a pas eue.
+                    if (stream == null || stream.url.isBlank()) return@launch
+                    val at = player.currentPosition
+                    httpFactory.setDefaultRequestProperties(stream.headers)
+                    player.setMediaItem(MediaItem.fromUri(stream.url))
+                    player.prepare()
+                    if (at > 0) player.seekTo(at)
+                    player.playWhenReady = true
+                    quality = choice
+                }
+            }
+        }
     }
 
     // Suivi de la position pour la barre de progression (~2 rafraîchissements/s).
@@ -1150,6 +1206,16 @@ fun PlayerScreen(
                         controller.setSpeed(it)
                         dialog = null
                     },
+                    qualitySection(
+                        qualityOptions(
+                            currentHeights = player.videoHeights(),
+                            alternatives = alternatives,
+                            selected = quality,
+                        ),
+                    ) { id ->
+                        QualityChoice.parse(id)?.let { applyQuality(it) }
+                        dialog = null
+                    },
                     audioSection(tracks) { trackId ->
                         controller.selectAudio(trackId)
                         tracks = controller.tracks()
@@ -1182,3 +1248,19 @@ fun PlayerScreen(
         }
     }
 }
+
+/**
+ * Les définitions que le flux courant annonce, de la plus haute à la plus basse.
+ *
+ * Lues à l'ouverture du menu plutôt que suivies en continu : elles ne changent
+ * qu'au montage d'un média, et un écouteur de plus sur le lecteur serait un
+ * écouteur de plus à défaire.
+ */
+private fun ExoPlayer.videoHeights(): List<Int> = runCatching {
+    currentTracks.groups
+        .filter { it.type == C.TRACK_TYPE_VIDEO }
+        .flatMap { group -> (0 until group.length).map { group.getTrackFormat(it).height } }
+        .filter { it > 0 }
+        .distinct()
+        .sortedDescending()
+}.getOrDefault(emptyList())

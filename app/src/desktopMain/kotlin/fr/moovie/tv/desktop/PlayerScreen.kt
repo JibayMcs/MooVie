@@ -44,6 +44,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
@@ -120,6 +121,12 @@ import fr.moovie.tv.ui.player.PlayerUpdateChip
 import fr.moovie.tv.core.player.matchAudioTrack
 import fr.moovie.tv.ui.player.parseMediaKey
 import fr.moovie.tv.ui.player.toPlayerSegments
+import fr.moovie.tv.data.sources.streamHeights
+import fr.moovie.tv.ui.navigation.AltSource
+import fr.moovie.tv.ui.player.QualityChoice
+import fr.moovie.tv.ui.player.qualityOptions
+import fr.moovie.tv.ui.player.qualitySection
+import fr.moovie.tv.ui.player.resolveAlternative
 import fr.moovie.tv.ui.player.audioSection
 import fr.moovie.tv.ui.player.speedSection
 import fr.moovie.tv.ui.player.subtitleSection
@@ -131,6 +138,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 import org.jetbrains.skia.Bitmap
@@ -220,6 +228,8 @@ internal fun DesktopPlayerScreen(
     sourceUrl: String = "",
     hoster: String = "",
     language: String = "",
+    /** Autres sources de la même langue, pour le menu « Qualité ». */
+    alternatives: List<AltSource> = emptyList(),
     isFullscreen: Boolean,
     onToggleFullscreen: () -> Unit,
     onBack: () -> Unit,
@@ -1035,6 +1045,79 @@ val subsViewModel = remember { PlayerSubtitlesViewModel() }
             }
         }
 
+        // ── Qualité ──────────────────────────────────────────────────────
+        //
+        // libVLC 3 ne sait pas changer de variante en cours de route : il
+        // n'expose que la piste courante, jamais la liste. Les deux actions du
+        // menu passent donc par une **réouverture à la position** — plafonner
+        // le flux courant se fait avec `:adaptive-maxheight`, une option
+        // d'ouverture ; changer de source, avec une autre URL. Une brève
+        // coupure, sur une action explicite.
+        var quality by remember(streamUrl) { mutableStateOf<QualityChoice>(QualityChoice.Auto) }
+        var currentHeights by remember(streamUrl) { mutableStateOf(emptyList<Int>()) }
+        var playedUrl by remember(streamUrl) { mutableStateOf(streamUrl) }
+        var playedHeaders by remember(streamUrl) { mutableStateOf(headers) }
+        val qualityScope = rememberCoroutineScope()
+
+        // Les variantes se lisent dans la master playlist : seule source
+        // d'information ici, libVLC ne les exposant pas.
+        LaunchedEffect(playedUrl, playedHeaders) {
+            currentHeights = runCatching {
+                streamHeights(PlayableStream(playedUrl, StreamFormat.HLS, playedHeaders))
+            }.getOrDefault(emptyList())
+        }
+
+        fun reopen(url: String, hdrs: Map<String, String>, maxHeight: Int?) {
+            val at = controller.positionMs()
+            qualityScope.launch {
+                fun h(name: String) = hdrs.entries.firstOrNull { it.key.equals(name, true) }?.value
+                val opts = buildList {
+                    add(":network-caching=1500")
+                    h("User-Agent")?.let { add(":http-user-agent=$it") }
+                    h("Referer")?.let { add(":http-referrer=$it") }
+                    maxHeight?.let { add(":adaptive-maxheight=$it") }
+                }
+                // Jamais depuis le thread UI : `media().play` prend un verrou
+                // natif. C'est la règle de tout ce fichier.
+                withContext(Dispatchers.IO) {
+                    runCatching { player.media().play(url, *opts.toTypedArray()) }
+                }
+                // Se recaler **après** l'ouverture : la position n'existe pas
+                // tant que le média n'est pas monté, et la demander trop tôt ne
+                // fait rien du tout — la lecture repartirait du début.
+                if (at > 0) {
+                    delay(REOPEN_SEEK_DELAY_MS)
+                    runCatching { controller.seekTo(at) }
+                }
+            }
+        }
+
+        fun applyQuality(choice: QualityChoice) {
+            when (choice) {
+                is QualityChoice.Auto -> {
+                    quality = choice
+                    reopen(playedUrl, playedHeaders, null)
+                }
+                is QualityChoice.Height -> {
+                    quality = choice
+                    reopen(playedUrl, playedHeaders, choice.height)
+                }
+                is QualityChoice.Source -> {
+                    val alt = alternatives.firstOrNull { it.url == choice.url } ?: return
+                    qualityScope.launch {
+                        val stream = resolveAlternative(alt.url, alt.hoster, language)
+                        // Échec : on garde le flux en cours plutôt que de casser
+                        // une lecture qui marche pour une qualité non obtenue.
+                        if (stream == null || stream.url.isBlank()) return@launch
+                        playedUrl = stream.url
+                        playedHeaders = stream.headers
+                        quality = choice
+                        reopen(stream.url, stream.headers, null)
+                    }
+                }
+            }
+        }
+
         when (dialog) {
             PlayerDialogKind.SUBTITLES -> PlayerOptionsDialog(
                 sections = listOf(
@@ -1084,6 +1167,16 @@ val subsViewModel = remember { PlayerSubtitlesViewModel() }
                     speedSection(speed) {
                         speed = it
                         controller.setSpeed(it)
+                        dialog = null
+                    },
+                    qualitySection(
+                        qualityOptions(
+                            currentHeights = currentHeights,
+                            alternatives = alternatives,
+                            selected = quality,
+                        ),
+                    ) { id ->
+                        QualityChoice.parse(id)?.let { applyQuality(it) }
                         dialog = null
                     },
                     audioSection(tracks) { trackId ->
@@ -1243,3 +1336,11 @@ private fun VolumeSlider(
     }
 }
 
+
+/**
+ * Délai avant de se recaler après une réouverture.
+ *
+ * libVLC refuse un `setTime` tant que le média n'est pas ouvert : demander la
+ * position tout de suite ne fait rien, et la lecture repart du début.
+ */
+private const val REOPEN_SEEK_DELAY_MS = 700L

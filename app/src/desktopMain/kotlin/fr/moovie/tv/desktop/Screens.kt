@@ -282,6 +282,7 @@ internal fun DesktopDetailsScreen(
                         sourceUrl = vm.playingLink?.url.orEmpty(),
                         hoster = vm.playingLink?.hoster.orEmpty(),
                         language = vm.playingLink?.language.orEmpty(),
+                        alternatives = vm.playbackAlternatives(),
                     ),
                 )
             }

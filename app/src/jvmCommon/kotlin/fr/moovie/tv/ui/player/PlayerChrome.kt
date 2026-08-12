@@ -89,6 +89,8 @@ import fr.moovie.tv.resources.player_settings
 import fr.moovie.tv.resources.report_segment
 import fr.moovie.tv.resources.player_skip_intro
 import fr.moovie.tv.resources.player_skip_outro
+import fr.moovie.tv.resources.player_quality
+import fr.moovie.tv.resources.player_quality_auto
 import fr.moovie.tv.resources.player_speed
 import fr.moovie.tv.resources.player_subtitles
 import fr.moovie.tv.resources.player_subtitles_off
@@ -703,6 +705,40 @@ fun audioSection(tracks: PlayerTracks, onSelect: (String) -> Unit): PlayerOption
         if (options.size > 1) options else emptyList(),
     )
 }
+
+/**
+ * Section « Qualité ».
+ *
+ * Prend une liste toute faite plutôt que d'interroger le lecteur, parce que les
+ * deux moteurs ne savent pas la même chose : ExoPlayer expose les variantes du
+ * flux et sait en changer à chaud ; libVLC 3 n'expose que la piste courante, et
+ * la liste doit être lue dans la master playlist puis appliquée en rouvrant le
+ * flux. Une abstraction commune aurait dû mentir à l'un des deux.
+ *
+ * Les entrées venues d'**autres sources** y figurent au même titre : ce qui
+ * intéresse ici est la définition, pas l'hébergeur qui la sert. Le nom de la
+ * source n'apparaît que sur celles-là, pour expliquer pourquoi les choisir
+ * interrompt brièvement la lecture.
+ *
+ * Moins de deux entrées : section vide, donc absente du menu. Proposer un choix
+ * unique donne l'illusion d'une possibilité qui n'existe pas.
+ */
+@Composable
+fun qualitySection(options: List<PlayerTrack>, onSelect: (String) -> Unit): PlayerOptionSection =
+    PlayerOptionSection(
+        stringResource(Res.string.player_quality),
+        if (options.size > 1) {
+            val auto = stringResource(Res.string.player_quality_auto)
+            options.map { track ->
+                // Le fabricant d'options est pur et ne connaît pas les
+                // ressources : il pose un marqueur, la traduction se fait ici.
+                val label = if (track.label == AUTO_LABEL) auto else track.label
+                PlayerOption(label, track.selected) { onSelect(track.id) }
+            }
+        } else {
+            emptyList()
+        },
+    )
 
 /** Section « Vitesse de lecture ». */
 @Composable

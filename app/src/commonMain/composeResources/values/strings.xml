@@ -540,4 +540,6 @@
     <string name="common_close">Fermer</string>
     <string name="trailer_mute">Couper le son</string>
     <string name="trailer_unmute">Rétablir le son</string>
+    <string name="player_quality">Qualité</string>
+    <string name="player_quality_auto">Automatique</string>
 </resources>
