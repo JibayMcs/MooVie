@@ -66,7 +66,15 @@ and ~~iOS~~, built from a single Kotlin Multiplatform codebase. Source extractio
   are never substituted for one another - VOSTFR carries burnt-in French subtitles you
   cannot turn off, so it is not a stand-in for VO.
 - **Player** - resume at timecode, subtitle and audio track selection, playback speed,
-  15 s seek, scrub mode on the progress bar, remote media keys.
+  15 s seek, remote media keys, and a progress bar the remote's arrows drive straight:
+  no key to press first, and the jump leaves on its own once you stop moving, so ten
+  presses cost one seek instead of ten.
+- **Picture-in-picture** (phone) - leaving Moo-vie while something plays folds it into a
+  floating window instead of stopping it. The player has a window of its own, so Moo-vie
+  stays usable *behind* the vignette - keep browsing the catalogue while an episode runs
+  in a corner, tap it to come back full screen. A button in the control bar does the same
+  without leaving the app. Playback also reaches the notification shade and the lock
+  screen, with pause, ±15 s and episode arrows.
 - **Subtitles** (OpenSubtitles) - searched from the player, ranked by language, frame
   rate and release, and downloaded only on an explicit press since the daily allowance is
   small. Already-downloaded ones are marked so you never spend twice. Comes with an offset
@@ -107,7 +115,10 @@ and ~~iOS~~, built from a single Kotlin Multiplatform codebase. Source extractio
   a random token. Existing values are prefilled, so you can reread or fix a key without
   retyping it, and clearing a field erases it. The page doubles as a **remote** - D-pad,
   OK, back, play/pause, and a field that types text on the TV, which makes searching
-  bearable. It drives Moo-vie, not the TV: it cannot turn it on or change its input.
+  bearable, and the phone's **physical volume keys set the box's volume**, the way Cast
+  does - the web page carries the same three buttons for a phone without the app. It
+  drives Moo-vie and the box's sound, not the television set: it cannot turn it on or
+  change its input.
 - **Offline-friendly** - TMDB responses and resolved source links are cached on disk.
 - **In-app updates** - periodic check against GitHub Releases; a banner on the home
   screen, a discreet chip during playback.

@@ -70,7 +70,16 @@ L'extraction des sources se fait **on-device** : pas de backend, pas de compte, 
   porte des sous-titres français incrustés qu'on ne peut pas retirer, ce n'est donc pas
   un remplaçant de la VO.
 - **Lecteur** - reprise au timecode, choix des sous-titres et de la piste audio, vitesse de
-  lecture, seek 15 s, mode scrub sur la barre de progression, touches média de la télécommande.
+  lecture, seek 15 s, touches média de la télécommande, et une barre de progression que les
+  flèches règlent directement : rien à valider avant, et le saut part tout seul dès qu'on
+  s'arrête de viser - dix appuis coûtent un saut, pas dix.
+- **Vignette flottante** (téléphone) - quitter Moo-vie pendant une lecture la replie dans
+  une fenêtre flottante au lieu de l'arrêter. Le lecteur a sa propre fenêtre : Moo-vie
+  reste utilisable *derrière* la vignette - on continue de parcourir le catalogue pendant
+  qu'un épisode tourne dans un coin, et on la touche pour revenir en plein écran. Un bouton
+  de la barre de contrôles fait la même chose sans quitter l'application. La lecture arrive
+  aussi dans le volet de notifications et sur l'écran verrouillé, avec pause, ±15 s et
+  flèches d'épisode.
 - **Sous-titres** (OpenSubtitles) - cherchés depuis le lecteur, classés par langue,
   cadence et release, et téléchargés uniquement sur un appui explicite, le quota
   quotidien étant serré. Ceux déjà téléchargés sont marqués, pour ne jamais payer deux
@@ -117,8 +126,10 @@ L'extraction des sources se fait **on-device** : pas de backend, pas de compte, 
   pré-remplies : on relit ou on corrige une clé sans la retaper, et vider un champ
   l'efface. La page sert aussi de **télécommande** - croix directionnelle, OK, retour,
   lecture/pause, et un champ qui tape le texte sur la TV, ce qui rend une recherche
-  supportable. Elle pilote Moo-vie, pas le téléviseur : elle ne peut ni l'allumer, ni
-  changer de source.
+  supportable, et les **touches physiques de volume du téléphone règlent le son de la
+  box**, à la manière de Cast - la page web porte les trois mêmes boutons pour un téléphone
+  sans l'application. Elle pilote Moo-vie et le son de la box, pas le téléviseur : elle ne
+  peut ni l'allumer, ni changer de source.
 - **Cache disque** - réponses TMDB et liens de sources résolus mis en cache.
 - **Mises à jour intégrées** - vérification périodique des releases GitHub : bandeau sur
   l'accueil, pastille discrète pendant la lecture.
