@@ -34,6 +34,14 @@ import fr.moovie.tv.resources.Res
 import fr.moovie.tv.resources.person_credits_empty
 import fr.moovie.tv.resources.person_credits_error
 import org.jetbrains.compose.resources.stringResource
+import fr.moovie.tv.data.settings.DesktopLanguage
+import fr.moovie.tv.data.settings.DesktopLocale
+import fr.moovie.tv.ui.components.MoovieSelect
+import fr.moovie.tv.resources.settings_language
+import fr.moovie.tv.resources.language_system
+import fr.moovie.tv.resources.language_fr
+import fr.moovie.tv.resources.language_en
+import fr.moovie.tv.resources.language_es
 
 /**
  * ViewModels à l'échelle de la fenêtre (équivalent du scope Activity sur
@@ -206,8 +214,18 @@ internal fun DesktopSettingsScreen(
         onBack = onBack,
         onPlayDownload = onPlayDownload,
         languageSelector = {
-            // Desktop : locale système pour l'instant (pas de sélecteur).
-            Text("Langue du système", color = Color(0xFF9A9A9A))
+            // Un vrai choix, et non plus un libellé inerte : voir DesktopLocale.
+            // Les chaînes de l'interface et les formats de date suivent tout de
+            // suite ; les métadonnées TMDB déjà chargées, elles, restent dans
+            // l'ancienne langue jusqu'au prochain lancement — leur rangée a été
+            // demandée avant le changement.
+            MoovieSelect(
+                title = stringResource(Res.string.settings_language),
+                options = DesktopLanguage.entries,
+                selected = DesktopLocale.current(),
+                label = { langueLabel(it) },
+                onSelect = { DesktopLocale.set(it) },
+            )
         },
     )
 }
@@ -432,3 +450,14 @@ internal fun DesktopPersonScreen(
         showBackButton = true,
     )
 }
+
+/** Libellé d'une langue, dans les chaînes partagées avec Android. */
+@Composable
+private fun langueLabel(language: DesktopLanguage): String = stringResource(
+    when (language) {
+        DesktopLanguage.SYSTEM -> Res.string.language_system
+        DesktopLanguage.FRENCH -> Res.string.language_fr
+        DesktopLanguage.ENGLISH -> Res.string.language_en
+        DesktopLanguage.SPANISH -> Res.string.language_es
+    },
+)

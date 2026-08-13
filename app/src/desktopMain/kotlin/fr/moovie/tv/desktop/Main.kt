@@ -66,6 +66,8 @@ import fr.moovie.tv.ui.offline.OfflineScreen
 import fr.moovie.tv.ui.offline.OfflineSearchScreen
 import fr.moovie.tv.ui.offline.playableFor
 import fr.moovie.tv.data.download.DownloadRepository
+import fr.moovie.tv.data.settings.DesktopLocale
+import androidx.compose.runtime.key
 
 /**
  * Point d'entrée desktop : mêmes écrans que la TV (jvmCommon), navigation par
@@ -73,6 +75,11 @@ import fr.moovie.tv.data.download.DownloadRepository
  * branché — écran d'attente à la place.
  */
 fun main() {
+    // **Avant tout le reste** : `Locale.setDefault` décide de ce que les
+    // ressources Compose, les formateurs de dates et la requête TMDB rendront.
+    // Posée après la première composition, elle laisserait un écran dessiné
+    // dans l'ancienne langue. Voir DesktopLocale.
+    DesktopLocale.apply()
     // Sonde réseau, comme MooVieApp la pose côté Android : le premier relevé
     // décide de ce que l'accueil affiche. Ici elle interroge le réseau
     // elle-même, faute d'équivalent système en JVM pure — voir Connectivity.
@@ -177,6 +184,11 @@ fun main() {
                 }
             }
 
+            // Changer de langue relance toute la composition : `Locale.setDefault`
+            // ne prévient personne, et sans cette clé l'écran garderait ses
+            // chaînes jusqu'au prochain redessin — un réglage qui a l'air de ne
+            // pas marcher.
+            key(DesktopLocale.generation.value) {
             MooVieTheme {
                 RemoteFocus.Register()
                 // L'animation se pose au-dessus de l'app, comme sur Android :
@@ -212,6 +224,7 @@ fun main() {
                 }
                 }
                 }
+            }
             }
         }
     }
