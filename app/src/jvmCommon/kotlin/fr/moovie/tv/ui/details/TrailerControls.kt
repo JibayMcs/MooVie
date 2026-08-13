@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -83,12 +84,14 @@ fun TrailerControls(
     // position, et c'est déjà ainsi que le lecteur principal la suit.
     var positionMs by remember { mutableStateOf(0L) }
     var durationMs by remember { mutableStateOf(0L) }
+    var bufferedMs by remember { mutableStateOf(0L) }
     var playing by remember { mutableStateOf(true) }
     LaunchedEffect(controller) {
         while (true) {
             controller?.let {
                 positionMs = it.positionMs()
                 durationMs = it.durationMs()
+                bufferedMs = it.bufferedMs()
                 playing = it.isPlaying
             }
             delay(POLL_MS)
@@ -121,6 +124,7 @@ fun TrailerControls(
         SeekBar(
             positionMs = positionMs,
             durationMs = durationMs,
+            bufferedMs = bufferedMs,
             onSeek = { controller?.seekTo(it) },
         )
 
@@ -160,15 +164,22 @@ fun TrailerControls(
 }
 
 /**
- * Barre de progression cliquable.
+ * Barre de progression cliquable, avec la portion déjà tamponnée en second
+ * plan.
+ *
+ * La piste de tampon dit **jusqu'où un saut est gratuit** : au-delà, le
+ * lecteur doit retélécharger — et sur une bande-annonce googlevideo servie au
+ * compte-gouttes, c'est la différence entre un saut instantané et une attente.
+ * Sans elle, un seek qui attend ressemble à un seek cassé.
  *
  * La largeur mesurée est indispensable : sans elle on ne sait pas convertir
  * l'abscisse d'un clic en instant du média, et la barre ne serait qu'un témoin.
  */
 @Composable
-private fun SeekBar(positionMs: Long, durationMs: Long, onSeek: (Long) -> Unit) {
+private fun SeekBar(positionMs: Long, durationMs: Long, bufferedMs: Long, onSeek: (Long) -> Unit) {
     var widthPx by remember { mutableStateOf(0) }
     val progress = if (durationMs > 0) positionMs.toFloat() / durationMs else 0f
+    val buffered = if (durationMs > 0) bufferedMs.toFloat() / durationMs else 0f
 
     Box(
         modifier = Modifier
@@ -184,12 +195,26 @@ private fun SeekBar(positionMs: Long, durationMs: Long, onSeek: (Long) -> Unit) 
                     }
                 }
             },
-        contentAlignment = Alignment.Center,
+        contentAlignment = Alignment.CenterStart,
     ) {
-        MoovieProgressBar(
-            progress = progress,
-            modifier = Modifier.fillMaxWidth().height(4.dp),
-        )
+        Box(modifier = Modifier.fillMaxWidth().height(4.dp)) {
+            Box(modifier = Modifier.matchParentSize().background(Color(0x33FFFFFF)))
+            // Le tampon sous l'avancement : un voile plus clair que la piste,
+            // moins que la bannière — un repère, pas une seconde barre criarde.
+            if (buffered > 0f) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .fillMaxWidth(buffered.coerceIn(0f, 1f))
+                        .background(Color(0x59FFFFFF)),
+                )
+            }
+            MoovieProgressBar(
+                progress = progress,
+                trackColor = Color.Transparent,
+                modifier = Modifier.matchParentSize(),
+            )
+        }
     }
 }
 

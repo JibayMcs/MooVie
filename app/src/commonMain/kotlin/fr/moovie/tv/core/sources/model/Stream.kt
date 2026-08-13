@@ -50,4 +50,21 @@ data class PlayableStream(
     val language: String? = null,
     val quality: String? = null,
     val subtitleUrls: Map<String, String> = emptyMap(),
+    /**
+     * Les pistes séparées, quand [url] désigne un manifeste qui ne fait que les
+     * réunir. Toutes deux renseignées, ou aucune.
+     *
+     * YouTube ne sert plus de flux progressif : image et son arrivent par deux
+     * URL, et il faut bien rendre une entrée unique aux lecteurs qui n'en
+     * acceptent qu'une — c'est ce que fait le manifeste DASH fabriqué à la
+     * volée, dont Media3 s'accommode très bien.
+     *
+     * Le lecteur desktop, lui, préfère les deux URL : le démuxeur DASH de
+     * FFmpeg — celui de mpv — ne sait pas lire nos `BaseURL` googlevideo, dont
+     * il désérialise deux fois les `&` jusqu'à une URL de fragment vide.
+     * Plutôt que de plier le manifeste au défaut d'un lecteur, on laisse
+     * chacun prendre la forme qui lui va.
+     */
+    val videoOnlyUrl: String? = null,
+    val audioOnlyUrl: String? = null,
 )

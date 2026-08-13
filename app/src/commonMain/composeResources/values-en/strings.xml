@@ -107,8 +107,8 @@
     <string name="player_fullscreen">Fullscreen</string>
     <string name="player_fullscreen_exit">Exit fullscreen</string>
     <string name="player_error">Playback failed — try another host from the Sources panel.</string>
-    <string name="player_vlc_missing">VLC not found</string>
-    <string name="player_vlc_help">The desktop player relies on libVLC. Install VLC then restart — Linux: sudo apt install vlc, Windows/macOS: videolan.org</string>
+    <string name="player_mpv_missing">Video player not found</string>
+    <string name="player_mpv_help">The desktop player relies on libmpv, normally shipped with the application. Reinstall Moo-vie, or on Linux install libmpv2 (or libmpv1) then restart.</string>
 
     <!-- Update -->
     <string name="settings_cat_update">Updates</string>

@@ -145,7 +145,7 @@ L'extraction des sources se fait **on-device** : pas de backend, pas de compte, 
 |---|---|
 | Langage / build | Kotlin 2.0, Kotlin Multiplatform (`androidMain` / `desktopMain` / `jvmCommon` partagé) |
 | UI | Compose Multiplatform, design system partagé (`MoovieButton`, rails, dialogues) |
-| Lecture | Media3 / ExoPlayer sur Android · libVLC (VLCJ) sur desktop |
+| Lecture | Media3 / ExoPlayer sur Android · libmpv sur desktop |
 | Réseau | Retrofit + OkHttp + kotlinx.serialization, DNS-over-HTTPS |
 | Extraction | OkHttp + Jsoup + crypto Java (déobfuscation packer, AES) |
 | Persistance | DataStore Preferences, cache disque OkHttp |
@@ -162,13 +162,13 @@ Récupérer le dernier build depuis les
 - **Windows** - `moovie-vX.Y.Z.msi`
 - **macOS** - `moovie-vX.Y.Z.dmg`
 
-L'AppImage Linux embarque son runtime Java **et libVLC** : elle tourne sur
-n'importe quelle distribution sans rien installer (vérifié sur Ubuntu 22.04/24.04,
-Debian 12 et Arch) et se met à jour depuis l'app. Sous **Windows**, le `.msi`
-s'installe par utilisateur - sans droits administrateur - et ajoute des raccourcis
-au menu Démarrer et au bureau ; le bandeau intégré le met alors à jour en place.
-Sous **macOS**, le bandeau ouvre la page de release (le `.dmg` s'installe à la
-main). Windows et macOS nécessitent toujours **VLC** installé sur la machine.
+Les trois paquets desktop embarquent leur runtime Java **et leur lecteur vidéo**
+(libmpv) : plus rien à installer à côté, sur aucune plateforme. L'AppImage Linux
+tourne sur n'importe quelle distribution (vérifié sur Ubuntu 22.04/24.04, Debian 12
+et Arch) et se met à jour depuis l'app. Sous **Windows**, le `.msi` s'installe par
+utilisateur - sans droits administrateur - et ajoute des raccourcis au menu Démarrer
+et au bureau ; le bandeau intégré le met alors à jour en place. Sous **macOS**, le
+bandeau ouvre la page de release (le `.dmg` s'installe à la main).
 
 Au premier lancement, coller une [clé API TMDB](https://www.themoviedb.org/settings/api)
 gratuite dans **Réglages → API & Clés**. Les mises à jour suivantes se font depuis l'app.
@@ -211,8 +211,8 @@ La variable d'environnement `OPENSUBTITLES_API_KEY` marche aussi, c'est ce qu'ut
 
 **Les contributions sont libres et souhaitées.** Ce sont les versions desktop qui ont
 le plus besoin de regards : la CI les produit pour Linux, Windows et macOS, mais
-chacune atterrit sur un matériel, des pilotes et une installation libVLC que personne
-ici ne peut reproduire. Tester l'une d'elles sur ta machine est un vrai coup de main.
+chacune atterrit sur un matériel, des pilotes et une pile audio que personne ici ne
+peut reproduire. Tester l'une d'elles sur ta machine est un vrai coup de main.
 
 Si quoi que ce soit se passe mal - une version qui ne démarre pas, un flux qui passe
 sur Android TV mais pas sur desktop, un contrôle que la télécommande n'atteint pas -
@@ -253,9 +253,8 @@ Moo-vie repose sur le travail d'autres personnes.
   [kotlinx.serialization](https://github.com/Kotlin/kotlinx.serialization) - JetBrains
 - [Media3 / ExoPlayer](https://developer.android.com/media/media3) et
   [DataStore](https://developer.android.com/topic/libraries/architecture/datastore) - Google / AndroidX
-- [VLC / libVLC](https://www.videolan.org) - VideoLAN, via
-  [vlcj](https://github.com/caprica/vlcj) de Caprica Software, qui assure la lecture
-  vidéo sur les versions desktop
+- [mpv / libmpv](https://mpv.io) - le projet mpv, qui assure la lecture vidéo sur
+  les versions desktop, et [FFmpeg](https://ffmpeg.org) dont il tire son décodage
 - [OkHttp et Retrofit](https://square.github.io/okhttp/) - Square
 - [jsoup](https://jsoup.org) - analyse les pages dont les sources sont extraites
 - [Coil](https://coil-kt.github.io/coil/) - chargement des images et cache disque

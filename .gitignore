@@ -23,3 +23,7 @@ opensubtitles.properties
 
 # Outils téléchargés pour l'empaquetage (appimagetool)
 /build-tools/
+
+# libmpv téléchargée par la CI pour les paquets Windows et macOS : un binaire
+# par plateforme, versionné chez son éditeur et non chez nous.
+/app/resources/

@@ -132,7 +132,7 @@ and ~~iOS~~, built from a single Kotlin Multiplatform codebase. Source extractio
 |---|---|
 | Language / build | Kotlin 2.0, Kotlin Multiplatform (`androidMain` / `desktopMain` / shared `jvmCommon`) |
 | UI | Compose Multiplatform, shared design system (`MoovieButton`, rails, dialogs) |
-| Playback | Media3 / ExoPlayer on Android · libVLC (VLCJ) on desktop |
+| Playback | Media3 / ExoPlayer on Android · libmpv on desktop |
 | Network | Retrofit + OkHttp + kotlinx.serialization, DNS-over-HTTPS |
 | Extraction | OkHttp + Jsoup + Java crypto (packer deobfuscation, AES) |
 | Storage | DataStore Preferences, OkHttp disk cache |
@@ -148,13 +148,13 @@ Grab the latest build from [Releases](https://github.com/JibayMcs/MooVie/release
 - **Windows** - `moovie-vX.Y.Z.msi`
 - **macOS** - `moovie-vX.Y.Z.dmg`
 
-The Linux AppImage bundles its own Java runtime **and libVLC**, so it runs on any
-distribution with nothing to install (tested on Ubuntu 22.04/24.04, Debian 12 and
-Arch), and updates itself from inside the app. On **Windows**, the `.msi` installs
-per user - no admin rights - and adds Start-menu and desktop shortcuts; the in-app
-banner then updates it in place. On **macOS**, the banner opens the release page
-(the `.dmg` is installed by hand). Windows and macOS still need **VLC** installed
-on the machine.
+All three desktop packages bundle their own Java runtime **and their video player**
+(libmpv): nothing else to install, on any platform. The Linux AppImage runs on any
+distribution (tested on Ubuntu 22.04/24.04, Debian 12 and Arch) and updates itself
+from inside the app. On **Windows**, the `.msi` installs per user - no admin rights -
+and adds Start-menu and desktop shortcuts; the in-app banner then updates it in
+place. On **macOS**, the banner opens the release page (the `.dmg` is installed by
+hand).
 
 On first launch, paste a free [TMDB API key](https://www.themoviedb.org/settings/api)
 under **Settings → API & Keys**. Later updates are handled from inside the app.
@@ -196,7 +196,7 @@ apiKey=YOUR_CONSUMER_KEY
 
 **Contributions are open and wanted.** The desktop builds are the ones that need
 eyes most: they are produced by CI for Linux, Windows and macOS, but each of those
-lands on hardware, drivers and a libVLC install that nobody here can reproduce.
+lands on hardware, drivers and an audio stack that nobody here can reproduce.
 Testing one of them on your own machine is genuinely useful work.
 
 If anything misbehaves - a build that won't start, a stream that plays on Android TV
@@ -238,9 +238,8 @@ Moo-vie stands on work done by others.
   [kotlinx.serialization](https://github.com/Kotlin/kotlinx.serialization) - JetBrains
 - [Media3 / ExoPlayer](https://developer.android.com/media/media3) and
   [DataStore](https://developer.android.com/topic/libraries/architecture/datastore) - Google / AndroidX
-- [VLC / libVLC](https://www.videolan.org) - VideoLAN, via
-  [vlcj](https://github.com/caprica/vlcj) by Caprica Software, which is what plays
-  video on the desktop builds
+- [mpv / libmpv](https://mpv.io) - the mpv project, which is what plays video on the
+  desktop builds, and [FFmpeg](https://ffmpeg.org) that it decodes with
 - [OkHttp and Retrofit](https://square.github.io/okhttp/) - Square
 - [jsoup](https://jsoup.org) - parses the pages sources are extracted from
 - [Coil](https://coil-kt.github.io/coil/) - image loading and disk cache
