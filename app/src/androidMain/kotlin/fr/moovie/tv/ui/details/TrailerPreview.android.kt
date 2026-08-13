@@ -2,6 +2,7 @@ package fr.moovie.tv.ui.details
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -31,11 +32,12 @@ import fr.moovie.tv.ui.player.MooviePlayerController
  * Trois partis pris, tous pour la même raison — c'est un **fond**, pas une
  * lecture :
  *
- * - **muet en pratique**. Le paramètre existe pour partager la signature avec
- *   le desktop, mais la fiche n'envoie un volume qu'au pointeur : ni la
- *   télécommande ni le doigt ne donnent le signal d'activité sur lequel repose
- *   le fondu, et du son qui démarre seul sans moyen de le rendre serait une
- *   nuisance.
+ * - **muet tant qu'il reste un fond.** Le son ne monte pas tout seul : il faut
+ *   avoir ouvert la bande-annonce et demandé le son. Mais alors il monte
+ *   vraiment — le volume est **suivi**, pas seulement posé à la création. Il ne
+ *   l'était pas, et le bouton de son de la chrome n'avait donc aucun effet sur
+ *   Android : le lecteur gardait le volume qu'il avait au premier instant,
+ *   c'est-à-dire zéro.
  * - **recadré** (`RESIZE_MODE_ZOOM`), comme l'affiche qu'il remplace : des
  *   bandes noires trahiraient une vidéo posée là, au lieu d'un décor.
  * - **sans contrôles ni focus**. La télécommande doit continuer d'atteindre les
@@ -72,6 +74,15 @@ fun TrailerPreview(
                 playWhenReady = true
                 prepare()
             }
+    }
+
+    // Le volume **suit** son paramètre. Posé au seul `remember`, il était figé à
+    // sa valeur du premier instant — zéro, puisque le son ne monte qu'une fois
+    // la bande-annonce ouverte : le bouton de son de la chrome ne produisait
+    // alors rien du tout. Le desktop tenait déjà cet effet ; Android l'avait
+    // oublié, et le paramètre le laissait croire branché.
+    LaunchedEffect(player, volume) {
+        player.volume = volume.coerceIn(0f, 1f)
     }
 
     // Le même lecteur, vu comme un contrôleur : c'est lui que les contrôles de

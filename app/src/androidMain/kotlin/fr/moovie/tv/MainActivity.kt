@@ -237,6 +237,21 @@ class MainActivity : ComponentActivity() {
                         // la bannière n'apparaît qu'une fois celle-ci activée.
                         val onPlayer = nav.current is Screen.Player
 
+                        // La bande-annonce plein écran est une **lecture**, mais
+                        // pas une destination : elle vit dans un état de la fiche,
+                        // et l'orientation ne la voyait donc jamais — on regardait
+                        // une vidéo dans un téléphone resté en portrait pendant
+                        // que le lecteur de film, lui, basculait. Ce n'est pas
+                        // l'écran qui décide du paysage, c'est le fait qu'une
+                        // vidéo occupe l'écran.
+                        val trailerExpanded by detailsViewModel.trailerExpanded
+                            .collectAsStateWithLifecycle()
+                        // Bornée à la fiche : l'état survit à sa fermeture (le
+                        // ViewModel a le scope de l'Activity) et bloquerait
+                        // l'accueil en paysage.
+                        val onVideo = onPlayer ||
+                            (trailerExpanded && nav.current is Screen.Details)
+
                         // Publie au lancement, et surtout **en sortant du
                         // lecteur** : c'est là que l'état vient de changer.
                         // Sans ce second cas la TV ne publierait qu'à son
@@ -271,10 +286,10 @@ class MainActivity : ComponentActivity() {
                         //
                         // La TV garde `UNSPECIFIED` : elle est en paysage de toute
                         // façon, et lui imposer une orientation n'apporterait rien.
-                        LaunchedEffect(uiFlavor, onPlayer) {
+                        LaunchedEffect(uiFlavor, onVideo) {
                             requestedOrientation = when {
                                 uiFlavor != UiFlavor.TOUCH -> ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-                                onPlayer -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                                onVideo -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
                                 else -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
                             }
 
@@ -287,7 +302,7 @@ class MainActivity : ComponentActivity() {
                             // d'où la condition sur le tactile plutôt que sur le
                             // seul écran courant.
                             val bars = WindowInsetsControllerCompat(window, window.decorView)
-                            if (uiFlavor == UiFlavor.TOUCH && onPlayer) {
+                            if (uiFlavor == UiFlavor.TOUCH && onVideo) {
                                 bars.systemBarsBehavior =
                                     WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
                                 bars.hide(WindowInsetsCompat.Type.systemBars())
@@ -305,7 +320,7 @@ class MainActivity : ComponentActivity() {
                             // d'état.
                             WindowCompat.setDecorFitsSystemWindows(
                                 window,
-                                !(uiFlavor == UiFlavor.TOUCH && onPlayer),
+                                !(uiFlavor == UiFlavor.TOUCH && onVideo),
                             )
 
                             // Dessiner jusque dans la découpe de la caméra.
@@ -318,7 +333,7 @@ class MainActivity : ComponentActivity() {
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                                 window.attributes = window.attributes.apply {
                                     layoutInDisplayCutoutMode = when {
-                                        uiFlavor != UiFlavor.TOUCH || !onPlayer ->
+                                        uiFlavor != UiFlavor.TOUCH || !onVideo ->
                                             WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_DEFAULT
                                         Build.VERSION.SDK_INT >= Build.VERSION_CODES.R ->
                                             WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
@@ -503,6 +518,7 @@ class MainActivity : ComponentActivity() {
                         // par-dessus le lecteur ni sur l'écran qu'il ouvre.
                         if (useBottomNav &&
                             !hidesBottomBar(nav.current) &&
+                            !onVideo &&
                             nav.current !is Screen.Remote
                         ) {
                             RemoteFab(
@@ -517,7 +533,13 @@ class MainActivity : ComponentActivity() {
                         // niveau la faisait disparaître sur les fiches — c'est-à-
                         // dire là où l'on passe le plus de temps, et où l'on
                         // perdait donc tout repère.
-                        if (useBottomNav && !hidesBottomBar(nav.current)) {
+                        //
+                        // `onVideo` en plus de la destination : la bande-annonce
+                        // plein écran prend tout l'écran sans être un écran, et
+                        // la barre d'onglets restait posée en travers de la
+                        // vidéo — ce que la règle d'à côté interdit justement
+                        // au lecteur.
+                        if (useBottomNav && !hidesBottomBar(nav.current) && !onVideo) {
                             MoovieBottomBar(
                                 current = nav.current,
                                 onSelect = { nav.switchTop(it) },
