@@ -392,6 +392,16 @@
     <!-- Descargas -->
     <string name="settings_cat_downloads">Descargas</string>
     <string name="downloads_help">Los títulos descargados se reproducen desde esta lista o desde su ficha, sin red. Pertenecen a este dispositivo y desaparecen si se desinstala la aplicación.</string>
+    <string name="downloads_storage_other">%1$s otros datos</string>
+    <string name="downloads_storage_free">%1$s libres de %2$s</string>
+
+    <!-- Hors ligne -->
+    <string name="offline_title">Sin conexión</string>
+    <string name="offline_library_help">Sin conexión. Solo están disponibles los títulos ya descargados.</string>
+    <string name="offline_empty_title">Nada que ver sin conexión</string>
+    <string name="offline_empty_help">Sin conexión y sin descargas en este dispositivo. Un título descargado desde el panel de fuentes sigue disponible aquí sin red.</string>
+    <string name="offline_retry">Reintentar</string>
+    <string name="offline_search_help">Busca entre los títulos descargados en este dispositivo.</string>
     <string name="downloads_used">%1$s ocupados</string>
     <string name="downloads_empty">Ninguna descarga. Mantener pulsada una fuente, desde una ficha, para iniciar una.</string>
     <string name="downloads_ready">Listo sin conexión · %1$s</string>

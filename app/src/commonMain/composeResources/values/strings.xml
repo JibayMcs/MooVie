@@ -394,6 +394,16 @@
     <!-- Téléchargements -->
     <string name="settings_cat_downloads">Téléchargements</string>
     <string name="downloads_help">Les titres téléchargés se lisent depuis cette liste ou depuis leur fiche, sans réseau. Ils sont propres à cet appareil et disparaissent si l'application est désinstallée.</string>
+    <string name="downloads_storage_other">%1$s autres données</string>
+    <string name="downloads_storage_free">%1$s libres sur %2$s</string>
+
+    <!-- Hors ligne -->
+    <string name="offline_title">Hors ligne</string>
+    <string name="offline_library_help">Pas de connexion. Seuls les titres déjà téléchargés sont disponibles.</string>
+    <string name="offline_empty_title">Rien à regarder hors ligne</string>
+    <string name="offline_empty_help">Aucune connexion, et aucun téléchargement sur cet appareil. Un titre téléchargé depuis le panneau des sources reste lisible ici sans réseau.</string>
+    <string name="offline_retry">Réessayer</string>
+    <string name="offline_search_help">Recherche dans les titres téléchargés sur cet appareil.</string>
     <string name="downloads_used">%1$s occupés</string>
     <string name="downloads_empty">Aucun téléchargement. Appui long sur une source, depuis une fiche, pour en lancer un.</string>
     <string name="downloads_ready">Prêt hors ligne · %1$s</string>

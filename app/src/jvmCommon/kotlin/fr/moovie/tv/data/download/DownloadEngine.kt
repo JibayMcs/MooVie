@@ -99,10 +99,33 @@ class DownloadEngine(
         // laisse des octets qui ne serviront jamais, sur un disque qui manque
         // déjà de place.
         if (diskFull(dir)) return DownloadOutcome.Failed(DISK_FULL)
+        affiche(download)
         return try {
             if (isHls(stream.url)) hls(download, stream, dir) else direct(download, stream, dir)
         } catch (e: Exception) {
             DownloadOutcome.Failed(e.message ?: e.toString())
+        }
+    }
+
+    /**
+     * L'affiche du titre, posée à côté de ses segments.
+     *
+     * **Au meilleur effort, et jamais bloquant** : une vignette manquante ne
+     * doit pas coûter le film. L'échec est donc avalé, et le fichier partiel
+     * effacé pour qu'une reprise retente au lieu d'afficher un octet illisible.
+     *
+     * Quelques dizaines de kilo-octets à côté de plusieurs gigaoctets : le coût
+     * ne se discute pas, et c'est la seule façon d'avoir une bibliothèque
+     * illustrée quand il n'y a plus de réseau pour aller la chercher.
+     */
+    private suspend fun affiche(download: Download) {
+        runCatching {
+            fetchDownloadPoster(
+                key = download.key,
+                tmdbId = download.tmdbId,
+                isTv = download.isTv,
+                imageUrl = download.imageUrl,
+            )
         }
     }
 
