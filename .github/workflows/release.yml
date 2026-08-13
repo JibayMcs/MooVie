@@ -116,14 +116,25 @@ jobs:
         if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
+          $ErrorActionPreference = "Stop"
           $dest = "app/resources/windows-x64"
           New-Item -ItemType Directory -Force -Path $dest | Out-Null
-          # Build officielle de shinchiro, la même que celle dont se sert le
-          # paquet Windows de mpv lui-même.
-          $url = "https://github.com/shinchiro/mpv-winbuild-cmake/releases/download/20250316/mpv-dev-x86_64-20250316-git-1ae7d8b.7z"
-          curl.exe -L --fail --retry 3 -o mpv-dev.7z $url
-          7z x mpv-dev.7z -ompv-dev
-          Copy-Item (Get-ChildItem -Recurse -Filter "libmpv-2.dll" mpv-dev)[0].FullName "$dest/libmpv-2.dll"
+          # L'archive est **résolue par l'API**, jamais écrite en dur : le nom
+          # du fichier de shinchiro porte sa date et le hash du commit mpv, si
+          # bien qu'une URL figée cesse d'exister à la publication suivante.
+          $api = "https://api.github.com/repos/shinchiro/mpv-winbuild-cmake/releases"
+          $rel = Invoke-RestMethod -Uri $api -Headers @{ "User-Agent" = "moovie-ci" }
+          $asset = $rel |
+            ForEach-Object { $_.assets } |
+            Where-Object { $_.name -like "mpv-dev-x86_64-2*.7z" } |
+            Select-Object -First 1
+          if (-not $asset) { throw "aucune archive mpv-dev dans les releases shinchiro" }
+          Write-Host "archive : $($asset.name)"
+          curl.exe -L --fail --retry 3 -o mpv-dev.7z $asset.browser_download_url
+          7z x mpv-dev.7z -ompv-dev | Out-Null
+          $dll = Get-ChildItem -Recurse -Filter "libmpv-2.dll" mpv-dev | Select-Object -First 1
+          if (-not $dll) { throw "libmpv-2.dll absente de l'archive" }
+          Copy-Item $dll.FullName "$dest/libmpv-2.dll"
           Get-Item "$dest/libmpv-2.dll" | Select-Object Name, Length
 
       - name: Embarquer libmpv (macOS)
@@ -139,25 +150,15 @@ jobs:
           cp "$src" "$dest/libmpv.2.dylib"
           chmod u+w "$dest/libmpv.2.dylib"
           # Les dépendances de Homebrew vivent sous /opt/homebrew, répertoire
-          # absent chez l'utilisateur. On copie donc la **fermeture entière** —
-          # récursivement, une dépendance en tirant d'autres — et on réécrit
-          # chaque chemin en `@loader_path` pour qu'elles se trouvent entre
-          # elles dans le paquet. Un seul niveau produirait un DMG qui
-          # s'installe et ne joue rien.
-          ferme() {
-            local fichier="$1"
-            for dep in $(otool -L "$fichier" | awk 'NR>1 && $1 ~ /^\/(opt|usr\/local)/ {print $1}'); do
-              local base=$(basename "$dep")
-              if [ ! -f "$dest/$base" ]; then
-                cp "$dep" "$dest/$base"
-                chmod u+w "$dest/$base"
-                install_name_tool -id "@loader_path/$base" "$dest/$base"
-                ferme "$dest/$base"
-              fi
-              install_name_tool -change "$dep" "@loader_path/$base" "$fichier"
-            done
-          }
-          ferme "$dest/libmpv.2.dylib"
+          # absent chez l'utilisateur : il faut copier la fermeture entière et
+          # réécrire chaque chemin en `@loader_path`. Ce travail est confié à
+          # `dylibbundler`, dont c'est l'unique métier — une boucle maison a
+          # laissé passer des références (ffmpeg, tiré par plusieurs chemins),
+          # et un DMG qui s'installe sans rien jouer est le pire des résultats.
+          brew install dylibbundler
+          dylibbundler --bundle-deps --overwrite-files --create-dir \
+            --fix-file "$dest/libmpv.2.dylib" \
+            --dest-dir "$dest" --install-path "@loader_path/"
           echo "dylibs embarquées : $(ls "$dest" | wc -l)"
           # Aucun chemin Homebrew ne doit subsister : il ne mènerait nulle part.
           if otool -L "$dest"/*.dylib | grep -E '^\s+/(opt|usr/local)/'; then
@@ -303,10 +304,14 @@ jobs:
           [ -n "$mpv" ] || { echo "libmpv absente de l'AppImage"; exit 1; }
           echo "libmpv embarquée : $(basename "$mpv")"
           manquantes=$(ldd "$mpv" 2>/dev/null | grep 'not found' | awk '{print $1}' | sort -u)
-          # libpulse et libasound ne sont volontairement pas embarquées : leur
-          # protocole est couplé au démon audio de l'hôte, que toute session de
-          # bureau fournit. Toute autre absence est une régression.
-          reste=$(echo "$manquantes" | grep -v '^libpulse\|^libasound' || true)
+          # Les familles que le bundler écarte **délibérément** ne peuvent pas
+          # compter comme des manques ici, sans quoi la vérification
+          # contredirait la politique d'embarquement : le son (couplé au démon
+          # audio de l'hôte), le graphique et le GPU (couplés au pilote et au
+          # serveur X). Toute session de bureau les fournit ; ces conteneurs de
+          # test, non. Voir le `excluded` de packageAppImage — les deux listes
+          # décrivent la même décision et doivent le rester.
+          reste=$(echo "$manquantes" | grep -vE '^(libpulse|libasound|libEGL|libGL|libGLX|libGLdispatch|libX11|libXext|libXi|libXrender|libXtst|libXau|libXdmcp|libxcb|libdrm)' || true)
           if [ -n "$reste" ]; then
             echo "dépendances manquantes pour libmpv : $reste"
             exit 1
