@@ -68,20 +68,41 @@ class YoutubeTrailerExtractor(
     suspend fun resolveDetailed(videoId: String, preferredAudio: String = "en"): TrailerResolution? {
         if (!VIDEO_ID.matches(videoId)) return null
 
+        // Deux passes, et la raison est mesurée : sur une bande-annonce de
+        // studio, googlevideo **refuse de servir les pistes séparées au-delà
+        // d'environ 38 % du fichier** — 403 sur une URL neuve, quel que soit le
+        // client, la cadence ou la forme de la requête. Les flux entiers (HLS,
+        // ou progressif image+son) échappent à ce bridage : mesuré, le
+        // progressif du client ANDROID se sert jusqu'au bout quand le 1080p du
+        // même client rend 403.
+        //
+        // La première passe ne retient donc **que** ces formes-là, en essayant
+        // tous les clients. La seconde accepte le manifeste DASH fabriqué à
+        // partir des pistes séparées : une bande-annonce qui s'arrête à mi-
+        // parcours reste préférable à pas de bande-annonce du tout.
+        val reponses = mutableListOf<Pair<InnerTubeClient, PlayerResponse>>()
         for (client in CLIENTS) {
             val response = request(client, videoId, preferredAudio) ?: continue
             // « OK » seulement : LOGIN_REQUIRED, UNPLAYABLE et AGE_VERIFICATION
             // s'accompagnent parfois d'un streamingData partiel qui ne joue pas.
             if (response.playabilityStatus?.status != "OK") continue
-            val stream = response.streamingData?.let { pick(it, client) } ?: continue
-            return TrailerResolution(
-                stream = stream,
-                client = client.name,
-                durationSeconds = response.videoDetails?.lengthSeconds?.toIntOrNull() ?: 0,
-            )
+            reponses += client to response
+            val stream = response.streamingData?.let { pick(it, client, entierSeulement = true) }
+            if (stream != null) return resolution(stream, client, response)
+        }
+        for ((client, response) in reponses) {
+            val stream = response.streamingData?.let { pick(it, client, entierSeulement = false) }
+            if (stream != null) return resolution(stream, client, response)
         }
         return null
     }
+
+    private fun resolution(stream: PlayableStream, client: InnerTubeClient, response: PlayerResponse) =
+        TrailerResolution(
+            stream = stream,
+            client = client.name,
+            durationSeconds = response.videoDetails?.lengthSeconds?.toIntOrNull() ?: 0,
+        )
 
     private suspend fun request(
         client: InnerTubeClient,
@@ -120,16 +141,21 @@ class YoutubeTrailerExtractor(
     /**
      * Choisit le flux à jouer.
      *
-     * Un flux **progressif** (image et son dans la même URL) serait le plus
-     * simple, et c'est le premier examiné — mais YouTube n'en sert plus : sur
-     * tous les titres mesurés, `formats` revient vide et tout est dans
-     * `adaptiveFormats`, pistes séparées. D'où le manifeste DASH fabriqué à la
-     * volée, seule façon de rendre au lecteur une entrée unique.
+     * @param entierSeulement ne rend qu'un flux que googlevideo sert **jusqu'au
+     *   bout** : manifeste HLS, ou progressif (image et son dans la même URL).
+     *   Les pistes séparées d'une bande-annonce de studio sont bridées à ~38 %
+     *   du fichier — voir [resolveDetailed]. Le progressif est souvent limité à
+     *   360p, et c'est un échange qu'on assume : une bande-annonce entière en
+     *   360p vaut mieux qu'une minute de 1080p suivie d'un gel.
      *
      * Un format sans `url` est un format signé qu'on ne sait pas déchiffrer. Il
      * est écarté plutôt que rendu : c'est une URL vide, pas une source.
      */
-    private fun pick(data: StreamingData, client: InnerTubeClient): PlayableStream? {
+    private fun pick(
+        data: StreamingData,
+        client: InnerTubeClient,
+        entierSeulement: Boolean,
+    ): PlayableStream? {
         val headers = mapOf("User-Agent" to client.userAgent)
 
         data.hlsManifestUrl?.takeIf { it.startsWith("https://") }?.let {
@@ -151,6 +177,8 @@ class YoutubeTrailerExtractor(
                 )
             }
 
+        if (entierSeulement) return null
+
         val tracks = data.adaptiveFormats
             // `isDrc` marque les variantes à compression dynamique : même itag,
             // même contenu, mais deux représentations d'un même identifiant dans
@@ -160,11 +188,19 @@ class YoutubeTrailerExtractor(
         val manifest = buildYoutubeDashManifest(tracks) ?: return null
         val file = manifestStore.write(manifest) ?: return null
 
+        // Les mêmes pistes, non emballées. Le manifeste reste l'URL principale
+        // — Media3 le lit sans broncher et y gagne l'adaptation de qualité —
+        // mais le lecteur desktop ne sait pas lire nos `BaseURL` googlevideo
+        // (démuxeur DASH de FFmpeg), et préfère ouvrir les deux directement.
+        // Rendre les deux formes évite d'imposer à l'un le détour qui ne sert
+        // qu'à l'autre.
         return PlayableStream(
             url = file,
             format = StreamFormat.DASH,
             headers = headers,
             quality = tracks.filter { it.isVideo }.maxOfOrNull { it.height }?.let { "${it}p" },
+            videoOnlyUrl = youtubeVideoTracks(tracks).firstOrNull()?.url,
+            audioOnlyUrl = youtubeAudioTracks(tracks).firstOrNull()?.url,
         )
     }
 
@@ -176,9 +212,14 @@ class YoutubeTrailerExtractor(
 
         /**
          * Ordre délibéré. iOS en tête parce que c'est le seul à rendre un
-         * `hlsManifestUrl`, donc de la vraie qualité adaptative ; les deux
-         * suivants ne savent servir que du progressif, plafonné à 720p, et ne
-         * sont là que pour les jours où iOS est restreint.
+         * `hlsManifestUrl` — de la vraie qualité adaptative, et servie en
+         * entier. ANDROID juste après parce qu'il est le seul à rendre un
+         * **flux progressif**, la seule forme que googlevideo sert jusqu'au
+         * bout sur une bande-annonce de studio (mesuré : son 360p passe là où
+         * le 1080p du même client rend 403 à 38 % du fichier).
+         *
+         * Les deux derniers sont des replis pour les jours où les premiers sont
+         * restreints — ce qui arrive, et c'est toute la raison de la cascade.
          */
         val CLIENTS = listOf(
             InnerTubeClient(
@@ -191,6 +232,18 @@ class YoutubeTrailerExtractor(
                     put("deviceModel", "iPhone16,2")
                     put("osName", "iPhone")
                     put("osVersion", "18.3.2.22D82")
+                },
+            ),
+            InnerTubeClient(
+                id = 3,
+                name = "ANDROID",
+                version = "20.10.38",
+                userAgent = "com.google.android.youtube/20.10.38 " +
+                    "(Linux; U; Android 14; SM-S928B Build/UP1A.231005.007) gzip",
+                extra = {
+                    put("osName", "Android")
+                    put("osVersion", "14")
+                    put("androidSdkVersion", 34)
                 },
             ),
             InnerTubeClient(
