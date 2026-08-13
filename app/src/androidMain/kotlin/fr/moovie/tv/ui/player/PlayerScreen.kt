@@ -4,6 +4,7 @@ import fr.moovie.tv.data.download.DownloadQueue
 import fr.moovie.tv.data.download.Download
 import fr.moovie.tv.core.sources.model.StreamFormat
 import fr.moovie.tv.core.sources.model.PlayableStream
+import android.app.Activity
 import android.net.Uri
 import android.view.ViewGroup
 import androidx.compose.animation.AnimatedVisibility
@@ -59,6 +60,15 @@ import androidx.media3.session.MediaSession
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import fr.moovie.tv.ui.adaptive.isTouchUi
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PictureInPictureAlt
+import fr.moovie.tv.ui.components.MoovieIconButton
+import fr.moovie.tv.resources.Res
+import fr.moovie.tv.resources.player_pause
+import fr.moovie.tv.resources.player_notification_channel
+import fr.moovie.tv.resources.player_pip
+import fr.moovie.tv.resources.player_play
+import org.jetbrains.compose.resources.stringResource
 import fr.moovie.tv.ui.navigation.AltSource
 import fr.moovie.tv.ui.player.QualityChoice
 import fr.moovie.tv.ui.player.qualityOptions
@@ -258,7 +268,11 @@ fun PlayerScreen(
 
     // Sans MediaSession, Android route les touches média (play/pause/seek de la
     // télécommande) vers la dernière session système au lieu de l'app.
-    val mediaSession = remember { MediaSession.Builder(context, player).build() }
+    // Le relais qui ajoute « épisode précédent / suivant » aux commandes vues du
+    // système : voir [EpisodePlayer]. C'est **lui** qu'on confie à la session,
+    // pas l'ExoPlayer nu — sinon le volet n'offre qu'une flèche gauche.
+    val sessionPlayer = remember(player) { EpisodePlayer(player) }
+    val mediaSession = remember { MediaSession.Builder(context, sessionPlayer).build() }
 
     // Surface vidéo seule : le contrôleur intégré est remplacé par l'overlay
     // Compose, et la vue ne doit pas capter le focus du D-pad.
@@ -332,6 +346,38 @@ fun PlayerScreen(
     var screensaverOn by remember { mutableStateOf(false) }
     // Appui en cours qui a servi à sortir de la veille : sa fin doit être avalée.
     var swallowUntilRelease by remember { mutableStateOf(false) }
+
+    // ── Vignette (picture-in-picture) ────────────────────────────────────────
+    //
+    // Sur téléphone seulement : voir [Pip]. La taille de l'image est lue à
+    // l'appel plutôt que suivie dans un état — elle ne sert qu'à construire les
+    // paramètres de la vignette, et le lecteur la connaît mieux que nous.
+    val enPip by Pip.actif.collectAsStateWithLifecycle()
+    // Le bouton de la barre n'a de sens que là où la vignette existe : sur un
+    // téléviseur, et sur une version d'Android qui l'ignore, il ne ferait rien.
+    val pipDisponible = remember(context, touchUi) { touchUi && Pip.disponible(context) }
+    Pip.Register(
+        actif = touchUi,
+        taille = { player.videoSize },
+        enLecture = { controller.isPlaying },
+        bascule = { controller.togglePause() },
+        libellePause = stringResource(Res.string.player_pause),
+        libelleLecture = stringResource(Res.string.player_play),
+    )
+    // Réaccorde la vignette à chaque changement de lecture : c'est ce qui arme
+    // la bascule automatique d'Android 12+ **et** retourne l'icône du bouton.
+    LaunchedEffect(isPlaying) {
+        (context as? Activity)?.let { Pip.rafraichit(it) }
+    }
+    // Une boîte de dialogue ou une barre de contrôles dessinées dans 200 dp de
+    // large sont illisibles, et la vignette a ses propres commandes.
+    LaunchedEffect(enPip) {
+        if (enPip) {
+            dialog = null
+            controlsVisible = false
+            screensaverOn = false
+        }
+    }
 
     fun wake() {
         controlsVisible = true
@@ -535,6 +581,39 @@ fun PlayerScreen(
 
     // ── Intro / générique (TheIntroDB) ───────────────────────────────────────
     val pid = remember(mediaKey) { parseMediaKey(mediaKey) }
+
+    // Commandes dans le volet et sur l'écran verrouillé. Sur téléphone
+    // seulement : Android TV n'a pas de volet de notifications, la notification
+    // y serait invisible et son seul effet serait d'exister.
+    // Les deux commandes d'épisode, posées sur le relais : elles alimentent à la
+    // fois les flèches de la notification et celles que le système dessine sur
+    // l'écran verrouillé, les secondes ne lisant que la session.
+    val versEpisode: ((Int) -> () -> Unit) = { delta ->
+        {
+            pid?.let {
+                // Même règle qu'au bouton de la barre : passer au suivant, c'est
+                // en avoir fini avec celui-ci.
+                if (delta > 0) markFinished()
+                onNextEpisode(it.tmdbId, it.season, it.episode + delta)
+            }
+            Unit
+        }
+    }
+    LaunchedEffect(sessionPlayer, pid) {
+        sessionPlayer.onPrecedent =
+            versEpisode(-1).takeIf { pid?.isTv == true && (pid?.episode ?: 0) > 1 }
+        sessionPlayer.onSuivant = versEpisode(+1).takeIf { pid?.isTv == true }
+    }
+
+    PlayerMediaNotification(
+        actif = touchUi,
+        player = sessionPlayer,
+        session = mediaSession,
+        titre = title,
+        soustitre = subtitle,
+        posterUrl = posterUrl,
+        nomCanal = stringResource(Res.string.player_notification_channel),
+    )
     var media by remember(streamUrl) { mutableStateOf<IntroMedia?>(null) }
     var activeSkip by remember { mutableStateOf<SkipKind?>(null) }
 
@@ -979,7 +1058,7 @@ fun PlayerScreen(
 
         // Titre du média, visible avec les contrôles (souris ou télécommande).
         AnimatedVisibility(
-            visible = controlsVisible,
+            visible = controlsVisible && !enPip,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier.align(Alignment.TopCenter),
@@ -991,7 +1070,7 @@ fun PlayerScreen(
         // Bouton « Passer l'intro / le générique », au-dessus de la barre pour
         // rester atteignable au D-pad quand les contrôles sont affichés.
         val skip = activeSkip
-        if (skip != null) {
+        if (skip != null && !enPip) {
             PlayerSkipButton(
                 kind = skip,
                 onClick = { doSkip() },
@@ -1005,7 +1084,7 @@ fun PlayerScreen(
         // Pastille de mise à jour, en haut à droite (le titre occupe la gauche).
         // L'horloge occupe ce même coin : la pastille se pose alors *sous* elle,
         // sinon les deux se superposent et deviennent illisibles.
-        if (chipVersion != null) {
+        if (chipVersion != null && !enPip) {
             PlayerUpdateChip(
                 version = chipVersion,
                 onClick = {
@@ -1019,7 +1098,7 @@ fun PlayerScreen(
         }
 
         // Décompte d'enchaînement, au-dessus de la barre de contrôles.
-        autoNextSeconds?.let { seconds ->
+        autoNextSeconds?.takeIf { !enPip }?.let { seconds ->
             PlayerAutoNextCountdown(
                 seconds = seconds,
                 cancelFocus = autoNextFocus,
@@ -1031,7 +1110,7 @@ fun PlayerScreen(
         }
 
         AnimatedVisibility(
-            visible = controlsVisible,
+            visible = controlsVisible && !enPip,
             enter = fadeIn() + slideInVertically(initialOffsetY = { it }),
             exit = fadeOut() + slideOutVertically(targetOffsetY = { it }),
             modifier = Modifier.align(Alignment.BottomCenter),
@@ -1151,6 +1230,19 @@ fun PlayerScreen(
                         if (durationMs > 0) controller.seekTo((fraction * durationMs).toLong())
                     }
                 },
+                // Passage en vignette au doigt. Le geste d'accueil y mène déjà,
+                // mais il faut le savoir : un bouton est ce qui **apprend** que
+                // la fonction existe. Il se pose dans le créneau réservé aux
+                // commandes de plateforme, la vignette n'existant pas ailleurs.
+                trailing = {
+                    if (pipDisponible) {
+                        MoovieIconButton(
+                            onClick = { (context as? Activity)?.let { Pip.entre(it) } },
+                            icon = Icons.Default.PictureInPictureAlt,
+                            contentDescription = stringResource(Res.string.player_pip),
+                        )
+                    }
+                },
             )
         }
 
@@ -1163,7 +1255,7 @@ fun PlayerScreen(
             }
         }
 
-        when (dialog) {
+        when (dialog.takeIf { !enPip }) {
             PlayerDialogKind.SUBTITLES -> PlayerOptionsDialog(
                 sections = listOf(
                     subtitleSection(tracks) { trackId ->
@@ -1249,7 +1341,7 @@ fun PlayerScreen(
         // Écran de veille : recouvre tout, y compris la barre de contrôles qui
         // reste ouverte en pause. Toute touche le referme et rend la main au
         // lecteur, toujours en pause.
-        if (screensaverOn) {
+        if (screensaverOn && !enPip) {
             MoovieScreensaver(
                 posterUrl = posterUrl.takeIf { it.isNotBlank() },
                 onDismiss = {

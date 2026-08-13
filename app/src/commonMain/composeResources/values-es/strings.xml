@@ -101,6 +101,8 @@
     <string name="player_subtitles_off">Desactivados</string>
     <string name="player_audio">Pista de audio</string>
     <string name="player_settings">Ajustes</string>
+    <string name="player_pip">Ventana flotante</string>
+    <string name="player_notification_channel">Reproduciendo</string>
     <string name="player_speed">Velocidad de reproducción</string>
     <string name="player_mute">Silenciar</string>
     <string name="player_unmute">Activar sonido</string>

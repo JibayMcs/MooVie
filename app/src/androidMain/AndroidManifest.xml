@@ -71,6 +71,28 @@
         android:usesCleartextTraffic="true"
         android:theme="@style/Theme.MooVie">
 
+
+        <!--
+          Le lecteur du téléphone, dans sa propre fenêtre. Voir PlayerHost pour
+          la raison : une Activity qui part en vignette laisse celle du dessous
+          revenir au premier plan, ce qu'une application à Activity unique ne
+          peut pas offrir.
+
+          `exported="false"` : on n'y entre que depuis Moo-vie, jamais depuis un
+          autre lanceur — elle n'a de sens qu'avec un flux déjà résolu.
+
+          Les mêmes `configChanges` que MainActivity, et pour la même raison,
+          plus impérative encore ici : sans `screenSize|smallestScreenSize|
+          screenLayout`, chaque bascule en vignette recréerait l'Activity et
+          redémarrerait la lecture.
+        -->
+        <activity
+            android:name=".PlayerActivity"
+            android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenLayout|screenSize|smallestScreenSize|uiMode"
+            android:exported="false"
+            android:supportsPictureInPicture="true"
+            android:theme="@style/Theme.MooVie" />
+
         <activity
             android:name=".MainActivity"
             android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenLayout|screenSize|smallestScreenSize|uiMode"

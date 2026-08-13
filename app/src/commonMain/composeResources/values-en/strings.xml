@@ -101,6 +101,8 @@
     <string name="player_subtitles_off">Off</string>
     <string name="player_audio">Audio track</string>
     <string name="player_settings">Settings</string>
+    <string name="player_pip">Picture-in-picture</string>
+    <string name="player_notification_channel">Now playing</string>
     <string name="player_speed">Playback speed</string>
     <string name="player_mute">Mute</string>
     <string name="player_unmute">Unmute</string>

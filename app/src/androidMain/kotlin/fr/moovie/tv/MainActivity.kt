@@ -72,6 +72,7 @@ import fr.moovie.tv.ui.profile.ProfileHost
 import fr.moovie.tv.ui.details.DetailsScreen
 import fr.moovie.tv.ui.history.HistoryScreen
 import fr.moovie.tv.ui.home.HomeScreen
+import fr.moovie.tv.ui.player.PlayerHost
 import fr.moovie.tv.ui.player.PlayerScreen
 import fr.moovie.tv.ui.search.SearchScreen
 import fr.moovie.tv.ui.settings.SettingsScreen
@@ -362,6 +363,55 @@ class MainActivity : ComponentActivity() {
                         // sont captés avant, par un BackHandler plus profond.
                         BackHandler(enabled = nav.canGoBack) { nav.pop() }
 
+                        // Sur téléphone, le lecteur ne vit pas ici : il part dans
+                        // sa propre Activity, seule façon d'avoir une vignette qui
+                        // flotte au-dessus d'un Moo-vie encore utilisable. Voir
+                        // PlayerHost. On le retire de la pile aussitôt qu'il y
+                        // arrive, pour que l'écran resté derrière la vignette soit
+                        // la fiche et non un lecteur fantôme — c'est aussi ce qui
+                        // fait qu'un retour depuis le lecteur retombe au bon
+                        // endroit. Le téléviseur, lui, ne passe jamais par là.
+                        LaunchedEffect(nav.current, uiFlavor) {
+                            val ecran = nav.current
+                            if (ecran !is Screen.Player || uiFlavor != UiFlavor.TOUCH) {
+                                return@LaunchedEffect
+                            }
+                            // `replace` quand la pile n'a que lui : c'est le cas du
+                            // flux de test injecté par adb, qui démarre sur le
+                            // lecteur. Dépiler laisserait une pile vide.
+                            if (nav.canGoBack) nav.pop() else nav.replace(Screen.Home)
+                            PlayerHost.ouvre(this@MainActivity, ecran)
+                        }
+
+                        // Ce que le lecteur détaché ne peut pas faire lui-même :
+                        // les trois passent par `detailsViewModel`, qui a le scope
+                        // de cette Activity et connaît la série en cours.
+                        LaunchedEffect(Unit) {
+                            PlayerHost.demandes.collect { demande ->
+                                when (demande) {
+                                    is PlayerHost.Demande.Prefetch ->
+                                        detailsViewModel.prefetchEpisodeSources(
+                                            demande.saison,
+                                            demande.episode,
+                                        )
+                                    // Pas de `pop` : la pile est déjà revenue sur
+                                    // la fiche au moment où le lecteur s'est
+                                    // détaché.
+                                    PlayerHost.Demande.Echec ->
+                                        detailsViewModel.retryAfterPlaybackFailure()
+                                    is PlayerHost.Demande.Episode -> nav.replace(
+                                        Screen.Details(
+                                            tmdbId = demande.tmdbId,
+                                            isTv = true,
+                                            autoSources = true,
+                                            resumeSeason = demande.saison,
+                                            resumeEpisode = demande.episode,
+                                        ),
+                                    )
+                                }
+                            }
+                        }
+
                         when (val s = nav.current) {
                             // Le téléviseur appairé, ou rien : sans cible la
                             // destination est inatteignable (l'icône qui y mène
@@ -465,7 +515,7 @@ class MainActivity : ComponentActivity() {
                                 resumeSeason = s.resumeSeason,
                                 resumeEpisode = s.resumeEpisode,
                             )
-                            is Screen.Player -> PlayerScreen(
+                            is Screen.Player -> if (uiFlavor != UiFlavor.TOUCH) PlayerScreen(
                                 streamUrl = s.streamUrl,
                                 headers = s.headers,
                                 mediaKey = s.mediaKey,

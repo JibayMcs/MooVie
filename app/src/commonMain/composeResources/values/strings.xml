@@ -103,6 +103,8 @@
     <string name="player_subtitles_off">Désactivés</string>
     <string name="player_audio">Piste audio</string>
     <string name="player_settings">Paramètres</string>
+    <string name="player_pip">Réduire en vignette</string>
+    <string name="player_notification_channel">Lecture en cours</string>
     <string name="player_speed">Vitesse de lecture</string>
     <string name="player_mute">Couper le son</string>
     <string name="player_unmute">Rétablir le son</string>
