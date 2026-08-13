@@ -119,6 +119,16 @@ and ~~iOS~~, built from a single Kotlin Multiplatform codebase. Source extractio
   does - the web page carries the same three buttons for a phone without the app. It
   drives Moo-vie and the box's sound, not the television set: it cannot turn it on or
   change its input.
+- **Offline mode** - lose the network and the app changes role instead of failing:
+  the home becomes your local library, search looks through what you downloaded rather
+  than TMDB, and sync, update checks and source resolution all stand down. With nothing
+  downloaded it says so plainly, with a Retry, rather than showing a catalogue where
+  nothing can be played. Android is asked whether the network is *validated* - the same
+  measure as the exclamation mark on the Wi-Fi icon, so a captive portal or an unplugged
+  router counts as offline; desktop, which has no such API, probes the host it actually
+  needs. Downloads keep their poster on disk, so the library is illustrated with no
+  network at all, and the page shows what the disk holds: your downloads, the rest of
+  the device and what is left, in one bar.
 - **Offline-friendly** - TMDB responses and resolved source links are cached on disk.
 - **In-app updates** - periodic check against GitHub Releases; a banner on the home
   screen, a discreet chip during playback.

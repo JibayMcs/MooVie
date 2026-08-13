@@ -130,6 +130,17 @@ L'extraction des sources se fait **on-device** : pas de backend, pas de compte, 
   box**, à la manière de Cast - la page web porte les trois mêmes boutons pour un téléphone
   sans l'application. Elle pilote Moo-vie et le son de la box, pas le téléviseur : elle ne
   peut ni l'allumer, ni changer de source.
+- **Mode hors ligne** - quand le réseau tombe, l'application change de rôle au lieu
+  d'échouer : l'accueil devient la bibliothèque locale, la recherche cherche dans les
+  titres téléchargés plutôt que dans TMDB, et la synchro, la vérification des mises à
+  jour et la résolution de sources se taisent. Sans aucun téléchargement, elle le dit
+  franchement, avec un bouton Réessayer, plutôt que d'afficher un catalogue dont rien
+  n'est lisible. On demande à Android si le réseau est *validé* - la mesure même du
+  point d'exclamation sur l'icône Wi-Fi, de sorte qu'un portail captif ou une box
+  débranchée comptent comme hors ligne ; le desktop, qui n'a pas cette API, sonde l'hôte
+  dont il a réellement besoin. Les téléchargements gardent leur affiche sur le disque,
+  la bibliothèque reste donc illustrée sans réseau, et la page montre ce que le disque
+  contient : vos téléchargements, le reste de l'appareil et ce qu'il reste, en une barre.
 - **Cache disque** - réponses TMDB et liens de sources résolus mis en cache.
 - **Mises à jour intégrées** - vérification périodique des releases GitHub : bandeau sur
   l'accueil, pastille discrète pendant la lecture.
