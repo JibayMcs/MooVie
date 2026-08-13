@@ -115,6 +115,14 @@ jobs:
       - name: Embarquer libmpv (Windows)
         if: matrix.os == 'windows-latest'
         shell: pwsh
+        env:
+          # Authentifie l'appel à l'API : en anonyme, les runners partagent une
+          # IP et ses soixante requêtes horaires, et l'empaquetage Windows a
+          # échoué sur « API rate limit exceeded » — une panne qui ne dépend
+          # pas de nous et ne se reproduit pas à volonté. Le jeton du workflow
+          # suffit à lire les releases d'un dépôt public, et fait passer la
+          # limite à mille par heure.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $ErrorActionPreference = "Stop"
           $dest = "app/resources/windows-x64"
@@ -123,7 +131,20 @@ jobs:
           # du fichier de shinchiro porte sa date et le hash du commit mpv, si
           # bien qu'une URL figée cesse d'exister à la publication suivante.
           $api = "https://api.github.com/repos/shinchiro/mpv-winbuild-cmake/releases"
-          $rel = Invoke-RestMethod -Uri $api -Headers @{ "User-Agent" = "moovie-ci" }
+          $headers = @{ "User-Agent" = "moovie-ci"; "Authorization" = "Bearer $env:GH_TOKEN" }
+          # Trois essais espacés : le quota se compte à l'heure, mais un refus
+          # ponctuel du réseau n'a pas à coûter une release entière.
+          $rel = $null
+          foreach ($essai in 1..3) {
+            try {
+              $rel = Invoke-RestMethod -Uri $api -Headers $headers
+              break
+            } catch {
+              Write-Host "essai $essai : $($_.Exception.Message)"
+              if ($essai -eq 3) { throw }
+              Start-Sleep -Seconds (10 * $essai)
+            }
+          }
           $asset = $rel |
             ForEach-Object { $_.assets } |
             Where-Object { $_.name -like "mpv-dev-x86_64-2*.7z" } |
