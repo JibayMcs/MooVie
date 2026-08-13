@@ -12,6 +12,7 @@ import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
+import android.view.KeyEvent
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -50,6 +51,7 @@ import fr.moovie.tv.ui.navigation.rememberNavStack
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import fr.moovie.tv.ui.remote.RemoteScreen
+import fr.moovie.tv.ui.remote.RemoteVolumeKeys
 import fr.moovie.tv.ui.pairing.RemoteHost
 import fr.moovie.tv.data.remote.RemoteTargetRepository
 import fr.moovie.tv.data.remote.RemotePresence
@@ -588,6 +590,22 @@ class MainActivity : ComponentActivity() {
         // téléviseur, qui n'en a évidemment aucune.
         lifecycleScope.launch { RemotePresence.refresh() }
     }
+
+    /**
+     * Le volume physique, prêté au téléviseur pendant que la télécommande est là.
+     *
+     * Avant `super`, et non dans `onKeyDown` : les touches de volume n'arrivent
+     * jamais jusqu'à lui. `dispatchKeyEvent` est le seul étage de l'application
+     * qui les voit avant que la fenêtre ne les traite pour son propre compte, et
+     * c'est aussi celui où Cast se branche.
+     *
+     * Sans écran de télécommande inscrit, [RemoteVolumeKeys.handle] rend faux
+     * sans regarder plus loin : ce détournement n'existe donc pas pour le reste
+     * de l'application, ni pour le téléviseur, qui exécute pourtant le même
+     * `MainActivity`.
+     */
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean =
+        RemoteVolumeKeys.handle(event) || super.dispatchKeyEvent(event)
 
     override fun onPause() {
         super.onPause()

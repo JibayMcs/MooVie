@@ -17,6 +17,22 @@ package fr.moovie.tv.data.remote
  * listes et recule dans le lecteur, selon l'écran. Deux boutons pour un même
  * code, parce que ce que l'utilisateur cherche des yeux diffère selon qu'il
  * navigue ou qu'il regarde.
+ *
+ * ### Le volume est la seule famille qui ne s'injecte pas
+ *
+ * `VOLUME_UP`, `VOLUME_DOWN` et `MUTE` ne passent pas par [sendRemoteKey] au
+ * sens où les autres l'entendent : les touches de volume ne sont **pas traitées
+ * par l'application**, mais par le gestionnaire de fenêtres, en amont d'elle.
+ * Injecter `KEYCODE_VOLUME_UP` dans l'Activity ne remonterait donc pas là où le
+ * volume se règle réellement, et tomberait au mieux dans une gestion interne que
+ * rien ne garantit. Chaque plateforme les traduit en une action directe : le
+ * volume **système** sur Android, celui du lecteur sur desktop, faute
+ * d'équivalent système en JVM pure.
+ *
+ * C'est aussi la seule famille qui agit hors de Moo-vie. Cela reste conforme à
+ * ce que dit [sendRemoteKey] plus bas — `adjustStreamVolume` est une API
+ * publique, sans permission, que n'importe quelle application peut appeler ;
+ * elle ne donne toujours aucune prise sur le téléviseur lui-même.
  */
 enum class RemoteKey {
     UP,
@@ -28,6 +44,9 @@ enum class RemoteKey {
     PLAY_PAUSE,
     REWIND,
     FORWARD,
+    VOLUME_UP,
+    VOLUME_DOWN,
+    MUTE,
 }
 
 /**

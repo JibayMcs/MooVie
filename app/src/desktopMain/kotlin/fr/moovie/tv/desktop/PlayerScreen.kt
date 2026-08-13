@@ -76,6 +76,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import fr.moovie.tv.data.intro.IntroDbRepository
 import fr.moovie.tv.data.intro.IntroMedia
+import fr.moovie.tv.data.remote.RemoteKey
+import fr.moovie.tv.data.remote.remoteVolume
 import fr.moovie.tv.data.settings.ScreensaverDelay
 import fr.moovie.tv.data.settings.SettingsRepository
 import fr.moovie.tv.ui.format.formatNowDateTime
@@ -377,6 +379,24 @@ internal fun DesktopPlayerScreen(
     fun toggleMute() {
         muted = !muted
         moteur.coupeSon(muted)
+    }
+
+    // Le volume, offert à la télécommande virtuelle du téléphone. Le même pas
+    // que les flèches du clavier : c'est le même réglage, et deux cadences pour
+    // un seul curseur se remarqueraient dès qu'on passe de l'un à l'autre.
+    //
+    // La lambda est posée une fois et lit l'état à chaque appel — `volume` est
+    // un délégué sur un `mutableStateOf` retenu, donc elle voit la valeur
+    // courante et non celle de la première composition.
+    DisposableEffect(Unit) {
+        remoteVolume = { key ->
+            when (key) {
+                RemoteKey.VOLUME_UP -> setVolume(volume + VOLUME_STEP)
+                RemoteKey.VOLUME_DOWN -> setVolume(volume - VOLUME_STEP)
+                else -> toggleMute()
+            }
+        }
+        onDispose { remoteVolume = null }
     }
 
     // Démarrage : headers (UA/Referer, ce que les extracteurs exigent), reprise
@@ -718,8 +738,8 @@ internal fun DesktopPlayerScreen(
                     Key.Spacebar -> { togglePause(); true }
                     Key.DirectionLeft -> { seekBy(-10_000); true }
                     Key.DirectionRight -> { seekBy(+10_000); true }
-                    Key.DirectionUp -> { setVolume(volume + 5); true }
-                    Key.DirectionDown -> { setVolume(volume - 5); true }
+                    Key.DirectionUp -> { setVolume(volume + VOLUME_STEP); true }
+                    Key.DirectionDown -> { setVolume(volume - VOLUME_STEP); true }
                     Key.M -> { toggleMute(); true }
                     Key.F, Key.F11 -> { onToggleFullscreen(); true }
                     else -> false
@@ -1187,6 +1207,9 @@ private fun MissingMpv(onBack: () -> Unit) {
 
 /** Plafond du volume. mpv amplifie au-delà de 100 %, jusqu'à `volume-max`. */
 private const val MAX_VOLUME = 200
+
+/** Pas d'un cran de volume, au clavier comme à la télécommande du téléphone. */
+private const val VOLUME_STEP = 5
 
 /** Repère du 100 % sur la piste, exprimé en fraction de sa largeur. */
 private const val UNITY_FRACTION = 100f / MAX_VOLUME

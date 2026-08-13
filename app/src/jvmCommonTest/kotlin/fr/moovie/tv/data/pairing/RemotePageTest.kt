@@ -42,6 +42,9 @@ class RemotePageTest {
         keyPlayPause = "Lecture ou pause",
         keyRewind = "Reculer",
         keyForward = "Avancer",
+        keyVolumeUp = "Augmenter le volume",
+        keyVolumeDown = "Baisser le volume",
+        keyMute = "Couper le son",
         keyKeyboard = "Clavier",
     )
 

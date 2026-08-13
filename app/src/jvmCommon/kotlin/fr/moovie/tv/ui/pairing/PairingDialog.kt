@@ -37,6 +37,9 @@ import fr.moovie.tv.resources.remote_intro
 import fr.moovie.tv.resources.remote_send
 import fr.moovie.tv.resources.remote_title
 import fr.moovie.tv.resources.remote_keyboard
+import fr.moovie.tv.resources.remote_mute
+import fr.moovie.tv.resources.remote_volume_down
+import fr.moovie.tv.resources.remote_volume_up
 import fr.moovie.tv.resources.remote_no_haptics
 import fr.moovie.tv.resources.remote_forward
 import fr.moovie.tv.resources.remote_rewind
@@ -136,6 +139,9 @@ fun rememberPairingHost(): PairingServer? {
         keyPlayPause = stringResource(Res.string.remote_play_pause),
         keyRewind = stringResource(Res.string.remote_rewind),
         keyForward = stringResource(Res.string.remote_forward),
+        keyVolumeUp = stringResource(Res.string.remote_volume_up),
+        keyVolumeDown = stringResource(Res.string.remote_volume_down),
+        keyMute = stringResource(Res.string.remote_mute),
         keyKeyboard = stringResource(Res.string.remote_keyboard),
         remoteNoHaptics = stringResource(Res.string.remote_no_haptics),
     )

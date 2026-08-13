@@ -472,6 +472,9 @@
     <string name="remote_play_pause">Reproducir o pausar</string>
     <string name="remote_rewind">Retroceder</string>
     <string name="remote_forward">Avanzar</string>
+    <string name="remote_volume_up">Subir el volumen</string>
+    <string name="remote_volume_down">Bajar el volumen</string>
+    <string name="remote_mute">Silenciar</string>
     <string name="remote_keyboard">Teclado</string>
     <string name="remote_no_haptics">Este navegador no admite la respuesta háptica.</string>
     <string name="remote_forget">Olvidar los mandos</string>

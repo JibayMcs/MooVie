@@ -15,6 +15,24 @@ import java.awt.event.KeyEvent
  */
 var remoteWindow: Window? = null
 
+/**
+ * Comment régler le son, posé par le lecteur tant qu'il est à l'écran.
+ *
+ * Une lambda plutôt qu'un accès direct au moteur, exactement comme
+ * [fr.moovie.tv.data.remote.RemoteNowPlaying.attachSeek] : le fil de socket ne
+ * connaît ni le moteur ni le fil sur lequel on a le droit de lui parler.
+ *
+ * Le desktop n'a pas d'équivalent d'`AudioManager` — une JVM pure n'atteint pas
+ * le mélangeur du système — donc c'est le volume **du lecteur** qui se règle
+ * ici. Conséquence assumée : hors lecture, il n'y a rien à régler et la touche
+ * échoue franchement au lieu de ne rien faire en silence.
+ *
+ * `@Volatile` parce que le lecteur l'écrit depuis la composition et que
+ * [sendRemoteKey] la lit depuis une connexion.
+ */
+@Volatile
+var remoteVolume: ((RemoteKey) -> Unit)? = null
+
 actual fun remoteAvailable(): Boolean = remoteWindow != null
 
 actual fun sendRemoteKey(key: RemoteKey): Boolean {
@@ -30,6 +48,15 @@ actual fun sendRemoteKey(key: RemoteKey): Boolean {
         RemoteKey.OK -> KeyEvent.VK_ENTER
         RemoteKey.BACK -> KeyEvent.VK_ESCAPE
         RemoteKey.PLAY_PAUSE -> KeyEvent.VK_SPACE
+        // Le lecteur écoute bien ↑/↓ et M pour le volume, mais eux seuls : la
+        // même touche navigue partout ailleurs. Passer par la fenêtre ferait
+        // donc défiler l'accueil quand on monte le son, ce qui est pire que de
+        // ne rien faire. On s'adresse au lecteur, ou à personne.
+        RemoteKey.VOLUME_UP, RemoteKey.VOLUME_DOWN, RemoteKey.MUTE -> {
+            val apply = remoteVolume ?: return false
+            EventQueue.invokeLater { apply(key) }
+            return true
+        }
     }
     post(window) { target, now ->
         listOf(

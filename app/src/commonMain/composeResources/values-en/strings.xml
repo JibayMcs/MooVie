@@ -472,6 +472,9 @@
     <string name="remote_play_pause">Play or pause</string>
     <string name="remote_rewind">Rewind</string>
     <string name="remote_forward">Forward</string>
+    <string name="remote_volume_up">Volume up</string>
+    <string name="remote_volume_down">Volume down</string>
+    <string name="remote_mute">Mute</string>
     <string name="remote_keyboard">Keyboard</string>
     <string name="remote_no_haptics">Haptic feedback is not supported by this browser.</string>
     <string name="remote_forget">Forget paired remotes</string>

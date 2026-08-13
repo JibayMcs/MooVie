@@ -2,6 +2,8 @@ package fr.moovie.tv.data.remote
 
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.content.Context
+import android.media.AudioManager
 import android.os.SystemClock
 import android.view.KeyCharacterMap
 import android.view.KeyEvent
@@ -34,8 +36,42 @@ actual fun sendRemoteKey(key: RemoteKey): Boolean {
         RemoteKey.OK -> KeyEvent.KEYCODE_DPAD_CENTER
         RemoteKey.BACK -> KeyEvent.KEYCODE_BACK
         RemoteKey.PLAY_PAUSE -> KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE
+        // Le volume sort du chemin des touches : voir adjustVolume.
+        RemoteKey.VOLUME_UP -> return adjustVolume(activity, AudioManager.ADJUST_RAISE)
+        RemoteKey.VOLUME_DOWN -> return adjustVolume(activity, AudioManager.ADJUST_LOWER)
+        RemoteKey.MUTE -> return adjustVolume(activity, AudioManager.ADJUST_TOGGLE_MUTE)
     }
     return dispatch(activity, key, code)
+}
+
+/**
+ * Règle le son de l'appareil, et laisse le système afficher sa jauge.
+ *
+ * **Pas de `dispatchKeyEvent` ici.** Sur une vraie télécommande, les touches de
+ * volume sont interceptées par le gestionnaire de fenêtres bien avant
+ * l'application : les distribuer à l'Activity ne viserait pas le bon étage, et
+ * ce qu'il en reste dépend d'une implémentation interne. `adjustStreamVolume`
+ * est l'appel que le système ferait lui-même, et il ne demande **aucune
+ * permission**.
+ *
+ * `FLAG_SHOW_UI` fait apparaître la jauge native d'Android TV. C'est elle qui
+ * rend le geste crédible : sans retour à l'écran, on ne sait pas si l'ordre est
+ * passé, on appuie plus fort, et on se retrouve deux crans plus loin.
+ *
+ * `STREAM_MUSIC` **n'a aucun effet quand la sortie est en passthrough HDMI**, ou
+ * quand le téléviseur garde la main par CEC : Android est alors court-circuité
+ * et son propre curseur est inerte. Le repli, s'il devient nécessaire, est
+ * d'atténuer dans le lecteur ; on ne l'ajoute pas d'avance, parce qu'il ferait
+ * cohabiter deux volumes sans que rien ne dise lequel bouge.
+ *
+ * Le `runCatching` couvre le refus que lève le système en mode Ne pas déranger :
+ * il n'a rien à voir avec nous, et il ne doit pas remonter sur un fil de socket.
+ */
+private fun adjustVolume(activity: Activity, direction: Int): Boolean {
+    val audio = activity.getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return false
+    return runCatching {
+        audio.adjustStreamVolume(AudioManager.STREAM_MUSIC, direction, AudioManager.FLAG_SHOW_UI)
+    }.isSuccess
 }
 
 actual fun sendRemoteText(text: String): Boolean {

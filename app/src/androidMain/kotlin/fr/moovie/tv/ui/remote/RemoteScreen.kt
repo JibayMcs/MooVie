@@ -261,6 +261,15 @@ fun RemoteScreen(
         send(key)
     }
 
+    // Les touches de volume du téléphone règlent le son du téléviseur, tant que
+    // cet écran est affiché. Il n'y a volontairement pas de bouton à l'écran en
+    // face : le geste qu'on cherche ici est celui qu'on fait sans regarder, et
+    // un doublon tactile n'ajouterait qu'une chose à lire. Voir
+    // [RemoteVolumeKeys] pour ce que coûte le détournement, et sa borne.
+    RemoteVolumeKeys.Capture { key ->
+        fire(key, if (key == RemoteKey.MUTE) RemoteHaptics.Tick.PRESS else RemoteHaptics.Tick.STEP)
+    }
+
     // Répétition au maintien : garder une flèche enfoncée fait défiler, comme
     // sur une vraie télécommande. Le premier envoi est fait par le geste ; ici
     // on ne s'occupe que de la suite. Changer de direction relance l'effet, donc

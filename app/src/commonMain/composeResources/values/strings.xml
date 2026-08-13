@@ -474,6 +474,9 @@
     <string name="remote_play_pause">Lecture ou pause</string>
     <string name="remote_rewind">Reculer</string>
     <string name="remote_forward">Avancer</string>
+    <string name="remote_volume_up">Augmenter le volume</string>
+    <string name="remote_volume_down">Baisser le volume</string>
+    <string name="remote_mute">Couper le son</string>
     <string name="remote_keyboard">Clavier</string>
     <string name="remote_no_haptics">Retour haptique non pris en charge par ce navigateur.</string>
     <string name="remote_forget">Oublier les télécommandes</string>

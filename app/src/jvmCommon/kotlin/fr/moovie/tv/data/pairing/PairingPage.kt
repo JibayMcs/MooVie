@@ -37,6 +37,9 @@ data class PairingTexts(
     val keyPlayPause: String = "",
     val keyRewind: String = "",
     val keyForward: String = "",
+    val keyVolumeUp: String = "",
+    val keyVolumeDown: String = "",
+    val keyMute: String = "",
     val keyKeyboard: String = "",
     val remoteNoHaptics: String = "",
 )
@@ -141,6 +144,16 @@ fun remotePage(texts: PairingTexts, base: String, appLink: String = ""): String 
     <button class="rk" data-k="REWIND"     aria-label="${esc(texts.keyRewind)}">$ICON_REWIND</button>
     <button class="rk hero" data-k="PLAY_PAUSE" aria-label="${esc(texts.keyPlayPause)}"><span class="ip">$ICON_PLAY</span><span class="ia">$ICON_PAUSE</span></button>
     <button class="rk" data-k="FORWARD"    aria-label="${esc(texts.keyForward)}">$ICON_FORWARD</button>
+  </div>
+
+  <!-- Le volume est à l'écran ici, alors que l'écran natif le laisse aux
+       touches physiques du téléphone : un navigateur ne les voit pas passer.
+       Sans ces trois boutons, la seule télécommande dont dispose un iPhone
+       serait la seule à ne pas savoir régler le son. -->
+  <div class="row">
+    <button class="rk" data-k="VOLUME_DOWN" aria-label="${esc(texts.keyVolumeDown)}">$ICON_VOLUME_DOWN</button>
+    <button class="rk" data-k="MUTE"        aria-label="${esc(texts.keyMute)}">$ICON_MUTE</button>
+    <button class="rk" data-k="VOLUME_UP"   aria-label="${esc(texts.keyVolumeUp)}">$ICON_VOLUME_UP</button>
   </div>
 
   <div class="row">
@@ -485,6 +498,15 @@ private const val ICON_BACK =
     """<svg viewBox="0 0 24 24"><path d="M10 8L5 12l5 4M5 12h9a5 5 0 010 10h-2"/></svg>"""
 private const val ICON_KEYBOARD =
     """<svg viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M7 10h.01M11 10h.01M15 10h.01M8 14h8"/></svg>"""
+
+/** Le haut-parleur des trois icônes de volume, à décliner par les ondes. */
+private const val SPEAKER = """<path d="M4 9v6h3.5L12 19V5L7.5 9z"/>"""
+private const val ICON_VOLUME_UP =
+    """<svg viewBox="0 0 24 24">$SPEAKER<path d="M15.5 8.5a5 5 0 010 7M18.5 6a8.5 8.5 0 010 12"/></svg>"""
+private const val ICON_VOLUME_DOWN =
+    """<svg viewBox="0 0 24 24">$SPEAKER<path d="M15.5 8.5a5 5 0 010 7"/></svg>"""
+private const val ICON_MUTE =
+    """<svg viewBox="0 0 24 24">$SPEAKER<path d="M16 9.5l5 5M21 9.5l-5 5"/></svg>"""
 
 /** Confirmation après envoi. */
 fun pairingDonePage(texts: PairingTexts): String = document(
