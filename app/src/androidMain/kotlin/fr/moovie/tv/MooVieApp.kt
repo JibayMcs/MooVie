@@ -3,6 +3,7 @@ package fr.moovie.tv
 import android.app.Application
 import android.content.Context
 import fr.moovie.tv.data.net.AppDns
+import fr.moovie.tv.data.net.Connectivity
 import fr.moovie.tv.data.settings.LocaleManager
 import fr.moovie.tv.data.settings.SettingsRepository
 import fr.moovie.tv.data.store.appContext
@@ -33,6 +34,11 @@ class MooVieApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // Sonde réseau : posée au démarrage du processus, pas d'un écran. Le
+        // premier relevé décide de ce que l'accueil affiche, et un service de
+        // fond — la synchro, la file de téléchargement — a besoin de la réponse
+        // même si aucune Activity n'est vivante.
+        Connectivity.start()
         val settings = SettingsRepository()
         scope.launch {
             combine(settings.dohEnabled, settings.dohProvider) { enabled, provider ->

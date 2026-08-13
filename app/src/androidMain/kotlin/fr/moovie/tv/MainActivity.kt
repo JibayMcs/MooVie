@@ -72,6 +72,10 @@ import fr.moovie.tv.ui.profile.ProfileHost
 import fr.moovie.tv.ui.details.DetailsScreen
 import fr.moovie.tv.ui.history.HistoryScreen
 import fr.moovie.tv.ui.home.HomeScreen
+import fr.moovie.tv.data.net.Connectivity
+import fr.moovie.tv.ui.offline.OfflineScreen
+import fr.moovie.tv.ui.offline.OfflineSearchScreen
+import fr.moovie.tv.ui.offline.playableFor
 import fr.moovie.tv.ui.player.PlayerHost
 import fr.moovie.tv.ui.player.PlayerScreen
 import fr.moovie.tv.ui.search.SearchScreen
@@ -363,6 +367,28 @@ class MainActivity : ComponentActivity() {
                         // sont captés avant, par un BackHandler plus profond.
                         BackHandler(enabled = nav.canGoBack) { nav.pop() }
 
+                        // Réseau : c'est lui qui décide de quelle application on
+                        // se sert. Voir OfflineScreen.
+                        val online by Connectivity.online.collectAsStateWithLifecycle()
+                        // Collecté ici parce que deux écrans en dépendent hors
+                        // ligne — l'historique pour savoir quoi lire, la barre
+                        // basse pour sa pastille — et que le flux est le même.
+                        val downloads by remember { DownloadRepository().downloads }
+                            .collectAsStateWithLifecycle(initialValue = emptyList())
+
+                        // ── Bascule hors ligne ──────────────────────────
+                        //
+                        // Rentrer dépile jusqu'à l'accueil, qui devient la
+                        // bibliothèque : rester sur une fiche que plus rien ne
+                        // peut charger n'apprendrait la coupure qu'en la faisant
+                        // échouer. **Sauf dans le lecteur** — un fichier
+                        // téléchargé se lit très bien sans réseau, et dépiler
+                        // sous les pieds de quelqu'un qui regarde un épisode
+                        // serait la pire façon de lui annoncer la nouvelle.
+                        LaunchedEffect(online) {
+                            if (!online && nav.current !is Screen.Player) nav.popToRoot()
+                        }
+
                         // Sur téléphone, le lecteur ne vit pas ici : il part dans
                         // sa propre Activity, seule façon d'avoir une vignette qui
                         // flotte au-dessus d'un Moo-vie encore utilisable. Voir
@@ -420,7 +446,12 @@ class MainActivity : ComponentActivity() {
                             Screen.Remote -> remoteTarget?.let {
                                 RemoteScreen(target = it, onBack = { nav.pop() })
                             }
-                            Screen.Home -> HomeScreen(
+                            // Hors ligne, l'accueil cède la place à la
+                            // bibliothèque locale : voir OfflineScreen.
+                            Screen.Home -> if (!online) OfflineScreen(
+                                onPlay = { d -> downloadPlayerScreen(d)?.let(nav::push) },
+                                onOpenSettings = { nav.push(Screen.Settings) },
+                            ) else HomeScreen(
                                 onOpenRemote = remoteTarget
                                     ?.takeIf { uiFlavor != UiFlavor.TV }
                                     ?.let { { nav.push(Screen.Remote) } },
@@ -485,10 +516,24 @@ class MainActivity : ComponentActivity() {
                                 select = s.select,
                                 onOpenTitle = { id, isTv -> nav.push(Screen.Details(id, isTv)) },
                             )
+                            // Hors ligne, une vignette d'historique lit le
+                            // fichier au lieu d'ouvrir une fiche qui ne
+                            // chargerait pas : voir playableFor.
                             Screen.History -> HistoryScreen(
-                                onOpenTitle = { id, isTv -> nav.push(Screen.Details(id, isTv)) },
+                                onOpenTitle = { id, isTv ->
+                                    if (online) {
+                                        nav.push(Screen.Details(id, isTv))
+                                    } else {
+                                        downloads.playableFor(id, isTv)
+                                            ?.let { d -> downloadPlayerScreen(d)?.let(nav::push) }
+                                    }
+                                },
                             )
-                            Screen.Search -> SearchScreen(
+                            // Hors ligne, chercher veut dire chercher dans ce
+                            // qu'on possède : voir OfflineSearchScreen.
+                            Screen.Search -> if (!online) OfflineSearchScreen(
+                                onPlay = { d -> downloadPlayerScreen(d)?.let(nav::push) },
+                            ) else SearchScreen(
                                 onOpenTitle = { id, isTv -> nav.push(Screen.Details(id, isTv)) },
                                 onBack = { nav.pop() },
                             )

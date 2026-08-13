@@ -297,8 +297,15 @@ fun SearchScreenContent(
     }
 }
 
+/**
+ * Le champ de recherche, partagé avec la recherche hors ligne.
+ *
+ * `internal` plutôt que privé : la bibliothèque locale se cherche avec le même
+ * champ que le catalogue, y compris sa saisie depuis le téléphone et sa sortie
+ * de focus au D-pad. Deux champs auraient divergé sur le premier des deux.
+ */
 @Composable
-private fun SearchField(
+internal fun SearchField(
     value: String,
     onValueChange: (String) -> Unit,
     onSubmit: () -> Unit,

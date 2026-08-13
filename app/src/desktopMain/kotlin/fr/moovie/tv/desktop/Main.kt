@@ -61,6 +61,11 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import fr.moovie.tv.data.net.Connectivity
+import fr.moovie.tv.ui.offline.OfflineScreen
+import fr.moovie.tv.ui.offline.OfflineSearchScreen
+import fr.moovie.tv.ui.offline.playableFor
+import fr.moovie.tv.data.download.DownloadRepository
 
 /**
  * Point d'entrée desktop : mêmes écrans que la TV (jvmCommon), navigation par
@@ -68,6 +73,10 @@ import kotlinx.coroutines.launch
  * branché — écran d'attente à la place.
  */
 fun main() {
+    // Sonde réseau, comme MooVieApp la pose côté Android : le premier relevé
+    // décide de ce que l'accueil affiche. Ici elle interroge le réseau
+    // elle-même, faute d'équivalent système en JVM pure — voir Connectivity.
+    Connectivity.start()
     // Même rôle que MooVieApp côté Android : applique la préférence DoH au
     // client d'extraction au démarrage puis à chaque changement de réglage.
     val settings = SettingsRepository()
@@ -257,12 +266,37 @@ private fun DesktopApp(
             },
         )
 
+        // Réseau : c'est lui qui décide de quelle application on se sert.
+        val online by Connectivity.online.collectAsState()
+        // Même flux que celui de la barre basse d'Android : l'historique hors
+        // ligne a besoin de savoir ce qui est lisible.
+        val downloads by remember { DownloadRepository().downloads }
+            .collectAsState(initial = emptyList())
+
+        // ── Bascule hors ligne ──────────────────────────
+        //
+        // Rentrer dépile jusqu'à l'accueil, qui devient la
+        // bibliothèque : rester sur une fiche que plus rien ne
+        // peut charger n'apprendrait la coupure qu'en la faisant
+        // échouer. **Sauf dans le lecteur** — un fichier
+        // téléchargé se lit très bien sans réseau, et dépiler
+        // sous les pieds de quelqu'un qui regarde un épisode
+        // serait la pire façon de lui annoncer la nouvelle.
+        LaunchedEffect(online) {
+            if (!online && nav.current !is Screen.Player) nav.popToRoot()
+        }
+
         when (val s = nav.current) {
             // La télécommande pilote un téléviseur depuis un téléphone : sur un
             // poste de travail elle n'a pas de sens, et rien n'y mène. La
             // branche existe parce que la destination est partagée.
             Screen.Remote -> Unit
-            Screen.Home -> DesktopHomeScreen(
+            // Hors ligne, l'accueil cède la place à la bibliothèque locale :
+            // voir OfflineScreen.
+            Screen.Home -> if (!online) OfflineScreen(
+                onPlay = { d -> downloadPlayerScreen(d)?.let(nav::push) },
+                onOpenSettings = { nav.push(Screen.Settings) },
+            ) else DesktopHomeScreen(
                 onOpenTitle = { id, isTv -> nav.push(Screen.Details(id, isTv)) },
                 onResume = { e ->
                     // Voir MainActivity : le rail ouvre la fiche, il ne lance
@@ -324,11 +358,24 @@ private fun DesktopApp(
                 onOpenTitle = { id, isTv -> nav.push(Screen.Details(id, isTv)) },
                 onBack = { nav.pop() },
             )
+            // Hors ligne, une vignette d'historique lit le fichier au lieu
+            // d'ouvrir une fiche qui ne chargerait pas : voir playableFor.
             Screen.History -> DesktopHistoryScreen(
-                onOpenTitle = { id, isTv -> nav.push(Screen.Details(id, isTv)) },
+                onOpenTitle = { id, isTv ->
+                    if (online) {
+                        nav.push(Screen.Details(id, isTv))
+                    } else {
+                        downloads.playableFor(id, isTv)
+                            ?.let { d -> downloadPlayerScreen(d)?.let(nav::push) }
+                    }
+                },
                 onBack = { nav.pop() },
             )
-            Screen.Search -> DesktopSearchScreen(
+            // Hors ligne, chercher veut dire chercher dans ce qu'on possède :
+            // voir OfflineSearchScreen.
+            Screen.Search -> if (!online) OfflineSearchScreen(
+                onPlay = { d -> downloadPlayerScreen(d)?.let(nav::push) },
+            ) else DesktopSearchScreen(
                 onOpenTitle = { id, isTv -> nav.push(Screen.Details(id, isTv)) },
                 onBack = { nav.pop() },
             )

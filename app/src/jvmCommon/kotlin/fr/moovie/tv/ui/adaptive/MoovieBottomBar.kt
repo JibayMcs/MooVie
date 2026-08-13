@@ -30,6 +30,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import fr.moovie.tv.data.download.DownloadRepository
+import fr.moovie.tv.data.net.Connectivity
 import fr.moovie.tv.data.download.DownloadState
 import fr.moovie.tv.ui.theme.MOOVIE_ACCENT
 import androidx.compose.runtime.Composable
@@ -70,6 +71,16 @@ private enum class NavTab(val screen: Screen, val icon: ImageVector, val label: 
 
 /** Vrai si [screen] est une destination de premier niveau, donc porteuse d'onglet. */
 fun isTopLevel(screen: Screen): Boolean = NavTab.entries.any { sameTab(it.screen, screen) }
+
+/**
+ * Onglets sans objet sans réseau.
+ *
+ * Le catalogue seul : il *est* TMDB, page par page, et rien n'en subsiste hors
+ * ligne. La recherche, elle, reste — elle cherche alors dans la bibliothèque
+ * locale, ce qui est exactement ce qu'on attend d'une recherche quand on n'a
+ * que ses propres fichiers.
+ */
+private val HORS_LIGNE_MASQUES = setOf(NavTab.CATALOG)
 
 /**
  * Vrai là où la barre doit s'effacer.
@@ -149,7 +160,12 @@ fun MoovieBottomBar(
         val active = running.count {
             it.state == DownloadState.RUNNING || it.state == DownloadState.QUEUED
         }
-        NavTab.entries.forEach { tab ->
+        // Hors ligne, deux onglets ne mènent nulle part : la recherche
+        // interroge TMDB et le catalogue en vient tout entier. Les laisser
+        // grisés serait pire que les retirer — une cible qu'on vise et qui ne
+        // répond pas se lit comme une panne de l'application.
+        val online by Connectivity.online.collectAsState()
+        NavTab.entries.filter { online || it !in HORS_LIGNE_MASQUES }.forEach { tab ->
             NavTabItem(
                 tab = tab,
                 selected = sameTab(current, tab.screen),

@@ -8,6 +8,7 @@ import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
+import fr.moovie.tv.data.net.Connectivity
 
 @Serializable
 data class GithubAsset(
@@ -46,6 +47,12 @@ class UpdateRepository {
      */
     suspend fun latestRelease(prereleases: Boolean = false): GithubRelease? =
         withContext(Dispatchers.IO) {
+            // Hors ligne, la question ne se pose pas : ni la vérification
+            // périodique, ni le bouton des réglages n'ont d'interlocuteur. Rendu
+            // ici plutôt que chez les deux appelants, pour que personne n'ait à
+            // y penser deux fois — et parce que « pas de réseau » et « aucune
+            // release » se répondent déjà de la même façon, par null.
+            if (!Connectivity.online.value) return@withContext null
             if (prereleases) latestIncludingPrereleases() else latestStable()
         }
 

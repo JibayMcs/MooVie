@@ -1,6 +1,7 @@
 package fr.moovie.tv.data.sync
 
 import fr.moovie.tv.data.backup.BackupRepository
+import fr.moovie.tv.data.net.Connectivity
 import fr.moovie.tv.data.settings.SettingsRepository
 import fr.moovie.tv.data.watch.WatchProgressRepository
 import kotlinx.coroutines.flow.first
@@ -58,6 +59,16 @@ object SyncCoordinator {
     private const val FOREGROUND_INTERVAL_MS = 5 * 60_000L
 
     suspend fun sync(trigger: SyncTrigger, now: Long): SyncReport? {
+        // Hors ligne, on ne tente rien.
+        //
+        // L'échec serait silencieux de toute façon, mais il coûterait une
+        // ouverture de magasin, une lecture de réglages et un délai réseau à
+        // chaque retour au premier plan — trois fois rien, sauf que le retour
+        // au premier plan est justement ce qu'on fait sans arrêt en cherchant
+        // du réseau. Surtout, `lastAttemptAt` serait posé pour une tentative
+        // qui n'a pas eu lieu, ce qui ferait taire la vraie synchro pendant
+        // cinq minutes après le retour de la connexion.
+        if (!Connectivity.online.value) return null
         if (trigger == SyncTrigger.FOREGROUND && now - lastAttemptAt < FOREGROUND_INTERVAL_MS) {
             return null
         }
