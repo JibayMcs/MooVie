@@ -947,9 +947,8 @@ internal fun DesktopPlayerScreen(
                 onTogglePause = { controller.togglePause() },
                 onSeekBack = { controller.seekBy(-PLAYER_SEEK_STEP_MS) },
                 onSeekForward = { controller.seekBy(PLAYER_SEEK_STEP_MS) },
-                onToggleScrub = {},
+                onCommitScrub = {},
                 onNudgeScrub = {},
-                onCancelScrub = {},
                 onPreviousEpisode = {
                     if (nextEpisode > 1) onNextEpisode(nextSeason, nextEpisode - 2)
                 },

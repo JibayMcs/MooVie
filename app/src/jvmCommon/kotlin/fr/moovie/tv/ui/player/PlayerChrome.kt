@@ -82,7 +82,6 @@ import fr.moovie.tv.resources.player_pause
 import fr.moovie.tv.resources.player_play
 import fr.moovie.tv.resources.player_prev_episode
 import fr.moovie.tv.resources.player_progress
-import fr.moovie.tv.resources.player_scrub_hint
 import fr.moovie.tv.resources.player_seek_back
 import fr.moovie.tv.resources.player_seek_forward
 import fr.moovie.tv.resources.player_settings
@@ -136,9 +135,8 @@ fun PlayerControlBar(
     onTogglePause: () -> Unit,
     onSeekBack: () -> Unit,
     onSeekForward: () -> Unit,
-    onToggleScrub: () -> Unit,
+    onCommitScrub: () -> Unit,
     onNudgeScrub: (Long) -> Unit,
-    onCancelScrub: () -> Unit,
     onPreviousEpisode: () -> Unit,
     onNextEpisode: () -> Unit,
     onOpenSubtitles: () -> Unit,
@@ -277,9 +275,8 @@ fun PlayerControlBar(
                 durationMs = durationMs,
                 segments = segments,
                 scrubbing = scrubbing,
-                onToggleScrub = onToggleScrub,
+                onCommitScrub = onCommitScrub,
                 onNudgeScrub = onNudgeScrub,
-                onCancelScrub = onCancelScrub,
                 onActivity = onActivity,
                 onSeekToFraction = onSeekToFraction,
                 modifier = Modifier.weight(1f),
@@ -329,10 +326,19 @@ private fun SkipKind.bandColor(): Color = when (this) {
 }
 
 /**
- * Barre de progression pilotable au D-pad. OK entre/sort du « mode réglage » :
- * hors de ce mode, ←/→ ne sont pas consommées et servent à passer d'un bouton à
- * l'autre — sinon le focus resterait piégé sur la barre, sans issue possible à
- * la télécommande.
+ * Barre de progression pilotable au D-pad.
+ *
+ * **←/→ règlent dès que la barre a le focus.** Il a fallu, un temps, appuyer sur
+ * OK pour « entrer en mode réglage » avant que les flèches ne servent à quelque
+ * chose : rien ne l'indiquait à l'écran, et la barre paraissait simplement
+ * inerte. Le saut part tout seul peu après le dernier appui — viser dix crans
+ * ne fait donc qu'un seul saut, ce qui compte sur un flux HLS où chacun coûte un
+ * rechargement.
+ *
+ * La contrepartie est que ←/→ sont désormais **consommées** : on quitte la barre
+ * par ↑, vers les boutons. C'était l'unique raison d'être de l'ancien passage
+ * par OK — laisser les flèches traverser pour sortir — et une seule issue suffit
+ * dès lors que la barre est la dernière rangée de la chrome.
  */
 @Composable
 private fun PlayerSeekBar(
@@ -341,9 +347,8 @@ private fun PlayerSeekBar(
     durationMs: Long,
     segments: List<PlayerSegment>,
     scrubbing: Boolean,
-    onToggleScrub: () -> Unit,
+    onCommitScrub: () -> Unit,
     onNudgeScrub: (Long) -> Unit,
-    onCancelScrub: () -> Unit,
     onActivity: () -> Unit,
     onSeekToFraction: ((Float) -> Unit)?,
     modifier: Modifier = Modifier,
@@ -351,8 +356,11 @@ private fun PlayerSeekBar(
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
 
-    // Quitter la barre annule un réglage non validé.
-    LaunchedEffect(focused) { if (!focused) onCancelScrub() }
+    // Quitter la barre **valide** la visée, elle ne l'annule plus. Tant qu'il
+    // fallait appuyer sur OK pour régler, l'abandon était le repli naturel ;
+    // maintenant qu'une flèche suffit, avoir déplacé le curseur *est* la
+    // demande, et repartir sans rien faire l'aurait silencieusement jetée.
+    LaunchedEffect(focused) { if (!focused) onCommitScrub() }
 
     val barHeight = if (focused || scrubbing) 10.dp else 6.dp
     var widthPx by remember { mutableStateOf(1) }
@@ -410,21 +418,25 @@ private fun PlayerSeekBar(
                 if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
                 onActivity()
                 when (event.key) {
+                    // OK n'ouvre plus rien : il applique tout de suite ce
+                    // qu'on vise, pour qui ne veut pas attendre le délai.
                     Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
-                        onToggleScrub()
+                        onCommitScrub()
                         true
                     }
-                    Key.DirectionLeft -> if (scrubbing) {
+                    // Réglage direct : la barre focalisée, ←/→ déplacent la
+                    // visée sans qu'on ait eu à valider quoi que ce soit avant.
+                    // C'est le geste qu'on fait sans y penser sur n'importe
+                    // quelle box, et l'ancien passage obligé par OK le rendait
+                    // introuvable — rien à l'écran ne disait qu'il fallait
+                    // « entrer » quelque part pour que les flèches servent.
+                    Key.DirectionLeft -> {
                         onNudgeScrub(-PLAYER_SCRUB_STEP_MS)
                         true
-                    } else {
-                        false
                     }
-                    Key.DirectionRight -> if (scrubbing) {
+                    Key.DirectionRight -> {
                         onNudgeScrub(PLAYER_SCRUB_STEP_MS)
                         true
-                    } else {
-                        false
                     }
                     else -> false
                 }
@@ -518,16 +530,13 @@ private fun PlayerSeekBar(
                     .padding(horizontal = 8.dp, vertical = 4.dp),
             )
         }
-        if (scrubbing) {
-            Text(
-                stringResource(Res.string.player_scrub_hint),
-                style = MaterialTheme.typography.labelSmall,
-                color = Color(0xFFBBBBBB),
-                modifier = Modifier.align(Alignment.BottomCenter),
-            )
-        } else if (focused) {
+        if (focused || scrubbing) {
             // Libellé d'accessibilité, gardé transparent : il décrit la barre
             // sans ajouter de texte visible sous la progression.
+            //
+            // Il n'y a plus de « OK pour valider » à côté : la consigne n'avait
+            // de sens que tant qu'OK ouvrait un mode, et l'afficher maintenant
+            // apprendrait un geste qui n'est plus nécessaire.
             Text(
                 stringResource(Res.string.player_progress),
                 style = MaterialTheme.typography.labelSmall,

@@ -168,6 +168,15 @@ private const val SUBTITLE_RELOAD_GRACE_MS = 8_000L
  */
 private const val REPORT_FINE_STEP_MS = 1_000L
 
+/**
+ * Délai après lequel une visée à la télécommande devient un saut.
+ *
+ * Assez long pour enchaîner les appuis sans qu'un saut ne parte au milieu,
+ * assez court pour que la lecture reprenne là où on visait sans qu'on se
+ * demande si l'ordre est passé.
+ */
+private const val SCRUB_COMMIT_MS = 700L
+
 @Composable
 fun PlayerScreen(
     streamUrl: String,
@@ -720,6 +729,20 @@ fun PlayerScreen(
         }
     }
 
+    // Le saut part de lui-même, peu après le dernier appui.
+    //
+    // C'est ce qui remplace la validation par OK, et ce qui rend la visée
+    // tenable sur un flux HLS : dix crans de suite ne provoquent qu'un seul
+    // saut, là où sauter à chaque flèche relancerait dix fois le chargement du
+    // segment. L'effet se relance à chaque appui, donc le compte repart tant que
+    // le doigt bouge.
+    LaunchedEffect(scrubTarget) {
+        val target = scrubTarget ?: return@LaunchedEffect
+        delay(SCRUB_COMMIT_MS)
+        controller.seekTo(target)
+        scrubTarget = null
+    }
+
     // Auto-masquage : la barre reste affichée en pause et tant qu'un menu est
     // ouvert, sinon elle se replie après 4 s sans appui.
     LaunchedEffect(activityTick, isPlaying, dialog) {
@@ -1132,20 +1155,18 @@ fun PlayerScreen(
                 onTogglePause = { controller.togglePause() },
                 onSeekBack = { controller.seekBy(-PLAYER_SEEK_STEP_MS) },
                 onSeekForward = { controller.seekBy(PLAYER_SEEK_STEP_MS) },
-                onToggleScrub = {
-                    val target = scrubTarget
-                    if (target != null) {
-                        controller.seekTo(target)
-                        scrubTarget = null
-                    } else {
-                        scrubTarget = positionMs
-                    }
+                // OK, ou la barre qu'on quitte : dans les deux cas on applique
+                // la visée sans attendre le délai. Sans visée en cours, il n'y a
+                // rien à faire — surtout pas un saut sur place, qui coûterait un
+                // rechargement de segment pour ne rien changer.
+                onCommitScrub = {
+                    scrubTarget?.let { controller.seekTo(it) }
+                    scrubTarget = null
                 },
                 onNudgeScrub = { delta ->
                     val max = if (durationMs > 0) durationMs else Long.MAX_VALUE
                     scrubTarget = ((scrubTarget ?: positionMs) + delta).coerceIn(0L, max)
                 },
-                onCancelScrub = { scrubTarget = null },
                 onPreviousEpisode = {
                     pid?.let { onNextEpisode(it.tmdbId, it.season, it.episode - 1) }
                 },

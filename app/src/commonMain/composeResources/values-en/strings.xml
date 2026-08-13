@@ -95,7 +95,6 @@
     <string name="player_next_episode">Next episode</string>
     <string name="player_prev_episode">Previous episode</string>
     <string name="player_progress">Progress bar</string>
-    <string name="player_scrub_hint">OK to confirm</string>
     <string name="player_buffering">Buffering…  %1$d %</string>
     <string name="player_subtitles">Subtitles</string>
     <string name="player_subtitles_off">Off</string>
