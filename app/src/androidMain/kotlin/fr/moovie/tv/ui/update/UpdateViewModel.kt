@@ -78,7 +78,10 @@ class UpdateViewModel(app: Application) : AndroidViewModel(app) {
         // réglage doit prendre effet sans relancer l'application.
         val canal = settings.updatePrereleases.first()
         val release = repo.latestRelease(prereleases = canal) ?: return UpdateCheck.FAILED
-        if (release.draft || release.prerelease) return UpdateCheck.UP_TO_DATE
+        // L'éligibilité est décidée par le dépôt, partagé avec le desktop :
+        // écrite ici, elle jetait les préversions que le canal venait de
+        // demander — et il a fallu la corriger des deux côtés.
+        if (!repo.isEligible(release, canal)) return UpdateCheck.UP_TO_DATE
         val apk = release.assets.firstOrNull { it.name.endsWith(".apk") }
             ?: return UpdateCheck.UP_TO_DATE
         if (!repo.isNewer(release.tagName, BuildConfig.VERSION_NAME)) return UpdateCheck.UP_TO_DATE

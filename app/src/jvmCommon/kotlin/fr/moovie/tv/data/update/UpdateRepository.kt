@@ -49,6 +49,21 @@ class UpdateRepository {
             if (prereleases) latestIncludingPrereleases() else latestStable()
         }
 
+    /**
+     * Cette release doit-elle être proposée sur ce canal ?
+     *
+     * **Partagée par les deux plateformes, et c'est le point.** La règle vivait
+     * en double dans les deux ViewModels, et le canal « préversions » livré en
+     * 1.18.0 n'en a corrigé aucun : ils demandaient la liste complète à GitHub
+     * puis rejetaient toute préversion, si bien que le réglage n'avait
+     * littéralement aucun effet — sur Android comme sur desktop. Une règle
+     * dupliquée est une règle qu'on oublie de moitié.
+     *
+     * Un brouillon n'est publié pour personne, quel que soit le canal.
+     */
+    fun isEligible(release: GithubRelease, prereleases: Boolean): Boolean =
+        !release.draft && (prereleases || !release.prerelease)
+
     private fun latestStable(): GithubRelease? = runCatching {
         val request = Request.Builder()
             .url("https://api.github.com/repos/JibayMcs/MooVie/releases/latest")
