@@ -111,6 +111,8 @@ import fr.moovie.tv.ui.download.ProvideTitleDownloads
 import fr.moovie.tv.ui.components.MoovieCard
 import fr.moovie.tv.ui.adaptive.useBottomNav
 import fr.moovie.tv.ui.components.MoovieIconButton
+import fr.moovie.tv.ui.download.DownloadCountBadge
+import fr.moovie.tv.ui.download.rememberActiveDownloadCount
 import fr.moovie.tv.ui.components.MoovieMarqueeText
 import fr.moovie.tv.ui.components.MoovieRail
 import fr.moovie.tv.ui.components.SkeletonRail
@@ -288,12 +290,18 @@ fun HomeScreenContent(
                     // à trois niveaux dans les réglages. Toujours visible même
                     // à vide — la faire apparaître déplacerait le focus des
                     // voisines au moment le plus inattendu.
-                    MoovieIconButton(
-                        onClick = onOpenDownloads,
-                        icon = Icons.Default.Download,
-                        contentDescription = stringResource(Res.string.settings_cat_downloads),
-                        modifier = headerDown,
-                    )
+                    // La pastille du nombre de téléchargements en cours, comme
+                    // sur la barre basse : c'est la même icône, elle doit dire
+                    // la même chose. Sans elle, un téléchargement lancé depuis
+                    // la fiche ne se voyait nulle part sur cet écran.
+                    DownloadCountBadge(rememberActiveDownloadCount()) {
+                        MoovieIconButton(
+                            onClick = onOpenDownloads,
+                            icon = Icons.Default.Download,
+                            contentDescription = stringResource(Res.string.settings_cat_downloads),
+                            modifier = headerDown,
+                        )
+                    }
                     // Télécommande : **seulement au doigt, et seulement si un
                     // téléviseur a été appairé**. Sur un téléviseur, se piloter
                     // soi-même n'a pas de sens ; sans cible, le bouton ouvrirait

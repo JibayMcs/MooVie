@@ -14,6 +14,7 @@ import androidx.compose.ui.text.TextStyle
 import fr.moovie.tv.data.download.downloadPoster
 import fr.moovie.tv.data.download.fetchDownloadPoster
 import java.io.File
+import okio.Path.Companion.toOkioPath
 import fr.moovie.tv.ui.components.MoovieAsyncImage
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -353,7 +354,12 @@ private fun Affiche(download: Download, modifier: Modifier = Modifier) {
                 )
             }
     }
-    val image = fichier ?: return
+    // `okio.Path` et non `java.io.File` : le mappeur qui accepte un `File` est
+    // **propre à Android** chez Coil. Sur desktop le modèle n'était résolu par
+    // personne, et la carte restait sans image sans que rien ne le signale —
+    // une bibliothèque hors ligne illustrée d'un seul côté. `Path` est le
+    // chemin que les deux plateformes comprennent.
+    val image = fichier?.toOkioPath() ?: return
     // Une bande pleine hauteur, et non une vignette posée en haut.
     //
     // Le cadre carré précédent laissait du vide sous l'image dès que la carte

@@ -29,7 +29,8 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import fr.moovie.tv.data.download.DownloadRepository
+import fr.moovie.tv.ui.download.DownloadCountBadge
+import fr.moovie.tv.ui.download.rememberActiveDownloadCount
 import fr.moovie.tv.data.net.Connectivity
 import fr.moovie.tv.data.download.DownloadState
 import fr.moovie.tv.ui.theme.MOOVIE_ACCENT
@@ -152,14 +153,10 @@ fun MoovieBottomBar(
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // Nombre de téléchargements en cours, pour la pastille. Collecté ici
-        // plutôt que passé par chaque écran : la barre est le seul endroit qui
-        // s'en sert, et elle vit sous tous les écrans.
-        val running by remember { DownloadRepository().downloads }
-            .collectAsState(initial = emptyList())
-        val active = running.count {
-            it.state == DownloadState.RUNNING || it.state == DownloadState.QUEUED
-        }
+        // Le même compteur que le rail de l'accueil : voir
+        // rememberActiveDownloadCount. Les deux comptaient séparément, et l'un
+        // des deux ne comptait pas du tout.
+        val active = rememberActiveDownloadCount()
         // Hors ligne, deux onglets ne mènent nulle part : la recherche
         // interroge TMDB et le catalogue en vient tout entier. Les laisser
         // grisés serait pire que les retirer — une cible qu'on vise et qui ne
@@ -244,17 +241,14 @@ private fun NavTabItem(
             // téléchargement démarre — sous le pouce, au pire moment. Un
             // `offset` ne participe pas à la mesure, donc la largeur ne bouge
             // pas non plus quand le chiffre passe à deux caractères.
+            // La même pastille que le rail de l'accueil : voir DownloadCountBadge.
+            // Elle était dessinée ici à la main, en ovale — `CircleShape` sur une
+            // boîte plus large que haute donne un stade, pas un disque.
             if (badge > 0) {
-                Text(
-                    text = badge.toString(),
-                    color = Color.White,
-                    style = MaterialTheme.typography.labelSmall,
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .offset(x = 4.dp, y = (-2).dp)
-                        .background(MOOVIE_ACCENT, CircleShape)
-                        .padding(horizontal = 5.dp),
-                )
+                DownloadCountBadge(
+                    count = badge,
+                    modifier = Modifier.align(Alignment.TopEnd).offset(x = 4.dp, y = (-2).dp),
+                ) {}
             }
         }
     }
