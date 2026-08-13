@@ -12,6 +12,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -205,6 +206,16 @@ private const val CINEMA_IDLE_MS = 3_000L
 
 /** L'interface s'efface doucement — c'est un fondu, pas une disparition. */
 private const val CINEMA_UI_FADE_MS = 600
+
+/**
+ * Inactivité au bout de laquelle la chrome de la bande-annonce se replie.
+ *
+ * Quatre secondes, comme la barre du lecteur de films : c'est la même
+ * situation — une vidéo qu'on regarde, des contrôles dont on n'a besoin qu'au
+ * moment où l'on y pense — et deux durées différentes pour un même geste se
+ * remarqueraient sans qu'on sache dire pourquoi.
+ */
+private const val TRAILER_CHROME_IDLE_MS = 4_000L
 
 /**
  * Le son monte plus lentement que l'image ne s'efface, et redescend d'autant.
@@ -517,6 +528,44 @@ fun DetailsScreenContent(
         }
     }
 
+    // Chrome de la bande-annonce : visible à l'ouverture, repliée sans activité,
+    // rappelée par n'importe quel geste. Même contrat que le lecteur de films —
+    // c'est la même situation, une vidéo qu'on regarde et des contrôles qui
+    // n'ont aucune raison de rester en travers.
+    var trailerChromeVisible by remember(trailerExpanded) { mutableStateOf(true) }
+
+    // Compteur d'activité, et non un instant : le relancer relance l'effet, ce
+    // qui redémarre le décompte sans horloge à comparer.
+    var trailerWake by remember(trailerExpanded) { mutableStateOf(0) }
+
+    LaunchedEffect(trailerExpanded, trailerWake) {
+        if (!trailerExpanded) return@LaunchedEffect
+        trailerChromeVisible = true
+        // En pause, la chrome reste — comme au lecteur, où l'on veut voir où
+        // l'on en est. L'état est relu à l'échéance plutôt que sondé en
+        // continu : une lecture toutes les quatre secondes, contre dix par
+        // seconde pour un sondage, et personne ne voit la différence.
+        while (true) {
+            delay(TRAILER_CHROME_IDLE_MS)
+            if (trailerController?.isPlaying != false) {
+                trailerChromeVisible = false
+                return@LaunchedEffect
+            }
+        }
+    }
+
+    // La souris réveille aussi la chrome, pas seulement le mode cinéma : sur
+    // desktop c'est le seul geste disponible sans cliquer, et cliquer pour
+    // faire réapparaître une barre qu'on veut simplement consulter serait une
+    // pause non demandée.
+    LaunchedEffect(trailerExpanded) {
+        if (!trailerExpanded) return@LaunchedEffect
+        while (true) {
+            pointerActivity.first()
+            trailerWake++
+        }
+    }
+
     // Les deux états qui découvrent la bande-annonce, et la seule différence
     // entre eux est la présence des contrôles.
     val trailerInFront = trailerExpanded || cinema
@@ -579,13 +628,17 @@ fun DetailsScreenContent(
 
     Box(
         modifier = Modifier.fillMaxSize().then(
-            if (!cinemaCapable) {
+            // Observé aussi quand la bande-annonce est au premier plan, et pas
+            // seulement en mode cinéma : c'est ce même flux qui réveille sa
+            // chrome, y compris au doigt — un écran tactile n'a pas de
+            // survol, mais toucher est bien une activité.
+            if (!cinemaCapable && !trailerExpanded) {
                 Modifier
             } else {
                 // Passe **Initial** : on observe le pointeur sans lui prendre
                 // ses événements. Un bouton survolé doit continuer de réagir
                 // pendant que l'interface se rallume.
-                Modifier.pointerInput(Unit) {
+                Modifier.pointerInput(trailerExpanded) {
                     awaitPointerEventScope {
                         while (true) {
                             awaitPointerEvent(PointerEventPass.Initial)
@@ -1151,11 +1204,38 @@ fun DetailsScreenContent(
             }
         }
 
+        // Réveil à la télécommande, pendant que la chrome est repliée.
+        //
+        // Une couche focalisable qui avale la première touche : sans elle, le
+        // D-pad continuerait d'atteindre les boutons de la chrome invisible —
+        // on relancerait la lecture ou on fermerait la bande-annonce en
+        // croyant simplement rallumer les contrôles. Même dispositif que le
+        // lecteur, pour la même raison.
+        val trailerWakeFocus = remember { FocusRequester() }
+        if (trailerExpanded && previewPlaying && !trailerChromeVisible) {
+            LaunchedEffect(Unit) { runCatching { trailerWakeFocus.requestFocus() } }
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .focusRequester(trailerWakeFocus)
+                    .focusable()
+                    .onPreviewKeyEvent { event ->
+                        if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                        // Le retour n'est pas une activité : il ferme, et
+                        // l'intercepter piégerait l'utilisateur devant une
+                        // vidéo dont il ne saurait plus sortir.
+                        if (event.key == Key.Back) return@onPreviewKeyEvent false
+                        trailerWake++
+                        true
+                    },
+            )
+        }
+
         // Contrôles de la bande-annonce, tout en haut de la pile : ils se posent
         // sur l'aperçu **et** sur l'interface effacée, qui reste composée
         // dessous pour garder sa position de défilement et son focus.
         AnimatedVisibility(
-            visible = trailerExpanded && previewPlaying,
+            visible = trailerExpanded && previewPlaying && trailerChromeVisible,
             enter = fadeIn(animationSpec = tween(CINEMA_UI_FADE_MS)),
             exit = fadeOut(animationSpec = tween(CINEMA_UI_FADE_MS)),
             modifier = Modifier.align(Alignment.BottomCenter),
