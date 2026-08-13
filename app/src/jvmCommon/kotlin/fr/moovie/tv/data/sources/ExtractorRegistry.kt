@@ -32,8 +32,26 @@ object ExtractorRegistry {
         .followRedirects(true)
         .build()
 
-    /** Seule porte de sortie réseau des extracteurs. */
-    val gateway: HttpGateway = OkHttpGateway(http)
+    /**
+     * Seule porte de sortie réseau des extracteurs, et **plafonnée dans le
+     * temps**.
+     *
+     * `readTimeout` ne protège que des silences : tant que des octets arrivent,
+     * il ne se déclenche jamais. Une requête documentaire lancée par erreur sur
+     * un média (une page HTML attendue, un film de deux gigaoctets servi) tient
+     * alors son fil indéfiniment — et comme le corps est lu par un appel
+     * bloquant, annuler la coroutine ne l'interrompt pas. Mesuré : quelques
+     * appels de ce genre suffisent à saturer le pool de coroutines partagé, et
+     * tout ce qui l'utilise gèle derrière, DataStore compris.
+     *
+     * `callTimeout` borne l'appel entier, lecture du corps incluse. Trente
+     * secondes sont très larges pour une page ou un manifeste, et laissent le
+     * client brut — celui des segments et des téléchargements, qui transfèrent
+     * de vrais médias — sans plafond.
+     */
+    val gateway: HttpGateway = OkHttpGateway(
+        http.newBuilder().callTimeout(30, TimeUnit.SECONDS).build(),
+    )
 
     private val voe = VoeExtractor(gateway)
 

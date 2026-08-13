@@ -116,9 +116,36 @@ suspend fun streamHeights(
     http: HttpGateway = ExtractorRegistry.gateway,
 ): List<Int> {
     if (stream.format != StreamFormat.HLS) return emptyList()
-    val body = http.getBody(stream.url, stream.headers) ?: return emptyList()
+    // **Borné, et pas seulement gardé par le format.** L'appelant peut se
+    // tromper — l'écran du lecteur desktop a longtemps déclaré HLS une URL de
+    // film en `.mp4` — et la garde ci-dessus le laissait alors charger le film
+    // entier dans une chaîne. Le prix n'était pas une lenteur : le fil restait
+    // à télécharger des gigaoctets, sans expirer puisque les octets arrivaient,
+    // et le pool de coroutines partagé finissait saturé. Tout ce qui en dépend
+    // gelait derrière, DataStore compris — donc l'application.
+    //
+    // Une plage change la nature du risque : sur une playlist, quelques
+    // kilo-octets, on la reçoit entière ; sur un fichier, on s'arrête net.
+    val response = http.fetch(
+        HttpRequest(
+            url = stream.url,
+            headers = stream.headers + ("Range" to "bytes=0-$MAX_PLAYLIST_BYTES"),
+        ),
+    ) ?: return emptyList()
+    if (!response.isSuccessful) return emptyList()
+    val body = response.body ?: return emptyList()
+    // Un manifeste commence par cette ligne. Sans ce contrôle, les octets d'un
+    // MP4 mal étiqueté partiraient dans l'analyseur de playlist.
+    if (!body.trimStart().startsWith("#EXTM3U")) return emptyList()
     return hlsHeights(body)
 }
+
+/**
+ * Plafond d'une playlist lue pour ses définitions. Un master HLS pèse quelques
+ * kilo-octets ; 256 Ko laissent une marge considérable tout en rendant
+ * impossible le téléchargement accidentel d'un média.
+ */
+private const val MAX_PLAYLIST_BYTES = 262_143
 
 /** Retourne null quand la méthode elle-même est refusée (à réessayer autrement). */
 private suspend fun probe(http: HttpGateway, stream: PlayableStream, head: Boolean): Boolean? {
