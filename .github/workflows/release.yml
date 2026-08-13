@@ -159,12 +159,26 @@ jobs:
           dylibbundler --bundle-deps --overwrite-files --create-dir \
             --fix-file "$dest/libmpv.2.dylib" \
             --dest-dir "$dest" --install-path "@loader_path/"
+          # Son propre identifiant reste celui de Homebrew : sans effet sur le
+          # chargement — JNA ouvre un chemin absolu — mais il n'a rien à faire
+          # dans un paquet livré, et il fausse toute vérification qui le lit.
+          install_name_tool -id "@loader_path/libmpv.2.dylib" "$dest/libmpv.2.dylib"
+          codesign --force --sign - "$dest/libmpv.2.dylib"
           echo "dylibs embarquées : $(ls "$dest" | wc -l)"
-          # Aucun chemin Homebrew ne doit subsister : il ne mènerait nulle part.
-          if otool -L "$dest"/*.dylib | grep -E '^\s+/(opt|usr/local)/'; then
-            echo "des chemins Homebrew subsistent dans les dylibs embarquées"
-            exit 1
-          fi
+          # Aucun chemin Homebrew ne doit subsister dans les **dépendances** :
+          # il ne mènerait nulle part chez l'utilisateur. `otool -L` annonce
+          # d'abord le fichier puis son propre identifiant : les vraies
+          # dépendances commencent à la troisième ligne, et les confondre
+          # faisait échouer la vérification sur un paquet pourtant correct.
+          for f in "$dest"/*.dylib; do
+            reste=$(otool -L "$f" | tail -n +3 | grep -E '^\s+/(opt|usr/local)/' || true)
+            if [ -n "$reste" ]; then
+              echo "chemins Homebrew dans $(basename "$f") :"
+              echo "$reste"
+              exit 1
+            fi
+          done
+          echo "aucun chemin Homebrew dans les dépendances embarquées."
 
       - name: Build paquet desktop (${{ matrix.ext }})
         run: ./gradlew packageDistributionForCurrentOS --no-daemon
