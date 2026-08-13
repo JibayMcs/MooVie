@@ -44,7 +44,12 @@ class DownloadEngineTest {
         val headersSeen = mutableListOf<Map<String, String>>()
         var failuresLeft = failOn.size
 
-        override suspend fun fetch(url: String, headers: Map<String, String>, target: File): Long {
+        override suspend fun fetch(
+            url: String,
+            headers: Map<String, String>,
+            target: File,
+            onProgress: suspend (recus: Long, total: Long) -> Unit,
+        ): Long {
             calls += url
             headersSeen += headers
             if (url in failOn && failuresLeft > 0) {
@@ -53,6 +58,10 @@ class DownloadEngineTest {
             }
             val body = bodies[url] ?: "octets-de-$url"
             target.writeText(body)
+            // Un vrai transfert rend compte pendant qu'il coule, pas seulement
+            // à la fin : c'est ce que le moteur doit relayer.
+            onProgress(target.length() / 2, target.length())
+            onProgress(target.length(), target.length())
             return target.length()
         }
     }
@@ -209,6 +218,38 @@ class DownloadEngineTest {
         assertEquals(2, last.totalSegments)
         assertEquals(2, last.doneSegments)
         assertEquals(1f, last.progress)
+    }
+
+    /**
+     * Un fichier unique doit **avancer pendant qu'il se télécharge**.
+     *
+     * Il ne le faisait pas : compté en segments, un MP4 en a un seul, donc 0 %
+     * du début à la fin puis 100 % à la dernière seconde. Sur un film de
+     * plusieurs gigaoctets, l'écran affirmait pendant une heure qu'il ne se
+     * passait rien pendant que le forfait fondait — signalé comme un
+     * téléchargement bloqué, ce qu'il n'était pas.
+     */
+    @Test
+    fun `un mp4 rend compte de son avancement avant d etre fini`() = runTest {
+        val mp4 = stream.copy(url = "https://cdn.example.com/v/film.mp4", format = StreamFormat.MP4)
+        val seen = mutableListOf<Download>()
+        engineWith(FakeFetcher(emptyMap()), StreamResolver { _, _ -> null }, seen).run(download, mp4)
+
+        val enCours = seen.filter { it.state == DownloadState.RUNNING }
+        assertTrue(
+            enCours.any { it.progress > 0f && it.progress < 1f },
+            "aucune progression intermédiaire : la barre resterait à zéro " +
+                "jusqu'à la fin (états vus : ${seen.map { it.state to it.progress }})",
+        )
+        assertEquals(1f, seen.last().progress)
+        assertEquals(DownloadState.DONE, seen.last().state)
+    }
+
+    /** Sans taille annoncée, on retombe sur les segments plutôt que sur rien. */
+    @Test
+    fun `sans taille annoncee l avancement reste celui des segments`() {
+        val muet = Download(key = "movie:1", title = "T", totalSegments = 4, doneSegments = 1)
+        assertEquals(0.25f, muet.progress)
     }
 
     // --- Garde d'espace disque ---------------------------------------------

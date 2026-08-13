@@ -53,6 +53,18 @@ data class Download(
     /** Octets sur le disque, pour dire ce que ça occupe. */
     val bytes: Long = 0,
 
+    /**
+     * Taille annoncée par l'hébergeur, ou 0 quand il ne la dit pas.
+     *
+     * C'est ce qui donne une progression aux fichiers uniques. Un MP4 n'a qu'un
+     * « segment » : compté en segments, il reste à 0 % du début à la fin, et
+     * saute à 100 % à la dernière seconde — pendant une heure, l'écran affirmait
+     * qu'il ne se passait rien alors que les gigaoctets arrivaient. En HLS, où
+     * la taille n'est jamais annoncée, les segments restent la seule mesure
+     * honnête : les deux cohabitent, chacun là où il sait compter.
+     */
+    val totalBytes: Long = 0,
+
     val createdAt: Long = 0,
 
     /**
@@ -72,8 +84,17 @@ data class Download(
     /** Message de la dernière panne, tel qu'on peut le montrer. */
     val error: String? = null,
 ) {
+    /**
+     * Avancement entre 0 et 1. Les octets priment quand la taille est connue —
+     * ils décrivent alors la même chose en plus fin, et sont la seule mesure
+     * qui bouge sur un fichier unique.
+     */
     val progress: Float
-        get() = if (totalSegments <= 0) 0f else doneSegments.toFloat() / totalSegments
+        get() = when {
+            totalBytes > 0 -> (bytes.toFloat() / totalBytes).coerceIn(0f, 1f)
+            totalSegments > 0 -> doneSegments.toFloat() / totalSegments
+            else -> 0f
+        }
 
     val isPlayable: Boolean get() = state == DownloadState.DONE
 }

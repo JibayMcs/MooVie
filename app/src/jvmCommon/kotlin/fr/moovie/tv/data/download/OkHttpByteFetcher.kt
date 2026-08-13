@@ -31,6 +31,7 @@ class OkHttpByteFetcher(
         url: String,
         headers: Map<String, String>,
         target: File,
+        onProgress: suspend (recus: Long, total: Long) -> Unit,
     ): Long = withContext(Dispatchers.IO) {
         val request = Request.Builder().url(url).apply {
             headers.forEach { (k, v) -> header(k, v) }
@@ -42,8 +43,23 @@ class OkHttpByteFetcher(
             }
             val body = response.body ?: throw IOException("Réponse vide sur $url")
             val partial = File(target.parentFile, target.name + ".part")
+            // `copyTo` recopierait tout d'un trait, sans rien dire : c'est ce
+            // qui laissait la barre à 0 % pendant qu'un film de plusieurs
+            // gigaoctets arrivait. La boucle est la même, à ceci près qu'elle
+            // rend compte au passage.
+            val total = body.contentLength().takeIf { it > 0 } ?: 0L
+            var recus = 0L
             body.byteStream().use { input ->
-                partial.outputStream().use { output -> input.copyTo(output) }
+                partial.outputStream().use { output ->
+                    val tampon = ByteArray(DEFAULT_BUFFER_SIZE)
+                    while (true) {
+                        val lus = input.read(tampon)
+                        if (lus < 0) break
+                        output.write(tampon, 0, lus)
+                        recus += lus
+                        onProgress(recus, total)
+                    }
+                }
             }
             if (!partial.renameTo(target)) {
                 partial.delete()

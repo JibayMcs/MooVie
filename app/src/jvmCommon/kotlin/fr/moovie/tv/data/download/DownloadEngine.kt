@@ -13,9 +13,27 @@ import java.net.URI
  * Étroit exprès — le moteur s'éprouve alors avec un faux qui écrit des octets
  * fabriqués, sans réseau ni hébergeur.
  */
-fun interface ByteFetcher {
-    /** Écrit le contenu dans [target] et rend le nombre d'octets écrits. */
-    suspend fun fetch(url: String, headers: Map<String, String>, target: File): Long
+// Interface ordinaire et non `fun interface` : la conversion SAM interdit les
+// valeurs par défaut, et le rappel de progression en a une — la plupart des
+// appels (playlists, segments) n'ont rien à raconter. Aucune lambda n'était
+// convertie de toute façon, les deux implémentations sont des classes.
+interface ByteFetcher {
+    /**
+     * Écrit le contenu dans [target] et rend le nombre d'octets écrits.
+     *
+     * [onProgress] reçoit, pendant le transfert, les octets déjà écrits et la
+     * taille annoncée (0 si l'hébergeur ne la dit pas). Sans lui, un fichier
+     * unique de plusieurs gigaoctets ne donne aucun signe de vie avant sa
+     * dernière seconde : l'écran affichait 0 % pendant une heure pendant que
+     * les données arrivaient — l'utilisateur voyait son forfait fondre en face
+     * d'une barre immobile.
+     */
+    suspend fun fetch(
+        url: String,
+        headers: Map<String, String>,
+        target: File,
+        onProgress: suspend (recus: Long, total: Long) -> Unit = { _, _ -> },
+    ): Long
 }
 
 /**
@@ -96,8 +114,37 @@ class DownloadEngine(
     ): DownloadOutcome {
         val target = File(dir, "video.mp4")
         publish(download.copy(state = DownloadState.RUNNING, totalSegments = 1, doneSegments = 0))
-        val bytes = fetchResilient(download, stream, stream.url, target)
-        publish(download.copy(state = DownloadState.DONE, totalSegments = 1, doneSegments = 1, bytes = bytes))
+
+        // Rendu compte pendant le transfert, et **espacé dans le temps** : la
+        // publication écrit dans DataStore, et un fichier de deux gigaoctets
+        // passe par ce rappel des dizaines de milliers de fois. Une seconde
+        // entre deux écritures suffit largement à une barre de progression, et
+        // laisse le magasin tranquille.
+        var dernierePublication = 0L
+        val bytes = fetchResilient(download, stream, stream.url, target) { recus, total ->
+            val maintenant = System.currentTimeMillis()
+            if (maintenant - dernierePublication >= PROGRESS_INTERVAL_MS) {
+                dernierePublication = maintenant
+                publish(
+                    download.copy(
+                        state = DownloadState.RUNNING,
+                        totalSegments = 1,
+                        doneSegments = 0,
+                        bytes = recus,
+                        totalBytes = total,
+                    ),
+                )
+            }
+        }
+        publish(
+            download.copy(
+                state = DownloadState.DONE,
+                totalSegments = 1,
+                doneSegments = 1,
+                bytes = bytes,
+                totalBytes = bytes,
+            ),
+        )
         return DownloadOutcome.Done(bytes)
     }
 
@@ -196,15 +243,16 @@ class DownloadEngine(
         stream: PlayableStream,
         url: String,
         target: File,
+        onProgress: suspend (recus: Long, total: Long) -> Unit = { _, _ -> },
     ): Long = try {
-        fetcher.fetch(url, stream.headers, target)
+        fetcher.fetch(url, stream.headers, target, onProgress)
     } catch (first: Exception) {
         val fresh = resolver.resolve(download.key, download.language)
             ?: throw first
         // L'URL du segment vient de l'ancienne playlist : on ne peut pas la
         // rejouer telle quelle sur la nouvelle source. Seuls les *en-têtes*
         // fraîchement obtenus servent — c'est eux que l'hébergeur vérifie.
-        fetcher.fetch(url, fresh.headers, target)
+        fetcher.fetch(url, fresh.headers, target, onProgress)
     }
 
     private suspend fun fetchText(stream: PlayableStream, url: String): String {
@@ -240,6 +288,15 @@ class DownloadEngine(
 
     private companion object {
         const val PROGRESS_EVERY = 10
+
+        /**
+         * Écart minimal entre deux publications de progression, sur un fichier
+         * unique. Chaque publication est une écriture DataStore, et le rappel
+         * arrive à chaque bloc lu — des dizaines de milliers de fois sur un
+         * film. Une seconde suffit à une barre qui avance ; en dessous, on
+         * userait le magasin pour une différence que personne ne voit.
+         */
+        const val PROGRESS_INTERVAL_MS = 1_000L
 
         /**
          * Réserve à ne pas entamer, 500 Mo. Assez pour que le système respire
