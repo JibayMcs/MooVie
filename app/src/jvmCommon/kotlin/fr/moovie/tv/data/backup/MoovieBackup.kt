@@ -40,6 +40,15 @@ data class MoovieBackup(
     /** Clés vues (`movie:123`, `tv:1396:s2e5`). */
     val watched: List<String> = emptyList(),
     val history: List<HistoryEntry> = emptyList(),
+    /**
+     * Dates de retrait de l'historique.
+     *
+     * Ajoutée après coup, donc par défaut vide : un fichier écrit par une
+     * version antérieure ne sait rien de ses suppressions, et la fusion doit
+     * continuer de faire l'union pour lui — un vieux fichier ne doit rien
+     * effacer.
+     */
+    val historyRemovedAt: Map<String, Long> = emptyMap(),
     /** Piste audio retenue par titre (`tv:1396` → « French »). */
     val audioTracks: Map<String, String> = emptyMap(),
     /**
@@ -164,6 +173,15 @@ data class BackupProfile(
     val resumeRemovedAt: Map<String, Long> = emptyMap(),
     val watchlistRemovedAt: Map<String, Long> = emptyMap(),
     val history: List<HistoryEntry> = emptyList(),
+    /**
+     * Dates de retrait de l'historique.
+     *
+     * Ajoutée après coup, donc par défaut vide : un fichier écrit par une
+     * version antérieure ne sait rien de ses suppressions, et la fusion doit
+     * continuer de faire l'union pour lui — un vieux fichier ne doit rien
+     * effacer.
+     */
+    val historyRemovedAt: Map<String, Long> = emptyMap(),
     val audioTracks: Map<String, String> = emptyMap(),
     val titles: Map<String, TitleMeta> = emptyMap(),
     val homeLayout: List<HomeLayoutEntry> = emptyList(),

@@ -46,6 +46,18 @@ private const val RESUME_AT_PREFIX = "resumeat:"
 /** Voir [RESUME_AT_PREFIX]. */
 private const val LATER_AT_PREFIX = "laterat:"
 private const val HIST_PREFIX = "hist:"
+
+/**
+ * Date de retrait d'une ligne d'historique — la pierre tombale qui manquait.
+ *
+ * `seen:`, `resume:` et `later:` en avaient une ; l'historique, non. Sa fusion
+ * faisait donc l'**union pure** de deux listes, si bien qu'une ligne supprimée
+ * ici revenait au premier import depuis un appareil qui l'avait encore. Le
+ * symptôme désignait la synchro — Backblaze, le chiffrement, l'horloge — alors
+ * que le fichier arrivait parfaitement : c'est la règle de fusion qui n'avait
+ * aucun moyen de distinguer « supprimé » de « pas encore vu ».
+ */
+private const val HIST_AT_PREFIX = "histat:"
 private const val META_PREFIX = "meta:"
 private const val AUDIO_PREFIX = "audio:"
 
@@ -104,6 +116,9 @@ class WatchProgressRepository(
     /** Dates de retrait de la liste « à voir ». */
     suspend fun watchlistRemovedAt(): Map<String, Long> = stamps(LATER_AT_PREFIX)
 
+    /** Dates de retrait de l'historique. */
+    suspend fun historyRemovedAt(): Map<String, Long> = stamps(HIST_AT_PREFIX)
+
     private suspend fun stamps(prefix: String): Map<String, Long> = store.data.first().asMap()
         .mapNotNull { (k, v) ->
             if (!k.name.startsWith(prefix)) return@mapNotNull null
@@ -133,9 +148,18 @@ class WatchProgressRepository(
         store.edit { it[stringPreferencesKey(META_PREFIX + titleKey)] = json.encodeToString(meta) }
     }
 
-    /** Retire une ligne de l'historique (sans toucher au statut vu). */
-    suspend fun removeFromHistory(key: String) {
-        store.edit { it.remove(stringPreferencesKey(HIST_PREFIX + key)) }
+    /**
+     * Retire une ligne de l'historique (sans toucher au statut vu).
+     *
+     * Le retrait est **daté** : voir [HIST_AT_PREFIX]. Sans cette date, la
+     * fusion ne peut pas savoir que l'absence est une décision, et l'entrée
+     * revient à la synchro suivante.
+     */
+    suspend fun removeFromHistory(key: String, now: Long = MoovieClock.now()) {
+        store.edit {
+            it.remove(stringPreferencesKey(HIST_PREFIX + key))
+            it[longPreferencesKey(HIST_AT_PREFIX + key)] = now
+        }
     }
 
     /** Fiches mémorisées, pour l'export. */
@@ -176,13 +200,15 @@ class WatchProgressRepository(
         /** Dates de retrait fusionnées — voir [RESUME_AT_PREFIX]. */
         resumeRemovedAt: Map<String, Long> = emptyMap(),
         watchlistRemovedAt: Map<String, Long> = emptyMap(),
+        historyRemovedAt: Map<String, Long> = emptyMap(),
     ) {
         store.edit { prefs ->
             prefs.asMap().keys
                 .filter { key ->
                     listOf(
                         RESUME_PREFIX, RESUME_AT_PREFIX, SEEN_PREFIX, SEEN_AT_PREFIX,
-                        LATER_PREFIX, LATER_AT_PREFIX, HIST_PREFIX, AUDIO_PREFIX,
+                        LATER_PREFIX, LATER_AT_PREFIX, HIST_PREFIX, HIST_AT_PREFIX,
+                        AUDIO_PREFIX,
                     )
                         .any { key.name.startsWith(it) }
                 }
@@ -197,6 +223,7 @@ class WatchProgressRepository(
             watchedAt.forEach { (k, at) -> prefs[longPreferencesKey(SEEN_AT_PREFIX + k)] = at }
             resumeRemovedAt.forEach { (k, at) -> prefs[longPreferencesKey(RESUME_AT_PREFIX + k)] = at }
             watchlistRemovedAt.forEach { (k, at) -> prefs[longPreferencesKey(LATER_AT_PREFIX + k)] = at }
+            historyRemovedAt.forEach { (k, at) -> prefs[longPreferencesKey(HIST_AT_PREFIX + k)] = at }
             history.forEach { prefs[stringPreferencesKey(HIST_PREFIX + it.key)] = json.encodeToString(it) }
             audioTracks.forEach { (k, v) -> prefs[stringPreferencesKey(AUDIO_PREFIX + k)] = v }
             titles.forEach { (k, v) -> prefs[stringPreferencesKey(META_PREFIX + k)] = json.encodeToString(v) }

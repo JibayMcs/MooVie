@@ -68,6 +68,7 @@ class BackupRepository(
                 watchedAt = watch.watchedAt(),
                 resumeRemovedAt = watch.resumeRemovedAt(),
                 watchlistRemovedAt = watch.watchlistRemovedAt(),
+                historyRemovedAt = watch.historyRemovedAt(),
                 history = watch.history.first(),
                 audioTracks = watch.audioTracks(),
                 titles = watch.titles(),
@@ -139,6 +140,7 @@ class BackupRepository(
                 watchedAt = watch.watchedAt(),
                 resumeRemovedAt = watch.resumeRemovedAt(),
                 watchlistRemovedAt = watch.watchlistRemovedAt(),
+                historyRemovedAt = watch.historyRemovedAt(),
                 history = watch.history.first(),
                 audioTracks = watch.audioTracks(),
             )
@@ -149,6 +151,7 @@ class BackupRepository(
                 watchedAt = entry.watchedAt,
                 resumeRemovedAt = entry.resumeRemovedAt,
                 watchlistRemovedAt = entry.watchlistRemovedAt,
+                historyRemovedAt = entry.historyRemovedAt,
                 history = entry.history,
                 audioTracks = entry.audioTracks,
             )
@@ -163,6 +166,7 @@ class BackupRepository(
                 watchedAt = merged.watchedAt,
                 resumeRemovedAt = merged.resumeRemovedAt,
                 watchlistRemovedAt = merged.watchlistRemovedAt,
+                historyRemovedAt = merged.historyRemovedAt,
             )
             if (entry.homeLayout.isNotEmpty()) {
                 layout.replaceAll(
@@ -186,6 +190,7 @@ class BackupRepository(
             watchedAt = watchRepo.watchedAt(),
             resumeRemovedAt = watchRepo.resumeRemovedAt(),
             watchlistRemovedAt = watchRepo.watchlistRemovedAt(),
+            historyRemovedAt = watchRepo.historyRemovedAt(),
             history = watchRepo.history.first(),
             audioTracks = watchRepo.audioTracks(),
         )
@@ -203,6 +208,7 @@ class BackupRepository(
             watchedAt = merged.watchedAt,
             resumeRemovedAt = merged.resumeRemovedAt,
             watchlistRemovedAt = merged.watchlistRemovedAt,
+            historyRemovedAt = merged.historyRemovedAt,
         )
         // L'ordre du fichier l'emporte ; en fusion, les genres épinglés propres à
         // cet appareil sont conservés (voir [mergeHomeLayouts]).

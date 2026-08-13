@@ -1,5 +1,6 @@
 package fr.moovie.tv.data.backup
 
+import fr.moovie.tv.data.watch.HistoryEntry
 import fr.moovie.tv.data.watch.ResumeEntry
 import fr.moovie.tv.data.watch.WatchlistEntry
 import kotlin.test.Test
@@ -175,5 +176,71 @@ class TombstoneMergeTest {
         val backup = WatchState(resume = listOf(resume("movie:1", 300)))
 
         assertEquals(300, merge(current, backup).resume.single().updatedAt)
+    }
+
+    private fun hist(key: String, at: Long) =
+        HistoryEntry(key = key, tmdbId = 1, isTv = false, title = "T", watchedAt = at)
+
+    /**
+     * Le défaut rapporté : une ligne supprimée de l'historique revenait à la
+     * synchro suivante, et le soupçon tombait sur Backblaze alors que le
+     * fichier arrivait intact — c'est la fusion qui faisait l'union.
+     */
+    @Test
+    fun `une ligne d historique supprimee ne revient pas`() {
+        val current = WatchState(historyRemovedAt = mapOf("movie:5" to 300))
+        val backup = WatchState(history = listOf(hist("movie:5", 100)))
+
+        assertTrue(merge(current, backup).history.isEmpty())
+    }
+
+    /** Revu depuis la suppression : c'est un nouveau visionnage, il reste. */
+    @Test
+    fun `un visionnage posterieur au retrait revient`() {
+        val current = WatchState(historyRemovedAt = mapOf("movie:5" to 100))
+        val backup = WatchState(history = listOf(hist("movie:5", 300)))
+
+        assertEquals(listOf("movie:5"), merge(current, backup).history.map { it.key })
+    }
+
+    /** Une suppression faite ailleurs s'applique à la ligne locale. */
+    @Test
+    fun `un retrait venu du fichier efface la ligne locale`() {
+        val current = WatchState(history = listOf(hist("movie:5", 100)))
+        val backup = WatchState(historyRemovedAt = mapOf("movie:5" to 300))
+
+        assertTrue(merge(current, backup).history.isEmpty())
+    }
+
+    /** La pierre tombale se propage, sans quoi le prochain appareil la perdrait. */
+    @Test
+    fun `la pierre tombale d historique survit a la fusion`() {
+        val current = WatchState(historyRemovedAt = mapOf("movie:5" to 300))
+        val backup = WatchState(historyRemovedAt = mapOf("movie:9" to 400))
+
+        val merged = merge(current, backup).historyRemovedAt
+        assertEquals(300, merged["movie:5"])
+        assertEquals(400, merged["movie:9"])
+    }
+
+    /**
+     * Un fichier d'avant cette version ne sait rien de ses suppressions : sans
+     * horodatage, on refait l'union d'autrefois plutôt que d'effacer.
+     */
+    @Test
+    fun `sans horodatage l historique refait l union`() {
+        val current = WatchState(history = listOf(hist("movie:1", 100)))
+        val backup = WatchState(history = listOf(hist("movie:2", 200)))
+
+        assertEquals(setOf("movie:1", "movie:2"), merge(current, backup).history.map { it.key }.toSet())
+    }
+
+    /** Deux visionnages du même titre à deux instants restent deux lignes. */
+    @Test
+    fun `deux visionnages distincts ne se dedoublonnent pas`() {
+        val current = WatchState(history = listOf(hist("movie:1", 100)))
+        val backup = WatchState(history = listOf(hist("movie:1", 200)))
+
+        assertEquals(2, merge(current, backup).history.size)
     }
 }

@@ -29,6 +29,8 @@ data class WatchState(
     val resumeRemovedAt: Map<String, Long> = emptyMap(),
     /** Dates de retrait de la liste « à voir ». */
     val watchlistRemovedAt: Map<String, Long> = emptyMap(),
+    /** Dates de retrait d'une ligne d'historique. Voir la fusion, plus bas. */
+    val historyRemovedAt: Map<String, Long> = emptyMap(),
 )
 
 /**
@@ -116,6 +118,7 @@ fun mergeBackup(
         watchlist = backup.watchlist,
         watched = backup.watched.toSet(),
         history = backup.history,
+        historyRemovedAt = backup.historyRemovedAt,
         audioTracks = backup.audioTracks,
     ),
     mode = mode,
@@ -201,8 +204,22 @@ fun mergeWatchState(
 
     // Historique : dédoublonné sur (clé, moment), deux appareils pouvant avoir
     // vu le même épisode à des instants différents — ce sont deux visionnages.
-    val seenHistory = current.history.map { it.key to it.watchedAt }.toSet()
-    val newHistory = incoming.history.filterNot { (it.key to it.watchedAt) in seenHistory }
+    //
+    // Et surtout **enterré comme le reste**. L'union pure d'autrefois faisait
+    // revenir chaque ligne supprimée à la main dès qu'un autre appareil l'avait
+    // encore : la suppression ne survivait pas à la synchro suivante, et le
+    // soupçon tombait sur le stockage distant alors que le fichier arrivait
+    // intact. Une ligne ne survit donc que si son visionnage est postérieur à
+    // la dernière décision de la retirer, d'où qu'elle vienne.
+    val historyRemovedAt = stampUnion(current.historyRemovedAt, incoming.historyRemovedAt)
+    fun vivante(entry: HistoryEntry): Boolean =
+        entry.watchedAt > (historyRemovedAt[entry.key] ?: 0L)
+
+    val gardees = current.history.filter(::vivante)
+    val seenHistory = gardees.map { it.key to it.watchedAt }.toSet()
+    val newHistory = incoming.history
+        .filter(::vivante)
+        .filterNot { (it.key to it.watchedAt) in seenHistory }
 
     val merged = WatchState(
         resume = mergedResume.sortedByDescending { it.updatedAt },
@@ -211,7 +228,8 @@ fun mergeWatchState(
         watchlistRemovedAt = mergedWatchlistRemovedAt,
         watched = mergedWatched,
         watchedAt = mergedWatchedAt,
-        history = (current.history + newHistory).sortedByDescending { it.watchedAt },
+        history = (gardees + newHistory).sortedByDescending { it.watchedAt },
+        historyRemovedAt = historyRemovedAt,
         // Le choix de langue de l'appareil courant prime : il vient d'un geste
         // récent de l'utilisateur, là où la sauvegarde reflète un autre poste.
         audioTracks = incoming.audioTracks + current.audioTracks,
