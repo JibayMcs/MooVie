@@ -16,7 +16,7 @@ plugins {
 //
 // Un suffixe semver — « -rc.1 » — désigne une préversion : le tag correspondant
 // sort en pré-release GitHub et reste invisible pour les updaters intégrés.
-val appVersion = "1.21.0"
+val appVersion = "1.21.0-rc.1"
 
 /**
  * La même version, telle que **jpackage** l'accepte : purement numérique.
