@@ -82,8 +82,11 @@ import fr.moovie.tv.ui.format.formatNowDateTime
 import fr.moovie.tv.data.watch.WatchProgressRepository
 import fr.moovie.tv.data.watch.nextUpEntry
 import fr.moovie.tv.resources.Res
+import fr.moovie.tv.resources.common_back
 import fr.moovie.tv.resources.common_cancel
 import fr.moovie.tv.resources.player_buffering
+import fr.moovie.tv.resources.player_mpv_help
+import fr.moovie.tv.resources.player_mpv_missing
 import fr.moovie.tv.resources.player_error
 import fr.moovie.tv.resources.player_fullscreen
 import fr.moovie.tv.resources.player_fullscreen_exit
@@ -135,6 +138,10 @@ import fr.moovie.tv.ui.theme.MOOVIE_ACCENT
 import fr.moovie.tv.ui.components.MoovieButton
 import fr.moovie.tv.ui.components.MoovieIconButton
 import fr.moovie.tv.ui.components.MoovieScreensaver
+import fr.moovie.tv.desktop.mpv.Libmpv
+import fr.moovie.tv.desktop.mpv.MpvEngine
+import fr.moovie.tv.desktop.mpv.MpvPlayerController
+import fr.moovie.tv.desktop.mpv.MpvVideoSurface
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -142,24 +149,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
-import org.jetbrains.skia.Bitmap
-import org.jetbrains.skia.ColorAlphaType
-import org.jetbrains.skia.ColorType
-import org.jetbrains.skia.ImageInfo
-import com.sun.jna.NativeLibrary
-import uk.co.caprica.vlcj.factory.MediaPlayerFactory
-import uk.co.caprica.vlcj.factory.discovery.NativeDiscovery
-import uk.co.caprica.vlcj.media.MediaSlaveType
-import uk.co.caprica.vlcj.player.base.MediaPlayer
-import uk.co.caprica.vlcj.player.base.MediaPlayerEventAdapter
-import uk.co.caprica.vlcj.player.embedded.videosurface.CallbackVideoSurface
-import uk.co.caprica.vlcj.player.embedded.videosurface.VideoSurfaceAdapters
-import uk.co.caprica.vlcj.player.embedded.videosurface.callback.BufferFormat
-import uk.co.caprica.vlcj.player.embedded.videosurface.callback.BufferFormatCallback
-import uk.co.caprica.vlcj.player.embedded.videosurface.callback.RenderCallback
-import uk.co.caprica.vlcj.player.embedded.videosurface.callback.format.RV32BufferFormat
-import java.io.File
-import java.nio.ByteBuffer
 
 /**
  * Fraction de l'épisode au-delà de laquelle on précharge les sources du
@@ -197,8 +186,8 @@ private val BLANK_CURSOR: PointerIcon by lazy {
 }
 
 /**
- * Lecteur desktop via libVLC (VLC doit être installé sur la machine).
- * Frames rendues dans Compose (callbacks vlcj) → overlay de contrôles
+ * Lecteur desktop via le moteur mpv embarqué.
+ * Trames rendues dans Compose (rendu logiciel libmpv) → overlay de contrôles
  * auto-masqué sans clignotement. Clavier : Espace = pause, ←/→ = ±10 s,
  * ↑/↓ = volume, M = muet, F/F11 = plein écran, Échap = retour (géré fenêtre).
  * Clic = pause/lecture, double-clic = plein écran.
@@ -248,31 +237,31 @@ internal fun DesktopPlayerScreen(
     val introRepo = remember { IntroDbRepository() }
     val screensaverDelay by settings.screensaverDelay.collectAsState(initial = ScreensaverDelay.M15)
     val saveScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.IO) }
-    val surface = remember { ComposeVideoSurface() }
+    val surface = remember { MpvVideoSurface() }
 
-    // libVLC absent → écran d'erreur plutôt qu'un crash. La fabrique est
-    // partagée avec l'aperçu de bande-annonce de la fiche, voir [vlcFactory].
-    val factory = vlcFactory
-    if (factory == null) {
-        MissingVlc(onBack)
+    // libmpv absent → écran d'erreur plutôt qu'un crash. Cas d'atelier : les
+    // paquets de l'application embarquent la bibliothèque.
+    if (Libmpv.instance == null) {
+        MissingMpv(onBack)
         return
     }
 
-    val player = remember {
-        factory.mediaPlayers().newEmbeddedMediaPlayer().apply {
-            videoSurface().set(
-                CallbackVideoSurface(
-                    surface.bufferFormatCallback,
-                    surface.renderCallback,
-                    true,
-                    VideoSurfaceAdapters.getVideoSurfaceAdapter(),
-                ),
-            )
-        }
+    var finished by remember { mutableStateOf(false) }
+    var playError by remember { mutableStateOf(false) }
+
+    val moteur = remember {
+        MpvEngine(
+            surImage = surface::publie,
+            surFin = { finished = true },
+            surErreur = {
+                println("[lecteur] $it")
+                playError = true
+            },
+        )
     }
 
     /** Vue du lecteur exposée à la chrome partagée. */
-    val controller = remember { VlcjPlayerController(player) }
+    val controller = remember { MpvPlayerController(moteur) }
 
     // Même garde-fou que sur Android TV, et volontairement le même code : un
     // flux nettement plus court que le média annoncé emprunte le chemin d'échec
@@ -300,16 +289,12 @@ internal fun DesktopPlayerScreen(
     KeepAwakeWhile(isPlaying)
     var timeMs by remember { mutableStateOf(0L) }
     var lengthMs by remember { mutableStateOf(0L) }
-    var finished by remember { mutableStateOf(false) }
-    var playError by remember { mutableStateOf(false) }
-    // Remplissage du cache réseau (0-100). libVLC 3 n'expose pas de plage
-    // tamponnée exploitable sur la barre : on affiche donc l'état de chargement
-    // en clair, là où Android TV peut dessiner une vraie piste de tampon.
+    // Remplissage du cache pendant une mise en mémoire tampon (0-100). mpv le
+    // dit explicitement (`paused-for-cache`), là où libVLC obligeait à le
+    // déduire d'une horloge qui avance.
     var bufferingPercent by remember(streamUrl) { mutableStateOf(100f) }
-    // Affiché seulement si le remplissage dure : libVLC repart de 0 % à chaque
-    // seek et remonte à 100 en une seconde et demie, si bien qu'un « 0 % »
-    // clignotait à chaque saut. Vu de l'écran, l'indicateur semblait coincé en
-    // bas alors qu'il ne faisait que redémarrer.
+    // Affiché seulement si le remplissage dure : un tampon d'une demi-seconde
+    // après un seek n'a pas à faire clignoter un « 0 % » à l'écran.
     var bufferingVisible by remember(streamUrl) { mutableStateOf(false) }
     // Ce flux a-t-il jamais produit une image ? Voir l'effet de fin : c'est la
     // seule façon de distinguer un épisode terminé d'un flux mort-né.
@@ -385,77 +370,29 @@ internal fun DesktopPlayerScreen(
         // Un volume qu'on règle est un volume qu'on veut entendre : le remonter
         // depuis zéro doit suffire, sans avoir à décoiffer le muet à côté.
         muted = false
-        player.audio().isMute = false
-        player.audio().setVolume(volume)
+        moteur.coupeSon(false)
+        moteur.regleVolumePourcent(volume)
     }
 
     fun toggleMute() {
         muted = !muted
-        player.audio().isMute = muted
+        moteur.coupeSon(muted)
     }
 
     // Démarrage : headers (UA/Referer, ce que les extracteurs exigent), reprise
-    // à la position sauvée, sous-titres externes ajoutés une fois le média prêt.
+    // à la position sauvée — l'option `start` du moteur, atomique, là où libVLC
+    // imposait un `setTime` sur l'événement « prêt » — puis sous-titres
+    // externes proposés sans en activer aucun.
     LaunchedEffect(streamUrl) {
-        controller.onMediaChanged()
         val resumeAt = if (mediaKey.isNotBlank()) progress.position(mediaKey) else 0L
-        player.events().addMediaPlayerEventListener(object : MediaPlayerEventAdapter() {
-            override fun mediaPlayerReady(mediaPlayer: MediaPlayer) {
-                // Ne JAMAIS rappeler libVLC depuis son propre thread
-                // d'événements : il détient un verrou natif pendant le callback,
-                // et toute commande émise ici l'interbloque. Symptôme observé :
-                // écran noir, aucun son, horloge figée sur la position de
-                // reprise, puis gel complet de la fenêtre au premier seek (le
-                // thread UI venant s'échouer sur le même verrou). Seuls les
-                // titres repris en cours étaient touchés, `setTime` n'étant
-                // appelé que si resumeAt > 0.
-                saveScope.launch {
-                    runCatching {
-                        if (resumeAt > 0) mediaPlayer.controls().setTime(resumeAt)
-                        // Aligne libVLC sur l'état du slider (volume plein, non muet).
-                        mediaPlayer.audio().isMute = false
-                        mediaPlayer.audio().setVolume(100)
-                        subtitles.forEach { (_, url) ->
-                            if (url.isNotBlank()) {
-                                mediaPlayer.media().addSlave(MediaSlaveType.SUBTITLE, url, false)
-                            }
-                        }
-                        // Aucun sous-titre au démarrage : libVLC en choisit
-                        // sinon un tout seul dès qu'une piste existe, et on se
-                        // retrouve avec des sous-titres sur tous les dialogues
-                        // sans les avoir demandés. Les afficher reste un choix
-                        // explicite. -1 coupe l'affichage sans retirer les
-                        // pistes, qui restent proposées dans la popup.
-                        mediaPlayer.subpictures().setTrack(-1)
-                    }
-                }
-            }
-
-            // Simple écriture d'état Compose : aucun appel natif, donc rien à
-            // renvoyer sur le thread de commandes depuis ce callback.
-            override fun buffering(mediaPlayer: MediaPlayer, newCache: Float) {
-                bufferingPercent = newCache
-            }
-
-            override fun finished(mediaPlayer: MediaPlayer) {
-                finished = true
-            }
-
-            override fun error(mediaPlayer: MediaPlayer) {
-                playError = true
-            }
-        })
 
         fun header(name: String) = headers.entries.firstOrNull { it.key.equals(name, ignoreCase = true) }?.value
-        val options = buildList {
-            add(":network-caching=1500")
-            header("User-Agent")?.let { add(":http-user-agent=$it") }
-            header("Referer")?.let { add(":http-referrer=$it") }
-        }
-        // Un Referer exigé par l'hébergeur passe par le relais local : libVLC
-        // ne le transmet pas aux segments, et la lecture s'arrête à 0:00 sur
-        // une source pourtant annoncée jouable (voir LocalStreamProxy). Les
-        // options ci-dessus restent : elles couvrent le cas sans relais.
+        // mpv transmet ses en-têtes jusqu'aux segments (MpvHeadersTest le
+        // verrouille) : le relais n'est plus là pour eux. Il reste pour le
+        // **DNS** — sa résolution passe par le client de l'application, donc
+        // par DoH, quand les fournisseurs d'accès bloquent les domaines des
+        // hébergeurs. Même règle éprouvée qu'avant : un hôte assez pointilleux
+        // pour exiger un Referer est aussi le genre d'hôte qu'on bloque.
         val played = if (header("Referer") != null && streamUrl.startsWith("http")) {
             val relay = LocalStreamProxy(headers)
             proxy = relay
@@ -463,7 +400,15 @@ internal fun DesktopPlayerScreen(
         } else {
             streamUrl
         }
-        player.media().play(played, *options.toTypedArray())
+        // L'ouverture attend le réseau : hors du fil d'interface.
+        withContext(Dispatchers.IO) {
+            val ouvert = moteur.ouvre(played, headers, departMs = resumeAt)
+            if (ouvert) {
+                moteur.coupeSon(false)
+                moteur.regleVolumePourcent(100)
+                moteur.ajouteSousTitres(subtitles.values)
+            }
+        }
     }
 
     /** Clé de titre (`tv:<id>`) : la préférence audio vaut pour toute la série. */
@@ -500,26 +445,19 @@ internal fun DesktopPlayerScreen(
     LaunchedEffect(mediaKey) {
         var ticks = 0
         var prefetchAsked = false
-        var lastRawTime = 0L
         while (true) {
             delay(500)
-            isPlaying = player.status().isPlaying
-            // Du contrôleur et non de libVLC : pendant un seek il rend la cible
-            // demandée, sinon la barre repart en arrière le temps que le flux
-            // se replace, ce qui se lit comme un seek qui a échoué.
+            isPlaying = controller.isPlaying
+            // Du contrôleur : pendant un seek il rend la cible demandée, sinon
+            // la barre repart en arrière le temps que le flux se replace, ce
+            // qui se lit comme un seek qui a échoué.
             val time = controller.positionMs()
-            val rawTime = player.status().time().coerceAtLeast(0)
-            // Une horloge qui avance prouve que le flux coule : libVLC n'émet
-            // pas toujours son « 100 % » final, et l'indicateur resterait
-            // affiché en pleine lecture.
-            // Sur l'horloge **brute** : celle du contrôleur rend la cible dès
-            // qu'un seek part, et masquerait l'indicateur au moment précis où
-            // le lecteur remplit son cache.
-            if (rawTime > lastRawTime) bufferingPercent = 100f
-            lastRawTime = rawTime
-            if (rawTime > 1_000) everPlayed = true
+            // Un signal, pas une heuristique : mpv dit quand la lecture attend
+            // le réseau, et où en est le remplissage.
+            bufferingPercent = moteur.remplissageCache()
+            if (time > 1_000) everPlayed = true
             timeMs = time
-            lengthMs = player.status().length().coerceAtLeast(0)
+            lengthMs = controller.durationMs()
             ticks++
             if (ticks % 10 == 0 && mediaKey.isNotBlank() && isPlaying) {
                 progress.save(mediaKey, timeMs, lengthMs)
@@ -558,7 +496,7 @@ internal fun DesktopPlayerScreen(
     LaunchedEffect(streamUrl, skipEnabled, pid) {
         if (!skipEnabled || pid == null) return@LaunchedEffect
         repeat(20) {
-            if (player.status().length() > 0) return@repeat
+            if (controller.durationMs() > 0) return@repeat
             delay(500)
         }
         media = introRepo.fetch(
@@ -566,7 +504,7 @@ internal fun DesktopPlayerScreen(
             pid.isTv,
             pid.season,
             pid.episode,
-            player.status().length().coerceAtLeast(0),
+            controller.durationMs(),
         )
     }
 
@@ -675,26 +613,28 @@ internal fun DesktopPlayerScreen(
     // Sortie : sauvegarde la position puis libère le lecteur.
     DisposableEffect(Unit) {
         onDispose {
-            val t = runCatching { player.status().time() }.getOrDefault(0L)
-            val d = runCatching { player.status().length() }.getOrDefault(0L)
+            val t = runCatching { controller.positionMs() }.getOrDefault(0L)
+            val d = runCatching { controller.durationMs() }.getOrDefault(0L)
             if (mediaKey.isNotBlank() && t > 0) {
                 saveScope.launch { progress.save(mediaKey, t, d) }
             }
-            // Libération hors du thread UI, et stop() AVANT release() : libVLC
-            // appelle notre callback de rendu depuis son thread vidéo, et le
-            // relâcher pendant qu'un appel est en vol fige la fenêtre ou tue le
-            // process. stop() coupe d'abord ces callbacks. Sur un flux bloqué
-            // (écran noir, « buffer deadlock prevented » côté VLC) c'était
-            // systématique au clic sur Retour.
-            saveScope.launch {
-                runCatching { player.controls().stop() }
-                runCatching { player.release() }
-                // Après stop() : le relais sert encore des segments tant que le
-                // lecteur n'est pas arrêté.
-                runCatching { proxy?.shutdown() }
-                runCatching { factory.release() }
-                controller.shutdown()
-            }
+            // Sur un **fil dédié**, pas une coroutine : la fermeture est la
+            // seule chose qui sépare « quitter le lecteur » de « la lecture
+            // continue en arrière-plan », et elle ne doit dépendre de rien —
+            // ni d'un scope, ni d'un dispatcher, ni de l'ordonnancement
+            // coroutines du bureau. Mesuré : à la fermeture de la fenêtre, la
+            // coroutine planifiée ici n'a jamais couru. Hors du fil
+            // d'interface tout de même, `ferme()` attendant la fin des fils
+            // du moteur.
+            val relais = proxy
+            Thread({
+                runCatching { moteur.ferme() }
+                    .onFailure { println("[lecteur] fermeture en échec : $it") }
+                    .onSuccess { println("[lecteur] moteur fermé") }
+                // Après le moteur : le relais sert encore des segments tant que
+                // le lecteur n'est pas arrêté.
+                runCatching { relais?.shutdown() }
+            }, "moovie-lecteur-fermeture").start()
         }
     }
 
@@ -822,10 +762,10 @@ internal fun DesktopPlayerScreen(
             )
         }
 
-        // Mise en mémoire tampon : seul repère de chargement disponible ici,
-        // libVLC 3 ne donnant aucune plage tamponnée (voir
-        // VlcjPlayerController.bufferedMs). Sur Android TV, c'est une vraie
-        // piste dessinée sur la barre de progression.
+        // Mise en mémoire tampon : l'indicateur textuel hérité de l'époque
+        // libVLC. mpv expose désormais une vraie plage tamponnée
+        // (controller.bufferedMs) — la dessiner sur la barre comme Android TV
+        // est un raffinement possible, l'indicateur reste juste en attendant.
         if (bufferingVisible && !playError) {
             Text(
                 stringResource(Res.string.player_buffering, bufferingPercent.toInt()),
@@ -887,47 +827,53 @@ internal fun DesktopPlayerScreen(
 
         // ── Qualité ──────────────────────────────────────────────────────
         //
-        // libVLC 3 ne sait pas changer de variante en cours de route : il
-        // n'expose que la piste courante, jamais la liste. Les deux actions du
-        // menu passent donc par une **réouverture à la position** — plafonner
-        // le flux courant se fait avec `:adaptive-maxheight`, une option
-        // d'ouverture ; changer de source, avec une autre URL. Une brève
-        // coupure, sur une action explicite.
+        // Sur un master HLS, mpv expose chaque variante comme une piste vidéo
+        // sélectionnable **à chaud** : plafonner la qualité ne coupe plus la
+        // lecture. Seul le changement de *source* rouvre — c'est une autre URL,
+        // et le moteur reprend à la position via son option de départ.
         var quality by remember(streamUrl) { mutableStateOf<QualityChoice>(QualityChoice.Auto) }
         var currentHeights by remember(streamUrl) { mutableStateOf(emptyList<Int>()) }
         var playedUrl by remember(streamUrl) { mutableStateOf(streamUrl) }
         var playedHeaders by remember(streamUrl) { mutableStateOf(headers) }
         val qualityScope = rememberCoroutineScope()
 
-        // Les variantes se lisent dans la master playlist : seule source
-        // d'information ici, libVLC ne les exposant pas.
+        // Les variantes se lisent dans la master playlist, comme avant : les
+        // hauteurs y sont nommées, là où les pistes du démultiplexeur peuvent
+        // arriver après l'ouverture du menu.
+        //
+        // **Le format est déduit de l'URL, jamais affirmé.** Ce `PlayableStream`
+        // était construit avec `StreamFormat.HLS` en dur, y compris sur les
+        // sources en `.mp4` — la garde « vide hors HLS » de `streamHeights`
+        // était donc contournée par son propre appelant, et la fonction
+        // chargeait le film entier en mémoire. Elle est désormais bornée de son
+        // côté ; ici on cesse simplement de mentir.
         LaunchedEffect(playedUrl, playedHeaders) {
+            val format = if (playedUrl.substringBefore('?').endsWith(".m3u8", ignoreCase = true)) {
+                StreamFormat.HLS
+            } else {
+                StreamFormat.UNKNOWN
+            }
             currentHeights = runCatching {
-                streamHeights(PlayableStream(playedUrl, StreamFormat.HLS, playedHeaders))
+                streamHeights(PlayableStream(playedUrl, format, playedHeaders))
             }.getOrDefault(emptyList())
         }
 
-        fun reopen(url: String, hdrs: Map<String, String>, maxHeight: Int?) {
+        fun reopen(url: String, hdrs: Map<String, String>) {
             val at = controller.positionMs()
             qualityScope.launch {
-                fun h(name: String) = hdrs.entries.firstOrNull { it.key.equals(name, true) }?.value
-                val opts = buildList {
-                    add(":network-caching=1500")
-                    h("User-Agent")?.let { add(":http-user-agent=$it") }
-                    h("Referer")?.let { add(":http-referrer=$it") }
-                    maxHeight?.let { add(":adaptive-maxheight=$it") }
-                }
-                // Jamais depuis le thread UI : `media().play` prend un verrou
-                // natif. C'est la règle de tout ce fichier.
                 withContext(Dispatchers.IO) {
-                    runCatching { player.media().play(url, *opts.toTypedArray()) }
-                }
-                // Se recaler **après** l'ouverture : la position n'existe pas
-                // tant que le média n'est pas monté, et la demander trop tôt ne
-                // fait rien du tout — la lecture repartirait du début.
-                if (at > 0) {
-                    delay(REOPEN_SEEK_DELAY_MS)
-                    runCatching { controller.seekTo(at) }
+                    // Le relais suit la même règle qu'à l'ouverture : il porte
+                    // la résolution DoH des hôtes à Referer.
+                    val referer = hdrs.entries.firstOrNull { it.key.equals("Referer", true) }?.value
+                    val cible = if (referer != null && url.startsWith("http")) {
+                        proxy?.shutdown()
+                        val relay = LocalStreamProxy(hdrs)
+                        proxy = relay
+                        relay.localUrl(url)
+                    } else {
+                        url
+                    }
+                    runCatching { moteur.ouvre(cible, hdrs, departMs = at.coerceAtLeast(0)) }
                 }
             }
         }
@@ -936,11 +882,11 @@ internal fun DesktopPlayerScreen(
             when (choice) {
                 is QualityChoice.Auto -> {
                     quality = choice
-                    reopen(playedUrl, playedHeaders, null)
+                    moteur.selectionneVideoParHauteur(null)
                 }
                 is QualityChoice.Height -> {
                     quality = choice
-                    reopen(playedUrl, playedHeaders, choice.height)
+                    moteur.selectionneVideoParHauteur(choice.height)
                 }
                 is QualityChoice.Source -> {
                     val alt = alternatives.firstOrNull { it.url == choice.url } ?: return
@@ -952,7 +898,7 @@ internal fun DesktopPlayerScreen(
                         playedUrl = stream.url
                         playedHeaders = stream.headers
                         quality = choice
-                        reopen(stream.url, stream.headers, null)
+                        reopen(stream.url, stream.headers)
                     }
                 }
             }
@@ -1113,11 +1059,10 @@ internal fun DesktopPlayerScreen(
             )
         }
 
-val subsViewModel = remember { PlayerSubtitlesViewModel() }
+        val subsViewModel = remember { PlayerSubtitlesViewModel() }
         val subsState by subsViewModel.state.collectAsState()
         val subsFile by subsViewModel.file.collectAsState()
-        // libVLC charge le fichier à chaud, sans interrompre la lecture — il arrive
-        // déjà recalé, le lecteur n'a rien à calculer.
+        // Le fichier arrive déjà recalé : le lecteur n'a rien à calculer.
         LaunchedEffect(subsFile) { controller.loadExternalSubtitle(subsFile) }
         DisposableEffect(Unit) { onDispose { subsViewModel.onLeave() } }
 
@@ -1225,23 +1170,22 @@ val subsViewModel = remember { PlayerSubtitlesViewModel() }
 }
 
 @Composable
-private fun MissingVlc(onBack: () -> Unit) {
+private fun MissingMpv(onBack: () -> Unit) {
     Column(
         modifier = Modifier.fillMaxSize().padding(48.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text("VLC introuvable", style = MaterialTheme.typography.headlineMedium)
         Text(
-            "Le lecteur desktop s'appuie sur libVLC. Installe VLC puis relance :\n" +
-                "Linux : sudo apt install vlc — Windows/macOS : videolan.org",
-            color = Color(0xFF9A9A9A),
+            stringResource(Res.string.player_mpv_missing),
+            style = MaterialTheme.typography.headlineMedium,
         )
-        MoovieButton(onClick = onBack) { Text("Retour") }
+        Text(stringResource(Res.string.player_mpv_help), color = Color(0xFF9A9A9A))
+        MoovieButton(onClick = onBack) { Text(stringResource(Res.string.common_back)) }
     }
 }
 
-/** Plafond du volume. libVLC amplifie au-delà de 100 %, jusqu'à 200 %. */
+/** Plafond du volume. mpv amplifie au-delà de 100 %, jusqu'à `volume-max`. */
 private const val MAX_VOLUME = 200
 
 /** Repère du 100 % sur la piste, exprimé en fraction de sa largeur. */
@@ -1355,4 +1299,3 @@ private fun VolumeSlider(
  * libVLC refuse un `setTime` tant que le média n'est pas ouvert : demander la
  * position tout de suite ne fait rien, et la lecture repart du début.
  */
-private const val REOPEN_SEEK_DELAY_MS = 700L

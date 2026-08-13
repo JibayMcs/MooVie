@@ -109,8 +109,8 @@
     <string name="player_fullscreen">Plein écran</string>
     <string name="player_fullscreen_exit">Quitter le plein écran</string>
     <string name="player_error">Lecture impossible — essaie un autre lecteur depuis le panneau Sources.</string>
-    <string name="player_vlc_missing">VLC introuvable</string>
-    <string name="player_vlc_help">Le lecteur desktop s'appuie sur libVLC. Installer VLC puis relancer — Linux : sudo apt install vlc, Windows/macOS : videolan.org</string>
+    <string name="player_mpv_missing">Lecteur vidéo introuvable</string>
+    <string name="player_mpv_help">Le lecteur desktop s'appuie sur libmpv, normalement fournie avec l'application. Réinstaller Moo-vie, ou sous Linux installer libmpv2 (ou libmpv1) puis relancer.</string>
 
     <!-- Mise à jour -->
     <string name="settings_cat_update">Mises à jour</string>

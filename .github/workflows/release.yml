@@ -104,6 +104,82 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      # libmpv embarquée dans le paquet, comme elle l'est dans l'AppImage.
+      # Sans elle, Windows et macOS installeraient une application sans
+      # lecteur : c'est exactement la panne de la 1.18.0, où ces deux
+      # plateformes attendaient un VLC système qui n'était pas là.
+      #
+      # Le fichier atterrit dans `app/resources/<plateforme>`, que Compose
+      # dépose à côté de l'application et dont jpackage donne le chemin en
+      # propriété système — voir `Libmpv.embarquee()`.
+      - name: Embarquer libmpv (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $dest = "app/resources/windows-x64"
+          New-Item -ItemType Directory -Force -Path $dest | Out-Null
+          # L'archive est **résolue par l'API**, jamais écrite en dur : le nom
+          # du fichier de shinchiro porte sa date et le hash du commit mpv, si
+          # bien qu'une URL figée cesse d'exister à la publication suivante.
+          $api = "https://api.github.com/repos/shinchiro/mpv-winbuild-cmake/releases"
+          $rel = Invoke-RestMethod -Uri $api -Headers @{ "User-Agent" = "moovie-ci" }
+          $asset = $rel |
+            ForEach-Object { $_.assets } |
+            Where-Object { $_.name -like "mpv-dev-x86_64-2*.7z" } |
+            Select-Object -First 1
+          if (-not $asset) { throw "aucune archive mpv-dev dans les releases shinchiro" }
+          Write-Host "archive : $($asset.name)"
+          curl.exe -L --fail --retry 3 -o mpv-dev.7z $asset.browser_download_url
+          7z x mpv-dev.7z -ompv-dev | Out-Null
+          $dll = Get-ChildItem -Recurse -Filter "libmpv-2.dll" mpv-dev | Select-Object -First 1
+          if (-not $dll) { throw "libmpv-2.dll absente de l'archive" }
+          Copy-Item $dll.FullName "$dest/libmpv-2.dll"
+          Get-Item "$dest/libmpv-2.dll" | Select-Object Name, Length
+
+      - name: Embarquer libmpv (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          set -e
+          arch=$([ "$(uname -m)" = "arm64" ] && echo macos-arm64 || echo macos-x64)
+          dest="app/resources/$arch"
+          mkdir -p "$dest"
+          brew install mpv
+          src=$(find "$(brew --prefix)" -name 'libmpv.2.dylib' | head -1)
+          [ -n "$src" ] || { echo "libmpv.2.dylib introuvable après brew install mpv"; exit 1; }
+          cp "$src" "$dest/libmpv.2.dylib"
+          chmod u+w "$dest/libmpv.2.dylib"
+          # Les dépendances de Homebrew vivent sous /opt/homebrew, répertoire
+          # absent chez l'utilisateur : il faut copier la fermeture entière et
+          # réécrire chaque chemin en `@loader_path`. Ce travail est confié à
+          # `dylibbundler`, dont c'est l'unique métier — une boucle maison a
+          # laissé passer des références (ffmpeg, tiré par plusieurs chemins),
+          # et un DMG qui s'installe sans rien jouer est le pire des résultats.
+          brew install dylibbundler
+          dylibbundler --bundle-deps --overwrite-files --create-dir \
+            --fix-file "$dest/libmpv.2.dylib" \
+            --dest-dir "$dest" --install-path "@loader_path/"
+          # Son propre identifiant reste celui de Homebrew : sans effet sur le
+          # chargement — JNA ouvre un chemin absolu — mais il n'a rien à faire
+          # dans un paquet livré, et il fausse toute vérification qui le lit.
+          install_name_tool -id "@loader_path/libmpv.2.dylib" "$dest/libmpv.2.dylib"
+          codesign --force --sign - "$dest/libmpv.2.dylib"
+          echo "dylibs embarquées : $(ls "$dest" | wc -l)"
+          # Aucun chemin Homebrew ne doit subsister dans les **dépendances** :
+          # il ne mènerait nulle part chez l'utilisateur. `otool -L` annonce
+          # d'abord le fichier puis son propre identifiant : les vraies
+          # dépendances commencent à la troisième ligne, et les confondre
+          # faisait échouer la vérification sur un paquet pourtant correct.
+          for f in "$dest"/*.dylib; do
+            reste=$(otool -L "$f" | tail -n +3 | grep -E '^\s+/(opt|usr/local)/' || true)
+            if [ -n "$reste" ]; then
+              echo "chemins Homebrew dans $(basename "$f") :"
+              echo "$reste"
+              exit 1
+            fi
+          done
+          echo "aucun chemin Homebrew dans les dépendances embarquées."
+
       - name: Build paquet desktop (${{ matrix.ext }})
         run: ./gradlew packageDistributionForCurrentOS --no-daemon
         env:
@@ -152,18 +228,21 @@ jobs:
           apt-get update
           # binutils : jlink appelle objcopy pour --strip-debug, et un conteneur
           # nu ne l'a pas — contrairement à un poste de développement.
-          # vlc-plugin-base / libvlc5 / libvlccore9 : source de la libVLC et des
-          # plugins embarqués dans l'AppImage. Sans eux, packageAppImage échoue
-          # explicitement plutôt que de livrer une image qui exigerait un
-          # « apt install vlc » chez l'utilisateur.
+          # libmpv1 : source de la bibliothèque embarquée dans l'AppImage.
+          # Sans elle, packageAppImage échoue explicitement plutôt que de
+          # livrer une image sans lecteur vidéo. Une seule bibliothèque là où
+          # libVLC en réclamait une centaine (voir bundleMpv) ; 22.04 sert
+          # `libmpv1`, les bases plus récentes `libmpv2`.
           apt-get install -y openjdk-17-jdk binutils curl file zsync git ca-certificates \
-            libvlc5 libvlccore9 vlc-plugin-base
+            libmpv1 || apt-get install -y openjdk-17-jdk binutils curl file zsync git \
+            ca-certificates libmpv2
 
       - uses: actions/checkout@v4
 
-      # Le runtime embarqué ne peut pas être Temurin : libVLC part en SIGSEGV
-      # dans son démuxeur adaptive dès le démarrage d'une lecture (reproduit
-      # 7/7, absent avec l'OpenJDK de la distribution).
+      # Le runtime embarqué ne peut pas être Temurin : le décodage natif part
+      # en SIGSEGV dès le démarrage d'une lecture (reproduit 7/7 sous libVLC,
+      # absent avec l'OpenJDK de la distribution). La cause est le runtime et
+      # non le lecteur, donc la précaution vaut aussi pour libmpv.
       - name: Construire l'AppImage
         env:
           MOOVIE_JPACKAGE_JDK: /usr/lib/jvm/java-17-openjdk-amd64
@@ -225,39 +304,33 @@ jobs:
             apt-get install -y libasound2t64 || apt-get install -y libasound2
           fi
 
-      # libVLC est désormais embarquée : aucune de ces distributions n'a VLC
-      # installé, donc si une dépendance manquait, la lecture casserait chez
-      # l'utilisateur sans que le démarrage ne le révèle. On vérifie donc
-      # séparément que la fermeture ELF de libVLC et de ses plugins se résout.
-      - name: Dépendances de libVLC embarquée sur ${{ matrix.image }}
+      # libmpv est embarquée : aucune de ces distributions n'a mpv installé,
+      # donc si une dépendance manquait, la lecture casserait chez
+      # l'utilisateur sans que le démarrage ne le révèle — l'application
+      # afficherait « lecteur vidéo introuvable » et rien d'autre. On vérifie
+      # donc séparément que sa fermeture ELF se résout.
+      - name: Dépendances de libmpv embarquée sur ${{ matrix.image }}
         run: |
           chmod +x moovie-*.AppImage
           ./moovie-*.AppImage --appimage-extract >/dev/null
           export LD_LIBRARY_PATH=squashfs-root/usr/lib/bundled
-          miss=0
-          for so in squashfs-root/usr/lib/bundled/libvlc.so.5 \
-                    $(find squashfs-root/usr/lib/vlc/plugins -name '*.so'); do
-            out=$(ldd "$so" 2>/dev/null | grep 'not found' || true)
-            if [ -n "$out" ]; then
-              miss=$((miss+1))
-              basename "$so" >> /tmp/failing
-              echo "$(basename $so): $(echo "$out" | awk '{print $1}' | sort -u | tr '\n' ' ')"
-            fi
-          done
-          touch /tmp/failing
-          echo "plugins en défaut : $miss"
-          # libpulse est volontairement non embarquée (son protocole est couplé
-          # au démon audio de l'hôte) : ses plugins peuvent manquer, VLC bascule
-          # alors sur ALSA. Tout autre plugin en défaut est une régression.
-          [ -z "$(grep -v '^libpulse' /tmp/failing || true)" ] || {
-            echo "des plugins autres que pulse ont une dépendance manquante"
+          mpv=$(ls squashfs-root/usr/lib/bundled/libmpv.so.* 2>/dev/null | head -1)
+          [ -n "$mpv" ] || { echo "libmpv absente de l'AppImage"; exit 1; }
+          echo "libmpv embarquée : $(basename "$mpv")"
+          manquantes=$(ldd "$mpv" 2>/dev/null | grep 'not found' | awk '{print $1}' | sort -u)
+          # Les familles que le bundler écarte **délibérément** ne peuvent pas
+          # compter comme des manques ici, sans quoi la vérification
+          # contredirait la politique d'embarquement : le son (couplé au démon
+          # audio de l'hôte), le graphique et le GPU (couplés au pilote et au
+          # serveur X). Toute session de bureau les fournit ; ces conteneurs de
+          # test, non. Voir le `excluded` de packageAppImage — les deux listes
+          # décrivent la même décision et doivent le rester.
+          reste=$(echo "$manquantes" | grep -vE '^(libpulse|libasound|libEGL|libGL|libGLX|libGLdispatch|libX11|libXext|libXi|libXrender|libXtst|libXau|libXdmcp|libxcb|libdrm)' || true)
+          if [ -n "$reste" ]; then
+            echo "dépendances manquantes pour libmpv : $reste"
             exit 1
-          }
-          # Assertion explicite sur le plugin critique : sans lui, aucun
-          # décodage H.264/HEVC, et l'app se contenterait d'un écran noir.
-          ldd squashfs-root/usr/lib/vlc/plugins/codec/libavcodec_plugin.so \
-            | grep 'not found' && { echo "libavcodec_plugin incomplet"; exit 1; }
-          echo "libavcodec_plugin : toutes ses dépendances résolues."
+          fi
+          echo "libmpv : toutes ses dépendances résolues."
 
       - name: Démarrage sur ${{ matrix.image }}
         run: |

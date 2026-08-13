@@ -107,8 +107,8 @@
     <string name="player_fullscreen">Pantalla completa</string>
     <string name="player_fullscreen_exit">Salir de pantalla completa</string>
     <string name="player_error">No se pudo reproducir — prueba otro reproductor desde el panel Fuentes.</string>
-    <string name="player_vlc_missing">VLC no encontrado</string>
-    <string name="player_vlc_help">El reproductor de escritorio usa libVLC. Instalar VLC y reiniciar — Linux: sudo apt install vlc, Windows/macOS: videolan.org</string>
+    <string name="player_mpv_missing">Reproductor de vídeo no encontrado</string>
+    <string name="player_mpv_help">El reproductor de escritorio usa libmpv, incluida normalmente con la aplicación. Reinstalar Moo-vie, o en Linux instalar libmpv2 (o libmpv1) y reiniciar.</string>
 
     <!-- Actualización -->
     <string name="settings_cat_update">Actualizaciones</string>

@@ -16,7 +16,7 @@ plugins {
 //
 // Un suffixe semver — « -rc.1 » — désigne une préversion : le tag correspondant
 // sort en pré-release GitHub et reste invisible pour les updaters intégrés.
-val appVersion = "1.18.0"
+val appVersion = "1.19.0"
 
 /**
  * La même version, telle que **jpackage** l'accepte : purement numérique.
@@ -152,7 +152,7 @@ kotlin {
                 // Compose for TV (en cours de retrait au profit des composants partagés)
                 implementation("androidx.tv:tv-material:1.0.0")
 
-                // Lecture vidéo native (Android uniquement — VLCJ prévu côté desktop)
+                // Lecture vidéo native (Android uniquement — le desktop est sur libmpv)
                 implementation("androidx.media3:media3-exoplayer:1.4.1")
                 implementation("androidx.media3:media3-exoplayer-hls:1.4.1")
                 implementation("androidx.media3:media3-exoplayer-dash:1.4.1")
@@ -167,8 +167,9 @@ kotlin {
             dependencies {
                 implementation(compose.desktop.currentOs)
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.9.0")
-                // Lecture vidéo desktop via libVLC (VLC doit être installé)
-                implementation("uk.co.caprica:vlcj:4.8.3")
+                // Lecture vidéo desktop via libmpv (embarquée dans les paquets),
+                // pilotée par un binding JNA maison — voir desktop/mpv/Libmpv.kt.
+                implementation("net.java.dev.jna:jna-jpms:5.14.0")
             }
         }
 
@@ -185,7 +186,7 @@ android {
         applicationId = "fr.moovie.tv"
         minSdk = 23
         targetSdk = 34
-        versionCode = 56
+        versionCode = 61
         versionName = appVersion
         buildConfigField("String", "OPENSUBTITLES_API_KEY", "\"$openSubtitlesApiKey\"")
     }
@@ -238,7 +239,7 @@ tasks.withType<Test>().configureEach {
     System.getProperty("moovie.probe.download")
         ?.let { systemProperty("moovie.probe.download", it) }
     // Mêmes relais pour les sondes qui prennent un flux en paramètre.
-    listOf("moovie.stream", "moovie.referer", "moovie.ua", "moovie.vlcopts").forEach { key ->
+    listOf("moovie.stream", "moovie.referer", "moovie.ua", "moovie.mpv.path").forEach { key ->
         System.getProperty(key)?.let { systemProperty(key, it) }
     }
     // Les sondes OpenSubtitles interrogent la vraie API : sans la clé elles
@@ -267,9 +268,10 @@ compose.desktop {
 
         // JDK dont jpackage tire le runtime embarqué, quand il doit différer de
         // celui qui exécute Gradle. Sous Linux la CI y met l'OpenJDK de la
-        // distribution : avec le runtime Temurin, libVLC meurt en SIGSEGV dans
-        // son démuxeur adaptive au démarrage de la lecture. Non défini → runtime
-        // du JDK courant, comportement local inchangé.
+        // distribution : avec le runtime Temurin, le décodage natif mourait en
+        // SIGSEGV au démarrage de la lecture (constaté sur libVLC ; la cause
+        // est le runtime, pas le lecteur, donc la précaution reste). Non défini
+        // → runtime du JDK courant, comportement local inchangé.
         System.getenv("MOOVIE_JPACKAGE_JDK")?.let { javaHome = it }
 
         nativeDistributions {
@@ -283,8 +285,17 @@ compose.desktop {
             description = "Moo-vie — streaming, extraction de sources on-device"
             // Sans vendor, jpackage écrit « Unknown » dans le champ Maintainer.
             vendor = "JibayMcs"
-            // JNA (vlcj) a besoin de sun.misc.Unsafe dans l'image jpackage.
+            // JNA — par qui passe tout le dialogue avec libmpv — a besoin de
+            // sun.misc.Unsafe dans l'image jpackage.
             modules("jdk.unsupported")
+
+            // Ressources déposées à côté de l'application, et dont jpackage
+            // donne le chemin en propriété système : c'est là que la CI pose
+            // libmpv pour Windows et macOS, qui n'ont pas de `LD_LIBRARY_PATH`
+            // à leur offrir. Compose lit les sous-répertoires par plateforme
+            // (`windows-x64`, `macos-arm64`…). Vide en local : le binding
+            // retombe alors sur la bibliothèque du système.
+            appResourcesRootDir.set(project.file("resources"))
 
             // Icônes des paquets natifs. Sans elles, jpackage retombe sur
             // l'icône Kotlin/Java par défaut. Les fichiers sont versionnés
@@ -332,96 +343,47 @@ private val appImageToolUrl =
     "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage"
 
 /**
- * Répertoires de plugins libVLC qu'on n'embarque pas.
+ * Copie libmpv dans l'AppDir.
  *
- * `gui`, `lua`, `control`, `services_discovery`, `notify`, `visualization` :
- * l'interface de VLC et ses à-côtés, dont on n'utilise rien — `gui` à lui seul
- * pèse 4 Mo et tire toute la chaîne Qt. `vdpau` et `vaapi` : décodage matériel,
- * couplé au pilote GPU de l'hôte, exactement ce qu'il ne faut pas figer. Le
- * reste (`mux`, `stream_out`, `access_output`, `keystore`, `meta_engine`,
- * `video_splitter`, `stream_extractor`) ne sert qu'à encoder, diffuser ou
- * gérer des archives.
- */
-val vlcDroppedDirs = setOf(
-    "gui", "lua", "control", "services_discovery", "notify", "visualization",
-    "vdpau", "vaapi", "mux", "stream_out", "access_output", "keystore",
-    "meta_engine", "video_splitter", "stream_extractor",
-)
-
-/**
- * Plugins écartés un par un, pour ce qu'ils traînent derrière eux.
+ * **Une bibliothèque, et c'est tout.** Le lecteur précédent réclamait ici une
+ * centaine de fichiers : libVLC, libvlccore, et un arbre de plugins qu'il
+ * fallait trier un par un pour ne pas emporter Qt, Samba ou ICU. Ce tri était
+ * la source du défaut le plus coûteux du projet — le plugin `xml` retiré pour
+ * gagner 29 Mo, et plus une seule bande-annonce ne se lisait en 1.18.0. mpv n'a
+ * pas de répertoire de plugins : ce qu'il sait faire est dans le fichier.
  *
- * `smb` amène toute la pile Samba (5,6 Mo de libndr), `libbluray`/`dvdread`/
- * `dvdnav`/`vcd` les disques optiques, `x264`/`x265`/`twolame` des encodeurs,
- * `svgdec` librsvg, `xml` ICU. `gl`/`gles2` tirent libplacebo (7 Mo) pour des
- * sorties vidéo qu'on n'utilise pas : la vidéo passe par les callbacks vlcj,
- * donc seul `vmem` compte.
+ * Ses dépendances (FFmpeg, libass, freetype…) ne sont pas listées non plus :
+ * la fermeture ELF calculée plus bas les ramasse toutes seules, comme pour le
+ * reste du paquet.
  */
-val vlcDroppedPlugins = setOf(
-    "smb", "dsm", "nfs", "sftp", "upnp", "libbluray", "dvdread", "dvdnav",
-    "vcd", "v4l2", "dtv", "screen", "avio", "x264", "x265", "svgdec",
-    "twolame", "xml", "packetizer_avparser", "gl", "gles2", "chromaprint",
-    "jack", "oss",
-    // Sorties vidéo liées au serveur graphique et au pilote GPU (libEGL,
-    // libxcb-xv), qu'on n'embarque jamais : elles ne se chargeraient pas. La
-    // vidéo passe de toute façon par les callbacks vlcj, donc par vmem.
-    "egl_x11", "egl_wl", "xcb_xv",
-    // Décodeur d'images SDL, inutile ici, et seul plugin à lier libpulse-simple.
-    "sdl_image",
-    // Capture d'écran et gestion de fenêtre X : sans objet pour nous, et
-    // dépendantes d'extensions xcb qu'on n'embarque pas.
-    "xcb_screen", "xcb_window",
-)
-
-/**
- * Copie libVLC et ses plugins dans l'AppDir.
- *
- * Sans ça, l'application exigeait un `apt install vlc` sur la machine cible, et
- * tournait avec la libVLC de l'hôte — dont la version varie d'une distribution
- * à l'autre. Deux crashes déjà rencontrés venaient de cette zone ; figer la
- * version supprime la classe entière de problèmes.
- */
-fun bundleVlc(appDir: File) {
+fun bundleMpv(appDir: File) {
     val libDirs = listOf(
         File("/usr/lib/x86_64-linux-gnu"),
         File("/usr/lib64"),
         File("/usr/lib"),
     )
-    val pluginsSrc = libDirs.map { File(it, "vlc/plugins") }.firstOrNull { it.isDirectory }
-    requireNotNull(pluginsSrc) {
-        "plugins libVLC introuvables — installer vlc-plugin-base sur la machine de build"
+    // Deux noms possibles : mpv ≥ 0.35 est en `so.2`, les LTS servent `so.1`.
+    // On prend ce que la machine de build a, et on l'expose sous le nom que le
+    // binding cherche en premier.
+    val noms = listOf("libmpv.so.2", "libmpv.so.1")
+    val lib = noms.firstNotNullOfOrNull { nom ->
+        libDirs.map { File(it, nom) }.firstOrNull { it.exists() }
+    }
+    requireNotNull(lib) {
+        "libmpv introuvable — installer libmpv2 (ou libmpv1) sur la machine de build"
     }
     val bundled = File(appDir, "usr/lib/bundled").apply { mkdirs() }
-    listOf("libvlc.so.5", "libvlccore.so.9").forEach { name ->
-        val lib = libDirs.map { File(it, name) }.firstOrNull { it.exists() }
-        requireNotNull(lib) { "$name introuvable — installer libvlc5 sur la machine de build" }
-        // canonicalFile : ce sont des liens symboliques vers libvlc.so.5.6.0,
-        // et un lien vers /usr/lib dans l'image ne mènerait nulle part.
-        lib.canonicalFile.copyTo(File(bundled, name), overwrite = true)
-        // JNA résout « vlc » en « libvlc.so », sans suffixe de version. Sans ce
-        // lien, il ne trouvait rien dans notre répertoire et retombait sur la
-        // libvlc du système, chargée alors avec nos plugins et notre
-        // libvlccore : le mélange de versions revenait par la fenêtre.
-        val unversioned = File(bundled, name.substringBefore(".so") + ".so")
-        unversioned.delete()
-        Files.createSymbolicLink(unversioned.toPath(), File(name).toPath())
-    }
-
-    val pluginsDst = File(appDir, "usr/lib/vlc/plugins")
-    var kept = 0
-    pluginsSrc.listFiles()?.filter { it.isDirectory && it.name !in vlcDroppedDirs }?.forEach { dir ->
-        dir.listFiles()?.filter { it.isFile && it.name.endsWith(".so") }?.forEach { plugin ->
-            val short = plugin.name.removePrefix("lib").removeSuffix("_plugin.so")
-            if (short in vlcDroppedPlugins) return@forEach
-            plugin.copyTo(File(pluginsDst, "${dir.name}/${plugin.name}"), overwrite = true)
-            kept++
-        }
-    }
-    // plugins.dat référence les chemins absolus du système de build : laissé en
-    // place, libVLC le lit et cherche les plugins là où ils ne sont plus. Son
-    // absence force un scan au démarrage, qui est le comportement correct.
-    File(pluginsDst, "plugins.dat").delete()
-    logger.lifecycle("Plugins libVLC embarqués : $kept")
+    // canonicalFile : ce sont des liens vers libmpv.so.2.x.y, et un lien vers
+    // /usr/lib dans l'image ne mènerait nulle part.
+    val cible = File(bundled, lib.name)
+    lib.canonicalFile.copyTo(cible, overwrite = true)
+    // JNA résout « mpv » en « libmpv.so », sans suffixe de version : sans ce
+    // lien il ne trouverait rien dans notre répertoire et retomberait sur la
+    // bibliothèque de l'hôte — celle dont on ne sait rien.
+    val sansVersion = File(bundled, "libmpv.so")
+    sansVersion.delete()
+    Files.createSymbolicLink(sansVersion.toPath(), File(lib.name).toPath())
+    logger.lifecycle("libmpv embarquée : ${lib.name} (${cible.length() / 1024 / 1024} Mo)")
 }
 
 val packageAppImage by tasks.registering {
@@ -485,25 +447,24 @@ val packageAppImage by tasks.registering {
         // $APPDIR n'est pas fiable selon le mode de montage : on résout le
         // chemin réel de AppRun, qui vit à la racine de l'AppDir.
         //
-        // VLC_PLUGIN_PATH pointe les plugins embarqués : sans lui, libVLC va
-        // chercher ceux du système, dont la version peut ne pas correspondre à
-        // la libvlc qu'on livre. MOOVIE_VLC_HOME dit à vlcj où trouver notre
-        // libvlc plutôt que celle de l'hôte.
+        // `LD_LIBRARY_PATH` suffit désormais : JNA y trouve la libmpv qu'on
+        // livre, et mpv n'a pas de répertoire de plugins à lui désigner. Les
+        // deux variables que cette ligne remplace (`VLC_PLUGIN_PATH`,
+        // `MOOVIE_VLC_HOME`) n'existaient que pour empêcher libVLC d'aller
+        // mélanger nos plugins avec la bibliothèque de l'hôte.
         File(appDir, "AppRun").apply {
             writeText(
                 """
                 #!/bin/sh
                 HERE="${'$'}(dirname "${'$'}(readlink -f "${'$'}0")")"
                 export LD_LIBRARY_PATH="${'$'}HERE/usr/lib/bundled${'$'}{LD_LIBRARY_PATH:+:${'$'}LD_LIBRARY_PATH}"
-                export VLC_PLUGIN_PATH="${'$'}HERE/usr/lib/vlc/plugins"
-                export MOOVIE_VLC_HOME="${'$'}HERE/usr/lib/bundled"
                 exec "${'$'}HERE/usr/bin/Moo-vie" "${'$'}@"
                 """.trimIndent() + "\n",
             )
             setExecutable(true)
         }
 
-        bundleVlc(appDir)
+        bundleMpv(appDir)
 
         // Bibliothèques embarquées. On copie la fermeture ELF de ce dont le
         // bundle a besoin, moins deux familles qu'on ne bundle jamais :

@@ -61,11 +61,27 @@ data class YtTrack(
  *         son, ou sans image, n'est pas une bande-annonce dégradée, c'est une
  *         panne qui a l'air de marcher.
  */
+/**
+ * Pistes image et son retenues, de la meilleure à la moins bonne.
+ *
+ * Sorties du fabricant de manifeste pour que **les deux formes du même flux
+ * partent de la même sélection** : le manifeste pour Media3, les deux URL
+ * directes pour le lecteur desktop. Deux tris séparés auraient fini par
+ * diverger, et un lecteur aurait joué autre chose que l'autre sans que rien ne
+ * le dise.
+ */
+internal fun youtubeVideoTracks(tracks: List<YtTrack>): List<YtTrack> = tracks
+    .filter { it.isVideo && it.container == "video/mp4" && it.codecs.startsWith("avc1") }
+    .filter { it.initRange != null && it.indexRange != null }
+    .sortedByDescending { it.height }
+
+internal fun youtubeAudioTracks(tracks: List<YtTrack>): List<YtTrack> = tracks
+    .filter { it.isAudio && it.container == "audio/mp4" && it.codecs.startsWith("mp4a") }
+    .filter { it.initRange != null && it.indexRange != null }
+    .sortedByDescending { it.bitrate }
+
 fun buildYoutubeDashManifest(tracks: List<YtTrack>): String? {
-    val videos = tracks
-        .filter { it.isVideo && it.container == "video/mp4" && it.codecs.startsWith("avc1") }
-        .filter { it.initRange != null && it.indexRange != null }
-        .sortedByDescending { it.height }
+    val videos = youtubeVideoTracks(tracks)
         // Deux barreaux, pas dix-huit. Mesuré : avec l'échelle complète, VLC
         // démarre sur le plus bas — 144p — et une bande-annonce de deux minutes
         // se termine avant que l'adaptation ait fini de monter. On regarde donc
@@ -73,10 +89,7 @@ fun buildYoutubeDashManifest(tracks: List<YtTrack>): String? {
         // En garder deux laisse un repli aux connexions faibles tout en faisant
         // du deuxième meilleur format le pire cas.
         .take(2)
-    val audios = tracks
-        .filter { it.isAudio && it.container == "audio/mp4" && it.codecs.startsWith("mp4a") }
-        .filter { it.initRange != null && it.indexRange != null }
-        .sortedByDescending { it.bitrate }
+    val audios = youtubeAudioTracks(tracks)
 
     if (videos.isEmpty() || audios.isEmpty()) return null
 
