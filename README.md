@@ -52,6 +52,15 @@ and ~~iOS~~, built from a single Kotlin Multiplatform codebase. Source extractio
   *Settings → Home*. A pinned row ends with a **See more** card that reopens its
   exact genre. Contextual hero, *Continue watching* with per-episode progress,
   trending and top-rated (TMDB), watched badges.
+- **Discovery** - hands of cards, one per recipe, built from what you actually
+  finished. A title suggested by *three* of your films is not the same thing as one
+  suggested by a single film, so the ranking is the overlap. Other hands: sagas you
+  started and never finished (TMDB collections, nothing to maintain by hand), titles
+  watched long ago, and a **rarely seen, widely loved** row - high rating, few votes,
+  the band a popularity sort can never surface. Three optional questions (mood, who
+  is watching, how much time) steer it; each answer shows what it actually filters.
+  Every card carries **Open**, **Watchlist** and **Already seen** - the last one is
+  how the page learns what you watched *before* the app existed.
 - **Search** - result grid, persistent history, D-pad flow from keyboard to results.
   Sort by relevance, popularity, rating, year or title, filter by kind, minimum
   rating and decade; the filters are kept per profile. TMDB cannot sort a text

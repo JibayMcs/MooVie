@@ -55,6 +55,16 @@ L'extraction des sources se fait **on-device** : pas de backend, pas de compte, 
   *Réglages → Accueil*. Une rangée épinglée se termine par une carte **En voir plus**
   qui rouvre son genre exact. Hero contextuel, *Reprendre la lecture* avec progression
   par épisode, tendances et mieux notés (TMDB), badges vus.
+- **Découverte** - des mains de cartes, une par recette, bâties sur ce que vous avez
+  réellement terminé. Un titre que *trois* de vos films désignent n'est pas de même
+  nature qu'un titre désigné par un seul : c'est le recoupement qui classe. Les autres
+  mains : vos sagas commencées et pas finies (collections TMDB, rien à entretenir à la
+  main), ce qui a été vu il y a longtemps, et une rangée **peu vus, très aimés** -
+  note haute et peu de votes, la bande qu'un tri par popularité ne montre jamais.
+  Trois questions facultatives (humeur, avec qui, combien de temps) l'orientent, et
+  chaque réponse affiche ce qu'elle filtre vraiment. Chaque carte porte **Ouvrir**,
+  **À voir** et **Déjà vu** - ce dernier est ce qui permet à la page d'apprendre ce
+  qui a été regardé *avant* l'application.
 - **Recherche** - résultats en grille, historique persistant, descente au D-pad du clavier
   vers les résultats. Tri par pertinence, popularité, note, année ou titre, filtres
   par type, note minimale et décennie ; les filtres sont retenus par profil. TMDB
