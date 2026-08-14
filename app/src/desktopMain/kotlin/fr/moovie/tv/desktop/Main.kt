@@ -325,6 +325,7 @@ private fun DesktopApp(
                 },
                 onOpenSettings = { nav.push(Screen.Settings) },
                 onOpenSearch = { nav.push(Screen.Search) },
+                onOpenDiscovery = { nav.push(Screen.Discovery) },
                 onOpenHistory = { nav.push(Screen.History) },
                 onOpenDownloads = { nav.push(Screen.Downloads) },
                 onOpenCatalog = { nav.push(Screen.Catalog()) },
@@ -389,6 +390,16 @@ private fun DesktopApp(
             Screen.Search -> if (!online) OfflineSearchScreen(
                 onPlay = { d -> downloadPlayerScreen(d)?.let(nav::push) },
             ) else DesktopSearchScreen(
+                onOpenTitle = { id, isTv -> nav.push(Screen.Details(id, isTv)) },
+                onBack = { nav.pop() },
+            )
+            // Hors ligne, la découverte n'a rien à découvrir : elle est bâtie
+            // sur TMDB de bout en bout. On renvoie à la bibliothèque locale
+            // plutôt que d'afficher une page vide.
+            Screen.Discovery -> if (!online) OfflineScreen(
+                onPlay = { d -> downloadPlayerScreen(d)?.let(nav::push) },
+                onOpenSettings = { nav.push(Screen.Settings) },
+            ) else DesktopDiscoveryScreen(
                 onOpenTitle = { id, isTv -> nav.push(Screen.Details(id, isTv)) },
                 onBack = { nav.pop() },
             )

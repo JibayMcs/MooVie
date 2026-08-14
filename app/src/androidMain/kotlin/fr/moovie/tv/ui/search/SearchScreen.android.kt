@@ -23,6 +23,8 @@ import java.util.Locale
 fun SearchScreen(
     onOpenTitle: (tmdbId: Int, isTv: Boolean) -> Unit,
     onBack: () -> Unit,
+    /** Entrée vers la découverte, seulement là où la barre basse est pleine. */
+    onOpenDiscovery: (() -> Unit)? = null,
     viewModel: SearchViewModel = viewModel(),
 ) {
     val query by viewModel.query.collectAsStateWithLifecycle()
@@ -57,6 +59,7 @@ fun SearchScreen(
     }
 
     SearchScreenContent(
+        onOpenDiscovery = onOpenDiscovery,
         query = query,
         results = results,
         history = history,

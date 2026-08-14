@@ -18,6 +18,17 @@ sealed interface Screen {
     data object History : Screen
 
     /**
+     * Découverte : des propositions bâties sur l'historique, en mains de cartes.
+     *
+     * Distincte du catalogue et de la recherche, et pour une raison précise :
+     * les deux autres répondent à « je cherche quelque chose », celle-ci à « je
+     * ne sais pas quoi regarder ». Ce ne sont pas les mêmes gestes, et les
+     * mélanger obligerait à traverser un champ de saisie pour arriver à des
+     * propositions qu'on n'a rien à formuler pour obtenir.
+     */
+    data object Discovery : Screen
+
+    /**
      * La file des téléchargements. Écran de premier niveau, comme l'historique :
      * on y va pour savoir où en est une opération longue, pas pour régler quoi
      * que ce soit.

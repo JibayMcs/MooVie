@@ -32,6 +32,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Mic
@@ -75,6 +76,7 @@ import fr.moovie.tv.resources.Res
 import fr.moovie.tv.resources.common_back
 import fr.moovie.tv.resources.search_clear_history
 import fr.moovie.tv.resources.search_empty_hint
+import fr.moovie.tv.resources.discovery_search_entry
 import fr.moovie.tv.resources.search_hint
 import fr.moovie.tv.resources.search_hint_short
 import fr.moovie.tv.resources.search_loading
@@ -148,6 +150,15 @@ fun SearchScreenContent(
      * desktop, et d'un Android TV sans moteur de reconnaissance installé.
      */
     onVoiceSearch: (() -> Unit)? = null,
+    /**
+     * Entrée vers la page Découverte, affichée tant que le champ est vide.
+     *
+     * Null quand la plateforme la propose ailleurs — sur desktop et TV, elle a
+     * son icône dans l'en-tête de l'accueil. Sur téléphone c'est le seul point
+     * d'entrée, la barre basse étant pleine à six onglets (voir le pourquoi
+     * dans `MoovieBottomBar`).
+     */
+    onOpenDiscovery: (() -> Unit)? = null,
     onBack: () -> Unit = {},
     /** Tri et filtres courants, et leur mise à jour. Conservés entre sessions. */
     filters: SearchFilters = SearchFilters.DEFAULT,
@@ -267,13 +278,35 @@ fun SearchScreenContent(
             // désormais sa propre page (Catalogue) — les deux gestes cohabitaient
             // mal ici, il fallait traverser le champ de saisie, donc le clavier
             // virtuel, pour atteindre les genres.
-            query.isBlank() -> HistorySection(
-                history = history,
-                onPick = onQueryChange,
-                onRemove = onRemoveHistory,
-                onClear = onClearHistory,
-                modifier = Modifier.padding(horizontal = searchHPad()),
-            )
+            query.isBlank() -> Column {
+                // Sur téléphone, la barre basse est pleine — six onglets, et
+                // le doc de `MoovieBottomBar` explique pourquoi il n'y en aura
+                // pas sept. La découverte se rattrape donc ici, à l'endroit
+                // exact où l'on arrive quand on ne sait pas quoi chercher :
+                // un champ vide.
+                onOpenDiscovery?.let { ouvrir ->
+                    MoovieButton(
+                        onClick = ouvrir,
+                        modifier = Modifier.padding(horizontal = searchHPad()),
+                    ) {
+                        Icon(
+                            Icons.Default.AutoAwesome,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        Text(stringResource(Res.string.discovery_search_entry))
+                    }
+                    Spacer(Modifier.height(24.dp))
+                }
+                HistorySection(
+                    history = history,
+                    onPick = onQueryChange,
+                    onRemove = onRemoveHistory,
+                    onClear = onClearHistory,
+                    modifier = Modifier.padding(horizontal = searchHPad()),
+                )
+            }
             results is SearchState.Loading -> SkeletonGrid(
                 columns = if (useBottomNav) 3 else 6,
                 modifier = Modifier.padding(horizontal = searchHPad()),

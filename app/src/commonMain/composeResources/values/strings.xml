@@ -560,4 +560,70 @@
     <string name="details_download_best">Télécharger en meilleure qualité</string>
     <string name="settings_update_prereleases">Recevoir les préversions</string>
     <string name="settings_update_prereleases_help">Propose aussi les versions de test (« rc »), publiées avant la version définitive pour être éprouvées. Elles peuvent contenir des défauts ; désactivé, seules les versions finales sont proposées.</string>
+
+    <!-- ── Découverte ────────────────────────────────────────────────────── -->
+    <string name="discovery_title">Découverte</string>
+    <string name="discovery_open">Découverte</string>
+    <string name="discovery_reload">Redistribuer</string>
+    <string name="discovery_needs_key">Il faut une clé TMDB pour proposer quoi que ce soit. À renseigner dans les réglages.</string>
+    <string name="discovery_empty">Plus rien à proposer pour le moment. Redistribuer, ou revenir après avoir regardé quelque chose.</string>
+    <string name="discovery_more">+%1$d</string>
+    <string name="discovery_see_more">Voir plus</string>
+    <string name="discovery_saga_progress">%1$d sur %2$d vus</string>
+    <string name="discovery_mood_edit">Régler l’humeur</string>
+    <string name="discovery_search_entry">Découverte : ce que vous n’avez pas encore vu</string>
+
+    <string name="discovery_action_open">Ouvrir</string>
+    <string name="discovery_action_later">À voir</string>
+    <string name="discovery_action_later_done">Dans la liste</string>
+    <string name="discovery_action_seen">Déjà vu</string>
+
+    <string name="discovery_group_recoupement">Parce que vous avez vu %1$s</string>
+    <string name="discovery_group_revoir">À revoir</string>
+    <string name="discovery_group_sagas">Vos sagas, commencées et pas finies</string>
+    <string name="discovery_group_pepites">Peu vus, très aimés</string>
+    <string name="discovery_group_humeur">Ce soir : %1$s</string>
+
+    <string name="discovery_why_recoupement">plusieurs de vos titres terminés désignent celui-ci</string>
+    <string name="discovery_why_revoir">vu il y a plusieurs mois, jamais rouvert depuis</string>
+    <string name="discovery_why_sagas">reprend la saga là où vous en êtes</string>
+    <string name="discovery_why_pepites">note haute et peu de votes : ce qu’un tri par popularité ne montre jamais</string>
+    <string name="discovery_why_humeur">d’après les réponses au questionnaire</string>
+
+    <string name="discovery_cold_title">Trois questions, et on commence</string>
+    <string name="discovery_cold_body">Sans historique, il n’y a rien à recouper. Trois réponses suffisent à donner une première direction ; elles se modifient ensuite à tout moment.</string>
+    <string name="discovery_cold_start">Répondre</string>
+    <string name="discovery_quiz_skip">Passer</string>
+
+    <string name="discovery_q_humeur">Quelle humeur, ce soir ?</string>
+    <string name="discovery_q_humeur_sub">Une seule réponse, modifiable ensuite</string>
+    <string name="discovery_q_avec">Devant l’écran, il y aura qui ?</string>
+    <string name="discovery_q_avec_sub">Ça change plus de choses que le genre</string>
+    <string name="discovery_q_temps">Et combien de temps ?</string>
+    <string name="discovery_q_temps_sub">La question qu’aucun catalogue ne pose</string>
+
+    <string name="discovery_opt_detendue">Détendue</string>
+    <string name="discovery_optd_detendue">comédie, famille, aventure</string>
+    <string name="discovery_opt_tension">Sous tension</string>
+    <string name="discovery_optd_tension">thriller, policier, mystère</string>
+    <string name="discovery_opt_rire">Envie de rire</string>
+    <string name="discovery_optd_rire">comédie</string>
+    <string name="discovery_opt_peur">Envie d’avoir peur</string>
+    <string name="discovery_optd_peur">horreur, mystère</string>
+    <string name="discovery_opt_seul">Personne d’autre</string>
+    <string name="discovery_optd_seul">drame, mystère, science-fiction</string>
+    <string name="discovery_opt_deux">Deux</string>
+    <string name="discovery_optd_deux">romance, drame</string>
+    <string name="discovery_opt_amis">Des amis</string>
+    <string name="discovery_optd_amis">comédie, action, horreur</string>
+    <string name="discovery_opt_famille">La famille</string>
+    <string name="discovery_optd_famille">tout public, animation</string>
+    <string name="discovery_opt_court">Moins de 1 h 40</string>
+    <string name="discovery_optd_court">durée de 100 min au plus</string>
+    <string name="discovery_opt_soiree">Une vraie soirée</string>
+    <string name="discovery_optd_soiree">durée de 2 h au moins</string>
+    <string name="discovery_opt_peuimporte">Peu importe</string>
+    <string name="discovery_optd_peuimporte">aucun filtre de durée</string>
+    <string name="discovery_opt_serie">Une série à suivre</string>
+    <string name="discovery_optd_serie">séries uniquement</string>
 </resources>

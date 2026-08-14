@@ -558,4 +558,70 @@
     <string name="details_download_best">Download in best quality</string>
     <string name="settings_update_prereleases">Receive pre-releases</string>
     <string name="settings_update_prereleases_help">Also offers test builds ("rc"), published before the final version so they can be tried out. They may contain defects; when off, only final versions are offered.</string>
+
+    <!-- ── Discovery ─────────────────────────────────────────────────────── -->
+    <string name="discovery_title">Discover</string>
+    <string name="discovery_open">Discover</string>
+    <string name="discovery_reload">Deal again</string>
+    <string name="discovery_needs_key">A TMDB key is needed before anything can be suggested. Add it in Settings.</string>
+    <string name="discovery_empty">Nothing left to suggest right now. Deal again, or come back after watching something.</string>
+    <string name="discovery_more">+%1$d</string>
+    <string name="discovery_see_more">See more</string>
+    <string name="discovery_saga_progress">%1$d of %2$d watched</string>
+    <string name="discovery_mood_edit">Set the mood</string>
+    <string name="discovery_search_entry">Discover: what you haven’t seen yet</string>
+
+    <string name="discovery_action_open">Open</string>
+    <string name="discovery_action_later">Watchlist</string>
+    <string name="discovery_action_later_done">On the list</string>
+    <string name="discovery_action_seen">Already seen</string>
+
+    <string name="discovery_group_recoupement">Because you watched %1$s</string>
+    <string name="discovery_group_revoir">Worth a rewatch</string>
+    <string name="discovery_group_sagas">Your sagas, started and unfinished</string>
+    <string name="discovery_group_pepites">Rarely seen, widely loved</string>
+    <string name="discovery_group_humeur">Tonight: %1$s</string>
+
+    <string name="discovery_why_recoupement">several of your finished titles point to this one</string>
+    <string name="discovery_why_revoir">watched months ago, never opened since</string>
+    <string name="discovery_why_sagas">picks the saga up where you left it</string>
+    <string name="discovery_why_pepites">high rating, few votes: what a popularity sort never shows</string>
+    <string name="discovery_why_humeur">based on your answers</string>
+
+    <string name="discovery_cold_title">Three questions, then we start</string>
+    <string name="discovery_cold_body">With no history there is nothing to cross-reference. Three answers are enough to set a first direction, and they can be changed at any time.</string>
+    <string name="discovery_cold_start">Answer</string>
+    <string name="discovery_quiz_skip">Skip</string>
+
+    <string name="discovery_q_humeur">What mood are you in tonight?</string>
+    <string name="discovery_q_humeur_sub">One answer, changeable later</string>
+    <string name="discovery_q_avec">Who else is watching?</string>
+    <string name="discovery_q_avec_sub">It changes more than the genre does</string>
+    <string name="discovery_q_temps">And how much time?</string>
+    <string name="discovery_q_temps_sub">The question no catalogue ever asks</string>
+
+    <string name="discovery_opt_detendue">Easy-going</string>
+    <string name="discovery_optd_detendue">comedy, family, adventure</string>
+    <string name="discovery_opt_tension">On edge</string>
+    <string name="discovery_optd_tension">thriller, crime, mystery</string>
+    <string name="discovery_opt_rire">In for a laugh</string>
+    <string name="discovery_optd_rire">comedy</string>
+    <string name="discovery_opt_peur">In for a scare</string>
+    <string name="discovery_optd_peur">horror, mystery</string>
+    <string name="discovery_opt_seul">On your own</string>
+    <string name="discovery_optd_seul">drama, mystery, sci-fi</string>
+    <string name="discovery_opt_deux">Two of you</string>
+    <string name="discovery_optd_deux">romance, drama</string>
+    <string name="discovery_opt_amis">With friends</string>
+    <string name="discovery_optd_amis">comedy, action, horror</string>
+    <string name="discovery_opt_famille">The family</string>
+    <string name="discovery_optd_famille">all ages, animation</string>
+    <string name="discovery_opt_court">Under 1 h 40</string>
+    <string name="discovery_optd_court">runtime 100 min or less</string>
+    <string name="discovery_opt_soiree">A proper evening</string>
+    <string name="discovery_optd_soiree">runtime 2 h or more</string>
+    <string name="discovery_opt_peuimporte">Doesn’t matter</string>
+    <string name="discovery_optd_peuimporte">no runtime filter</string>
+    <string name="discovery_opt_serie">A series to follow</string>
+    <string name="discovery_optd_serie">series only</string>
 </resources>

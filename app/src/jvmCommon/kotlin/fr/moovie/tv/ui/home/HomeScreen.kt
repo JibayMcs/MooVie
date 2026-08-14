@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Download
 import fr.moovie.tv.resources.settings_cat_downloads
 import androidx.compose.material.icons.filled.History
@@ -88,6 +89,7 @@ import fr.moovie.tv.resources.home_in_progress
 import fr.moovie.tv.resources.home_next_up
 import fr.moovie.tv.resources.home_time_left
 import fr.moovie.tv.resources.home_open_settings
+import fr.moovie.tv.resources.discovery_open
 import fr.moovie.tv.resources.home_search
 import fr.moovie.tv.resources.home_see_more
 import fr.moovie.tv.resources.home_settings
@@ -133,6 +135,12 @@ fun HomeScreenContent(
     onResume: (ResumeEntry) -> Unit,
     onOpenSettings: () -> Unit,
     onOpenSearch: () -> Unit,
+    /**
+     * Page Découverte. Vide par défaut pour ne pas casser les appels
+     * existants ; l'icône reste affichée, car un bouton qui apparaît selon la
+     * plateforme déplacerait le focus de ses voisines.
+     */
+    onOpenDiscovery: () -> Unit = {},
     onOpenHistory: () -> Unit,
     onOpenDownloads: () -> Unit = {},
     /**
@@ -266,6 +274,17 @@ fun HomeScreenContent(
                         onClick = onOpenSearch,
                         icon = Icons.Default.Search,
                         contentDescription = stringResource(Res.string.home_search),
+                        modifier = headerDown,
+                    )
+                    // Découverte : troisième geste, encore différent des deux
+                    // autres. La recherche répond à « je cherche ce titre », le
+                    // catalogue à « montre-moi de la science-fiction », et
+                    // celui-ci à « je ne sais pas quoi regarder » — la seule
+                    // question qui n'a rien à formuler.
+                    MoovieIconButton(
+                        onClick = onOpenDiscovery,
+                        icon = Icons.Default.AutoAwesome,
+                        contentDescription = stringResource(Res.string.discovery_open),
                         modifier = headerDown,
                     )
                     // Parcourir par genre : geste distinct de la recherche par

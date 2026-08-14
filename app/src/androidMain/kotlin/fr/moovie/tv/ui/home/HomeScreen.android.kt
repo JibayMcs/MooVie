@@ -17,6 +17,7 @@ fun HomeScreen(
     onResume: (ResumeEntry) -> Unit,
     onOpenSettings: () -> Unit,
     onOpenSearch: () -> Unit,
+    onOpenDiscovery: () -> Unit = {},
     onOpenHistory: () -> Unit,
     onOpenDownloads: () -> Unit = {},
     /** Voir HomeScreenContent : null quand la télécommande n'a pas lieu d'être. */
@@ -38,6 +39,7 @@ fun HomeScreen(
         onResume = onResume,
         onOpenSettings = onOpenSettings,
         onOpenSearch = onOpenSearch,
+        onOpenDiscovery = onOpenDiscovery,
         onOpenHistory = onOpenHistory,
         onOpenDownloads = onOpenDownloads,
         onOpenRemote = onOpenRemote,

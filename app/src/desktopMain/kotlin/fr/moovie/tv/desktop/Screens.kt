@@ -18,6 +18,8 @@ import fr.moovie.tv.ui.details.DetailsViewModel
 import fr.moovie.tv.ui.catalog.CatalogSelection
 import fr.moovie.tv.ui.catalog.CatalogScreenContent
 import fr.moovie.tv.ui.catalog.CatalogViewModel
+import fr.moovie.tv.ui.discovery.DiscoveryScreenContent
+import fr.moovie.tv.ui.discovery.DiscoveryViewModel
 import fr.moovie.tv.ui.history.HistoryScreenContent
 import fr.moovie.tv.ui.history.HistoryViewModel
 import fr.moovie.tv.ui.home.HomeScreenContent
@@ -55,6 +57,7 @@ internal object Vm {
     val details by lazy { DetailsViewModel() }
     val catalog by lazy { CatalogViewModel() }
     val person by lazy { PersonViewModel() }
+    val discovery by lazy { DiscoveryViewModel() }
 
     /** Partagé entre la bannière et le bouton « Vérifier maintenant ». */
     val update by lazy { DesktopUpdateViewModel() }
@@ -66,6 +69,7 @@ internal fun DesktopHomeScreen(
     onResume: (ResumeEntry) -> Unit,
     onOpenSettings: () -> Unit,
     onOpenSearch: () -> Unit,
+    onOpenDiscovery: () -> Unit = {},
     onOpenHistory: () -> Unit,
     onOpenDownloads: () -> Unit = {},
     onOpenCatalog: () -> Unit,
@@ -85,6 +89,7 @@ internal fun DesktopHomeScreen(
         onResume = onResume,
         onOpenSettings = onOpenSettings,
         onOpenSearch = onOpenSearch,
+        onOpenDiscovery = onOpenDiscovery,
         onOpenHistory = onOpenHistory,
         onOpenDownloads = onOpenDownloads,
         onOpenCatalog = onOpenCatalog,
@@ -125,6 +130,38 @@ internal fun DesktopSearchScreen(
         onClearHistory = vm::clearHistory,
         filters = filters,
         onFiltersChange = vm::setFilters,
+        onBack = onBack,
+        showBackButton = true,
+    )
+}
+
+/**
+ * Enveloppe desktop de la page Découverte.
+ *
+ * Bouton Retour toujours visible, comme les autres écrans du poste de travail :
+ * il n'y a pas de touche Retour sur un clavier de bureau.
+ */
+@Composable
+internal fun DesktopDiscoveryScreen(
+    onOpenTitle: (tmdbId: Int, isTv: Boolean) -> Unit,
+    onBack: () -> Unit,
+) {
+    val vm = Vm.discovery
+    val state by vm.state.collectAsState()
+    val mood by vm.mood.collectAsState()
+    val retirees by vm.retirees.collectAsState()
+    val watchlistKeys by vm.watchlistKeys.collectAsState()
+
+    DiscoveryScreenContent(
+        state = state,
+        mood = mood,
+        retirees = retirees,
+        watchlistKeys = watchlistKeys,
+        onOpenTitle = onOpenTitle,
+        onMarkSeen = vm::markSeen,
+        onToggleWatchlist = vm::toggleWatchlist,
+        onAnswer = vm::answer,
+        onReload = vm::reload,
         onBack = onBack,
         showBackButton = true,
     )

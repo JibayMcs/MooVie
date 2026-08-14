@@ -78,6 +78,7 @@ import fr.moovie.tv.ui.offline.OfflineSearchScreen
 import fr.moovie.tv.ui.offline.playableFor
 import fr.moovie.tv.ui.player.PlayerHost
 import fr.moovie.tv.ui.player.PlayerScreen
+import fr.moovie.tv.ui.discovery.DiscoveryScreen
 import fr.moovie.tv.ui.search.SearchScreen
 import fr.moovie.tv.ui.settings.SettingsScreen
 import android.content.pm.ActivityInfo
@@ -475,6 +476,7 @@ class MainActivity : ComponentActivity() {
                                 },
                                 onOpenSettings = { nav.push(Screen.Settings) },
                                 onOpenSearch = { nav.push(Screen.Search) },
+                                onOpenDiscovery = { nav.push(Screen.Discovery) },
                                 onOpenHistory = { nav.push(Screen.History) },
                                 onOpenDownloads = { nav.push(Screen.Downloads) },
                                 onOpenCatalog = { nav.push(Screen.Catalog()) },
@@ -535,7 +537,27 @@ class MainActivity : ComponentActivity() {
                                 onPlay = { d -> downloadPlayerScreen(d)?.let(nav::push) },
                             ) else SearchScreen(
                                 onOpenTitle = { id, isTv -> nav.push(Screen.Details(id, isTv)) },
+                                // Au doigt, c'est le seul chemin vers la
+                                // découverte : la barre basse est pleine à six
+                                // onglets, et un septième a déjà été essayé.
+                                // Ailleurs, l'en-tête de l'accueil a son icône
+                                // et la répéter ici n'apporterait rien.
+                                onOpenDiscovery = if (useBottomNav) {
+                                    { nav.push(Screen.Discovery) }
+                                } else {
+                                    null
+                                },
                                 onBack = { nav.pop() },
+                            )
+                            // Hors ligne, la découverte est tout entière bâtie
+                            // sur TMDB : la bibliothèque locale prend sa place.
+                            Screen.Discovery -> if (!online) OfflineScreen(
+                                onPlay = { d -> downloadPlayerScreen(d)?.let(nav::push) },
+                                onOpenSettings = { nav.push(Screen.Settings) },
+                            ) else DiscoveryScreen(
+                                onOpenTitle = { id, isTv -> nav.push(Screen.Details(id, isTv)) },
+                                onBack = { nav.pop() },
+                                showBackButton = useBottomNav,
                             )
                             is Screen.Person -> PersonScreen(
                                 personId = s.personId,
