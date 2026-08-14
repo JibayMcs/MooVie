@@ -27,3 +27,7 @@ opensubtitles.properties
 # libmpv téléchargée par la CI pour les paquets Windows et macOS : un binaire
 # par plateforme, versionné chez son éditeur et non chez nous.
 /app/resources/
+
+# Relevés du contrôle de santé des sources (tools/check-sources.sh) :
+# des mesures, propres à une machine et à un instant — rien à versionner.
+tools/reports/
