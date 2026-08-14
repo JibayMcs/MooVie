@@ -571,7 +571,6 @@
     <string name="discovery_see_more">Voir plus</string>
     <string name="discovery_saga_progress">%1$d sur %2$d vus</string>
     <string name="discovery_mood_edit">Régler l’humeur</string>
-    <string name="discovery_search_entry">Découverte : ce que vous n’avez pas encore vu</string>
 
     <string name="discovery_action_open">Ouvrir</string>
     <string name="discovery_action_later">À voir</string>

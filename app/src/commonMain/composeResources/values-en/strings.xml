@@ -569,7 +569,6 @@
     <string name="discovery_see_more">See more</string>
     <string name="discovery_saga_progress">%1$d of %2$d watched</string>
     <string name="discovery_mood_edit">Set the mood</string>
-    <string name="discovery_search_entry">Discover: what you haven’t seen yet</string>
 
     <string name="discovery_action_open">Open</string>
     <string name="discovery_action_later">Watchlist</string>

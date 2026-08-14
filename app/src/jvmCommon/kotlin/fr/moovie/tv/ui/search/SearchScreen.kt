@@ -75,8 +75,8 @@ import fr.moovie.tv.data.tmdb.TmdbItem
 import fr.moovie.tv.resources.Res
 import fr.moovie.tv.resources.common_back
 import fr.moovie.tv.resources.search_clear_history
+import fr.moovie.tv.resources.discovery_open
 import fr.moovie.tv.resources.search_empty_hint
-import fr.moovie.tv.resources.discovery_search_entry
 import fr.moovie.tv.resources.search_hint
 import fr.moovie.tv.resources.search_hint_short
 import fr.moovie.tv.resources.search_loading
@@ -93,6 +93,7 @@ import fr.moovie.tv.ui.adaptive.isTouchUi
 import fr.moovie.tv.ui.adaptive.useBottomNav
 import fr.moovie.tv.ui.remote.remoteTypable
 import fr.moovie.tv.ui.theme.MOOVIE_ACCENT
+import fr.moovie.tv.ui.theme.MOOVIE_ORANGE
 import fr.moovie.tv.ui.components.MoovieButton
 import fr.moovie.tv.ui.components.LocalMoovieCardActive
 import fr.moovie.tv.ui.components.MoovieAsyncImage
@@ -151,7 +152,7 @@ fun SearchScreenContent(
      */
     onVoiceSearch: (() -> Unit)? = null,
     /**
-     * Entrée vers la page Découverte, affichée tant que le champ est vide.
+     * Entrée vers la page Découverte : une icône, à droite du micro.
      *
      * Null quand la plateforme la propose ailleurs — sur desktop et TV, elle a
      * son icône dans l'en-tête de l'accueil. Sur téléphone c'est le seul point
@@ -258,6 +259,33 @@ fun SearchScreenContent(
                     contentDescription = stringResource(Res.string.search_voice),
                 )
             }
+            // Découverte, à droite du micro et sans libellé.
+            //
+            // Elle a d'abord été un bouton pleine largeur sous le champ : trop
+            // long, trop lourd pour une entrée facultative, et il repoussait
+            // l'historique de recherche sous la ligne de flottaison. Une icône
+            // de plus dans la rangée du champ ne coûte rien et se trouve au
+            // moment exact où l'on se demande quoi chercher.
+            //
+            // Teinte orange plutôt que le gris des autres : c'est le seul
+            // bouton de cette rangée qui mène ailleurs que dans la recherche,
+            // et une nuance de gris de plus ne l'aurait pas dit. Assez pour se
+            // remarquer, pas assez pour crier.
+            onOpenDiscovery?.let { ouvrir ->
+                MoovieButton(
+                    onClick = ouvrir,
+                    // Mêmes marges que MoovieIconButton, sans quoi les deux
+                    // boutons voisins n'auraient pas la même taille.
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.AutoAwesome,
+                        contentDescription = stringResource(Res.string.discovery_open),
+                        tint = MOOVIE_ORANGE,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+            }
         }
         // Sous le champ, au-dessus des résultats : c'est l'ordre dans lequel on
         // y pense, et le seul qui laisse la flèche du bas mener du champ aux
@@ -278,35 +306,13 @@ fun SearchScreenContent(
             // désormais sa propre page (Catalogue) — les deux gestes cohabitaient
             // mal ici, il fallait traverser le champ de saisie, donc le clavier
             // virtuel, pour atteindre les genres.
-            query.isBlank() -> Column {
-                // Sur téléphone, la barre basse est pleine — six onglets, et
-                // le doc de `MoovieBottomBar` explique pourquoi il n'y en aura
-                // pas sept. La découverte se rattrape donc ici, à l'endroit
-                // exact où l'on arrive quand on ne sait pas quoi chercher :
-                // un champ vide.
-                onOpenDiscovery?.let { ouvrir ->
-                    MoovieButton(
-                        onClick = ouvrir,
-                        modifier = Modifier.padding(horizontal = searchHPad()),
-                    ) {
-                        Icon(
-                            Icons.Default.AutoAwesome,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                        )
-                        Spacer(Modifier.width(10.dp))
-                        Text(stringResource(Res.string.discovery_search_entry))
-                    }
-                    Spacer(Modifier.height(24.dp))
-                }
-                HistorySection(
-                    history = history,
-                    onPick = onQueryChange,
-                    onRemove = onRemoveHistory,
-                    onClear = onClearHistory,
-                    modifier = Modifier.padding(horizontal = searchHPad()),
-                )
-            }
+            query.isBlank() -> HistorySection(
+                history = history,
+                onPick = onQueryChange,
+                onRemove = onRemoveHistory,
+                onClear = onClearHistory,
+                modifier = Modifier.padding(horizontal = searchHPad()),
+            )
             results is SearchState.Loading -> SkeletonGrid(
                 columns = if (useBottomNav) 3 else 6,
                 modifier = Modifier.padding(horizontal = searchHPad()),
