@@ -35,7 +35,34 @@ fun nextLinkFor(
     preferred: String,
     excluded: Set<String> = emptySet(),
     heights: Map<String, Int> = emptyMap(),
-): EmbedLink? = orderedLinksFor(links, preferred, excluded, heights).firstOrNull()
+    trust: Map<String, HosterTrust> = emptyMap(),
+): EmbedLink? = orderedLinksFor(links, preferred, excluded, heights, trust).firstOrNull()
+
+/**
+ * Ce que cet appareil a retenu d'un hébergeur, à force de l'essayer.
+ *
+ * ### Pourquoi une mémoire plutôt qu'une liste
+ *
+ * Certains hébergeurs sont proposés en permanence et ne jouent jamais — `netu`
+ * a été mesuré 18 fois proposé, 0 fois jouable. La réponse évidente est une
+ * liste d'exclusion, mais elle demande d'être tenue à jour à la main, elle est
+ * la même pour tout le monde alors qu'un hébergeur peut être bloqué chez un
+ * fournisseur d'accès et pas chez un autre, et elle ne pardonne pas : un
+ * hébergeur qui revient reste banni jusqu'à ce que quelqu'un s'en aperçoive.
+ *
+ * Une mémoire locale n'a aucun de ces défauts. Elle se remplit toute seule, elle
+ * décrit **cette** connexion, et elle se corrige d'elle-même dans les deux sens.
+ */
+enum class HosterTrust {
+    /** A déjà servi un flux jouable ici. */
+    GOOD,
+
+    /** Jamais essayé, ou trop peu pour conclure. */
+    UNKNOWN,
+
+    /** Essayé plusieurs fois, jamais jouable. */
+    BAD,
+}
 
 /**
  * Les liens jouables pour cette langue, du plus souhaitable au moins.
@@ -75,9 +102,37 @@ fun orderedLinksFor(
     preferred: String,
     excluded: Set<String> = emptySet(),
     heights: Map<String, Int> = emptyMap(),
+    trust: Map<String, HosterTrust> = emptyMap(),
 ): List<EmbedLink> = links
     .filter { it.language == preferred && it.url !in excluded }
-    .sortedByDescending { heights[it.url] ?: UNKNOWN_HEIGHT }
+    .sortedWith(
+        compareByDescending<EmbedLink> { note(it, heights, trust) }
+            // À note égale, ce qui a déjà marché ici passe devant. Départage
+            // seulement : la définition reste maîtresse, sans quoi un hébergeur
+            // fidèle en 480p passerait devant un 1080p jamais essayé.
+            .thenByDescending { (trust[it.hoster] ?: HosterTrust.UNKNOWN) == HosterTrust.GOOD },
+    )
+
+/**
+ * La note d'un lien : sa définition, sauf s'il est connu pour ne jamais jouer.
+ *
+ * Un hébergeur [HosterTrust.BAD] tombe **en dernier**, sous les liens les plus
+ * modestes, plutôt que d'être écarté. La nuance compte : il reste jouable si
+ * tout le reste échoue, et le jour où il remarche, la première réussite le
+ * ramène dans le rang. Une exclusion sèche demanderait qu'on pense à l'annuler.
+ *
+ * Il n'est pas non plus mesuré, donc il siégeait jusqu'ici au pivot des 720
+ * — devant des liens réellement moins bons, mais qui, eux, jouent.
+ */
+private fun note(
+    link: EmbedLink,
+    heights: Map<String, Int>,
+    trust: Map<String, HosterTrust>,
+): Int = if (trust[link.hoster] == HosterTrust.BAD) {
+    Int.MIN_VALUE
+} else {
+    heights[link.url] ?: UNKNOWN_HEIGHT
+}
 
 /**
  * Ce que vaut un lien dont on ne sait rien encore.

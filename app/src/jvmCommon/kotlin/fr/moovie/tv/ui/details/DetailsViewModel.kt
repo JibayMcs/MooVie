@@ -61,6 +61,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import org.jetbrains.compose.resources.getString
+import fr.moovie.tv.core.sources.usecase.HosterTrust
+import fr.moovie.tv.data.sources.HosterTrustRepository
 
 /** Délai max par provider avant de le marquer en échec (n'affecte que ce provider). */
 private const val PROVIDER_TIMEOUT_MS = 12000L
@@ -789,6 +791,31 @@ class DetailsViewModel : ViewModel() {
     private var servedFromCache = false
 
     /** Dernière requête de recherche, pour pouvoir la rejouer sans le cache. */
+    /**
+     * Ce que l'appareil a appris des hébergeurs. Voir [HosterTrustRepository] :
+     * un hébergeur qui n'a jamais rien rendu de jouable cesse de passer devant
+     * ceux qui marchent.
+     */
+    private val hosterTrust = HosterTrustRepository()
+
+    /**
+     * Verdicts en mémoire, relus en continu.
+     *
+     * Une carte tenue à jour plutôt qu'une lecture par tour de cascade : la
+     * boucle tourne toutes les 250 ms, et lire le magasin à chaque tour
+     * mettrait un accès disque sur le chemin le plus sensible de
+     * l'application.
+     */
+    private var trustNow: Map<String, HosterTrust> = emptyMap()
+
+    init {
+        // **Après** la déclaration du dépôt, et ce n'est pas cosmétique : un
+        // `init` placé en tête du corps s'exécute avant que `hosterTrust` n'ait
+        // sa valeur. Le code compilait — l'accès est différé dans une lambda —
+        // et ne tenait qu'à l'ordonnancement de la coroutine.
+        viewModelScope.launch { hosterTrust.trust.collect { trustNow = it } }
+    }
+
     private var lastSourceQuery: (suspend (SourceProvider) -> List<EmbedLink>)? = null
 
     /**
@@ -1116,7 +1143,13 @@ class DetailsViewModel : ViewModel() {
                     _quickPlay.value = QuickPlayState.Idle
                     return@launch
                 }
-                val next = nextLinkFor(active.links, preferred = lang, excluded = tried, heights = _heights.value)
+                val next = nextLinkFor(
+                    active.links,
+                    preferred = lang,
+                    excluded = tried,
+                    heights = _heights.value,
+                    trust = trustNow,
+                )
                 if (next != null) {
                     tried += next.url
                     // Affiche l'hébergeur en cours d'essai : la cascade devient
@@ -1135,6 +1168,8 @@ class DetailsViewModel : ViewModel() {
                         if (gen != resolveGen) return@launch
                         pendingMeta?.let { watchRepo.register(it) }
                         playingLink = next
+                        // Ce qui vient de jouer ici rejouera probablement.
+                        hosterTrust.recordSuccess(next.hoster)
                         _quickPlay.value = QuickPlayState.Idle
                         _resolved.value = stream
                         return@launch
@@ -1142,6 +1177,10 @@ class DetailsViewModel : ViewModel() {
                     // Écarté durablement : la sonde vient de le refuser, inutile
                     // d'y revenir si la cascade reprend plus tard.
                     rejectedLinks += next.url
+                    // Et retenu **au-delà de ce titre** : c'est le lien qui est
+                    // écarté ici, l'hébergeur qui l'est là. Un échec ne condamne
+                    // rien — voir SEUIL_ECHECS.
+                    hosterTrust.recordFailure(next.hoster)
                     continue
                 }
                 if (!active.anyLoading) {
