@@ -29,9 +29,50 @@ data class MovieDetails(
     @SerialName("production_countries") val countries: List<ProductionCountry> = emptyList(),
     @SerialName("spoken_languages") val spokenLanguages: List<SpokenLanguage> = emptyList(),
     @SerialName("release_dates") val releaseDates: ReleaseDateResults? = null,
+    /**
+     * La saga à laquelle ce film appartient, quand TMDB en connaît une.
+     *
+     * **Ce champ arrivait déjà dans chaque réponse et on le jetait.** Le
+     * déclarer ne coûte pas une requête de plus : toute la page Découverte des
+     * sagas tient là-dessus, sans le moindre fichier à entretenir.
+     */
+    @SerialName("belongs_to_collection") val collection: CollectionRef? = null,
 ) {
     val year: String? get() = releaseDate?.take(4)?.ifBlank { null }
     fun backdropUrl() = backdropPath?.let { "https://image.tmdb.org/t/p/w1280$it" }
+    fun posterUrl() = posterPath?.let { "https://image.tmdb.org/t/p/w342$it" }
+}
+
+/** Renvoi vers une saga, tel qu'il figure dans la fiche d'un film. */
+@Serializable
+data class CollectionRef(
+    val id: Int,
+    val name: String = "",
+    @SerialName("poster_path") val posterPath: String? = null,
+    @SerialName("backdrop_path") val backdropPath: String? = null,
+)
+
+/** Le contenu d'une saga : ses films, que l'on trie nous-mêmes par date. */
+@Serializable
+data class CollectionDetails(
+    val id: Int,
+    val name: String = "",
+    @SerialName("poster_path") val posterPath: String? = null,
+    val parts: List<TmdbItem> = emptyList(),
+) {
+    /**
+     * Les films dans l'ordre de sortie, les sans-date en dernier.
+     *
+     * TMDB rend l'ordre de sa base, qui n'est pas l'ordre de la saga. On ne
+     * prétend pas connaître l'ordre chronologique de fiction : c'est une donnée
+     * éditoriale, elle n'existe nulle part dans l'API, et l'inventer serait
+     * pire que de s'en tenir aux dates.
+     */
+    val inOrder: List<TmdbItem>
+        get() = parts.sortedWith(
+            compareBy({ it.releaseDate.isNullOrBlank() }, { it.releaseDate }),
+        )
+
     fun posterUrl() = posterPath?.let { "https://image.tmdb.org/t/p/w342$it" }
 }
 

@@ -51,8 +51,34 @@ const val STORE_CATALOG_FILTERS = "moovie_catalog_filters"
  * ou l'ordre des hébergeurs sont des réglages de l'installation, pas de la
  * personne — ils restent globaux.
  */
+/**
+ * Les réponses au questionnaire de la page Découverte.
+ *
+ * Personnel par nature : deux personnes devant le même téléviseur n'ont pas la
+ * même humeur un mardi soir, et c'est précisément ce que la question demande.
+ */
+const val STORE_MOOD = "moovie_mood"
+
+/**
+ * Ce qui a été écarté de la page Découverte : « déjà vu » et « pas intéressé ».
+ *
+ * Séparé du suivi de lecture à dessein. Marquer « déjà vu » depuis la
+ * découverte écrit bien un vrai « vu » dans [STORE_WATCH] — il doit compter, se
+ * synchroniser et porter sa pierre tombale. Ce magasin-ci ne garde que ce qui
+ * n'a pas d'équivalent ailleurs : les sagas écartées, qui n'ont pas de clé de
+ * visionnage.
+ */
+const val STORE_DISCOVERY = "moovie_discovery"
+
 val PROFILE_SCOPED_STORES =
-    listOf(STORE_WATCH, STORE_HOME, STORE_SEARCH_FILTERS, STORE_CATALOG_FILTERS)
+    listOf(
+        STORE_WATCH,
+        STORE_HOME,
+        STORE_SEARCH_FILTERS,
+        STORE_CATALOG_FILTERS,
+        STORE_MOOD,
+        STORE_DISCOVERY,
+    )
 
 /**
  * Profil dont les données sont servies, lu à la construction de chaque dépôt.

@@ -83,6 +83,53 @@ interface TmdbApi {
     ): TmdbPageResult
 
     /**
+     * Découverte à plusieurs genres, pour la page Découverte.
+     *
+     * Distinct de [discover], qui sert le catalogue et n'accepte qu'un genre.
+     * Deux différences décident du résultat :
+     *
+     * - **le tube et non la virgule.** Chez TMDB, `28,53` veut dire « action
+     *   ET thriller » — une intersection qui ne rend presque rien dès trois
+     *   genres, et qui oblige à enchaîner des replis jusqu'à servir autre chose
+     *   que ce qui était demandé. `28|53` veut dire « ou », et c'est ce qu'on
+     *   entend quand on coche plusieurs humeurs.
+     * - **une bande de votes, pas un plancher.** [maxVotes] est le paramètre
+     *   qui sépare une découverte d'un carrousel : au-delà de quelques milliers
+     *   de votes, on ne propose plus que ce que tout le monde a déjà vu.
+     */
+    @GET("discover/{media}")
+    suspend fun discoverMood(
+        @Path("media") media: String, // "movie" | "tv"
+        @Query("api_key") apiKey: String,
+        @Query("language") language: String,
+        /** Genres joints par `|` (OU). Vide = tout le catalogue. */
+        @Query("with_genres") genres: String? = null,
+        @Query("sort_by") sortBy: String = "vote_average.desc",
+        @Query("page") page: Int = 1,
+        @Query("vote_average.gte") minRating: Double? = null,
+        @Query("vote_count.gte") minVotes: Int? = null,
+        @Query("vote_count.lte") maxVotes: Int? = null,
+        @Query("with_runtime.lte") maxRuntime: Int? = null,
+        @Query("with_runtime.gte") minRuntime: Int? = null,
+        @Query("primary_release_date.lte") movieBefore: String? = null,
+        @Query("first_air_date.lte") tvBefore: String? = null,
+        @Query("include_adult") includeAdult: Boolean = false,
+    ): TmdbPageResult
+
+    /**
+     * Une collection TMDB : la saga d'un film, ses épisodes cinéma dans l'ordre.
+     *
+     * Aucune donnée à entretenir de notre côté — `belongs_to_collection` arrive
+     * déjà dans la fiche d'un film, il ne restait qu'à le lire.
+     */
+    @GET("collection/{id}")
+    suspend fun collection(
+        @Path("id") id: Int,
+        @Query("api_key") apiKey: String,
+        @Query("language") language: String,
+    ): CollectionDetails
+
+    /**
      * `append_to_response` porte maintenant `videos` : les bandes-annonces
      * arrivent **dans la réponse de la fiche**, sans requête supplémentaire.
      * TMDB les filtre alors sur `language`, d'où le repli de [videos] quand la

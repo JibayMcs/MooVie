@@ -219,6 +219,45 @@ class TmdbRepository(
             .distinctBy { it.id to it.isTv }
             .sortedByDescending { it.year ?: "" }
 
+    /**
+     * Découverte à plusieurs genres et bande de votes — voir [TmdbApi.discoverMood].
+     *
+     * Les titres sans affiche sont écartés ici plutôt qu'à l'affichage : une
+     * main de cartes faite d'affiches ne peut rien faire d'un trou, et la carte
+     * suivante prendra sa place sans que personne ne remarque le manque.
+     */
+    suspend fun discoverMood(
+        apiKey: String,
+        isTv: Boolean,
+        genres: List<Int> = emptyList(),
+        sortBy: String = "vote_average.desc",
+        page: Int = 1,
+        minRating: Double? = null,
+        minVotes: Int? = null,
+        maxVotes: Int? = null,
+        maxRuntime: Int? = null,
+        minRuntime: Int? = null,
+        before: String? = null,
+    ): List<TmdbItem> = api.discoverMood(
+        media = if (isTv) "tv" else "movie",
+        apiKey = apiKey,
+        language = language,
+        // Le tube, jamais la virgule : voir TmdbApi.discoverMood.
+        genres = genres.takeIf { it.isNotEmpty() }?.joinToString("|"),
+        sortBy = sortBy,
+        page = page,
+        minRating = minRating,
+        minVotes = minVotes,
+        maxVotes = maxVotes,
+        maxRuntime = maxRuntime.takeUnless { isTv },
+        minRuntime = minRuntime.takeUnless { isTv },
+        movieBefore = before.takeUnless { isTv },
+        tvBefore = before.takeIf { isTv },
+    ).results.filter { it.posterPath != null }
+
+    suspend fun collection(apiKey: String, id: Int): CollectionDetails =
+        api.collection(id, apiKey, language)
+
     suspend fun movieDetails(apiKey: String, id: Int): MovieDetails =
         api.movieDetails(id, apiKey, language)
 
