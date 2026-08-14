@@ -46,6 +46,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
@@ -250,6 +251,30 @@ fun PlayerScreen(
             // Garde CPU + Wi-Fi éveillés pendant la lecture (évite les coupures
             // de flux quand le réseau se met en veille).
             .setWakeMode(C.WAKE_MODE_NETWORK)
+            // ── Focus audio, **sur téléphone seulement** ──────────────────
+            //
+            // Sans lui, ExoPlayer ne demande jamais le focus : l'application
+            // parlait par-dessus un appel entrant, par-dessus un autre lecteur,
+            // et continuait à voix haute quand on débranchait son casque. Trois
+            // situations qui n'existent que sur un appareil qu'on tient, et que
+            // la vignette flottante a rendues quotidiennes.
+            //
+            // `handleAudioBecomingNoisy` est le débranchement du casque ; il n'a
+            // aucun sens sur un téléviseur, dont le son ne se débranche pas.
+            //
+            // **Pas sur TV, et c'est délibéré.** Une box est seule à jouer, et
+            // certaines émettent des pertes de focus transitoires pour un bip
+            // système : les honorer mettrait le film en pause au milieu d'une
+            // scène, pour un son que personne n'a demandé. Le comportement de
+            // la TV, éprouvé depuis un an, ne bouge pas.
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(C.USAGE_MEDIA)
+                    .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
+                    .build(),
+                touchUi,
+            )
+            .setHandleAudioBecomingNoisy(touchUi)
             .build()
             .apply {
                 // Aucun sous-titre au démarrage : ExoPlayer active sinon de
