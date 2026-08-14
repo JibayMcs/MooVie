@@ -113,6 +113,7 @@
 
     <!-- Update -->
     <string name="settings_cat_update">Updates</string>
+    <string name="settings_current_version">Installed version</string>
     <string name="settings_update_interval">Check frequency</string>
     <string name="settings_update_help">Checks for a new version at a regular interval. During playback the notice appears as a discreet chip instead of a banner. “Never” disables checking entirely.</string>
     <string name="settings_check_now">Check now</string>

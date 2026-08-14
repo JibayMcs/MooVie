@@ -113,6 +113,7 @@
 
     <!-- Actualización -->
     <string name="settings_cat_update">Actualizaciones</string>
+    <string name="settings_current_version">Versión instalada</string>
     <string name="settings_update_interval">Frecuencia de comprobación</string>
     <string name="settings_update_help">Comprueba si hay una nueva versión a intervalos regulares. Durante la reproducción el aviso aparece como una pastilla discreta en vez de un banner. «Nunca» desactiva la comprobación por completo.</string>
     <string name="settings_check_now">Comprobar ahora</string>

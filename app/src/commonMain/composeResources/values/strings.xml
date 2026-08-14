@@ -115,6 +115,7 @@
 
     <!-- Mise à jour -->
     <string name="settings_cat_update">Mises à jour</string>
+    <string name="settings_current_version">Version installée</string>
     <string name="settings_update_interval">Fréquence de vérification</string>
     <string name="settings_update_help">Vérifie si une nouvelle version est disponible, à intervalle régulier. Pendant la lecture, l'information s'affiche en pastille discrète plutôt qu'en bandeau. « Jamais » désactive complètement la vérification.</string>
     <string name="settings_check_now">Vérifier maintenant</string>

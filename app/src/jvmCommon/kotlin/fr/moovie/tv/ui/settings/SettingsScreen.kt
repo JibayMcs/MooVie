@@ -152,6 +152,7 @@ import fr.moovie.tv.resources.settings_tmdb_help
 import fr.moovie.tv.resources.settings_tmdb_hint
 import fr.moovie.tv.resources.settings_tmdb_key
 import fr.moovie.tv.resources.settings_update_help
+import fr.moovie.tv.resources.settings_current_version
 import fr.moovie.tv.resources.settings_update_interval
 import fr.moovie.tv.resources.settings_update_prereleases
 import fr.moovie.tv.resources.settings_update_prereleases_help
@@ -201,6 +202,7 @@ import fr.moovie.tv.ui.subtitles.SubtitlesSection
 import fr.moovie.tv.ui.components.MoovieIconButton
 import fr.moovie.tv.ui.components.MoovieSelect
 import org.jetbrains.compose.resources.stringResource
+import fr.moovie.tv.shared.appVersionName
 
 /**
  * Largeur du volet de navigation. Volontairement contenue : en 1080p l'écran ne
@@ -608,6 +610,18 @@ fun SettingsScreenContent(
                 }
 
                 SettingsSection.UPDATE -> {
+                    // La version installée, en tête de section.
+                    //
+                    // Elle manquait, et son absence a coûté cher : « À jour » ne
+                    // dit pas *depuis quoi*, si bien qu'un appareil portant une
+                    // version plus haute que tout ce qui est publié — un build
+                    // local, une rc dépassée — se lit exactement comme un canal
+                    // en panne. C'est la première chose à regarder quand une
+                    // mise à jour n'arrive pas, elle a donc sa place ici et non
+                    // dans un écran « À propos ».
+                    SettingRow(label = stringResource(Res.string.settings_current_version)) {
+                        Text(appVersionName, style = MaterialTheme.typography.titleMedium)
+                    }
                     SettingRow(
                         label = stringResource(Res.string.settings_update_interval),
                         help = stringResource(Res.string.settings_update_help),
