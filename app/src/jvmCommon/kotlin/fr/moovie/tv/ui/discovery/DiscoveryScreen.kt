@@ -47,6 +47,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -92,6 +93,7 @@ import fr.moovie.tv.resources.discovery_saga_progress
 import fr.moovie.tv.resources.discovery_see_more
 import fr.moovie.tv.resources.discovery_title
 import fr.moovie.tv.ui.adaptive.isTouchUi
+import fr.moovie.tv.ui.adaptive.LocalUiFlavor
 import fr.moovie.tv.ui.adaptive.useBottomNav
 import fr.moovie.tv.ui.components.MoovieAsyncImage
 import fr.moovie.tv.ui.components.MoovieButton
@@ -104,6 +106,7 @@ import fr.moovie.tv.ui.theme.MoovieGradient
 import fr.moovie.tv.ui.theme.MoovieShape
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.abs
 
@@ -339,6 +342,10 @@ private fun Main(
             snapPosition = SnapPosition.Center,
         )
         val entryFocus = remember { FocusRequester() }
+        val scope = rememberCoroutineScope()
+        // Doigt et souris n'ont pas de focus qui suive une carte quand la liste
+        // s'allonge : c'est à eux seuls qu'il faut rendre la cible.
+        val sansFocus = LocalUiFlavor.current.isDirect
         val capacite = cardsThatFit(maxWidth.value, largeur.value, marge.value)
         val tailleLot = if (groupe.cards.size <= capacite) {
             groupe.cards.size
@@ -487,7 +494,40 @@ private fun Main(
                                     phase = phase,
                                     teinte = teinte,
                                     largeur = largeur,
-                                    onClick = { lotsVisibles++ },
+                                    /*
+                                     * Révéler un lot **et aller le voir**.
+                                     *
+                                     * Sans le défilement, la carte « voir plus »
+                                     * est repoussée hors de l'écran par les
+                                     * cartes qu'elle vient de révéler : le
+                                     * deuxième appui tombe alors sur l'affiche
+                                     * qui a pris sa place, et se contente de la
+                                     * désigner. On croit à un chargement en
+                                     * panne, alors que c'est la cible qui a
+                                     * disparu.
+                                     *
+                                     * Au D-pad le défaut n'existe pas : le focus
+                                     * reste sur la carte et Compose la ramène
+                                     * seul. Il ne concerne donc que le doigt et
+                                     * la souris, qui n'ont pas de focus à suivre
+                                     * — d'où le garde-fou sur `isDirect`.
+                                     *
+                                     * On défile jusqu'à la **première carte
+                                     * nouvellement révélée** plutôt que jusqu'à
+                                     * la carte de queue : les nouveautés se
+                                     * présentent à gauche, et « voir plus » se
+                                     * retrouve au bord droit, là où le pouce
+                                     * venait de la quitter.
+                                     */
+                                    onClick = {
+                                        val premiereNouvelle = cartesVisibles.size
+                                        lotsVisibles++
+                                        if (sansFocus) {
+                                            scope.launch {
+                                                listState.animateScrollToItem(premiereNouvelle)
+                                            }
+                                        }
+                                    },
                                 )
                             }
                         }
