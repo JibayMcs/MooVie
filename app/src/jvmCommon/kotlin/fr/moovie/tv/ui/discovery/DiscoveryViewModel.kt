@@ -65,13 +65,23 @@ class DiscoveryViewModel : ViewModel() {
         }
     }
 
-    /** Redistribue : relit l'historique et redemande à TMDB. */
+    /**
+     * Nombre de fois qu'on a demandé à rebattre les cartes.
+     *
+     * Il ne compte pas les chargements automatiques : ceux-là doivent rendre la
+     * page telle qu'on l'a laissée. Seul un appui explicite sur « Redistribuer »
+     * l'incrémente, et c'est lui qui fait changer ce que servent les recettes.
+     */
+    private var tirage = 0
+
+    /** Redistribue : relit l'historique et redemande à TMDB, autrement. */
     fun reload() {
         viewModelScope.launch {
             _state.value = DiscoveryState.Loading
             _retirees.value = emptySet()
+            tirage++
             val key = settings.tmdbApiKey.first()
-            _state.value = runCatching { repo.build(key, mood.value) }
+            _state.value = runCatching { repo.build(key, mood.value, tirage) }
                 .getOrDefault(DiscoveryState.ColdStart)
         }
     }

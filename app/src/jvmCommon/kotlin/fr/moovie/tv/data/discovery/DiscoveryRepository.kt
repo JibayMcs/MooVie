@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import java.time.LocalDate
+import kotlin.random.Random
 
 /**
  * Ce que la page Découverte a écarté, et ce qu'elle a appris de TMDB.
@@ -81,7 +82,17 @@ class DiscoveryRepository(
     private val prefs: DiscoveryPrefs = DiscoveryPrefs(),
 ) {
 
-    suspend fun build(apiKey: String, mood: MoodAnswers): DiscoveryState {
+    /**
+     * Construit la page.
+     *
+     * [tirage] est le nombre de fois qu'on a demandé à **rebattre les cartes**.
+     * Il ne change rien aux recettes, seulement à ce qu'elles servent : les
+     * groupes bâtis sur TMDB demandent une autre page, ceux bâtis sur
+     * l'historique rebattent leur ordre. Sans lui, « Redistribuer » recalculait
+     * scrupuleusement le même résultat — techniquement juste, et parfaitement
+     * inutile pour qui cherche à découvrir.
+     */
+    suspend fun build(apiKey: String, mood: MoodAnswers, tirage: Int = 0): DiscoveryState {
         if (apiKey.isBlank()) return DiscoveryState.NeedsKey
 
         val history = watch.history.first()
@@ -108,11 +119,11 @@ class DiscoveryRepository(
 
         val groupes = coroutineScope {
             listOf(
-                async { runCatching { humeur(apiKey, mood, exclus) }.getOrNull() },
-                async { runCatching { recoupement(apiKey, history, exclus) }.getOrNull() },
-                async { runCatching { sagas(apiKey, history, seen, masques) }.getOrNull() },
-                async { runCatching { revoir(history, masques) }.getOrNull() },
-                async { runCatching { pepites(apiKey, history, mood, exclus) }.getOrNull() },
+                async { runCatching { humeur(apiKey, mood, exclus, tirage) }.getOrNull() },
+                async { runCatching { recoupement(apiKey, history, exclus, tirage) }.getOrNull() },
+                async { runCatching { sagas(apiKey, history, seen, masques, tirage) }.getOrNull() },
+                async { runCatching { revoir(history, masques, tirage) }.getOrNull() },
+                async { runCatching { pepites(apiKey, history, mood, exclus, tirage) }.getOrNull() },
             ).awaitAll()
         }.filterNotNull().filter { it.cards.isNotEmpty() }
 
@@ -131,21 +142,25 @@ class DiscoveryRepository(
         apiKey: String,
         mood: MoodAnswers,
         exclus: Set<String>,
+        tirage: Int,
     ): DiscoveryGroup? {
         if (!mood.isComplete) return null
-        val items = tmdb.discoverMood(
-            apiKey = apiKey,
-            isTv = mood.wantsTv,
-            genres = mood.genres,
-            // Trié par note, pas par popularité : c'est ce qui sépare une
-            // découverte d'un carrousel. Le plancher de votes évite les 10/10
-            // sur trois votants, qui ne sont pas une note mais du bruit.
-            sortBy = "vote_average.desc",
-            minRating = 6.2,
-            minVotes = 300,
-            maxRuntime = mood.maxRuntime,
-            minRuntime = mood.minRuntime,
-        )
+        val items = pageTiree(tirage) { page ->
+            tmdb.discoverMood(
+                apiKey = apiKey,
+                isTv = mood.wantsTv,
+                genres = mood.genres,
+                // Trié par note, pas par popularité : c'est ce qui sépare une
+                // découverte d'un carrousel. Le plancher de votes évite les
+                // 10/10 sur trois votants, qui ne sont pas une note mais du bruit.
+                sortBy = "vote_average.desc",
+                page = page,
+                minRating = 6.2,
+                minVotes = 300,
+                maxRuntime = mood.maxRuntime,
+                minRuntime = mood.minRuntime,
+            )
+        }
         return groupe(DiscoveryKind.HUMEUR, items, exclus)
     }
 
@@ -162,6 +177,7 @@ class DiscoveryRepository(
         apiKey: String,
         history: List<HistoryEntry>,
         exclus: Set<String>,
+        tirage: Int,
     ): DiscoveryGroup? {
         val graines = history.distinctBy { it.titleKey }.take(GRAINES)
         if (graines.isEmpty()) return null
@@ -187,11 +203,23 @@ class DiscoveryRepository(
             }
         }
 
+        /*
+         * Le classement reste le recoupement, mais **les ex aequo sont
+         * rebattus**.
+         *
+         * Avec six graines, l'immense majorité des candidats est à un seul
+         * recoupement : ce paquet-là est énorme, et c'est lui qu'on voit en
+         * premier. Le trier par note donnait toujours la même tête de liste, si
+         * bien que « Redistribuer » ne redistribuait rien. Brasser à l'intérieur
+         * d'un même score change ce qui se présente sans jamais faire passer un
+         * titre désigné une fois devant un titre désigné trois fois.
+         */
+        val des = Random(tirage)
         val classes = score.entries
-            .sortedWith(
-                compareByDescending<Map.Entry<Pair<Int, Boolean>, Int>> { it.value }
-                    .thenByDescending { parId[it.key]?.voteAverage ?: 0.0 },
-            )
+            .groupBy { it.value }
+            .toSortedMap(compareByDescending { it })
+            .values
+            .flatMap { paquet -> paquet.shuffled(des) }
             .mapNotNull { parId[it.key] }
 
         return groupe(
@@ -213,6 +241,7 @@ class DiscoveryRepository(
     private suspend fun revoir(
         history: List<HistoryEntry>,
         masques: Set<String>,
+        tirage: Int,
     ): DiscoveryGroup? {
         val limite = MoovieClock.now() - JOURS_REVOIR * 24L * 3600_000L
         val cartes = history
@@ -227,8 +256,11 @@ class DiscoveryRepository(
                     posterUrl = it.imageUrl,
                 )
             }
+        // Brassé plutôt que trié par date : l'ordre chronologique donnait
+        // toujours les mêmes trois titres en tête, et ce groupe n'a aucune
+        // raison d'être ordonné — tout y a été vu il y a longtemps.
         return cartes.takeIf { it.size >= 2 }
-            ?.let { DiscoveryGroup(DiscoveryKind.REVOIR, it) }
+            ?.let { DiscoveryGroup(DiscoveryKind.REVOIR, it.shuffled(Random(tirage))) }
     }
 
     /**
@@ -244,6 +276,7 @@ class DiscoveryRepository(
         history: List<HistoryEntry>,
         seen: Set<String>,
         masques: Set<String>,
+        tirage: Int,
     ): DiscoveryGroup? {
         val films = history.filterNot { it.isTv }.distinctBy { it.tmdbId }.take(FILMS_SAGA)
         if (films.isEmpty()) return null
@@ -303,6 +336,7 @@ class DiscoveryRepository(
         history: List<HistoryEntry>,
         mood: MoodAnswers,
         exclus: Set<String>,
+        tirage: Int,
     ): DiscoveryGroup? {
         // Les genres de l'historique sont des **noms** (relevés à l'ouverture
         // d'une fiche), et `discover` veut des identifiants : la table de
@@ -319,16 +353,38 @@ class DiscoveryRepository(
                 .take(3)
         }
 
-        val items = tmdb.discoverMood(
-            apiKey = apiKey,
-            isTv = false,
-            genres = genres,
-            sortBy = "vote_average.desc",
-            minRating = 6.8,
-            minVotes = VOTES_MIN,
-            maxVotes = VOTES_MAX,
-        )
+        val items = pageTiree(tirage) { page ->
+            tmdb.discoverMood(
+                apiKey = apiKey,
+                isTv = false,
+                genres = genres,
+                sortBy = "vote_average.desc",
+                page = page,
+                minRating = 6.8,
+                minVotes = VOTES_MIN,
+                maxVotes = VOTES_MAX,
+            )
+        }
         return groupe(DiscoveryKind.PEPITES, items, exclus)
+    }
+
+    /**
+     * Une page de découverte, choisie par le tirage, avec repli sur la première.
+     *
+     * Les pages profondes ne sont pas garanties : nos filtres sont serrés (la
+     * bande de votes des pépites, surtout), et rien ne dit que TMDB ait trois
+     * pages à offrir. Une page maigre ferait disparaître le groupe — alors que
+     * l'utilisateur vient précisément de demander à en voir plus. On revient
+     * donc à la première dès que la moisson est trop courte.
+     */
+    private suspend fun pageTiree(
+        tirage: Int,
+        bloc: suspend (page: Int) -> List<TmdbItem>,
+    ): List<TmdbItem> {
+        val page = 1 + (tirage % PAGES)
+        if (page == 1) return bloc(1)
+        val tirees = runCatching { bloc(page) }.getOrDefault(emptyList())
+        return if (tirees.size >= MOISSON_MINI) tirees else bloc(1)
     }
 
     private fun groupe(
@@ -358,6 +414,18 @@ class DiscoveryRepository(
 
         /** Films d'historique dont on cherche la saga. Voir le cache dans [DiscoveryPrefs]. */
         const val FILMS_SAGA = 12
+
+        /**
+         * Pages TMDB parcourues en boucle par « Redistribuer ».
+         *
+         * Trois : de quoi ne pas revoir la même main deux fois de suite, sans
+         * s'enfoncer dans une queue de catalogue où les filtres ne rendent plus
+         * grand-chose.
+         */
+        const val PAGES = 3
+
+        /** En deçà, la page tirée est jugée trop maigre et on revient à la première. */
+        const val MOISSON_MINI = 5
 
         const val JOURS_REVOIR = 90
         const val VOTES_MIN = 300
