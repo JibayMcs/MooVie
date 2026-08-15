@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -38,6 +39,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -217,47 +219,128 @@ private fun EnTete(
     mood: MoodAnswers,
     onEditMood: () -> Unit,
 ) {
-    Row(
+    /*
+     * ### Pourquoi ça s'empile au doigt
+     *
+     * Une fois les questions répondues, la pastille d'humeur ne dit plus
+     * « Régler l'humeur » mais « Détendue · Deux · Une vraie soirée ». Dans une
+     * `Row`, un enfant sans contrainte est mesuré à sa largeur naturelle : la
+     * pastille prenait donc toute la place et **poussait le bouton de
+     * rechargement hors de l'écran**. Sur un téléphone, répondre au
+     * questionnaire faisait disparaître le seul moyen de redistribuer.
+     *
+     * C'est le piège déjà consigné pour `SettingRow` et la rangée de
+     * disposition de l'accueil : une rangée qui sépare un libellé et des
+     * contrôles suppose une largeur qu'un portrait n'a pas. La réponse est la
+     * même — on empile.
+     *
+     * Sur grand écran la rangée reste unique, mais la pastille y est bornée par
+     * un poids : même dans une fenêtre étroite, elle rétrécit et s'abrège au
+     * lieu de chasser ses voisines.
+     */
+    val empile = useBottomNav
+
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = hPad(), vertical = if (useBottomNav) 16.dp else 32.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
+            .padding(horizontal = hPad(), vertical = if (empile) 16.dp else 32.dp),
     ) {
-        if (showBackButton) {
-            MoovieIconButton(
-                onClick = onBack,
-                icon = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = stringResource(Res.string.common_back),
-            )
-        }
-        Text(
-            stringResource(Res.string.discovery_title),
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.SemiBold,
-        )
-        Spacer(Modifier.weight(1f))
-        // Les réponses restent visibles et modifiables : ce n'est pas un sas
-        // franchi une fois, c'est un réglage de la page.
-        MoovieButton(onClick = onEditMood) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            if (showBackButton) {
+                MoovieIconButton(
+                    onClick = onBack,
+                    icon = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = stringResource(Res.string.common_back),
+                )
+            }
+            // Le titre absorbe le mou et **remplace le Spacer** : deux poids
+            // dans la même rangée se partageaient la place moitié-moitié, et le
+            // titre s'abrégeait en « Découve… » alors qu'il y avait de la place
+            // de reste. Un seul enfant élastique, c'est lui.
             Text(
-                if (mood.isComplete) {
-                    // `map` est inline, `joinToString` ne l'est pas : un
-                    // `stringResource` ne peut vivre que dans le premier.
-                    mood.options.map { stringResource(optionLabel(it.id)) }
-                        .joinToString(" · ")
-                } else {
-                    stringResource(Res.string.discovery_mood_edit)
-                },
-                style = MaterialTheme.typography.labelMedium,
+                stringResource(Res.string.discovery_title),
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            if (!empile) {
+                // **Pas de poids ici.** Deux enfants élastiques dans la même
+                // rangée se partagent le mou moitié-moitié : la pastille et le
+                // rechargement se retrouvaient plantés au milieu, avec un vide
+                // de deux cents pixels à leur droite. Le titre est seul à
+                // s'étirer, ces deux-là se posent donc au bord.
+                //
+                // Une borne haute suffit à les protéger d'un libellé trop long
+                // dans une fenêtre étroite : le texte s'abrège, il ne pousse
+                // personne.
+                PastilleHumeur(
+                    mood = mood,
+                    onClick = onEditMood,
+                    modifier = Modifier.widthIn(max = 420.dp),
+                )
+            }
+            // Dernier de la rangée, et jamais contraint : c'est le seul bouton
+            // qui redistribue la page, il ne doit dépendre de la longueur
+            // d'aucun texte voisin.
+            MoovieIconButton(
+                onClick = onReload,
+                icon = Icons.Default.Refresh,
+                contentDescription = stringResource(Res.string.discovery_reload),
             )
         }
-        MoovieIconButton(
-            onClick = onReload,
-            icon = Icons.Default.Refresh,
-            contentDescription = stringResource(Res.string.discovery_reload),
+        if (empile) {
+            Spacer(Modifier.height(6.dp))
+            PastilleHumeur(mood = mood, onClick = onEditMood)
+        }
+    }
+}
+
+/**
+ * Les réponses au questionnaire, visibles et modifiables.
+ *
+ * Ce n'est pas un sas franchi une fois, c'est un réglage de la page : on doit
+ * pouvoir lire ce qui oriente les propositions, et le changer d'un appui.
+ */
+@Composable
+private fun PastilleHumeur(
+    mood: MoodAnswers,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    /*
+     * Une icône, et le liseré d'état quand des réponses existent.
+     *
+     * Un `MoovieButton` au repos n'a **pas de fond** : c'est l'identité de
+     * l'application, et elle tient parce que le focus ou le survol le
+     * révèlent. Au doigt, rien ne le révèle jamais — posée seule sous le titre,
+     * la pastille se lisait comme du texte égaré plutôt que comme un contrôle.
+     * L'icône lui rend sa nature ; `selected` dit qu'une réponse est en place.
+     */
+    MoovieButton(onClick = onClick, modifier = modifier, selected = mood.isComplete) {
+        Icon(
+            imageVector = Icons.Default.Tune,
+            contentDescription = null,
+            modifier = Modifier.size(16.dp),
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            if (mood.isComplete) {
+                // `map` est inline, `joinToString` ne l'est pas : un
+                // `stringResource` ne peut vivre que dans le premier.
+                mood.options.map { stringResource(optionLabel(it.id)) }
+                    .joinToString(" · ")
+            } else {
+                stringResource(Res.string.discovery_mood_edit)
+            },
+            style = MaterialTheme.typography.labelMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
