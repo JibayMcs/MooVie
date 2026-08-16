@@ -43,7 +43,29 @@ enum class MoodQuestion { HUMEUR, AVEC, TEMPS }
 data class MoodOption(
     val id: String,
     val question: MoodQuestion,
+    /**
+     * Genres demandés. **Seule la question de l'humeur en porte.**
+     *
+     * C'est la correction d'un défaut mesuré : les genres des trois questions
+     * étaient réunis en OU, si bien qu'une « soirée horreur en solo » demandait
+     * horreur *ou* mystère *ou* drame *ou* science-fiction — et rendait des
+     * drames. La question qui dit ce qu'on veut regarder est l'humeur ; les
+     * deux autres n'ont pas à la diluer.
+     */
     val genres: List<Int> = emptyList(),
+    /**
+     * Genres écartés, portés par « avec qui ».
+     *
+     * Une exclusion ne peut jamais contredire l'humeur : celles qui recoupent
+     * les genres demandés sont abandonnées (voir [MoodAnswers.exclureGenres]).
+     * Sans ce garde-fou, « envie d'avoir peur » + « la famille » ne rendrait
+     * rien du tout.
+     */
+    val exclure: List<Int> = emptyList(),
+    /** Plancher de votes propre à la réponse. Plus bas = plus confidentiel. */
+    val votesMin: Int? = null,
+    /** Plancher de note propre à la réponse. Plus haut = valeurs sûres. */
+    val noteMin: Double? = null,
     val maxRuntime: Int? = null,
     val minRuntime: Int? = null,
     val wantsTv: Boolean = false,
@@ -72,6 +94,7 @@ private object G {
     const val ROMANCE = 10749
     const val SF = 878
     const val THRILLER = 53
+    const val DOCUMENTAIRE = 99
 }
 
 /** Le questionnaire, dans l'ordre où il est posé. */
@@ -82,12 +105,13 @@ val MOOD_OPTIONS: List<MoodOption> = listOf(
     MoodOption("rire", MoodQuestion.HUMEUR, listOf(G.COMEDIE)),
     MoodOption("peur", MoodQuestion.HUMEUR, listOf(G.HORREUR, G.MYSTERE)),
 
-    // 2 — avec qui. La meilleure question du lot : elle change plus de choses
-    // que le genre, et aucun catalogue ne la pose.
-    MoodOption("seul", MoodQuestion.AVEC, listOf(G.DRAME, G.MYSTERE, G.SF)),
-    MoodOption("deux", MoodQuestion.AVEC, listOf(G.ROMANCE, G.DRAME)),
-    MoodOption("amis", MoodQuestion.AVEC, listOf(G.COMEDIE, G.ACTION, G.HORREUR)),
-    MoodOption("famille", MoodQuestion.AVEC, listOf(G.FAMILLE, G.ANIMATION, G.FANTASTIQUE)),
+    // 2 — avec qui. Elle n'ajoute **aucun** genre : elle écarte, ou elle règle
+    // l'exigence. C'est ce qui lui permet de rester la meilleure question du
+    // lot sans jamais noyer l'humeur qu'on vient de choisir.
+    MoodOption("seul", MoodQuestion.AVEC, votesMin = 80),
+    MoodOption("deux", MoodQuestion.AVEC, noteMin = 7.0),
+    MoodOption("amis", MoodQuestion.AVEC, exclure = listOf(G.DRAME, G.DOCUMENTAIRE)),
+    MoodOption("famille", MoodQuestion.AVEC, exclure = listOf(G.HORREUR, G.THRILLER)),
 
     // 3 — le temps. Un film de 2 h 40 un mardi soir, c'est un film qu'on ne
     // finira pas ; la reprise le sait déjà, autant le demander avant.
@@ -105,8 +129,14 @@ fun moodOption(id: String): MoodOption? = MOOD_OPTIONS.firstOrNull { it.id == id
 /**
  * Les réponses retenues, telles que la page les applique.
  *
- * Les genres des deux premières questions sont **réunis, pas croisés** : « sous
- * tension » et « à deux » veut dire thriller ou drame, pas thriller ET drame.
+ * **Une seule question porte les genres, et c'est l'humeur.** Les réunir toutes
+ * les trois en OU paraissait généreux et rendait la page absurde : « envie
+ * d'avoir peur, en solo » demandait horreur ou mystère ou drame ou
+ * science-fiction, et servait des drames. « Avec qui » écarte ou règle
+ * l'exigence, « combien de temps » borne la durée.
+ *
+ * Les genres de l'humeur, eux, restent **réunis et non croisés** : « sous
+ * tension » veut dire thriller ou policier, pas thriller ET policier.
  * L'intersection est le piège dans lequel tombe la page de Movix — trois genres
  * exigés ensemble ne rendent presque rien, et il faut enchaîner des replis
  * jusqu'à servir autre chose que ce qui était demandé.
@@ -118,7 +148,20 @@ data class MoodAnswers(val ids: List<String> = emptyList()) {
     val isComplete: Boolean
         get() = MoodQuestion.entries.all { q -> options.any { it.question == q } }
 
+    /** Ce qu'on veut regarder : l'humeur, et elle seule. */
     val genres: List<Int> get() = options.flatMap { it.genres }.distinct()
+
+    /**
+     * Ce qu'on écarte, **jamais au détriment de l'humeur**.
+     *
+     * Une exclusion qui recoupe un genre demandé est abandonnée : « envie
+     * d'avoir peur » avec « la famille » rend de l'horreur, pas le vide.
+     */
+    val exclureGenres: List<Int>
+        get() = options.flatMap { it.exclure }.distinct() - genres.toSet()
+
+    val votesMin: Int? get() = options.firstNotNullOfOrNull { it.votesMin }
+    val noteMin: Double? get() = options.firstNotNullOfOrNull { it.noteMin }
     val maxRuntime: Int? get() = options.firstNotNullOfOrNull { it.maxRuntime }
     val minRuntime: Int? get() = options.firstNotNullOfOrNull { it.minRuntime }
     val wantsTv: Boolean get() = options.any { it.wantsTv }

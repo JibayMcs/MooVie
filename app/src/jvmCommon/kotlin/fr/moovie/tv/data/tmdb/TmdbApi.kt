@@ -104,6 +104,8 @@ interface TmdbApi {
         @Query("language") language: String,
         /** Genres joints par `|` (OU). Vide = tout le catalogue. */
         @Query("with_genres") genres: String? = null,
+        /** Genres écartés, joints par `,`. Ici la virgule est bien un ET-NON. */
+        @Query("without_genres") sansGenres: String? = null,
         @Query("sort_by") sortBy: String = "vote_average.desc",
         @Query("page") page: Int = 1,
         @Query("vote_average.gte") minRating: Double? = null,

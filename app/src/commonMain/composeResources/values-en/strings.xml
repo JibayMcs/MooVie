@@ -608,13 +608,13 @@
     <string name="discovery_opt_peur">In for a scare</string>
     <string name="discovery_optd_peur">horror, mystery</string>
     <string name="discovery_opt_seul">On your own</string>
-    <string name="discovery_optd_seul">drama, mystery, sci-fi</string>
+    <string name="discovery_optd_seul">including demanding and obscure</string>
     <string name="discovery_opt_deux">Two of you</string>
-    <string name="discovery_optd_deux">romance, drama</string>
+    <string name="discovery_optd_deux">safe bets, highly rated</string>
     <string name="discovery_opt_amis">With friends</string>
-    <string name="discovery_optd_amis">comedy, action, horror</string>
+    <string name="discovery_optd_amis">brisk, no drama or documentary</string>
     <string name="discovery_opt_famille">The family</string>
-    <string name="discovery_optd_famille">all ages, animation</string>
+    <string name="discovery_optd_famille">all ages, no horror or thriller</string>
     <string name="discovery_opt_court">Under 1 h 40</string>
     <string name="discovery_optd_court">runtime 100 min or less</string>
     <string name="discovery_opt_soiree">A proper evening</string>
@@ -623,4 +623,5 @@
     <string name="discovery_optd_peuimporte">no runtime filter</string>
     <string name="discovery_opt_serie">A series to follow</string>
     <string name="discovery_optd_serie">series only</string>
+    <string name="discovery_quiz_reset">Clear the answers</string>
 </resources>

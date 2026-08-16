@@ -610,13 +610,13 @@
     <string name="discovery_opt_peur">Envie d’avoir peur</string>
     <string name="discovery_optd_peur">horreur, mystère</string>
     <string name="discovery_opt_seul">Personne d’autre</string>
-    <string name="discovery_optd_seul">drame, mystère, science-fiction</string>
+    <string name="discovery_optd_seul">y compris exigeant et confidentiel</string>
     <string name="discovery_opt_deux">Deux</string>
-    <string name="discovery_optd_deux">romance, drame</string>
+    <string name="discovery_optd_deux">des valeurs sûres, bien notées</string>
     <string name="discovery_opt_amis">Des amis</string>
-    <string name="discovery_optd_amis">comédie, action, horreur</string>
+    <string name="discovery_optd_amis">rythmé, sans drame ni documentaire</string>
     <string name="discovery_opt_famille">La famille</string>
-    <string name="discovery_optd_famille">tout public, animation</string>
+    <string name="discovery_optd_famille">tout public, sans horreur ni thriller</string>
     <string name="discovery_opt_court">Moins de 1 h 40</string>
     <string name="discovery_optd_court">durée de 100 min au plus</string>
     <string name="discovery_opt_soiree">Une vraie soirée</string>
@@ -625,4 +625,5 @@
     <string name="discovery_optd_peuimporte">aucun filtre de durée</string>
     <string name="discovery_opt_serie">Une série à suivre</string>
     <string name="discovery_optd_serie">séries uniquement</string>
+    <string name="discovery_quiz_reset">Effacer les réponses</string>
 </resources>

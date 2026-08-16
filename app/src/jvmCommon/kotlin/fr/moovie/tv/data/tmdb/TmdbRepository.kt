@@ -230,6 +230,7 @@ class TmdbRepository(
         apiKey: String,
         isTv: Boolean,
         genres: List<Int> = emptyList(),
+        sansGenres: List<Int> = emptyList(),
         sortBy: String = "vote_average.desc",
         page: Int = 1,
         minRating: Double? = null,
@@ -244,6 +245,8 @@ class TmdbRepository(
         language = language,
         // Le tube, jamais la virgule : voir TmdbApi.discoverMood.
         genres = genres.takeIf { it.isNotEmpty() }?.joinToString("|"),
+        // La virgule ici : on écarte tout ce qui porte l'un **ou** l'autre.
+        sansGenres = sansGenres.takeIf { it.isNotEmpty() }?.joinToString(","),
         sortBy = sortBy,
         page = page,
         minRating = minRating,

@@ -608,13 +608,13 @@
     <string name="discovery_opt_peur">Ganas de pasar miedo</string>
     <string name="discovery_optd_peur">terror, misterio</string>
     <string name="discovery_opt_seul">Nadie más</string>
-    <string name="discovery_optd_seul">drama, misterio, ciencia ficción</string>
+    <string name="discovery_optd_seul">incluso exigente y poco conocida</string>
     <string name="discovery_opt_deux">Dos</string>
-    <string name="discovery_optd_deux">romance, drama</string>
+    <string name="discovery_optd_deux">apuestas seguras, bien valoradas</string>
     <string name="discovery_opt_amis">Con amigos</string>
-    <string name="discovery_optd_amis">comedia, acción, terror</string>
+    <string name="discovery_optd_amis">ágil, sin drama ni documental</string>
     <string name="discovery_opt_famille">La familia</string>
-    <string name="discovery_optd_famille">para todos, animación</string>
+    <string name="discovery_optd_famille">para todos, sin terror ni thriller</string>
     <string name="discovery_opt_court">Menos de 1 h 40</string>
     <string name="discovery_optd_court">duración de 100 min como mucho</string>
     <string name="discovery_opt_soiree">Una velada entera</string>
@@ -623,4 +623,5 @@
     <string name="discovery_optd_peuimporte">sin filtro de duración</string>
     <string name="discovery_opt_serie">Una serie para seguir</string>
     <string name="discovery_optd_serie">solo series</string>
+    <string name="discovery_quiz_reset">Borrar las respuestas</string>
 </resources>

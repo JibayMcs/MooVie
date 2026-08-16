@@ -155,8 +155,12 @@ class DiscoveryRepository(
                 // 10/10 sur trois votants, qui ne sont pas une note mais du bruit.
                 sortBy = "vote_average.desc",
                 page = page,
-                minRating = 6.2,
-                minVotes = 300,
+                // « Avec qui » n'ajoute aucun genre : elle écarte, ou elle
+                // règle l'exigence. C'est ce qui empêche une soirée horreur en
+                // solo de se retrouver pleine de drames.
+                sansGenres = mood.exclureGenres,
+                minRating = mood.noteMin ?: 6.2,
+                minVotes = mood.votesMin ?: 300,
                 maxRuntime = mood.maxRuntime,
                 minRuntime = mood.minRuntime,
             )
