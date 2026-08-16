@@ -2,6 +2,8 @@ package fr.moovie.tv.ui.discovery
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,9 +15,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.RestartAlt
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -35,6 +41,7 @@ import fr.moovie.tv.data.discovery.MoodQuestion
 import fr.moovie.tv.data.discovery.moodOptionsFor
 import fr.moovie.tv.resources.Res
 import fr.moovie.tv.resources.discovery_quiz_skip
+import fr.moovie.tv.resources.discovery_quiz_reset
 import fr.moovie.tv.resources.mood_amis
 import fr.moovie.tv.resources.mood_court
 import fr.moovie.tv.resources.mood_detendue
@@ -74,13 +81,33 @@ fun MoodQuizContent(
     answers: MoodAnswers,
     onAnswer: (MoodOption) -> Unit,
     onSkip: () -> Unit,
+    /** Efface les trois réponses. Null tant qu'il n'y a rien à effacer. */
+    onReset: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val hPad = if (useBottomNav) 16.dp else 40.dp
     val options = remember(question) { moodOptionsFor(question) }
     val choisie = answers.answerFor(question)
 
-    Column(modifier = modifier.fillMaxSize().padding(top = if (useBottomNav) 16.dp else 40.dp)) {
+    /*
+     * **Défilant, et c'est une correction de bug.**
+     *
+     * Un téléviseur 1080p n'offre que 540 dp de haut. L'en-tête de la page, la
+     * question, son sous-titre et une carte de réponse en 4:3 dépassaient ce
+     * budget : le bouton « Passer » tombait sous la ligne de flottaison, et
+     * comme rien ne défilait, il était purement inatteignable — sur l'appareil
+     * qui n'a ni doigt ni molette pour aller le chercher.
+     *
+     * Le conteneur défile donc, et c'est le **focus** qui le pilote : la
+     * télécommande descend des cartes vers les boutons, et Compose amène de
+     * lui-même l'élément focalisé dans le champ de vision.
+     */
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(top = if (useBottomNav) 16.dp else 40.dp, bottom = 32.dp),
+    ) {
         // Progression : trois traits, pas un pourcentage. On veut savoir
         // combien il en reste, pas où l'on en est à un pour cent près.
         Row(
@@ -139,9 +166,27 @@ fun MoodQuizContent(
         }
 
         Spacer(Modifier.height(20.dp))
-        Row(modifier = Modifier.padding(horizontal = hPad)) {
+        Row(
+            modifier = Modifier.padding(horizontal = hPad),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
             MoovieButton(onClick = onSkip) {
                 Text(stringResource(Res.string.discovery_quiz_skip))
+            }
+            // Effacer les réponses n'avait **aucun chemin** : la pastille de
+            // l'en-tête rouvre le questionnaire, mais rien ne permettait de
+            // revenir à une page sans humeur. Un bouton nommé, à côté de
+            // « Passer », plutôt qu'une icône à deviner.
+            onReset?.let { reset ->
+                MoovieButton(onClick = reset) {
+                    Icon(
+                        imageVector = Icons.Default.RestartAlt,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(Res.string.discovery_quiz_reset))
+                }
             }
         }
     }

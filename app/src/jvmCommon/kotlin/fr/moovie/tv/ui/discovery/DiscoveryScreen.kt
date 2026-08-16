@@ -150,6 +150,7 @@ fun DiscoveryScreenContent(
     onMarkSeen: (DiscoveryCard) -> Unit,
     onToggleWatchlist: (DiscoveryCard) -> Unit,
     onAnswer: (MoodOption) -> Unit,
+    onClearMood: () -> Unit = {},
     onReload: () -> Unit,
     onBack: () -> Unit = {},
     showBackButton: Boolean = false,
@@ -181,6 +182,14 @@ fun DiscoveryScreenContent(
                         quiz = MoodQuestion.entries.getOrNull(q.ordinal + 1)
                     },
                     onSkip = { quiz = null },
+                    // Rien à effacer tant qu'aucune réponse n'existe : un
+                    // bouton qui ne peut rien faire vaut moins que pas de
+                    // bouton du tout.
+                    onReset = if (mood.options.isNotEmpty()) {
+                        { onClearMood(); quiz = MoodQuestion.HUMEUR }
+                    } else {
+                        null
+                    },
                 )
 
                 state is DiscoveryState.Loading -> Message(stringResource(Res.string.discovery_reload))

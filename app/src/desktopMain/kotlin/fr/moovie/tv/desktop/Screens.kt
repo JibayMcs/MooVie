@@ -161,6 +161,7 @@ internal fun DesktopDiscoveryScreen(
         onMarkSeen = vm::markSeen,
         onToggleWatchlist = vm::toggleWatchlist,
         onAnswer = vm::answer,
+        onClearMood = vm::clearMood,
         onReload = vm::reload,
         onBack = onBack,
         showBackButton = true,

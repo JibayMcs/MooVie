@@ -33,6 +33,7 @@ fun DiscoveryScreen(
         onMarkSeen = viewModel::markSeen,
         onToggleWatchlist = viewModel::toggleWatchlist,
         onAnswer = viewModel::answer,
+        onClearMood = viewModel::clearMood,
         onReload = viewModel::reload,
         onBack = onBack,
         showBackButton = showBackButton,
