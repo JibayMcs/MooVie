@@ -112,6 +112,7 @@ import fr.moovie.tv.ui.download.DownloadPosterBadge
 import fr.moovie.tv.ui.download.ProvideTitleDownloads
 import fr.moovie.tv.ui.components.MoovieCard
 import fr.moovie.tv.ui.adaptive.useBottomNav
+import fr.moovie.tv.ui.components.MoovieFocusLabel
 import fr.moovie.tv.ui.components.MoovieIconButton
 import fr.moovie.tv.ui.download.DownloadCountBadge
 import fr.moovie.tv.ui.download.rememberActiveDownloadCount
@@ -270,40 +271,48 @@ fun HomeScreenContent(
                     modifier = Modifier.align(Alignment.TopEnd).padding(horizontal = 32.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    MoovieIconButton(
-                        onClick = onOpenSearch,
-                        icon = Icons.Default.Search,
-                        contentDescription = stringResource(Res.string.home_search),
-                        modifier = headerDown,
-                    )
+                    MoovieFocusLabel(stringResource(Res.string.home_search)) {
+                        MoovieIconButton(
+                            onClick = onOpenSearch,
+                            icon = Icons.Default.Search,
+                            contentDescription = stringResource(Res.string.home_search),
+                            modifier = headerDown,
+                        )
+                    }
                     // Découverte : troisième geste, encore différent des deux
                     // autres. La recherche répond à « je cherche ce titre », le
                     // catalogue à « montre-moi de la science-fiction », et
                     // celui-ci à « je ne sais pas quoi regarder » — la seule
                     // question qui n'a rien à formuler.
-                    MoovieIconButton(
-                        onClick = onOpenDiscovery,
-                        icon = Icons.Default.AutoAwesome,
-                        contentDescription = stringResource(Res.string.discovery_open),
-                        modifier = headerDown,
-                    )
+                    MoovieFocusLabel(stringResource(Res.string.discovery_open)) {
+                        MoovieIconButton(
+                            onClick = onOpenDiscovery,
+                            icon = Icons.Default.AutoAwesome,
+                            contentDescription = stringResource(Res.string.discovery_open),
+                            modifier = headerDown,
+                        )
+                    }
                     // Parcourir par genre : geste distinct de la recherche par
                     // titre, d'où un bouton à part plutôt qu'un onglet caché
                     // derrière le champ de saisie.
-                    MoovieIconButton(
-                        onClick = onOpenCatalog,
-                        icon = Icons.Default.GridView,
-                        contentDescription = stringResource(Res.string.catalog_open),
-                        modifier = headerDown,
-                    )
+                    MoovieFocusLabel(stringResource(Res.string.catalog_open)) {
+                        MoovieIconButton(
+                            onClick = onOpenCatalog,
+                            icon = Icons.Default.GridView,
+                            contentDescription = stringResource(Res.string.catalog_open),
+                            modifier = headerDown,
+                        )
+                    }
                     // Entre la loupe et l'engrenage : le focus par défaut de la
                     // barre reste sur la recherche, l'historique est à un cran.
-                    MoovieIconButton(
-                        onClick = onOpenHistory,
-                        icon = Icons.Default.History,
-                        contentDescription = stringResource(Res.string.history_title),
-                        modifier = headerDown,
-                    )
+                    MoovieFocusLabel(stringResource(Res.string.history_title)) {
+                        MoovieIconButton(
+                            onClick = onOpenHistory,
+                            icon = Icons.Default.History,
+                            contentDescription = stringResource(Res.string.history_title),
+                            modifier = headerDown,
+                        )
+                    }
                     // Les téléchargements se surveillent, ils ne se règlent
                     // pas : leur place est ici, à côté de l'historique, et non
                     // à trois niveaux dans les réglages. Toujours visible même
@@ -313,13 +322,15 @@ fun HomeScreenContent(
                     // sur la barre basse : c'est la même icône, elle doit dire
                     // la même chose. Sans elle, un téléchargement lancé depuis
                     // la fiche ne se voyait nulle part sur cet écran.
-                    DownloadCountBadge(rememberActiveDownloadCount()) {
-                        MoovieIconButton(
-                            onClick = onOpenDownloads,
-                            icon = Icons.Default.Download,
-                            contentDescription = stringResource(Res.string.settings_cat_downloads),
-                            modifier = headerDown,
-                        )
+                    MoovieFocusLabel(stringResource(Res.string.settings_cat_downloads)) {
+                        DownloadCountBadge(rememberActiveDownloadCount()) {
+                            MoovieIconButton(
+                                onClick = onOpenDownloads,
+                                icon = Icons.Default.Download,
+                                contentDescription = stringResource(Res.string.settings_cat_downloads),
+                                modifier = headerDown,
+                            )
+                        }
                     }
                     // Télécommande : **seulement au doigt, et seulement si un
                     // téléviseur a été appairé**. Sur un téléviseur, se piloter
@@ -327,19 +338,23 @@ fun HomeScreenContent(
                     // un écran vide. Les deux conditions valent mieux qu'un
                     // bouton qui explique pourquoi il ne sert à rien.
                     if (onOpenRemote != null) {
+                        MoovieFocusLabel(stringResource(Res.string.remote_title)) {
+                            MoovieIconButton(
+                                onClick = onOpenRemote,
+                                icon = Icons.Default.SettingsRemote,
+                                contentDescription = stringResource(Res.string.remote_title),
+                                modifier = headerDown,
+                            )
+                        }
+                    }
+                    MoovieFocusLabel(stringResource(Res.string.home_settings)) {
                         MoovieIconButton(
-                            onClick = onOpenRemote,
-                            icon = Icons.Default.SettingsRemote,
-                            contentDescription = stringResource(Res.string.remote_title),
+                            onClick = onOpenSettings,
+                            icon = Icons.Default.Settings,
+                            contentDescription = stringResource(Res.string.home_settings),
                             modifier = headerDown,
                         )
                     }
-                    MoovieIconButton(
-                        onClick = onOpenSettings,
-                        icon = Icons.Default.Settings,
-                        contentDescription = stringResource(Res.string.home_settings),
-                        modifier = headerDown,
-                    )
                 }
                 }
             }
