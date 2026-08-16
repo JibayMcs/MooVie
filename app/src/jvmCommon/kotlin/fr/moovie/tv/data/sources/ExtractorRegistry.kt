@@ -104,6 +104,10 @@ object ProviderRegistry {
         CoflixProvider(ExtractorRegistry.http),
         CinestreamProvider(ExtractorRegistry.http),
         FrembedProvider(ExtractorRegistry.gateway),
+        // Après les catalogues déjà éprouvés : wiflix couvre moins de titres
+        // (il refuse ceux dont la date de sortie ne correspond pas à TMDB) mais
+        // apporte des hébergeurs que personne d'autre ne sert.
+        WiflixProvider(ExtractorRegistry.gateway),
         // Seul catalogue en version originale : c'est lui qui rend le réglage VO
         // utilisable, et l'app regardable pour un public non francophone.
         VidapiProvider(ExtractorRegistry.gateway),
