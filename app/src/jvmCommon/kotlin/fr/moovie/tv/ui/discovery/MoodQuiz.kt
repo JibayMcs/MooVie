@@ -1,6 +1,7 @@
 package fr.moovie.tv.ui.discovery
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
@@ -20,6 +21,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -163,21 +165,21 @@ fun MoodQuizContent(
                     onClick = { onAnswer(option) },
                 )
             }
+            // Passer est une **carte**, en bout de main, et non un bouton posé
+            // sous les autres. Deux raisons, toutes deux propres au téléviseur :
+            // la télécommande y arrive d'un coup de flèche droite au lieu de
+            // devoir descendre, et sur les 540 dp d'un 1080p le bouton tombait
+            // sous la ligne de flottaison. Une sortie qu'on ne peut pas
+            // atteindre n'est pas une sortie.
+            item(key = "passer") { PasserCard(onClick = onSkip) }
         }
 
-        Spacer(Modifier.height(20.dp))
-        Row(
-            modifier = Modifier.padding(horizontal = hPad),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            MoovieButton(onClick = onSkip) {
-                Text(stringResource(Res.string.discovery_quiz_skip))
-            }
-            // Effacer les réponses n'avait **aucun chemin** : la pastille de
-            // l'en-tête rouvre le questionnaire, mais rien ne permettait de
-            // revenir à une page sans humeur. Un bouton nommé, à côté de
-            // « Passer », plutôt qu'une icône à deviner.
-            onReset?.let { reset ->
+        // Effacer les réponses reste un bouton, et reste en bas : c'est le seul
+        // geste destructeur de l'écran, il n'a rien à faire dans la main où
+        // l'on choisit. Absent tant qu'il n'y a rien à effacer.
+        onReset?.let { reset ->
+            Spacer(Modifier.height(16.dp))
+            Row(modifier = Modifier.padding(horizontal = hPad)) {
                 MoovieButton(onClick = reset) {
                     Icon(
                         imageVector = Icons.Default.RestartAlt,
@@ -187,6 +189,52 @@ fun MoodQuizContent(
                     Spacer(Modifier.width(8.dp))
                     Text(stringResource(Res.string.discovery_quiz_reset))
                 }
+            }
+        }
+    }
+}
+
+/**
+ * La carte « Passer », en bout de main.
+ *
+ * Volontairement **sans illustration** : elle n'est pas une réponse de plus,
+ * elle sort du questionnaire. Même gabarit que ses voisines pour que la main
+ * reste régulière, mais un fond sourd et un simple contour au lieu d'une image,
+ * de sorte qu'on ne la choisisse jamais par méprise en parcourant les visuels.
+ */
+@Composable
+private fun PasserCard(onClick: () -> Unit) {
+    val largeur = if (useBottomNav) 128.dp else 168.dp
+    MoovieCard(onClick = onClick, focusedScale = 1.06f) {
+        Box(
+            modifier = Modifier
+                .width(largeur)
+                .aspectRatio(0.72f)
+                .clip(MoovieShape)
+                .background(
+                    Brush.verticalGradient(
+                        listOf(Color(0xFF17171D), Color(0xFF0C0C11)),
+                    ),
+                )
+                .border(1.dp, Color(0xFF2E2E38), MoovieShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                    contentDescription = null,
+                    tint = Color(0xFF9A9AA5),
+                    modifier = Modifier.size(26.dp),
+                )
+                Text(
+                    stringResource(Res.string.discovery_quiz_skip),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFFCFCFD8),
+                )
             }
         }
     }
