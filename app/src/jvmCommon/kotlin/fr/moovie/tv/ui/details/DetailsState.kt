@@ -71,6 +71,53 @@ enum class ProviderStatus { LOADING, DONE, EMPTY, FAILED }
 data class ProviderProgress(val name: String, val status: ProviderStatus)
 
 /**
+ * Pourquoi le panneau des sources est vide.
+ *
+ * « Aucune source disponible » recouvrait quatre situations que rien ne
+ * distinguait à l'écran, alors que le chargement les sépare déjà : un catalogue
+ * qui répond sans avoir le titre ([ProviderStatus.EMPTY]) et un catalogue
+ * injoignable ([ProviderStatus.FAILED]) ne veulent pas dire la même chose du
+ * tout. Le premier est une réponse — le titre n'existe pas chez nous ; le second
+ * est une panne, souvent le réseau, et l'utilisateur peut y faire quelque chose.
+ *
+ * C'est la faiblesse structurelle d'une application qui extrait ses sources sur
+ * l'appareil : elle *sait* pourquoi elle échoue, et jusqu'ici elle n'en disait
+ * rien. Le diagnostic est une fonction pure des statuts déjà collectés — aucun
+ * appel réseau supplémentaire, aucune heuristique.
+ */
+enum class SourceDiagnosis {
+    /** Tous les catalogues sont désactivés dans les réglages. */
+    NONE_ENABLED,
+
+    /** Aucun catalogue n'a répondu : réseau, DNS, ou domaines tous morts. */
+    UNREACHABLE,
+
+    /** Une partie a répondu sans résultat, le reste est injoignable. */
+    PARTIAL,
+
+    /** Tous ont répondu, aucun n'a ce titre. C'est une réponse, pas une panne. */
+    ABSENT,
+}
+
+/**
+ * Diagnostic d'un panneau vide, ou null tant que la recherche n'est pas finie —
+ * auquel cas il n'y a rien à conclure et l'appelant garde son indicateur de
+ * chargement.
+ */
+fun diagnoseEmptySources(state: SourcesState.Active): SourceDiagnosis? {
+    if (state.noProviderEnabled) return SourceDiagnosis.NONE_ENABLED
+    if (state.anyLoading) return null
+
+    val failed = state.providers.count { it.status == ProviderStatus.FAILED }
+    val answered = state.providers.size - failed
+    return when {
+        answered == 0 -> SourceDiagnosis.UNREACHABLE
+        failed > 0 -> SourceDiagnosis.PARTIAL
+        else -> SourceDiagnosis.ABSENT
+    }
+}
+
+/**
  * État du panneau de sources. Idle = fermé. Active = panneau ouvert (dès le clic),
  * avec les liens accumulés et la progression par provider, mis à jour en streaming.
  */
@@ -79,6 +126,15 @@ sealed interface SourcesState {
     data class Active(
         val links: List<EmbedLink>,
         val providers: List<ProviderProgress>,
+        /**
+         * L'utilisateur a désactivé **tous** les catalogues dans les réglages.
+         *
+         * Sans ce drapeau la liste de providers reste vide, donc [anyLoading]
+         * reste vrai, et le panneau tourne indéfiniment sur une recherche qui
+         * n'a jamais été lancée. Une liste vide ne peut pas porter les deux sens
+         * à la fois : « pas encore publiée » et « il n'y en a aucun ».
+         */
+        val noProviderEnabled: Boolean = false,
     ) : SourcesState {
         /**
          * Liste de providers vide = chargement tout juste démarré (elle n'arrive
@@ -87,7 +143,8 @@ sealed interface SourcesState {
          * cherché — c'est ce qui obligeait à appuyer deux fois sur OK.
          */
         val anyLoading: Boolean
-            get() = providers.isEmpty() || providers.any { it.status == ProviderStatus.LOADING }
+            get() = !noProviderEnabled &&
+                (providers.isEmpty() || providers.any { it.status == ProviderStatus.LOADING })
     }
 }
 

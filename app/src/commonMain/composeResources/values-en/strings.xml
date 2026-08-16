@@ -78,6 +78,23 @@
     <string name="details_no_player">No %1$s player worked.</string>
     <string name="details_lang_missing">No %1$s source — other languages available.</string>
     <string name="details_no_sources">No source available for this title.</string>
+    <string name="details_sources_none_enabled">No catalogue enabled, in Settings → Sources.</string>
+    <plurals name="details_sources_absent">
+        <item quantity="one">The catalogue queried does not have this title.</item>
+        <item quantity="other">None of the %1$d catalogues queried has this title.</item>
+    </plurals>
+    <plurals name="details_sources_unreachable">
+        <item quantity="one">The catalogue did not answer: check your connection.</item>
+        <item quantity="other">None of the %1$d catalogues answered: check your connection.</item>
+    </plurals>
+    <plurals name="details_sources_partial_absent">
+        <item quantity="one">%1$d catalogue does not have this title</item>
+        <item quantity="other">%1$d catalogues do not have this title</item>
+    </plurals>
+    <plurals name="details_sources_partial_failed">
+        <item quantity="one">%1$d is unreachable.</item>
+        <item quantity="other">%1$d are unreachable.</item>
+    </plurals>
     <string name="details_trying_source">Playing from %1$s…</string>
     <string name="details_searching_source">Searching for a source… %1$s</string>
     <string name="details_resolve_error">Can’t play “%1$s”. Try another player.</string>

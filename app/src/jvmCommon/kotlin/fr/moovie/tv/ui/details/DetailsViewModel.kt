@@ -842,6 +842,18 @@ class DetailsViewModel : ViewModel() {
             // interrogé tous les catalogues actifs aujourd'hui, sinon une mise à
             // jour qui en ajoute un resterait invisible sur les fiches déjà vues.
             val providers = activeProviders()
+            // Tout désactivé dans les réglages : il n'y a rien à interroger. Sans
+            // cette sortie, la liste vide passe pour « pas encore publiée » et le
+            // panneau reste en chargement pour toujours.
+            if (providers.isEmpty()) {
+                if (generation != loadGeneration) return@launch
+                _sources.value = SourcesState.Active(
+                    links = emptyList(),
+                    providers = emptyList(),
+                    noProviderEnabled = true,
+                )
+                return@launch
+            }
             val rank = providers.mapIndexed { i, p -> p.name to i }.toMap()
             val expected = providers.map { it.name }.toSet()
 

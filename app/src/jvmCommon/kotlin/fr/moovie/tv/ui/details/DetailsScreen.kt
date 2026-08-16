@@ -104,6 +104,11 @@ import fr.moovie.tv.resources.details_episodes_season
 import fr.moovie.tv.resources.details_lang_missing
 import fr.moovie.tv.resources.details_lang_unavailable
 import fr.moovie.tv.resources.details_no_sources
+import fr.moovie.tv.resources.details_sources_absent
+import fr.moovie.tv.resources.details_sources_none_enabled
+import fr.moovie.tv.resources.details_sources_partial_absent
+import fr.moovie.tv.resources.details_sources_partial_failed
+import fr.moovie.tv.resources.details_sources_unreachable
 import fr.moovie.tv.resources.details_play
 import fr.moovie.tv.resources.details_playing
 import fr.moovie.tv.resources.details_resume
@@ -223,6 +228,27 @@ private const val TRAILER_CHROME_IDLE_MS = 4_000L
  * comme une intention.
  */
 private const val CINEMA_SOUND_FADE_MS = 1_200
+
+/**
+ * Temps laissé au bandeau « langue indisponible » avant de s'effacer.
+ *
+ * Deux mots à lire — « VF indisponible » —, sur un écran qu'on regarde de loin
+ * et sans s'attendre à devoir lire. Quatre secondes couvrent le temps de
+ * remarquer qu'il est apparu, plus celui de le lire.
+ */
+private const val QUICKPLAY_BANNER_MS = 4_000L
+
+/**
+ * La même chose lorsque le bandeau porte **aussi** le motif.
+ *
+ * « 6 catalogues n'ont pas ce titre, 2 sont injoignables » fait une dizaine de
+ * mots, soit à peu près quatre secondes de plus au rythme d'un spectateur qui ne
+ * lisait pas — d'où le doublement plutôt qu'un arrondi choisi au jugé. Le
+ * bandeau ne bloque rien et se pose en bas de l'écran : le laisser trop
+ * longtemps ne coûte qu'un peu d'encombrement, le retirer trop tôt coûte
+ * l'information elle-même, qui est tout l'objet de cette ligne.
+ */
+private const val QUICKPLAY_BANNER_WITH_REASON_MS = 8_000L
 
 /**
  * Largeur d'une vignette du casting.
@@ -1340,9 +1366,24 @@ fun DetailsScreenContent(
         // Bannière de lecture rapide (recherche en cours / indisponible),
         // surtout utile pour les épisodes qui n'ont pas de bouton dédié.
         val q = quickPlay
+        // Calculé une fois : le motif décide de ce qu'on affiche *et* du temps
+        // qu'on laisse pour le lire. Deux calculs séparés finiraient par diverger,
+        // et le bandeau se retirerait au milieu d'une phrase.
+        val unavailableReason = (q as? QuickPlayState.Unavailable)
+            ?.let { sources as? SourcesState.Active }
+            ?.let { emptySourcesReason(it) }
         if (q is QuickPlayState.Unavailable) {
-            LaunchedEffect(q) {
-                delay(4000)
+            // Le motif peut arriver après le bandeau — un catalogue encore en
+            // vol au moment du verdict. La clé l'inclut donc, sinon la durée
+            // resterait celle d'une seule ligne.
+            LaunchedEffect(q, unavailableReason != null) {
+                delay(
+                    if (unavailableReason != null) {
+                        QUICKPLAY_BANNER_WITH_REASON_MS
+                    } else {
+                        QUICKPLAY_BANNER_MS
+                    },
+                )
                 onDismissQuickPlay()
             }
         }
@@ -1381,11 +1422,26 @@ fun DetailsScreenContent(
                             style = MaterialTheme.typography.bodyMedium,
                         )
                     }
-                    is QuickPlayState.Unavailable -> Text(
-                        stringResource(Res.string.details_lang_unavailable, q.lang),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color(0xFFE0A0A0),
-                    )
+                    // Ce bandeau est souvent le *seul* écran que l'utilisateur
+                    // voit : le panneau ne s'ouvre de lui-même que s'il y a des
+                    // liens, et ici il n'y en a aucun. Le motif doit donc être
+                    // ici, pas seulement dans le panneau.
+                    is QuickPlayState.Unavailable -> Column(
+                        verticalArrangement = Arrangement.spacedBy(2.dp),
+                    ) {
+                        Text(
+                            stringResource(Res.string.details_lang_unavailable, q.lang),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color(0xFFE0A0A0),
+                        )
+                        unavailableReason?.let {
+                            Text(
+                                it,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = Color.White.copy(alpha = 0.6f),
+                            )
+                        }
+                    }
                     else -> Unit
                 }
             }
@@ -1482,11 +1538,21 @@ private fun SourcesSlideOver(
 
         when {
             links.isEmpty() && state.anyLoading -> SkeletonRows(modifier = pPad)
-            links.isEmpty() -> Text(
-                stringResource(Res.string.details_no_sources),
-                color = Color(0xFFE0A0A0),
-                modifier = pPad,
-            )
+            links.isEmpty() -> Column(modifier = pPad, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    stringResource(Res.string.details_no_sources),
+                    color = Color(0xFFE0A0A0),
+                )
+                // Le « pourquoi », qui distingue un titre absent d'une panne
+                // réseau : sans lui les deux se lisent comme une app cassée.
+                emptySourcesReason(state)?.let {
+                    Text(
+                        it,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = Color.White.copy(alpha = 0.6f),
+                    )
+                }
+            }
             else -> LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 contentPadding = PaddingValues(horizontal = 24.dp),
@@ -1744,6 +1810,42 @@ private fun SourcesSummary(
                 color = Color(0xFFE06A6A),
             )
         }
+    }
+}
+
+/**
+ * Met en mots [diagnoseEmptySources] — ou null tant qu'on cherche encore.
+ *
+ * Toute l'information vient des statuts déjà collectés : c'est une mise en forme,
+ * pas une seconde enquête.
+ */
+@Composable
+private fun emptySourcesReason(state: SourcesState.Active): String? {
+    val diagnosis = diagnoseEmptySources(state) ?: return null
+    val failed = state.providers.count { it.status == ProviderStatus.FAILED }
+    val answered = state.providers.size - failed
+    return when (diagnosis) {
+        SourceDiagnosis.NONE_ENABLED ->
+            stringResource(Res.string.details_sources_none_enabled)
+
+        SourceDiagnosis.UNREACHABLE -> pluralStringResource(
+            Res.plurals.details_sources_unreachable,
+            state.providers.size,
+            state.providers.size,
+        )
+
+        SourceDiagnosis.ABSENT -> pluralStringResource(
+            Res.plurals.details_sources_absent,
+            answered,
+            answered,
+        )
+
+        // Les deux moitiés sont comptées séparément : « 1 catalogue n'a pas ce
+        // titre, 2 sont injoignables » ne se plie pas à un seul pluriel.
+        SourceDiagnosis.PARTIAL ->
+            pluralStringResource(Res.plurals.details_sources_partial_absent, answered, answered) +
+                ", " +
+                pluralStringResource(Res.plurals.details_sources_partial_failed, failed, failed)
     }
 }
 

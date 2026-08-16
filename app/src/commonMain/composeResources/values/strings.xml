@@ -80,6 +80,23 @@
     <string name="details_no_player">Aucun lecteur %1$s n'a fonctionné.</string>
     <string name="details_lang_missing">Aucune source en %1$s — autres langues disponibles.</string>
     <string name="details_no_sources">Aucune source disponible pour ce titre.</string>
+    <string name="details_sources_none_enabled">Aucun catalogue activé, dans Réglages → Sources.</string>
+    <plurals name="details_sources_absent">
+        <item quantity="one">Le catalogue interrogé n'a pas ce titre.</item>
+        <item quantity="other">Aucun des %1$d catalogues interrogés n'a ce titre.</item>
+    </plurals>
+    <plurals name="details_sources_unreachable">
+        <item quantity="one">Le catalogue n'a pas répondu : connexion à vérifier.</item>
+        <item quantity="other">Aucun des %1$d catalogues n'a répondu : connexion à vérifier.</item>
+    </plurals>
+    <plurals name="details_sources_partial_absent">
+        <item quantity="one">%1$d catalogue n'a pas ce titre</item>
+        <item quantity="other">%1$d catalogues n'ont pas ce titre</item>
+    </plurals>
+    <plurals name="details_sources_partial_failed">
+        <item quantity="one">%1$d est injoignable.</item>
+        <item quantity="other">%1$d sont injoignables.</item>
+    </plurals>
     <string name="details_trying_source">Lecture depuis %1$s…</string>
     <string name="details_searching_source">Recherche d'une source… %1$s</string>
     <string name="details_resolve_error">Impossible de lire « %1$s ». Essayer un autre lecteur.</string>
