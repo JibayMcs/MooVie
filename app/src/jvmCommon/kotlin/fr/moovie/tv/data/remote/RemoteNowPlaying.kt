@@ -65,6 +65,33 @@ object RemoteNowPlaying {
     val state: StateFlow<NowPlaying?> = _state.asStateFlow()
 
     /**
+     * Le dernier relevé, **conservé après la fin de la lecture**.
+     *
+     * ## Ce que ça règle
+     *
+     * La progression ne remontait vers le téléphone que tant que son écran de
+     * télécommande restait ouvert. Fermer l'application pendant que la box
+     * continue laissait le téléphone en arrière, et avec deux comptes de
+     * synchronisation distincts, rien ne rattrapait jamais l'écart.
+     *
+     * Le téléviseur garde donc ce qu'il a joué en dernier et le publie dans son
+     * relevé d'état. Le téléphone le récupère à **n'importe quelle** sonde — au
+     * lancement suivant, à l'ouverture de la télécommande — sans qu'il ait fallu
+     * un service en arrière-plan sur le téléphone ni un serveur qu'il n'a pas.
+     *
+     * ## Ce que ça ne couvre pas
+     *
+     * Un seul titre. Si la box en enchaîne deux pendant que le téléphone est
+     * absent, seul le dernier est récupéré : le premier est perdu pour lui. Le
+     * cas est rare et le prix d'un historique complet serait une file à
+     * maintenir des deux côtés, pour une information dont personne ne s'aperçoit
+     * qu'elle manque.
+     */
+    @Volatile
+    var last: NowPlaying? = null
+        private set
+
+    /**
      * Comment déplacer la lecture, posé par le lecteur tant qu'il est à l'écran.
      *
      * Une lambda plutôt qu'une référence au contrôleur : le fil de socket n'a
@@ -77,6 +104,8 @@ object RemoteNowPlaying {
 
     fun publish(now: NowPlaying) {
         _state.value = now
+        // Retenu même après l'arrêt : c'est tout l'objet de [last].
+        if (now.mediaKey.isNotBlank()) last = now
     }
 
     /** Le lecteur s'annonce joignable, et dit par quel chemin. */
@@ -88,6 +117,8 @@ object RemoteNowPlaying {
     fun clear() {
         _state.value = null
         seeker = null
+        // `last` survit volontairement : « rien ne joue » n'efface pas « voilà
+        // où en était la dernière chose jouée ».
     }
 
     /** Déplace la lecture. Faux si aucun lecteur n'est là pour obéir. */

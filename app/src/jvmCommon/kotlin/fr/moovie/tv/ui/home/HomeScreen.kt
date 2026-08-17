@@ -29,6 +29,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material.icons.filled.Cast
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.AutoAwesome
@@ -97,6 +98,7 @@ import fr.moovie.tv.resources.remote_title
 import fr.moovie.tv.resources.media_movie
 import fr.moovie.tv.resources.media_series
 import fr.moovie.tv.resources.mark_watched
+import fr.moovie.tv.resources.details_send_to_tv
 import fr.moovie.tv.resources.resume_remove
 import fr.moovie.tv.resources.watchlist_add
 import fr.moovie.tv.resources.watchlist_open
@@ -134,6 +136,8 @@ fun HomeScreenContent(
     watched: Set<String>,
     onOpenTitle: (tmdbId: Int, isTv: Boolean) -> Unit,
     onResume: (ResumeEntry) -> Unit,
+    /** Diffuser une reprise sur le téléviseur, null s'il n'y en a pas à portée. */
+    onSendResumeToTv: ((ResumeEntry) -> Unit)? = null,
     onOpenSettings: () -> Unit,
     onOpenSearch: () -> Unit,
     /**
@@ -451,6 +455,7 @@ fun HomeScreenContent(
                 onDismiss = { resumeMenuFor = null; focusMemory.restore() },
                 onRemove = { onRemoveResume(entry.key) },
                 onMarkWatched = { onMarkResumeWatched(entry.key) },
+                onSendToTv = onSendResumeToTv?.let { send -> { send(entry) } },
             )
         }
     }
@@ -734,6 +739,15 @@ private fun ResumeMenuDialog(
     onDismiss: () -> Unit,
     onRemove: () -> Unit,
     onMarkWatched: () -> Unit,
+    /**
+     * Diffuser sur le téléviseur, ou null s'il n'y en a pas à portée.
+     *
+     * Dans ce menu plutôt que sur la carte : reprendre une lecture est le geste
+     * courant, et l'appui long enseigne déjà le reste. Ajouter un bouton visible
+     * sur chaque vignette encombrerait une rangée qu'on parcourt à la
+     * télécommande pour une action qu'on fait rarement.
+     */
+    onSendToTv: (() -> Unit)? = null,
 ) {
     val firstAction = remember { FocusRequester() }
     Dialog(onDismissRequest = onDismiss) {
@@ -748,9 +762,21 @@ private fun ResumeMenuDialog(
                 entry.title + (entry.episodeLabel?.let { " · $it" } ?: ""),
                 style = MaterialTheme.typography.titleMedium,
             )
+            onSendToTv?.let { send ->
+                MoovieButton(
+                    onClick = { send(); onDismiss() },
+                    modifier = Modifier.fillMaxWidth().focusRequester(firstAction),
+                ) {
+                    Icon(Icons.Default.Cast, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(10.dp))
+                    Text(stringResource(Res.string.details_send_to_tv))
+                }
+            }
             MoovieButton(
                 onClick = { onRemove(); onDismiss() },
-                modifier = Modifier.fillMaxWidth().focusRequester(firstAction),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(if (onSendToTv == null) Modifier.focusRequester(firstAction) else Modifier),
             ) {
                 Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(10.dp))

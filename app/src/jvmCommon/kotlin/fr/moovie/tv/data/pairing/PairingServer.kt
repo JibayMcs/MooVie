@@ -285,6 +285,7 @@ class PairingServer(
                         now = RemoteNowPlaying.state.value,
                         typing = RemoteTyping.field.value,
                         syncFingerprint = RemoteSyncIdentity.fingerprint,
+                        lastPlayed = RemoteNowPlaying.last,
                     )
                     respond(sock.getOutputStream(), 200, JSON_TYPE, JSON.encodeToString(state))
                 }

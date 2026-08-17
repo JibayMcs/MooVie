@@ -15,6 +15,8 @@ import fr.moovie.tv.ui.catalog.CatalogSelection
 fun HomeScreen(
     onOpenTitle: (tmdbId: Int, isTv: Boolean) -> Unit,
     onResume: (ResumeEntry) -> Unit,
+    /** Diffuser une reprise sur le téléviseur, null s'il n'y en a pas à portée. */
+    onSendResumeToTv: ((ResumeEntry) -> Unit)? = null,
     onOpenSettings: () -> Unit,
     onOpenSearch: () -> Unit,
     onOpenDiscovery: () -> Unit = {},
@@ -37,6 +39,7 @@ fun HomeScreen(
         watched = watched,
         onOpenTitle = onOpenTitle,
         onResume = onResume,
+        onSendResumeToTv = onSendResumeToTv,
         onOpenSettings = onOpenSettings,
         onOpenSearch = onOpenSearch,
         onOpenDiscovery = onOpenDiscovery,

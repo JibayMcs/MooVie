@@ -227,7 +227,11 @@ fun RemoteScreen(
                     // Ce que la TV joue est enregistré **ici**, dans le magasin
                     // du téléphone. Voir mirrorProgress : sans ça la progression
                     // ne circule que dans un sens.
-                    playing?.let { mirrorProgress(progress, it, lastMirrorMs) }
+                    // En lecture, on suit ; à l'arrêt, on rattrape ce que la
+                    // box a joué en dernier — c'est ce qui couvre le téléphone
+                    // qui était fermé pendant qu'elle continuait.
+                    (playing ?: status.state.lastPlayed)
+                        ?.let { mirrorProgress(progress, it, lastMirrorMs) }
                         ?.let { lastMirrorMs = it }
                 }
                 // Pas de réponse : on **garde** ce qu'on affichait. Ce n'est
@@ -892,7 +896,7 @@ private const val TYPE_DEBOUNCE_MS = 250L
  * box continue laisse le téléphone en arrière ; seule la synchro rattrape ce
  * cas, quand elle est configurée des deux côtés.
  */
-private suspend fun mirrorProgress(
+internal suspend fun mirrorProgress(
     progress: WatchProgressRepository,
     now: NowPlaying,
     lastWrittenMs: Long,

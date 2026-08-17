@@ -39,6 +39,12 @@ data class RemoteState(
      * le droit d'enregistrer ce qu'il diffuse — voir [PlayRequest.record].
      */
     val syncFingerprint: String = "",
+    /**
+     * La dernière lecture du téléviseur, même terminée. C'est elle qui permet au
+     * téléphone de rattraper ce qu'il a manqué en étant fermé — voir
+     * [RemoteNowPlaying.last].
+     */
+    val lastPlayed: NowPlaying? = null,
 )
 
 /**

@@ -50,7 +50,10 @@ import fr.moovie.tv.ui.navigation.Screen
 import fr.moovie.tv.ui.navigation.rememberNavStack
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import fr.moovie.tv.data.remote.PlayRequest
+import fr.moovie.tv.ui.remote.rememberTvSender
 import fr.moovie.tv.ui.remote.CastLaunchScreen
+import fr.moovie.tv.ui.remote.catchUpWithTelevision
 import fr.moovie.tv.ui.remote.RemoteScreen
 import fr.moovie.tv.ui.remote.RemoteVolumeKeys
 import fr.moovie.tv.ui.pairing.RemoteHost
@@ -281,6 +284,23 @@ class MainActivity : ComponentActivity() {
                                 RemoteSyncIdentity.publish(SyncSettingsRepository().syncFingerprint())
                             }
                         }
+
+                        // Au lancement, sur téléphone : demander au téléviseur ce
+                        // qu'il a joué en dernier et l'enregistrer ici. C'est ce
+                        // qui rattrape une diffusion suivie jusqu'au bout pendant
+                        // que l'application était fermée — sans service en fond.
+                        //
+                        // Téléphone seulement : une box n'a personne à rattraper,
+                        // et s'interrogerait elle-même.
+                        if (uiFlavor == UiFlavor.TOUCH) {
+                            LaunchedEffect(Unit) { runCatching { catchUpWithTelevision() } }
+                        }
+
+                        // Diffuser depuis l'accueil, sans ouvrir de fiche. Le
+                        // même composant que la fiche — il porte sa modale de
+                        // remplacement — donc une seule règle pour les deux
+                        // points d'entrée.
+                        val homeSender = rememberTvSender(onSent = { nav.push(Screen.Remote) })
 
                         var everPlayed by remember { mutableStateOf(false) }
                         LaunchedEffect(onPlayer) {
@@ -515,6 +535,25 @@ class MainActivity : ComponentActivity() {
                                     ?.takeIf { uiFlavor != UiFlavor.TV }
                                     ?.let { { nav.push(Screen.Remote) } },
                                 onOpenTitle = { id, isTv -> nav.push(Screen.Details(id, isTv)) },
+                                // Null quand aucun téléviseur ne répond : l'entrée
+                                // de menu n'existe alors pas, plutôt que d'être là
+                                // sans rien faire.
+                                onSendResumeToTv = if (!homeSender.available) null else {
+                                    { e ->
+                                        homeSender.ask(
+                                            PlayRequest(
+                                                tmdbId = e.tmdbId,
+                                                isTv = e.isTv,
+                                                season = e.season,
+                                                episode = e.episode,
+                                                title = e.title,
+                                                artwork = e.imageUrl.orEmpty(),
+                                                positionMs = e.positionMs,
+                                                durationMs = e.durationMs,
+                                            ),
+                                        )
+                                    }
+                                },
                                 onResume = { e ->
                                     // Pas de lecture directe : on ouvre la fiche,
                                     // saison de reprise sélectionnée et focus sur
