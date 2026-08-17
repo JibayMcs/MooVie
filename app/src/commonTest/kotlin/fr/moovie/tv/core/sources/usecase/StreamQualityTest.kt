@@ -12,14 +12,20 @@ import kotlin.test.assertNull
  */
 class StreamQualityTest {
 
+    /**
+     * `1280x536` est un 2,39:1 pleine largeur, donc du **720p** — et non du
+     * « 536 » qu'on lirait en ne regardant que la hauteur. C'est précisément
+     * l'exemple qui a rendu le classement incompréhensible : une source large
+     * perdait une classe entière. Voir [nominalHeight].
+     */
     @Test
-    fun `la hauteur est lue dans la master playlist`() {
+    fun `une variante large est classee sur sa largeur`() {
         val playlist = """
             #EXTM3U
             #EXT-X-STREAM-INF:PROGRAM-ID=1,BANDWIDTH=614015,RESOLUTION=1280x536,CODECS="avc1.4d401f"
             index-v1-a1.m3u8
         """.trimIndent()
-        assertEquals(536, hlsHeight(playlist))
+        assertEquals(720, hlsHeight(playlist))
     }
 
     @Test

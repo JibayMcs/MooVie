@@ -67,7 +67,20 @@ class OkHttpGateway(private val client: OkHttpClient) : HttpGateway {
                         .mapValues { (_, v) -> v.firstOrNull().orEmpty() },
                     // HEAD n'a pas de corps ; string() rendrait une chaîne vide,
                     // ce qui est correct mais inutile à matérialiser.
-                    body = if (request.method == HttpMethod.HEAD) null else resp.body?.string(),
+                    //
+                    // Texte **ou** octets, jamais les deux : `string()` et
+                    // `bytes()` consomment tous deux le flux, et le second appel
+                    // rendrait vide.
+                    body = when {
+                        request.method == HttpMethod.HEAD -> null
+                        request.binary -> null
+                        else -> resp.body?.string()
+                    },
+                    bytes = if (request.binary && request.method != HttpMethod.HEAD) {
+                        resp.body?.bytes()
+                    } else {
+                        null
+                    },
                 )
             }
         }.getOrNull()

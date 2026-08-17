@@ -8,6 +8,8 @@ import fr.moovie.tv.core.sources.port.getBody
 import fr.moovie.tv.core.sources.usecase.isDurationAcceptable
 import fr.moovie.tv.core.sources.model.StreamFormat
 import fr.moovie.tv.core.sources.usecase.hlsHeights
+import fr.moovie.tv.core.sources.usecase.mp4HeaderComplete
+import fr.moovie.tv.core.sources.usecase.mp4Height
 import fr.moovie.tv.core.sources.usecase.qualityLabel
 
 /**
@@ -115,6 +117,14 @@ suspend fun streamHeights(
     stream: PlayableStream,
     http: HttpGateway = ExtractorRegistry.gateway,
 ): List<Int> {
+    // Un MP4 n'annonce qu'une définition, celle de son unique piste vidéo : la
+    // liste en compte donc zéro ou une, là où un HLS adaptatif en aligne
+    // plusieurs. Les deux répondent pourtant à la même question, et sans ce
+    // chemin la moitié des sources n'avait aucune qualité — ni affichée, ni
+    // triable.
+    if (stream.format == StreamFormat.MP4) {
+        return listOfNotNull(mp4StreamHeight(stream, http))
+    }
     if (stream.format != StreamFormat.HLS) return emptyList()
     // **Borné, et pas seulement gardé par le format.** L'appelant peut se
     // tromper — l'écran du lecteur desktop a longtemps déclaré HLS une URL de
@@ -146,6 +156,51 @@ suspend fun streamHeights(
  * impossible le téléchargement accidentel d'un média.
  */
 private const val MAX_PLAYLIST_BYTES = 262_143
+
+/**
+ * Définition d'un MP4, lue dans son en-tête.
+ *
+ * Deux requêtes au plus, et seulement si la première ne suffit pas : un fichier
+ * « faststart » range son `moov` avant les données, les autres le mettent à la
+ * fin. Mesuré sur les hébergeurs servis aujourd'hui, la tête suffit toujours —
+ * la queue est un filet, pas le cas courant, et c'est pourquoi elle n'est
+ * demandée qu'à défaut plutôt que systématiquement.
+ *
+ * L'appel est **binaire** : décodé en texte, l'en-tête perdrait tout octet
+ * invalide en UTF-8, ce qui décale les tailles de boîte et fait lire la hauteur
+ * n'importe où. Voir [HttpRequest.binary].
+ */
+private suspend fun mp4StreamHeight(stream: PlayableStream, http: HttpGateway): Int? {
+    suspend fun lis(plage: String): ByteArray? = http.fetch(
+        HttpRequest(
+            url = stream.url,
+            headers = stream.headers + ("Range" to plage),
+            binary = true,
+        ),
+    )?.takeIf { it.isSuccessful }?.bytes
+
+    val tete = lis("bytes=0-$MAX_MP4_HEADER_BYTES")
+    if (tete != null) {
+        mp4Height(tete)?.let { return it }
+        // `moov` lu et pourtant pas de hauteur : le fichier a répondu, il n'y a
+        // rien de plus à en tirer. Insister sur la queue coûterait une requête
+        // pour le même résultat.
+        if (mp4HeaderComplete(tete)) return null
+    }
+
+    // Ni hauteur ni `moov` : il est probablement à la fin. Une plage suffixe
+    // (« les N derniers octets ») évite d'avoir à connaître la taille du fichier.
+    return lis("bytes=-$MAX_MP4_HEADER_BYTES")?.let { mp4Height(it) }
+}
+
+/**
+ * Ce qu'on accepte de lire d'un MP4 pour en connaître la définition.
+ *
+ * Un `moov` de long métrage pèse quelques centaines de kilo-octets — il contient
+ * la table des échantillons de tout le film. 512 Ko couvrent les cas observés
+ * sans jamais approcher le poids du média lui-même.
+ */
+private const val MAX_MP4_HEADER_BYTES = 524_287
 
 /** Retourne null quand la méthode elle-même est refusée (à réessayer autrement). */
 private suspend fun probe(http: HttpGateway, stream: PlayableStream, head: Boolean): Boolean? {

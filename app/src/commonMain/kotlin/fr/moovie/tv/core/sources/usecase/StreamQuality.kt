@@ -26,13 +26,48 @@ fun hlsHeight(playlist: String): Int? = hlsHeights(playlist).firstOrNull()
  */
 fun hlsHeights(playlist: String): List<Int> =
     RESOLUTION.findAll(playlist)
-        .mapNotNull { it.groupValues[2].toIntOrNull() }
+        .mapNotNull { m ->
+            val largeur = m.groupValues[1].toIntOrNull()
+            val hauteur = m.groupValues[2].toIntOrNull() ?: return@mapNotNull null
+            nominalHeight(largeur, hauteur)
+        }
         .filter { it > 0 }
         .distinct()
         .sortedDescending()
         .toList()
 
 private val RESOLUTION = Regex("""RESOLUTION=(\d+)x(\d+)""")
+
+/**
+ * Définition **de classe**, en hauteur 16:9 équivalente.
+ *
+ * ## Le défaut que ça corrige
+ *
+ * Un film large ne remplit pas un 16:9 : *Reacher* est en 2,00:1, donc une copie
+ * pleine largeur mesure 1920×**960**. Classer sur la hauteur seule la rangeait
+ * en « 720p » — pour une source qui a exactement autant de pixels par ligne
+ * qu'un 1080p. Mesuré sur S2E6 : uqload servait du 1920×960 étiqueté 720p, et
+ * vidzy du 864×432 étiqueté 360p là où c'est du 480p. **Toute source large était
+ * sous-évaluée**, d'autant plus qu'elle était cinémascope.
+ *
+ * L'ancien contournement — arrondir au palier inférieur — traitait le symptôme
+ * (« 536 n'est pas un chiffre rond ») en aggravant la cause : il rabotait vers
+ * le bas ce qui était déjà mesuré trop bas.
+ *
+ * ## Pourquoi la largeur, et pourquoi quand même le maximum
+ *
+ * La largeur ne dépend pas du format d'image : 1920 est du 1080p qu'on soit en
+ * 16:9 ou en 2,40:1. C'est donc elle qui porte la classe. On garde néanmoins le
+ * **plus grand** des deux estimateurs, pour le cas inverse : un 1440×1080 en 4:3
+ * est bien du 1080p, et sa largeur seule le dirait « 810p ».
+ *
+ * Largeur inconnue — un `tkhd` illisible, une playlist sans les deux nombres —
+ * et on retombe exactement sur l'ancien comportement, c'est-à-dire la hauteur.
+ */
+fun nominalHeight(width: Int?, height: Int): Int {
+    val parLargeur = width?.takeIf { it > 0 }?.let { it * 9 / 16 } ?: 0
+    return maxOf(parLargeur, height)
+}
 
 /**
  * Libellé lisible d'une hauteur d'image.

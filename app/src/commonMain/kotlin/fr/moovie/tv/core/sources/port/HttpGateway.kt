@@ -42,6 +42,21 @@ data class HttpRequest(
      */
     val followRedirects: Boolean = true,
     val profile: NetworkProfile = NetworkProfile.DEFAULT,
+    /**
+     * Rendre le corps en **octets** plutôt qu'en texte.
+     *
+     * Tout le reste de la cascade lit des pages et des manifestes, donc du
+     * texte ; l'en-tête d'un MP4 est le seul cas contraire, et il ne survit pas
+     * au détour par une chaîne. OkHttp décode selon le `Content-Type`, à défaut
+     * en UTF-8 : les octets invalides deviennent alors U+FFFD, et une taille de
+     * boîte lue à travers cette substitution envoie l'analyseur n'importe où.
+     *
+     * Le piège est qu'il ne se voit pas : les définitions courantes (1080 =
+     * `0x0438`, 720 = `0x02D0`) ne portent que des octets ASCII et traversent la
+     * conversion intactes. Une mesure qui marche sur les cas qu'on essaie et
+     * casse ailleurs est pire qu'une mesure absente.
+     */
+    val binary: Boolean = false,
 )
 
 data class HttpResponse(
@@ -54,6 +69,8 @@ data class HttpResponse(
     val url: String,
     val headers: Map<String, String> = emptyMap(),
     val body: String? = null,
+    /** Renseigné à la place de [body] quand [HttpRequest.binary] le demande. */
+    val bytes: ByteArray? = null,
 ) {
     val isSuccessful: Boolean get() = status in 200..299
     val isRedirect: Boolean get() = status in 300..399
