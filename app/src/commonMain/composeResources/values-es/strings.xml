@@ -230,6 +230,8 @@
     <string name="explore_series">Series</string>
     <string name="explore_no_results">No hay títulos en este género.</string>
     <string name="details_source_via">vía %1$s</string>
+    <string name="details_source_measuring">midiendo…</string>
+    <string name="details_source_quality_unknown">definición desconocida</string>
     <string name="details_sources_searching">Buscando…</string>
     <plurals name="details_source_count">
         <item quantity="one">%1$d fuente</item>

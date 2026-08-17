@@ -36,7 +36,9 @@ class PlayerQualityTest {
         )
         assertEquals(listOf("auto", "src:u1"), ids(o))
         // Le nom de l'hébergeur explique pourquoi ce choix coupe la lecture.
-        assertTrue(o[1].label.contains("vidzy") && o[1].label.contains("1080p"))
+        // Il est **présenté**, pas repris brut : l'identifiant vient d'un
+        // domaine, et l'utilisateur n'a pas à lire une adresse.
+        assertTrue(o[1].label.contains("Vidzy") && o[1].label.contains("1080p"))
     }
 
     @Test

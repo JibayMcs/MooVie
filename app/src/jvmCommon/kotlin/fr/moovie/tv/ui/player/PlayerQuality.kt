@@ -2,6 +2,7 @@ package fr.moovie.tv.ui.player
 
 import fr.moovie.tv.core.sources.model.EmbedLink
 import fr.moovie.tv.core.sources.model.PlayableStream
+import fr.moovie.tv.data.sources.hosterLabel
 import fr.moovie.tv.core.sources.usecase.qualityLabel
 import fr.moovie.tv.data.sources.ExtractorRegistry
 import fr.moovie.tv.data.sources.isStreamPlayable
@@ -89,7 +90,7 @@ fun qualityOptions(
                     id = SOURCE_PREFIX + alt.url,
                     // Le nom de la source n'est là que sur ces entrées : c'est
                     // ce qui explique qu'elles coupent brièvement la lecture.
-                    label = "$etiquette · ${alt.hoster}",
+                    label = "$etiquette · ${hosterLabel(alt.hoster)}",
                     selected = selected is QualityChoice.Source && selected.url == alt.url,
                 ),
             )

@@ -37,6 +37,7 @@ fun DetailsScreen(
     val resolveError by viewModel.resolveError.collectAsStateWithLifecycle()
     val resolvingUrl by viewModel.resolving.collectAsStateWithLifecycle()
     val sourceQualities by viewModel.qualities.collectAsStateWithLifecycle()
+    val sourceHeights by viewModel.heights.collectAsStateWithLifecycle()
     val sourceStatuses by viewModel.linkStatus.collectAsStateWithLifecycle()
     val streamLang by viewModel.streamLanguage.collectAsStateWithLifecycle()
     // Indexés par le lien d'embed dont ils sont partis : c'est la seule façon
@@ -149,6 +150,7 @@ fun DetailsScreen(
         downloads = downloadsBySource.associateBy { it.sourceUrl },
         downloadList = downloadsBySource,
         sourceQualities = sourceQualities,
+        sourceHeights = sourceHeights,
         onRequestQuality = viewModel::requestQuality,
         trailer = trailer,
         onPlayTrailer = viewModel::openTrailer,

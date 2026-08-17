@@ -284,6 +284,7 @@ internal fun DesktopDetailsScreen(
     val resolveError by vm.resolveError.collectAsState()
     val resolvingUrl by vm.resolving.collectAsState()
     val sourceQualities by vm.qualities.collectAsState()
+    val sourceHeights by vm.heights.collectAsState()
     val sourceStatuses by vm.linkStatus.collectAsState()
     val streamLang by vm.streamLanguage.collectAsState()
     // Indexés par le lien d'embed dont ils sont partis : c'est la seule façon
@@ -402,6 +403,7 @@ internal fun DesktopDetailsScreen(
         downloads = downloadsBySource.associateBy { it.sourceUrl },
         downloadList = downloadsBySource,
         sourceQualities = sourceQualities,
+        sourceHeights = sourceHeights,
         onRequestQuality = vm::requestQuality,
         trailer = trailer,
         onPlayTrailer = vm::openTrailer,

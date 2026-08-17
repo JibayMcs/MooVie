@@ -135,6 +135,10 @@ import fr.moovie.tv.ui.format.upcomingDate
 import fr.moovie.tv.resources.details_episode_upcoming
 import fr.moovie.tv.resources.details_source_dead
 import fr.moovie.tv.resources.details_source_via
+import fr.moovie.tv.resources.details_source_measuring
+import fr.moovie.tv.resources.details_source_quality_unknown
+import fr.moovie.tv.data.sources.hosterLabel
+import fr.moovie.tv.core.sources.usecase.orderedLinksFor
 import fr.moovie.tv.resources.details_catalogue_count
 import fr.moovie.tv.resources.details_source_count
 import fr.moovie.tv.resources.details_sources_searching
@@ -339,6 +343,8 @@ fun DetailsScreenContent(
     seasonDownload: DetailsViewModel.SeasonDownload? = null,
     /** Qualité vidéo mesurée par URL d'embed (voir DetailsViewModel.qualities). */
     sourceQualities: Map<String, String> = emptyMap(),
+    /** Hauteurs mesurées par URL : elles ordonnent le panneau des sources. */
+    sourceHeights: Map<String, Int> = emptyMap(),
     onRequestQuality: (EmbedLink) -> Unit = {},
     /** Verdict de la sonde par URL d'embed — voir [LinkStatus]. */
     sourceStatuses: Map<String, LinkStatus> = emptyMap(),
@@ -1369,6 +1375,7 @@ fun DetailsScreenContent(
                     onPick = onPickSource,
                     onDownload = onDownloadSource,
                     qualities = sourceQualities,
+                    heights = sourceHeights,
                     statuses = sourceStatuses,
                     downloads = downloads,
                     onRequestQuality = onRequestQuality,
@@ -1475,11 +1482,22 @@ private fun SourcesSlideOver(
     downloads: Map<String, Download>,
     /** Qualité mesurée par URL d'embed, remplie au fil de l'eau. */
     qualities: Map<String, String>,
+    /**
+     * Hauteur mesurée par URL. C'est elle qui **ordonne** le panneau, pas le
+     * libellé : « 1080p » et « 720p » ne se trient pas comme des chaînes.
+     */
+    heights: Map<String, Int>,
     /** Demande la mesure d'un lien ; sans effet si elle est déjà connue. */
     onRequestQuality: (EmbedLink) -> Unit,
 ) {
     val links = state.links
+    // Le panneau montre **exactement** l'ordre que la cascade suivra : c'est la
+    // même fonction qui décide des deux. Auparavant la liste gardait l'ordre des
+    // catalogues pendant que la lecture rapide suivait les définitions, si bien
+    // que ce qui se lançait n'était pas ce qui figurait en tête — le classement
+    // paraissait arbitraire parce qu'il y en avait deux.
     val grouped = links.groupBy { it.language ?: "?" }
+        .mapValues { (lang, _) -> orderedLinksFor(links, preferred = lang, heights = heights) }
     // La langue préférée d'abord, puis celles du réglage dans leur ordre de
     // déclaration, puis tout ce que les catalogues auraient étiqueté autrement :
     // une langue inédite apparaît ainsi sans qu'on ait touché à ce code.
@@ -1683,7 +1701,7 @@ private fun SourceRow(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 buildString {
-                    append(link.hoster.replaceFirstChar { it.uppercase() })
+                    append(hosterLabel(link))
                     if (rank != null) append(" · $rank")
                 },
                 style = MaterialTheme.typography.titleSmall,
@@ -1712,10 +1730,31 @@ private fun SourceRow(
                 DownloadState.FAILED -> stringResource(Res.string.details_source_dl_failed)
                 null -> null
             }
+            // La définition est **toujours** écrite, même quand on ne la connaît
+            // pas encore. Une colonne où une ligne sur deux porte « 1080p » et
+            // l'autre le nom d'un catalogue ne se compare pas : on lit deux
+            // informations différentes à la même place, et le classement paraît
+            // arbitraire alors qu'il ne l'est pas. Dire « mesure… » puis
+            // « définition inconnue » coûte deux mots et rend la colonne lisible
+            // de haut en bas.
+            val qualityText = quality ?: when (status) {
+                LinkStatus.UNKNOWN, LinkStatus.CHECKING ->
+                    stringResource(Res.string.details_source_measuring)
+                else -> stringResource(Res.string.details_source_quality_unknown)
+            }
             val secondary = downloadLine ?: if (dead) {
                 stringResource(Res.string.details_source_dead)
             } else {
-                quality ?: link.provider?.let { stringResource(Res.string.details_source_via, it) }
+                // Le catalogue reste, après la définition : il départage deux
+                // lignes identiques, et c'est lui qu'on regarde quand une source
+                // déçoit régulièrement.
+                buildString {
+                    append(qualityText)
+                    link.provider?.let {
+                        append(" · ")
+                        append(stringResource(Res.string.details_source_via, it))
+                    }
+                }
             }
             secondary?.let {
                 Text(

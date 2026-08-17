@@ -21,6 +21,7 @@ import fr.moovie.tv.data.sources.ExtractorRegistry
 import fr.moovie.tv.core.sources.model.PlayableStream
 import fr.moovie.tv.data.sources.isStreamPlayable
 import fr.moovie.tv.core.sources.usecase.qualityLabel
+import fr.moovie.tv.data.sources.hosterLabel
 import fr.moovie.tv.data.sources.streamHeights
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
@@ -1167,7 +1168,7 @@ class DetailsViewModel : ViewModel() {
                     // Affiche l'hébergeur en cours d'essai : la cascade devient
                     // visible au lieu de laisser l'utilisateur devant un écran
                     // d'attente muet.
-                    _quickPlay.value = QuickPlayState.Searching(next.hoster, hoster = next.hoster)
+                    _quickPlay.value = QuickPlayState.Searching(hosterLabel(next), hoster = hosterLabel(next))
                     val stream = runCatching { ExtractorRegistry.resolve(next) }.getOrNull()
                     if (gen != resolveGen) return@launch // titre changé entre-temps
                     // Une URL extraite ne suffit pas : ces hébergeurs signent des
@@ -1278,7 +1279,7 @@ class DetailsViewModel : ViewModel() {
                 playingLink = link
                 _resolved.value = stream
             } else {
-                _resolveError.value = getString(Res.string.details_resolve_error, link.hoster)
+                _resolveError.value = getString(Res.string.details_resolve_error, hosterLabel(link))
             }
         }
     }
@@ -1302,7 +1303,7 @@ class DetailsViewModel : ViewModel() {
             val stream = runCatching { ExtractorRegistry.resolve(link) }.getOrNull()
             _resolving.value = null
             if (stream == null) {
-                _resolveError.value = getString(Res.string.details_resolve_error, link.hoster)
+                _resolveError.value = getString(Res.string.details_resolve_error, hosterLabel(link))
                 return@launch
             }
             DownloadQueue.enqueue(

@@ -232,6 +232,8 @@
     <string name="explore_series">Séries</string>
     <string name="explore_no_results">Aucun titre dans ce genre.</string>
     <string name="details_source_via">via %1$s</string>
+    <string name="details_source_measuring">mesure…</string>
+    <string name="details_source_quality_unknown">définition inconnue</string>
     <string name="details_sources_searching">Recherche…</string>
     <plurals name="details_source_count">
         <item quantity="one">%1$d source</item>
