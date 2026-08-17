@@ -64,11 +64,25 @@ class SyncSettingsRepository {
      *
      * ## Ce qu'elle couvre, et pourquoi tout ça
      *
-     * Le fournisseur, les identifiants **et la phrase secrète**. Deux appareils
-     * sur le même bucket mais avec des phrases différentes ne se lisent pas
-     * davantage que deux comptes distincts : les données sont chiffrées avec
-     * elle. Les confondre ferait écrire le téléviseur dans un fichier que le
-     * téléphone ne saura jamais déchiffrer.
+     * Le fournisseur, les identifiants, la phrase secrète **et le profil actif**.
+     *
+     * Deux appareils sur le même bucket mais avec des phrases différentes ne se
+     * lisent pas davantage que deux comptes distincts : les données sont
+     * chiffrées avec elle. Les confondre ferait écrire le téléviseur dans un
+     * fichier que le téléphone ne saura jamais déchiffrer.
+     *
+     * Le **profil** pour la même raison, un cran plus bas : chaque profil a ses
+     * propres magasins, si bien qu'un téléviseur posé sur « Enfants » qui reçoit
+     * une diffusion du profil « Jibay » rangerait la reprise dans le mauvais.
+     *
+     * Les identifiants de profil sont tirés **localement** : le « Jibay » d'un
+     * téléphone et celui d'un téléviseur n'ont aucune raison de coïncider, et
+     * seul le profil d'origine est commun par construction. L'empreinte est donc
+     * volontairement **stricte plutôt que juste** — elle rapproche ce qu'elle
+     * peut prouver, et refuse le reste. Deux profils nommés pareil sur deux
+     * appareils ne se reconnaîtront pas, et le téléviseur n'enregistrera rien :
+     * ce n'est pas une perte, puisque le téléphone tient déjà le compte et le
+     * rattrape de lui-même.
      */
     suspend fun syncFingerprint(): String {
         val active = provider.first()
@@ -78,6 +92,7 @@ class SyncSettingsRepository {
             append(active.name)
             creds.toSortedMap().forEach { (k, v) -> append('\u0000').append(k).append('=').append(v) }
             append('\u0000').append(passphrase.first())
+            append('\u0000').append(fr.moovie.tv.data.store.ActiveProfile.id)
         }
         return material.encodeToByteArray()
             .fold(0L) { acc, b -> acc * 31 + b }

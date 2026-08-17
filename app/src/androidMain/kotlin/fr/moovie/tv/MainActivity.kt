@@ -277,8 +277,14 @@ class MainActivity : ComponentActivity() {
                         // fichier d'avant la soirée.
                         // L'empreinte de synchro de cet appareil, pour que le
                         // serveur d'appairage puisse la donner sans interroger
-                        // DataStore depuis un fil de socket. Republiée à chaque
-                        // retour au premier plan : les réglages ont pu changer.
+                        // DataStore depuis un fil de socket.
+                        //
+                        // Elle couvre le **profil actif**, et se recalcule donc
+                        // au changement de profil : cet effet vit sous le
+                        // `key(current)` de ProfileHost, qui remonte tout l'arbre.
+                        // Ce n'est pas un hasard heureux — une empreinte restée
+                        // sur l'ancien profil autoriserait le téléviseur à écrire
+                        // dans le mauvais.
                         LaunchedEffect(Unit) {
                             runCatching {
                                 RemoteSyncIdentity.publish(SyncSettingsRepository().syncFingerprint())
