@@ -375,6 +375,24 @@ class DetailsViewModel : ViewModel() {
         return pending.await()
     }
 
+    /**
+     * Enregistre la reprise, **sauf** pour une diffusion venue d'un téléphone
+     * d'un autre compte.
+     *
+     * Un point unique plutôt que la règle répétée aux quatre endroits qui
+     * enregistrent : c'est exactement le genre de condition qu'on oublie sur le
+     * cinquième, et l'oubli ne se verrait pas — il laisserait juste une ligne de
+     * trop dans « Reprendre » du salon.
+     *
+     * Le lecteur applique la même règle à ses propres écritures ; il faut les
+     * deux, parce que `register` crée l'entrée et `save` la met à jour.
+     */
+    private suspend fun registerUnlessCast(meta: fr.moovie.tv.data.watch.ResumeEntry?) {
+        val entry = meta ?: return
+        if (fr.moovie.tv.data.remote.RemoteCast.isEphemeral(entry.key)) return
+        watchRepo.register(entry)
+    }
+
     fun movieKey() = "movie:$tmdbId"
     fun episodeKey(season: Int, episode: Int) = "tv:$tmdbId:s${season}e$episode"
 
@@ -1134,7 +1152,7 @@ class DetailsViewModel : ViewModel() {
             // à trancher.
             pendingMeta?.key?.let { key ->
                 localStream(key)?.let { local ->
-                    pendingMeta?.let { watchRepo.register(it) }
+                    registerUnlessCast(pendingMeta)
                     _quickPlay.value = QuickPlayState.Idle
                     _resolved.value = local
                     return@launch
@@ -1179,7 +1197,7 @@ class DetailsViewModel : ViewModel() {
                         isStreamPlayable(stream, playbackMinutes)
                     ) {
                         if (gen != resolveGen) return@launch
-                        pendingMeta?.let { watchRepo.register(it) }
+                        registerUnlessCast(pendingMeta)
                         playingLink = next
                         // Ce qui vient de jouer ici rejouera probablement.
                         hosterTrust.recordSuccess(next.hoster)
@@ -1246,7 +1264,7 @@ class DetailsViewModel : ViewModel() {
         // fait qu'« hors ligne » veut dire hors ligne, et non « plus rapide ».
         pendingMeta?.key?.let { key ->
             localStream(key)?.let { local ->
-                viewModelScope.launch { pendingMeta?.let { watchRepo.register(it) } }
+                viewModelScope.launch { registerUnlessCast(pendingMeta) }
                 playingLink = null
                 _resolved.value = local
                 return
@@ -1271,7 +1289,7 @@ class DetailsViewModel : ViewModel() {
             if (stream != null) {
                 // La lecture va démarrer : persiste les métadonnées pour le
                 // rail « Reprendre » (la position suivra depuis le lecteur).
-                pendingMeta?.let { watchRepo.register(it) }
+                registerUnlessCast(pendingMeta)
                 // Renseigné ici aussi, et pas seulement par la lecture
                 // rapide : sans quoi le bouton de téléchargement manquait sur
                 // le chemin le plus courant, et la reprise après flux cassé ne

@@ -68,6 +68,7 @@
     <string name="person_credits_error">Filmographie indisponible — vérifier la clé TMDB et la connexion.</string>
     <string name="details_sources">Sources</string>
     <string name="details_send_to_tv">Lire sur le téléviseur</string>
+    <string name="cast_launching">Lecture depuis le téléphone…</string>
     <string name="remote_play_busy_title">Le téléviseur regarde déjà quelque chose</string>
     <string name="remote_play_busy_body">« %1$s » est en cours. Le remplacer par ce titre ?</string>
     <string name="remote_play_busy_confirm">Remplacer</string>

@@ -99,6 +99,7 @@ class PlayerActivity : ComponentActivity() {
                                 nextSeason = ecran.nextSeason,
                                 nextEpisode = ecran.nextEpisode,
                                 posterUrl = ecran.posterUrl,
+                                startAtMs = ecran.startAtMs,
                                 expectedMinutes = ecran.expectedMinutes,
                                 onPrefetchNext = {
                                     PlayerHost.demande(

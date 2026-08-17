@@ -33,6 +33,12 @@ data class TypingField(val label: String = "", val value: String = "")
 data class RemoteState(
     val now: NowPlaying? = null,
     val typing: TypingField? = null,
+    /**
+     * Empreinte de la destination de synchro du téléviseur, vide s'il n'en a
+     * pas. Le téléphone la compare à la sienne pour décider si le téléviseur a
+     * le droit d'enregistrer ce qu'il diffuse — voir [PlayRequest.record].
+     */
+    val syncFingerprint: String = "",
 )
 
 /**

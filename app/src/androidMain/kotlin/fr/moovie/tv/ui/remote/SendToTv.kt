@@ -28,6 +28,7 @@ import fr.moovie.tv.data.remote.RemotePresence
 import fr.moovie.tv.data.remote.RemoteStatus
 import fr.moovie.tv.data.remote.RemoteTarget
 import fr.moovie.tv.data.remote.RemoteTargetRepository
+import fr.moovie.tv.data.sync.SyncSettingsRepository
 import fr.moovie.tv.resources.Res
 import fr.moovie.tv.resources.common_cancel
 import fr.moovie.tv.resources.remote_play_busy_body
@@ -90,6 +91,7 @@ class TvSender internal constructor(
 @Composable
 fun rememberTvSender(onSent: () -> Unit): TvSender {
     val repo = remember { RemoteTargetRepository() }
+    val sync = remember { SyncSettingsRepository() }
     val target by repo.target.collectAsStateWithLifecycle(initialValue = null)
     val reachable by RemotePresence.found.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
@@ -108,18 +110,26 @@ fun rememberTvSender(onSent: () -> Unit): TvSender {
                 // Relu au moment du geste : le dernier relevé peut dater d'une
                 // seconde, assez pour demander confirmation d'un remplacement
                 // qui n'a plus lieu d'être.
-                val playing = if (forced) {
-                    null
-                } else {
-                    (client.status() as? RemoteStatus.Known)?.state?.now
-                }
+                val state = (client.status() as? RemoteStatus.Known)?.state
+                val playing = if (forced) null else state?.now
                 if (playing != null) {
                     busyTitle = playing.title
                     pending = request
                     return@launch
                 }
                 pending = null
-                if (client.play(request)) onSent() else failed = true
+                // Le téléviseur n'enregistre que si on peut **prouver** que les
+                // deux appareils écrivent au même endroit : deux empreintes non
+                // vides et identiques. Sinon il n'est qu'un écran, et tout reste
+                // ici. Voir PlayRequest.record.
+                val mine = runCatching { sync.syncFingerprint() }.getOrDefault("")
+                val theirs = state?.syncFingerprint.orEmpty()
+                val sameDestination = mine.isNotEmpty() && mine == theirs
+                if (client.play(request.copy(record = sameDestination))) {
+                    onSent()
+                } else {
+                    failed = true
+                }
             }
         }
     }

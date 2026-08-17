@@ -50,6 +50,7 @@ import fr.moovie.tv.ui.navigation.Screen
 import fr.moovie.tv.ui.navigation.rememberNavStack
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import fr.moovie.tv.ui.remote.CastLaunchScreen
 import fr.moovie.tv.ui.remote.RemoteScreen
 import fr.moovie.tv.ui.remote.RemoteVolumeKeys
 import fr.moovie.tv.ui.pairing.RemoteHost
@@ -65,11 +66,14 @@ import fr.moovie.tv.ui.download.downloadPlayerScreen
 import fr.moovie.tv.data.download.localStream
 import fr.moovie.tv.data.pairing.PairingSession
 import fr.moovie.tv.data.remote.RemoteFocus
+import fr.moovie.tv.data.remote.RemoteCast
+import fr.moovie.tv.data.remote.RemoteSyncIdentity
 import fr.moovie.tv.data.remote.RemoteLaunch
 import fr.moovie.tv.data.watch.ResumeEntry
 import fr.moovie.tv.data.watch.WatchProgressRepository
 import fr.moovie.tv.data.remote.remoteTarget
 import fr.moovie.tv.data.sync.SyncCoordinator
+import fr.moovie.tv.data.sync.SyncSettingsRepository
 import fr.moovie.tv.data.sync.SyncTrigger
 import fr.moovie.tv.ui.profile.ProfileHost
 import fr.moovie.tv.ui.details.DetailsScreen
@@ -268,6 +272,16 @@ class MainActivity : ComponentActivity() {
                         // Sans ce second cas la TV ne publierait qu'à son
                         // prochain démarrage, et le PC lirait au bureau un
                         // fichier d'avant la soirée.
+                        // L'empreinte de synchro de cet appareil, pour que le
+                        // serveur d'appairage puisse la donner sans interroger
+                        // DataStore depuis un fil de socket. Republiée à chaque
+                        // retour au premier plan : les réglages ont pu changer.
+                        LaunchedEffect(Unit) {
+                            runCatching {
+                                RemoteSyncIdentity.publish(SyncSettingsRepository().syncFingerprint())
+                            }
+                        }
+
                         var everPlayed by remember { mutableStateOf(false) }
                         LaunchedEffect(onPlayer) {
                             if (onPlayer) {
@@ -426,54 +440,32 @@ class MainActivity : ComponentActivity() {
                         // qu'on regardait avant, l'ordre vient d'ailleurs.
                         LaunchedEffect(Unit) {
                             RemoteLaunch.requests.collect { demande ->
-                                // La position **avant** de naviguer : le lecteur
-                                // lit sa reprise dans le magasin local au montage
-                                // (PlayerScreen), et le téléviseur n'a aucune
-                                // raison de connaître un épisode commencé sur le
-                                // téléphone. L'écrire ici, c'est reprendre le
-                                // chemin existant plutôt que d'en ajouter un.
-                                if (demande.positionMs > 0) {
-                                    val key = if (demande.isTv) {
-                                        "tv:${demande.tmdbId}:s${demande.season}e${demande.episode}"
-                                    } else {
-                                        "movie:${demande.tmdbId}"
-                                    }
-                                    runCatching {
-                                        val repo = WatchProgressRepository()
-                                        // `register` **avant** `save`, et ce n'est
-                                        // pas un détail : `save` ne met à jour
-                                        // qu'une entrée existante et abandonne en
-                                        // silence s'il n'y en a pas. Le téléviseur
-                                        // n'a jamais vu cet épisode — c'est tout
-                                        // l'objet du geste — donc sans cette
-                                        // ligne la position était écrite dans le
-                                        // vide et la lecture repartait de zéro.
-                                        //
-                                        // L'ordre inverse est également sûr pour
-                                        // la suite : le `register` que fait la
-                                        // lecture rapide au démarrage conserve la
-                                        // position déjà présente.
-                                        repo.register(
-                                            ResumeEntry(
-                                                key = key,
-                                                tmdbId = demande.tmdbId,
-                                                isTv = demande.isTv,
-                                                season = demande.season,
-                                                episode = demande.episode,
-                                                title = demande.title,
-                                                imageUrl = demande.artwork.ifBlank { null },
-                                            ),
-                                        )
-                                        repo.save(key, demande.positionMs, demande.durationMs)
-                                    }
+                                // La position **ne passe plus par le magasin** :
+                                // elle est portée jusqu'au lecteur. Y passer liait
+                                // la reprise à la persistance, si bien qu'un
+                                // téléviseur sans droit d'écriture repartait du
+                                // début. Voir Screen.Player.startAtMs.
+                                val castKey = if (demande.isTv) {
+                                    "tv:${demande.tmdbId}:s${demande.season}e${demande.episode}"
+                                } else {
+                                    "movie:${demande.tmdbId}"
                                 }
+                                // Diffusion depuis un compte étranger : ce titre
+                                // ne laissera **rien** sur ce téléviseur — ni
+                                // reprise, ni historique. Voir RemoteCast.
+                                if (demande.record) RemoteCast.clear() else RemoteCast.markEphemeral(castKey)
+
                                 nav.replace(
-                                    Screen.Details(
+                                    Screen.CastLaunch(
                                         tmdbId = demande.tmdbId,
                                         isTv = demande.isTv,
-                                        autoSources = true,
-                                        resumeSeason = demande.season,
-                                        resumeEpisode = demande.episode,
+                                        season = demande.season,
+                                        episode = demande.episode,
+                                        title = demande.title,
+                                        subtitle = demande.subtitle,
+                                        artwork = demande.artwork,
+                                        positionMs = demande.positionMs,
+                                        launchId = System.currentTimeMillis(),
                                     ),
                                 )
                             }
@@ -630,6 +622,16 @@ class MainActivity : ComponentActivity() {
                                 name = s.name,
                                 onOpenTitle = { id, isTv -> nav.push(Screen.Details(id, isTv)) },
                             )
+                            // Diffusion en cours de préparation : l'affiche et le
+                            // titre pendant la recherche, puis le lecteur. Aucun
+                            // retour possible vers cet écran une fois la lecture
+                            // lancée — `replace`, comme l'arrivée de la demande.
+                            is Screen.CastLaunch -> CastLaunchScreen(
+                                launch = s,
+                                onPlay = { player -> nav.replace(player) },
+                                onGiveUp = { nav.replace(Screen.Home) },
+                            )
+
                             is Screen.Details -> DetailsScreen(
                                 tmdbId = s.tmdbId,
                                 isTv = s.isTv,
@@ -655,6 +657,13 @@ class MainActivity : ComponentActivity() {
                                 streamUrl = s.streamUrl,
                                 headers = s.headers,
                                 mediaKey = s.mediaKey,
+                                // Le téléviseur rend le lecteur **ici**, pas via
+                                // PlayerActivity : il y a deux sites d'appel, et
+                                // n'en servir qu'un laissait la position de
+                                // diffusion à sa valeur par défaut — donc une
+                                // lecture qui repart du début, sur l'appareil
+                                // qui est justement la cible du cast.
+                                startAtMs = s.startAtMs,
                                 sourceUrl = s.sourceUrl,
                                 hoster = s.hoster,
                                 language = s.language,

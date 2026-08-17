@@ -66,6 +66,7 @@
     <string name="person_credits_error">Filmografía no disponible — comprobar la clave TMDB y la conexión.</string>
     <string name="details_sources">Fuentes</string>
     <string name="details_send_to_tv">Reproducir en el televisor</string>
+    <string name="cast_launching">Reproduciendo desde el teléfono…</string>
     <string name="remote_play_busy_title">El televisor ya está viendo algo</string>
     <string name="remote_play_busy_body">«%1$s» se está reproduciendo. ¿Reemplazarlo por este título?</string>
     <string name="remote_play_busy_confirm">Reemplazar</string>

@@ -42,6 +42,50 @@ class SyncSettingsRepository {
         }.orEmpty()
     }
 
+    /**
+     * Empreinte de la **destination de synchro**, ou chaîne vide si aucune.
+     *
+     * ## À quoi elle sert
+     *
+     * Un téléphone qui diffuse un titre sur le téléviseur doit savoir si les
+     * deux appareils écrivent au même endroit. Si oui, laisser le téléviseur
+     * enregistrer la progression est sans conséquence — la synchro réconcilie.
+     * Si non, ce qu'il écrit **pollue un compte qui n'est pas le bon** : le
+     * téléviseur ne sert alors que d'écran, et l'historique appartient au
+     * téléphone.
+     *
+     * ## Pourquoi une empreinte et pas les identifiants
+     *
+     * Elle traverse le réseau local, sur un serveur **sans TLS** — c'est un
+     * choix assumé de l'appairage, un certificat auto-signé apprenant le
+     * mauvais réflexe. Envoyer une clé B2 en clair sur ce canal serait une
+     * fuite ; une empreinte ne permet que de répondre « pareil ou pas », ce qui
+     * est exactement la question posée.
+     *
+     * ## Ce qu'elle couvre, et pourquoi tout ça
+     *
+     * Le fournisseur, les identifiants **et la phrase secrète**. Deux appareils
+     * sur le même bucket mais avec des phrases différentes ne se lisent pas
+     * davantage que deux comptes distincts : les données sont chiffrées avec
+     * elle. Les confondre ferait écrire le téléviseur dans un fichier que le
+     * téléphone ne saura jamais déchiffrer.
+     */
+    suspend fun syncFingerprint(): String {
+        val active = provider.first()
+        if (active == SyncProvider.NONE) return ""
+        val creds = credentials.first()
+        val material = buildString {
+            append(active.name)
+            creds.toSortedMap().forEach { (k, v) -> append('\u0000').append(k).append('=').append(v) }
+            append('\u0000').append(passphrase.first())
+        }
+        return material.encodeToByteArray()
+            .fold(0L) { acc, b -> acc * 31 + b }
+            .toULong()
+            .toString(16)
+            .padStart(16, '0')
+    }
+
     /** Millisecondes epoch de la dernière synchro réussie. 0 = jamais. */
     val lastSyncAt: Flow<Long> = store.data.map { it[LAST_SYNC] ?: 0L }
 

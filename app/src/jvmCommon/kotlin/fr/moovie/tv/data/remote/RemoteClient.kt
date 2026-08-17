@@ -125,6 +125,7 @@ class RemoteClient(private val target: RemoteTarget) {
             append("&art=").append(encode(request.artwork))
             if (request.positionMs > 0) append("&pos=").append(request.positionMs)
             if (request.durationMs > 0) append("&dur=").append(request.durationMs)
+            if (!request.record) append("&norec=1")
         },
     )
 

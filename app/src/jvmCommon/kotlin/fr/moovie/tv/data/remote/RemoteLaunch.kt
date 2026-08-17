@@ -51,6 +51,25 @@ data class PlayRequest(
     val artwork: String = "",
     val positionMs: Long = 0,
     val durationMs: Long = 0,
+    /**
+     * Le téléviseur a-t-il le droit d'enregistrer ce qu'il diffuse ?
+     *
+     * Faux quand les deux appareils n'écrivent pas au même endroit — comptes de
+     * synchro différents, phrases secrètes différentes, ou simplement aucune
+     * synchro des deux côtés. Le téléviseur n'est alors qu'un **écran** : y
+     * laisser une progression et une ligne d'historique polluerait un compte qui
+     * n'a rien demandé, et l'utilisateur retrouverait sur sa box des titres
+     * qu'il n'y a jamais regardés.
+     *
+     * Vrai **seulement si on peut le prouver** : deux empreintes non vides et
+     * identiques. L'absence de synchro des deux côtés ne prouve rien — elle
+     * garantit au contraire que rien ne réconciliera jamais — donc elle vaut
+     * faux. Voir [fr.moovie.tv.data.sync.SyncSettingsRepository.syncFingerprint].
+     *
+     * Par défaut vrai, pour qu'un téléphone d'avant cette version — qui n'envoie
+     * pas le champ — garde le comportement qu'il avait.
+     */
+    val record: Boolean = true,
 )
 
 /**

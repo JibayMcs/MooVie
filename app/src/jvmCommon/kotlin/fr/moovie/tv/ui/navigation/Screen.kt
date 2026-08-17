@@ -68,6 +68,36 @@ sealed interface Screen {
      * le panneau des sources s'ouvre directement — sur [resumeSeason]/[resumeEpisode]
      * pour une série.
      */
+    /**
+     * Écran d'attente d'une diffusion : l'affiche et le titre pendant que le
+     * téléviseur cherche une source, puis le lecteur.
+     *
+     * ## Pourquoi une destination à elle
+     *
+     * La diffusion passait par [Details] avec `autoSources`, ce qui marchait mais
+     * montrait la fiche quelques secondes — et surtout **ne se relançait pas** :
+     * deux diffusions du même titre produisent une destination égale au sens des
+     * data class, donc aucune recomposition et aucune relance. Recaster le même
+     * épisode ne faisait plus rien.
+     *
+     * @param launchId rend chaque diffusion distincte des précédentes. C'est ce
+     *   qui règle le recast : sans lui, deux demandes identiques sont le même
+     *   écran.
+     * @param positionMs point de départ, transmis au lecteur sans passer par le
+     *   magasin — voir [Player.startAtMs].
+     */
+    data class CastLaunch(
+        val tmdbId: Int,
+        val isTv: Boolean,
+        val season: Int = 0,
+        val episode: Int = 0,
+        val title: String = "",
+        val subtitle: String = "",
+        val artwork: String = "",
+        val positionMs: Long = 0,
+        val launchId: Long = 0,
+    ) : Screen
+
     data class Details(
         val tmdbId: Int,
         val isTv: Boolean,
@@ -92,6 +122,17 @@ sealed interface Screen {
         val nextEpisode: Int = 0,
         /** Affiche du titre, utilisée par l'écran de veille. */
         val posterUrl: String = "",
+        /**
+         * Position de départ imposée, en millisecondes. 0 = lire la reprise
+         * dans le magasin, comme d'habitude.
+         *
+         * Existe pour la **diffusion depuis un téléphone**, où la position vient
+         * d'un autre appareil et ne doit pas forcément être écrite ici : passer
+         * par le magasin pour transmettre un point de départ liait la reprise à
+         * la persistance, si bien qu'un téléviseur qui n'a pas le droit
+         * d'enregistrer repartait du début.
+         */
+        val startAtMs: Long = 0,
         /**
          * Durée annoncée par TMDB, en minutes (0 = inconnue).
          *

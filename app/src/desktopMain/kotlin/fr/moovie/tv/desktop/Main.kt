@@ -304,6 +304,11 @@ private fun DesktopApp(
             // poste de travail elle n'a pas de sens, et rien n'y mène. La
             // branche existe parce que la destination est partagée.
             Screen.Remote -> Unit
+            // Un poste de travail n'est jamais la cible d'une diffusion : il ne
+            // fait pas tourner de serveur d'appairage, donc rien ne peut lui
+            // envoyer de titre. Même raison que ci-dessus — la destination est
+            // partagée, la branche doit exister.
+            is Screen.CastLaunch -> Unit
             // Hors ligne, l'accueil cède la place à la bibliothèque locale :
             // voir OfflineScreen.
             Screen.Home -> if (!online) OfflineScreen(

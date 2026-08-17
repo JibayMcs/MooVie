@@ -19,10 +19,12 @@ import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.rememberCoroutineScope
 import fr.moovie.tv.data.remote.NowPlaying
+import fr.moovie.tv.data.remote.RemoteCast
 import fr.moovie.tv.data.remote.RemoteNowPlaying
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -193,6 +195,8 @@ fun PlayerScreen(
     onUpdateSelected: () -> Unit = {},
     /** Affiche du titre, utilisée par l'écran de veille. */
     posterUrl: String = "",
+    /** Position de départ imposée (diffusion depuis un téléphone). 0 = magasin. */
+    startAtMs: Long = 0,
     /** Durée annoncée par TMDB, en minutes (0 = inconnue) — voir [PlayerDurationGuard]. */
     expectedMinutes: Int = 0,
     /**
@@ -448,7 +452,13 @@ fun PlayerScreen(
             .build()
         player.setMediaItem(item)
 
-        val resumeAt = if (mediaKey.isNotBlank()) progress.position(mediaKey) else 0L
+        // Une position imposée prime sur le magasin : elle vient d'un autre
+        // appareil, qui sait mieux que celui-ci où en est le spectateur.
+        val resumeAt = when {
+            startAtMs > 0 -> startAtMs
+            mediaKey.isNotBlank() -> progress.position(mediaKey)
+            else -> 0L
+        }
         if (resumeAt > 0) player.seekTo(resumeAt)
         player.prepare()
         player.playWhenReady = true
@@ -574,7 +584,11 @@ fun PlayerScreen(
     fun markFinished() {
         val duration = controller.durationMs()
         if (mediaKey.isNotBlank() && duration > 0) {
-            exitScope.launch { progress.save(mediaKey, duration, duration) }
+            // Rien n'est écrit pour une diffusion venue d'un autre compte : le
+            // téléviseur n'est qu'un écran, l'historique appartient au téléphone.
+            if (!RemoteCast.isEphemeral(mediaKey)) {
+                exitScope.launch { progress.save(mediaKey, duration, duration) }
+            }
         }
         // La série doit rester dans « Reprendre la lecture » : l'entrée qu'on
         // vient de terminer en sort, et celle de l'épisode suivant n'existe pas
@@ -597,7 +611,9 @@ fun PlayerScreen(
             if (controller.isPlaying) {
                 val position = controller.positionMs()
                 val duration = controller.durationMs()
-                progress.save(mediaKey, position, duration)
+                if (!RemoteCast.isEphemeral(mediaKey)) {
+                    progress.save(mediaKey, position, duration)
+                }
 
                 // Assez tard pour que l'épisode soit probablement fini, assez
                 // tôt pour que les catalogues aient le temps de répondre — ils
@@ -1100,6 +1116,41 @@ fun PlayerScreen(
             },
     ) {
         AndroidView(modifier = Modifier.fillMaxSize(), factory = { playerView })
+
+        // Voile de démarrage : l'affiche tant que l'image n'est pas là.
+        //
+        // Résoudre une source et **jouer** sont deux attentes distinctes. La
+        // première a son écran — celui de la diffusion — mais elle cède la place
+        // dès que l'URL est connue, alors qu'ExoPlayer doit encore se remplir.
+        // Entre les deux il ne restait qu'un écran noir : sur une source déjà en
+        // cache, la résolution prend deux secondes et c'est l'attente du tampon
+        // qu'on voit, sans rien pour dire qu'il se passe quelque chose.
+        //
+        // Le voile tombe à la **première image**, pas à `isPlaying` : le lecteur
+        // se déclare jouant avant d'avoir décodé quoi que ce soit, et le noir
+        // reparaissait alors une fraction de seconde.
+        var premiereImage by remember(streamUrl) { mutableStateOf(false) }
+        LaunchedEffect(streamUrl, positionMs) {
+            if (positionMs > 0) premiereImage = true
+        }
+        androidx.compose.animation.AnimatedVisibility(
+            visible = !premiereImage,
+            enter = fadeIn(),
+            exit = fadeOut(),
+        ) {
+            Box(
+                modifier = Modifier.fillMaxSize().background(Color(0xFF080808)),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (posterUrl.isNotBlank()) {
+                    fr.moovie.tv.ui.components.MoovieAsyncImage(
+                        model = posterUrl,
+                        contentDescription = title,
+                        modifier = Modifier.size(width = 200.dp, height = 300.dp),
+                    )
+                }
+            }
+        }
 
         // Couche de réveil : cible de focus quand la barre est masquée. Elle
         // cesse d'être focalisable dès que la barre s'affiche, sinon la

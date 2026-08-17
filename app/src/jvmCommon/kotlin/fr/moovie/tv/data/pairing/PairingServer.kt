@@ -5,6 +5,7 @@ import fr.moovie.tv.data.remote.RemoteLaunch
 import fr.moovie.tv.data.remote.RemoteKey
 import fr.moovie.tv.data.remote.RemoteNowPlaying
 import fr.moovie.tv.data.remote.RemoteState
+import fr.moovie.tv.data.remote.RemoteSyncIdentity
 import fr.moovie.tv.data.remote.RemoteTyping
 import kotlinx.serialization.encodeToString
 import fr.moovie.tv.data.remote.remoteAvailable
@@ -245,6 +246,7 @@ class PairingServer(
                     artwork = form["art"].orEmpty(),
                     positionMs = form["pos"]?.toLongOrNull() ?: 0,
                     durationMs = form["dur"]?.toLongOrNull() ?: 0,
+                    record = form["norec"] != "1",
                 ),
             )
             // 409 et non 500 : l'adresse est bonne, c'est l'état du téléviseur
@@ -282,6 +284,7 @@ class PairingServer(
                     val state = RemoteState(
                         now = RemoteNowPlaying.state.value,
                         typing = RemoteTyping.field.value,
+                        syncFingerprint = RemoteSyncIdentity.fingerprint,
                     )
                     respond(sock.getOutputStream(), 200, JSON_TYPE, JSON.encodeToString(state))
                 }
