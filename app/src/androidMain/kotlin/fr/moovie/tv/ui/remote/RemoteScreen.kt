@@ -73,6 +73,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import fr.moovie.tv.ui.components.MoovieAsyncImage
 import fr.moovie.tv.ui.theme.MoovieShape
 import fr.moovie.tv.data.remote.NowPlaying
+import fr.moovie.tv.data.watch.ResumeEntry
+import fr.moovie.tv.data.watch.WatchProgressRepository
+import fr.moovie.tv.ui.player.parseMediaKey
 import fr.moovie.tv.data.remote.RemoteClient
 import fr.moovie.tv.data.remote.RemoteKey
 import fr.moovie.tv.data.remote.RemotePresence
@@ -124,6 +127,10 @@ fun RemoteScreen(
     modifier: Modifier = Modifier,
 ) {
     val client = remember(target) { RemoteClient(target) }
+    // Le magasin **du téléphone**. C'est lui qui fait foi : dès que les deux
+    // appareils ne partagent pas le même compte de synchronisation, chacun a le
+    // sien et rien ne les réconcilie jamais.
+    val progress = remember { WatchProgressRepository() }
     val scope = rememberCoroutineScope()
 
     /** Direction maintenue, ou null. Elle pilote aussi la répétition. */
@@ -200,6 +207,10 @@ fun RemoteScreen(
         // paquet perdu suffit — et effacer le mini-lecteur dessus le faisait
         // clignoter. Il faut une petite série pour conclure à une absence.
         var silences = 0
+        // Dernière position recopiée, pour n'écrire qu'à intervalle : le relevé
+        // arrive chaque seconde, et DataStore réécrit tout son fichier à chaque
+        // fois. La reprise n'a pas besoin d'être à la seconde près.
+        var lastMirrorMs = 0L
         while (true) {
             when (val status = client.status()) {
                 is RemoteStatus.Known -> {
@@ -213,6 +224,11 @@ fun RemoteScreen(
                     ) {
                         shownMs = playing.positionMs
                     }
+                    // Ce que la TV joue est enregistré **ici**, dans le magasin
+                    // du téléphone. Voir mirrorProgress : sans ça la progression
+                    // ne circule que dans un sens.
+                    playing?.let { mirrorProgress(progress, it, lastMirrorMs) }
+                        ?.let { lastMirrorMs = it }
                 }
                 // Pas de réponse : on **garde** ce qu'on affichait. Ce n'est
                 // qu'après quelques silences d'affilée qu'on admet l'absence.
@@ -846,3 +862,68 @@ private const val SILENCES_BEFORE_LOST = 3
  * pas une requête par lettre.
  */
 private const val TYPE_DEBOUNCE_MS = 250L
+
+/**
+ * Recopie dans le magasin du téléphone ce que le téléviseur est en train de
+ * lire, et rend la position écrite — ou null si rien ne l'a été.
+ *
+ * ## Pourquoi le téléphone doit tenir ce compte
+ *
+ * La progression ne circulait que dans un sens. On envoyait un épisode à 12:34,
+ * on le finissait sur la box, et le téléphone en restait à 12:34 : son rail
+ * « Reprendre » mentait. La synchro finit par réconcilier — **à condition que
+ * les deux appareils partagent le même compte**. Ce n'est pas le cas général :
+ * chacun peut avoir le sien, et alors rien ne les rapproche jamais.
+ *
+ * Or tout ce qu'il faut arrive déjà : le relevé d'état porte la position, la
+ * durée, et maintenant la clé du média ([NowPlaying.mediaKey]). Il ne manquait
+ * que de l'écrire.
+ *
+ * ## `register` avant `save`, encore
+ *
+ * Même règle que côté téléviseur, et pour la même raison : `save` ne met à jour
+ * qu'une entrée existante et abandonne en silence sinon. Le téléphone peut très
+ * bien n'avoir jamais ouvert ce titre — on regarde sur la TV ce qu'on a lancé
+ * depuis l'accueil.
+ *
+ * ## Ce qui n'est pas couvert
+ *
+ * L'écran de télécommande doit être ouvert. Fermer l'application pendant que la
+ * box continue laisse le téléphone en arrière ; seule la synchro rattrape ce
+ * cas, quand elle est configurée des deux côtés.
+ */
+private suspend fun mirrorProgress(
+    progress: WatchProgressRepository,
+    now: NowPlaying,
+    lastWrittenMs: Long,
+): Long? {
+    val id = parseMediaKey(now.mediaKey) ?: return null
+    if (now.positionMs <= 0 || now.durationMs <= 0) return null
+    // Un écart, pas un intervalle de temps : c'est la position qui compte, et
+    // un saut en arrière doit s'enregistrer aussi vite qu'une avancée.
+    if (kotlin.math.abs(now.positionMs - lastWrittenMs) < MIRROR_STEP_MS) return null
+
+    progress.register(
+        ResumeEntry(
+            key = now.mediaKey,
+            tmdbId = id.tmdbId,
+            isTv = id.isTv,
+            season = id.season,
+            episode = id.episode,
+            title = now.title,
+            imageUrl = now.artwork.ifBlank { null },
+        ),
+    )
+    progress.save(now.mediaKey, now.positionMs, now.durationMs)
+    return now.positionMs
+}
+
+/**
+ * Écart de position au-delà duquel on réécrit la reprise.
+ *
+ * DataStore réécrit tout son fichier à chaque édition, et le relevé arrive
+ * chaque seconde : recopier à chaque fois userait le disque pour une précision
+ * dont la reprise n'a aucun besoin. Dix secondes, c'est moins que ce qu'on
+ * perdrait à rouvrir le titre.
+ */
+private const val MIRROR_STEP_MS = 10_000L

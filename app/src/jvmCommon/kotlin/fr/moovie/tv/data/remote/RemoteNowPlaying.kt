@@ -21,6 +21,12 @@ import kotlinx.serialization.Serializable
  * Les valeurs par défaut existent pour la compatibilité : un téléviseur d'une
  * version antérieure omettra les champs qu'il ne connaît pas, et le téléphone
  * doit lire ce qu'il reçoit plutôt que d'échouer sur ce qui manque.
+ *
+ * [mediaKey] est ce qui rend la progression **réversible**. Sans lui le
+ * téléphone reçoit une position sans savoir de quoi : il peut l'afficher, pas
+ * l'enregistrer. Or c'est le magasin du téléphone qui fait foi dès que les deux
+ * appareils ne partagent pas le même compte de synchronisation — chacun a alors
+ * le sien, et rien ne les réconcilie jamais.
  */
 @Serializable
 data class NowPlaying(
@@ -30,6 +36,8 @@ data class NowPlaying(
     val positionMs: Long = 0,
     val durationMs: Long = 0,
     val playing: Boolean = false,
+    /** `movie:123` ou `tv:123:s2e6`. Vide sur un téléviseur d'avant cette version. */
+    val mediaKey: String = "",
 )
 
 /**

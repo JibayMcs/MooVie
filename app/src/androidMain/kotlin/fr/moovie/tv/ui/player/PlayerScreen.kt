@@ -516,6 +516,7 @@ fun PlayerScreen(
                     positionMs = positionMs,
                     durationMs = durationMs,
                     playing = controller.isPlaying,
+                    mediaKey = mediaKey,
                 ),
             )
             delay(500)
