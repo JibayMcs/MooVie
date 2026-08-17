@@ -10,6 +10,8 @@ import androidx.compose.runtime.remember
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import fr.moovie.tv.data.settings.tmdbCountry
+import fr.moovie.tv.data.remote.PlayRequest
+import fr.moovie.tv.ui.remote.rememberTvSender
 import fr.moovie.tv.ui.navigation.Screen
 
 /**
@@ -28,6 +30,12 @@ fun DetailsScreen(
     autoSources: Boolean = false,
     resumeSeason: Int = 0,
     resumeEpisode: Int = 0,
+    /**
+     * Bascule vers la télécommande, après un titre envoyé au téléviseur. Le
+     * geste continue sur l'écran qui montre ce que la TV fait, plutôt que de
+     * laisser le téléphone sur une fiche devenue sans objet.
+     */
+    onOpenRemote: () -> Unit = {},
     viewModel: DetailsViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -57,6 +65,10 @@ fun DetailsScreen(
     val selectedEpisode by viewModel.selectedEpisode.collectAsStateWithLifecycle()
     // Reprise depuis l'accueil : lance la lecture directe une seule fois, dès que la fiche est chargée.
     val autoConsumed = remember { mutableStateOf(false) }
+
+    // Envoi vers le téléviseur du salon. Le composant porte lui-même sa modale
+    // de confirmation ; il n'expose ici qu'un « peut-on envoyer ».
+    val tvSender = rememberTvSender(onSent = onOpenRemote)
 
     LaunchedEffect(tmdbId, isTv) { viewModel.start(tmdbId, isTv, resumeSeason, resumeEpisode) }
     LaunchedEffect(state) {
@@ -151,6 +163,33 @@ fun DetailsScreen(
         downloadList = downloadsBySource,
         sourceQualities = sourceQualities,
         sourceHeights = sourceHeights,
+        // Null quand aucun téléviseur ne répond : pas de bouton plutôt qu'un
+        // bouton inerte. Voir TvSender.
+        onSendToTv = if (!tvSender.available) null else {
+            {
+                val episode = selectedEpisode
+                val season = episode?.season ?: resumeSeason
+                val number = episode?.episode?.episodeNumber ?: resumeEpisode
+                // La reprise **de ce téléphone**, pour que la TV continue là où
+                // on s'est arrêté plutôt qu'au début. La clé se recalcule au lieu
+                // d'être devinée : c'est la même que celle du magasin.
+                val key = if (isTv) "tv:$tmdbId:s${season}e$number" else "movie:$tmdbId"
+                val here = resume[key]
+                tvSender.ask(
+                    PlayRequest(
+                        tmdbId = tmdbId,
+                        isTv = isTv,
+                        season = season,
+                        episode = number,
+                        title = viewModel.playbackTitle,
+                        subtitle = viewModel.playbackSubtitle,
+                        artwork = viewModel.playbackPoster.orEmpty(),
+                        positionMs = here?.positionMs ?: 0,
+                        durationMs = here?.durationMs ?: 0,
+                    ),
+                )
+            }
+        },
         onRequestQuality = viewModel::requestQuality,
         trailer = trailer,
         onPlayTrailer = viewModel::openTrailer,

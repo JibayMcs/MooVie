@@ -45,6 +45,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.Cast
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.material.icons.filled.Info
@@ -104,7 +105,9 @@ import fr.moovie.tv.resources.details_episodes_season
 import fr.moovie.tv.resources.details_lang_missing
 import fr.moovie.tv.resources.details_lang_unavailable
 import fr.moovie.tv.resources.details_no_sources
+import fr.moovie.tv.resources.details_sources
 import fr.moovie.tv.resources.details_sources_absent
+import fr.moovie.tv.resources.details_send_to_tv
 import fr.moovie.tv.resources.details_sources_none_enabled
 import fr.moovie.tv.resources.details_sources_partial_absent
 import fr.moovie.tv.resources.details_sources_partial_failed
@@ -345,6 +348,16 @@ fun DetailsScreenContent(
     sourceQualities: Map<String, String> = emptyMap(),
     /** Hauteurs mesurées par URL : elles ordonnent le panneau des sources. */
     sourceHeights: Map<String, Int> = emptyMap(),
+    /**
+     * Envoyer ce titre au téléviseur appairé, ou null s'il n'y en a pas à
+     * portée.
+     *
+     * Nullable plutôt qu'un booléen à côté : un bouton qui n'existe pas ne peut
+     * pas être appuyé par erreur, et la condition « une TV répond **maintenant** »
+     * ([fr.moovie.tv.data.remote.RemotePresence]) est déjà tranchée par
+     * l'appelant. L'écran partagé n'a pas à connaître le réseau local.
+     */
+    onSendToTv: (() -> Unit)? = null,
     onRequestQuality: (EmbedLink) -> Unit = {},
     /** Verdict de la sonde par URL d'embed — voir [LinkStatus]. */
     sourceStatuses: Map<String, LinkStatus> = emptyMap(),
@@ -821,6 +834,16 @@ fun DetailsScreenContent(
                             }
                         }
                         MoovieButton(onClick = onOpenPanel) { Text(stringResource(Res.string.details_sources)) }
+                        // Icône seule : la rangée est déjà pleine, et un
+                        // téléviseur se reconnaît sans légende. N'apparaît que
+                        // si une TV a répondu — voir onSendToTv.
+                        onSendToTv?.let { send ->
+                            MoovieIconButton(
+                                onClick = send,
+                                icon = Icons.Default.Cast,
+                                contentDescription = stringResource(Res.string.details_send_to_tv),
+                            )
+                        }
                         // Bande-annonce et « En savoir plus » ne sont plus ici :
                         // ils vivent en haut à droite de la fiche. La rangée
                         // d'actions retrouve de l'air, et ces deux-là ne sont
@@ -902,6 +925,7 @@ fun DetailsScreenContent(
                             isWatched = key in watched,
                             hasResume = resume.containsKey(key),
                             searching = quickPlay is QuickPlayState.Searching,
+                            onSendToTv = onSendToTv,
                             primaryModifier = primaryModifier,
                             onPlay = { onQuickPlayEpisode(selected.season, ep.episodeNumber) },
                             onOpenSources = { onOpenEpisodePanel(selected.season, ep.episodeNumber) },
@@ -2184,6 +2208,8 @@ private fun EpisodeDetail(
     isWatched: Boolean,
     hasResume: Boolean,
     searching: Boolean,
+    /** Envoyer *cet épisode* au téléviseur, ou null s'il n'y en a pas à portée. */
+    onSendToTv: (() -> Unit)? = null,
     /** Porte le focus d'entrée **et** ramène la page en haut. Voir son origine. */
     primaryModifier: Modifier,
     onPlay: () -> Unit,
@@ -2303,6 +2329,15 @@ private fun EpisodeDetail(
             }
         }
         MoovieButton(onClick = onOpenSources) { Text(stringResource(Res.string.details_sources)) }
+        // Même bouton que sur une fiche de film, et à la même place : c'est
+        // depuis un épisode qu'on veut le plus souvent continuer sur la TV.
+        onSendToTv?.let { send ->
+            MoovieIconButton(
+                onClick = send,
+                icon = Icons.Default.Cast,
+                contentDescription = stringResource(Res.string.details_send_to_tv),
+            )
+        }
         DownloadBestButton(downloadSearching, onDownloadBest)
         MoovieIconButton(
             onClick = onToggleWatched,

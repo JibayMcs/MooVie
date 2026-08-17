@@ -1,5 +1,7 @@
 package fr.moovie.tv.data.pairing
 
+import fr.moovie.tv.data.remote.PlayRequest
+import fr.moovie.tv.data.remote.RemoteLaunch
 import fr.moovie.tv.data.remote.RemoteKey
 import fr.moovie.tv.data.remote.RemoteNowPlaying
 import fr.moovie.tv.data.remote.RemoteState
@@ -206,6 +208,54 @@ class PairingServer(
         // maintiendrait allumée.
         if (route == "ping") {
             respond(sock.getOutputStream(), 204, "text/plain; charset=utf-8", "")
+            return@use
+        }
+
+        // --- Lecture demandée par le téléphone -------------------------------
+        //
+        // Hors du bloc « télécommande » ci-dessous, et ce n'est pas un détail :
+        // celui-ci exige `remoteAvailable()`, c'est-à-dire une session armée par
+        // l'ouverture de la page. Envoyer un titre depuis l'application n'a pas
+        // à passer par là — c'est le geste qui *démarre* l'usage, il ne peut pas
+        // supposer qu'on a déjà ouvert une télécommande.
+        //
+        // Le corps est un formulaire comme les autres routes, pas du JSON : le
+        // serveur sait déjà les décoder, et cinq champs ne justifient pas un
+        // second format à analyser à la main.
+        if (route == "play") {
+            val length = headers["content-length"]?.toIntOrNull() ?: 0
+            if (length !in 0..MAX_BODY_BYTES) {
+                respond(sock.getOutputStream(), 413, "text/plain; charset=utf-8", "Too large")
+                return@use
+            }
+            val form = decodeForm(String(readExactly(input, length), Charsets.UTF_8))
+            val tmdbId = form["id"]?.toIntOrNull()
+            if (tmdbId == null || tmdbId <= 0) {
+                respond(sock.getOutputStream(), 400, "text/plain; charset=utf-8", "Bad id")
+                return@use
+            }
+            val accepted = RemoteLaunch.request(
+                PlayRequest(
+                    tmdbId = tmdbId,
+                    isTv = form["tv"] == "1",
+                    season = form["s"]?.toIntOrNull() ?: 0,
+                    episode = form["e"]?.toIntOrNull() ?: 0,
+                    title = form["t"].orEmpty(),
+                    subtitle = form["st"].orEmpty(),
+                    artwork = form["art"].orEmpty(),
+                    positionMs = form["pos"]?.toLongOrNull() ?: 0,
+                    durationMs = form["dur"]?.toLongOrNull() ?: 0,
+                ),
+            )
+            // 409 et non 500 : l'adresse est bonne, c'est l'état du téléviseur
+            // qui ne s'y prête pas — personne n'écoute encore. Le téléphone
+            // peut le dire au lieu de basculer sur une télécommande vide.
+            respond(
+                sock.getOutputStream(),
+                if (accepted) 204 else 409,
+                "text/plain; charset=utf-8",
+                "",
+            )
             return@use
         }
 

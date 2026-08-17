@@ -102,6 +102,35 @@ class RemoteClient(private val target: RemoteTarget) {
     suspend fun seek(positionMs: Long): Boolean = post("seek", "p=$positionMs")
 
     /**
+     * Demande au téléviseur de lire ce titre.
+     *
+     * On envoie **l'identifiant TMDB, pas la source** : c'est le téléviseur qui
+     * résout, avec ses propres catalogues et sa propre connexion. Voir
+     * [PlayRequest] pour ce que ce choix implique.
+     *
+     * Faux couvre deux cas que l'appelant doit distinguer de la réussite, sans
+     * avoir à les distinguer entre eux : le téléviseur n'a pas répondu, ou il a
+     * répondu qu'il n'était pas en état de recevoir (409). Dans les deux cas il
+     * ne faut pas basculer sur la télécommande, qui ne montrerait rien.
+     */
+    suspend fun play(request: PlayRequest): Boolean = post(
+        "play",
+        buildString {
+            append("id=").append(request.tmdbId)
+            append("&tv=").append(if (request.isTv) "1" else "0")
+            if (request.season > 0) append("&s=").append(request.season)
+            if (request.episode > 0) append("&e=").append(request.episode)
+            append("&t=").append(encode(request.title))
+            append("&st=").append(encode(request.subtitle))
+            append("&art=").append(encode(request.artwork))
+            if (request.positionMs > 0) append("&pos=").append(request.positionMs)
+            if (request.durationMs > 0) append("&dur=").append(request.durationMs)
+        },
+    )
+
+    private fun encode(value: String): String = URLEncoder.encode(value, "UTF-8")
+
+    /**
      * Le téléviseur répond-il, et ce jeton vaut-il encore ?
      *
      * Les deux à la fois : une adresse joignable avec un jeton révoqué rend 404,

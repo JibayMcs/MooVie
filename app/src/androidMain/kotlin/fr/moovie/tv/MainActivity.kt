@@ -65,6 +65,9 @@ import fr.moovie.tv.ui.download.downloadPlayerScreen
 import fr.moovie.tv.data.download.localStream
 import fr.moovie.tv.data.pairing.PairingSession
 import fr.moovie.tv.data.remote.RemoteFocus
+import fr.moovie.tv.data.remote.RemoteLaunch
+import fr.moovie.tv.data.watch.ResumeEntry
+import fr.moovie.tv.data.watch.WatchProgressRepository
 import fr.moovie.tv.data.remote.remoteTarget
 import fr.moovie.tv.data.sync.SyncCoordinator
 import fr.moovie.tv.data.sync.SyncTrigger
@@ -413,6 +416,69 @@ class MainActivity : ComponentActivity() {
                         // Ce que le lecteur détaché ne peut pas faire lui-même :
                         // les trois passent par `detailsViewModel`, qui a le scope
                         // de cette Activity et connaît la série en cours.
+                        // Un titre envoyé depuis le téléphone. Même destination
+                        // que l'enchaînement d'épisodes — `autoSources` charge,
+                        // résout et ouvre le lecteur sans qu'on touche à rien —
+                        // parce que c'est le chemin déjà éprouvé plutôt qu'un
+                        // second à maintenir.
+                        //
+                        // `replace` et non `push` : rien ne doit ramener sur ce
+                        // qu'on regardait avant, l'ordre vient d'ailleurs.
+                        LaunchedEffect(Unit) {
+                            RemoteLaunch.requests.collect { demande ->
+                                // La position **avant** de naviguer : le lecteur
+                                // lit sa reprise dans le magasin local au montage
+                                // (PlayerScreen), et le téléviseur n'a aucune
+                                // raison de connaître un épisode commencé sur le
+                                // téléphone. L'écrire ici, c'est reprendre le
+                                // chemin existant plutôt que d'en ajouter un.
+                                if (demande.positionMs > 0) {
+                                    val key = if (demande.isTv) {
+                                        "tv:${demande.tmdbId}:s${demande.season}e${demande.episode}"
+                                    } else {
+                                        "movie:${demande.tmdbId}"
+                                    }
+                                    runCatching {
+                                        val repo = WatchProgressRepository()
+                                        // `register` **avant** `save`, et ce n'est
+                                        // pas un détail : `save` ne met à jour
+                                        // qu'une entrée existante et abandonne en
+                                        // silence s'il n'y en a pas. Le téléviseur
+                                        // n'a jamais vu cet épisode — c'est tout
+                                        // l'objet du geste — donc sans cette
+                                        // ligne la position était écrite dans le
+                                        // vide et la lecture repartait de zéro.
+                                        //
+                                        // L'ordre inverse est également sûr pour
+                                        // la suite : le `register` que fait la
+                                        // lecture rapide au démarrage conserve la
+                                        // position déjà présente.
+                                        repo.register(
+                                            ResumeEntry(
+                                                key = key,
+                                                tmdbId = demande.tmdbId,
+                                                isTv = demande.isTv,
+                                                season = demande.season,
+                                                episode = demande.episode,
+                                                title = demande.title,
+                                                imageUrl = demande.artwork.ifBlank { null },
+                                            ),
+                                        )
+                                        repo.save(key, demande.positionMs, demande.durationMs)
+                                    }
+                                }
+                                nav.replace(
+                                    Screen.Details(
+                                        tmdbId = demande.tmdbId,
+                                        isTv = demande.isTv,
+                                        autoSources = true,
+                                        resumeSeason = demande.season,
+                                        resumeEpisode = demande.episode,
+                                    ),
+                                )
+                            }
+                        }
+
                         LaunchedEffect(Unit) {
                             PlayerHost.demandes.collect { demande ->
                                 when (demande) {
@@ -568,6 +634,9 @@ class MainActivity : ComponentActivity() {
                                 tmdbId = s.tmdbId,
                                 isTv = s.isTv,
                                 onOpenPerson = { id, name -> nav.push(Screen.Person(id, name)) },
+                                // Après un titre envoyé au salon : on suit sur
+                                // l'écran qui montre ce que la TV fait.
+                                onOpenRemote = { nav.push(Screen.Remote) },
                                 onPlay = { player ->
                                     // Neutralise l'auto-lecture sur l'entrée de la
                                     // fiche : sinon en revenir du lecteur relancerait
