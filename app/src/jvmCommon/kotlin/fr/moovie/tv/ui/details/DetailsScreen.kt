@@ -769,11 +769,24 @@ fun DetailsScreenContent(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         MoovieButton(
-                            onClick = {
-                                // Cliquable aussi pendant le chargement : la lecture
-                                // démarrera dès qu'une source arrive.
-                                if (prefReady || loadingSources) onQuickPlayMovie()
-                            },
+                            // Jamais inerte, et c'est le point. Pendant le
+                            // chargement, la lecture démarre dès qu'une source
+                            // arrive. Et **quand il n'y en a aucune**, l'appui
+                            // reste le seul moyen d'obtenir le motif : la lecture
+                            // rapide conclut aussitôt et le publie dans son
+                            // bandeau. La garde d'avant en faisait un cul-de-sac
+                            // silencieux — on appuyait sur l'action principale de
+                            // la fiche, focalisée à l'arrivée sur TV, et il ne se
+                            // passait rien du tout.
+                            //
+                            // Le bouton de l'épisode (EpisodeHero) n'a jamais eu
+                            // cette garde : c'est pour ça que le bandeau se voyait
+                            // sur un épisode et jamais sur un film. Deux boutons
+                            // pour le même geste, un seul savait échouer.
+                            //
+                            // Appuyer deux fois ne relance rien : `startQuickPlay`
+                            // sort si son job tourne encore.
+                            onClick = onQuickPlayMovie,
                             modifier = primaryModifier,
                         ) {
                             when {
