@@ -1,5 +1,10 @@
 package fr.moovie.tv.ui.remote
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -19,6 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -96,6 +102,16 @@ fun rememberTvSender(onSent: () -> Unit): TvSender {
     val target by repo.target.collectAsStateWithLifecycle(initialValue = null)
     val reachable by RemotePresence.found.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+
+    // Android 13 masque toute notification non autorisée sans rien dire à
+    // l'application : sans cette demande, le service tournerait très bien et
+    // personne ne verrait jamais les commandes de la diffusion. On la pose au
+    // moment où elle s'explique — un titre part vers le téléviseur — plutôt
+    // qu'au premier lancement, où elle ne voudrait rien dire.
+    val askNotify = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { }
 
     var pending by remember { mutableStateOf<PlayRequest?>(null) }
     var busyTitle by remember { mutableStateOf("") }
@@ -126,6 +142,17 @@ fun rememberTvSender(onSent: () -> Unit): TvSender {
                 val mine = runCatching { sync.syncFingerprint() }.getOrDefault("")
                 val theirs = state?.syncFingerprint.orEmpty()
                 if (client.play(request.copy(record = mayRecordOnTv(mine, theirs)))) {
+                    // La box a pris : on la suit désormais en fond. C'est ce qui
+                    // met ses commandes sur l'écran verrouillé, et surtout ce
+                    // qui recopie sa progression même téléphone rangé — voir
+                    // [CastSessionService].
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                        context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) !=
+                        PackageManager.PERMISSION_GRANTED
+                    ) {
+                        askNotify.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    }
+                    CastSessionService.start(context)
                     onSent()
                 } else {
                     failed = true

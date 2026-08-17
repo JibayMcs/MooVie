@@ -53,6 +53,7 @@ import kotlinx.coroutines.flow.first
 import fr.moovie.tv.data.remote.PlayRequest
 import fr.moovie.tv.ui.remote.rememberTvSender
 import fr.moovie.tv.ui.remote.CastLaunchScreen
+import fr.moovie.tv.ui.remote.CastSessionService
 import fr.moovie.tv.ui.remote.catchUpWithTelevision
 import fr.moovie.tv.ui.remote.RemoteScreen
 import fr.moovie.tv.ui.remote.RemoteVolumeKeys
@@ -140,6 +141,7 @@ class MainActivity : ComponentActivity() {
 
         handleKeyExtras(intent)
         handleRemoteLink(intent)
+        handleCastNotification(intent)
 
         setContent {
             // L'animation de lancement se pose *au-dessus* de l'app plutôt que
@@ -860,6 +862,7 @@ class MainActivity : ComponentActivity() {
         setIntent(intent)
         handleKeyExtras(intent)
         handleRemoteLink(intent)
+        handleCastNotification(intent)
     }
 
     /**
@@ -917,6 +920,23 @@ class MainActivity : ComponentActivity() {
             if (known?.token != token) pendingRemote.value = true
         }
         return true
+    }
+
+    /**
+     * Toucher la notification de diffusion ouvre la télécommande.
+     *
+     * C'est ce qu'on cherche en touchant une diffusion en cours — voir ce que la
+     * TV joue, la mettre en pause, la déplacer — et non l'accueil, qui n'a rien à
+     * dire sur elle.
+     *
+     * La garde sur [CastSessionService.live] n'est pas de la prudence : sans
+     * elle, on retomberait exactement sur le défaut décrit dans
+     * [handleRemoteLink]. Voir la note de ce drapeau.
+     */
+    private fun handleCastNotification(intent: Intent?) {
+        if (intent?.getBooleanExtra(CastSessionService.EXTRA_OPEN_REMOTE, false) != true) return
+        if (!CastSessionService.live) return
+        pendingRemote.value = true
     }
 
     private fun handleKeyExtras(intent: Intent?) {

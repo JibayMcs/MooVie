@@ -15,6 +15,12 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Diffusion vers la TV : le service qui suit la box et met ses commandes
+         dans le volet. Le type est bien `mediaPlayback` — celui d'une lecture
+         déportée sur un autre appareil, le cas du Cast — et non `dataSync`
+         ci-dessus, dont Android 15 borne l'usage à un quota journalier qu'une
+         soirée de série dépasserait. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <!-- Auto-updater : installation des APK de mise à jour téléchargés -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
@@ -140,5 +146,10 @@
             android:name=".data.download.DownloadService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
+
+        <service
+            android:name=".ui.remote.CastSessionService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
     </application>
 </manifest>
