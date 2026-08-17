@@ -28,6 +28,7 @@ import fr.moovie.tv.data.remote.RemotePresence
 import fr.moovie.tv.data.remote.RemoteStatus
 import fr.moovie.tv.data.remote.RemoteTarget
 import fr.moovie.tv.data.remote.RemoteTargetRepository
+import fr.moovie.tv.data.remote.mayRecordOnTv
 import fr.moovie.tv.data.sync.SyncSettingsRepository
 import fr.moovie.tv.resources.Res
 import fr.moovie.tv.resources.common_cancel
@@ -124,8 +125,7 @@ fun rememberTvSender(onSent: () -> Unit): TvSender {
                 // ici. Voir PlayRequest.record.
                 val mine = runCatching { sync.syncFingerprint() }.getOrDefault("")
                 val theirs = state?.syncFingerprint.orEmpty()
-                val sameDestination = mine.isNotEmpty() && mine == theirs
-                if (client.play(request.copy(record = sameDestination))) {
+                if (client.play(request.copy(record = mayRecordOnTv(mine, theirs)))) {
                     onSent()
                 } else {
                     failed = true

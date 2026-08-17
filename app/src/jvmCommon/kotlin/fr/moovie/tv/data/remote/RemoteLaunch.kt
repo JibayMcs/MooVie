@@ -73,6 +73,25 @@ data class PlayRequest(
 )
 
 /**
+ * Le téléviseur peut-il enregistrer, vu les deux empreintes de destination ?
+ *
+ * La règle tient en une ligne, et c'est bien pour ça qu'elle mérite d'être
+ * nommée : elle vivait au milieu d'un `@Composable` Android, hors de portée de
+ * tout test, alors qu'elle décide seule si une box écrit ou non dans un compte
+ * de synchro. Voir [PlayRequest.record] pour le raisonnement, et
+ * [fr.moovie.tv.data.sync.SyncSettingsRepository.syncFingerprint] pour ce que
+ * les empreintes couvrent.
+ *
+ * **Deux empreintes vides ne se valent pas.** C'est le seul piège de la règle :
+ * `"" == ""` est vrai, et une comparaison naïve autoriserait donc l'écriture
+ * précisément dans le cas où plus rien ne réconciliera jamais les deux
+ * appareils. L'absence de synchro ne prouve pas une destination commune, elle
+ * garantit l'inverse.
+ */
+fun mayRecordOnTv(mine: String, theirs: String): Boolean =
+    mine.isNotEmpty() && mine == theirs
+
+/**
  * Les demandes de lecture reçues du téléphone, vues de la composition.
  *
  * Même motif que [RemoteNowPlaying] et [RemoteTyping], et pour la même raison :
