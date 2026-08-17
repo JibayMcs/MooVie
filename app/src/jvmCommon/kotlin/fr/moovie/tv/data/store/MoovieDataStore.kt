@@ -106,15 +106,46 @@ fun profileStoreName(base: String, profileId: String = ActiveProfile.id): String
 
 private val stores = mutableMapOf<String, DataStore<Preferences>>()
 
+/** Fabrique posée par les tests, voir [overrideStores]. Null en production. */
+@Volatile
+private var override: ((String) -> DataStore<Preferences>)? = null
+
+private val overridden = mutableMapOf<String, DataStore<Preferences>>()
+
 /**
  * DataStore Preferences partagé, par nom ("moovie_settings", "moovie_watch"…).
  * Instance unique par fichier — DataStore interdit deux instances actives sur
  * le même fichier — créée à la demande.
  */
 fun preferencesStore(name: String): DataStore<Preferences> = synchronized(stores) {
+    override?.let { create -> return@synchronized overridden.getOrPut(name) { create(name) } }
     stores.getOrPut(name) {
         PreferenceDataStoreFactory.create(produceFile = { moovieDataStoreFile(name) })
     }
+}
+
+/**
+ * Pour les tests : sert des magasins fabriqués ici plutôt que des fichiers.
+ *
+ * **Pourquoi une couture dans le code de production.** Les dépôts appellent
+ * [preferencesStore] à leur construction, sans argument et sans injection — c'est
+ * le choix assumé décrit sur [ActiveProfile]. Sans point de substitution, aucun
+ * d'entre eux n'est testable : les faire tourner écrirait dans la configuration
+ * réelle de la machine, et deux tests successifs se liraient l'un l'autre. Le
+ * premier à en avoir eu besoin est `syncFingerprint()`, qui décide si un
+ * téléviseur a le droit d'enregistrer ce qu'on lui diffuse.
+ *
+ * **Deux caches et non un.** Les instances sur fichier ne sont jamais jetées :
+ * les vider pour installer la fabrique de test, puis la retirer, en recréerait
+ * une seconde sur le même fichier — précisément ce que DataStore refuse
+ * (« multiple DataStores active for the same file »). Seul le cache de test est
+ * remis à zéro, ce qui donne à chaque test des magasins vierges.
+ *
+ * Passer `null` rend la main aux fichiers.
+ */
+internal fun overrideStores(create: ((String) -> DataStore<Preferences>)?) = synchronized(stores) {
+    override = create
+    overridden.clear()
 }
 
 /**
