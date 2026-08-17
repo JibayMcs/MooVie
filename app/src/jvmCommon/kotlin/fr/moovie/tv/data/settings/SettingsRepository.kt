@@ -4,6 +4,10 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
+import fr.moovie.tv.core.subtitles.model.SubtitleBackdrop
+import fr.moovie.tv.core.subtitles.model.SubtitleColor
+import fr.moovie.tv.core.subtitles.model.SubtitleSize
+import fr.moovie.tv.core.subtitles.model.SubtitleStyle
 import fr.moovie.tv.data.net.DohProvider
 import fr.moovie.tv.data.store.preferencesStore
 import kotlinx.coroutines.flow.Flow
@@ -286,6 +290,54 @@ class SettingsRepository {
     suspend fun setSubtitleLanguages(value: List<String>) =
         store.edit { it[SUBTITLE_LANGUAGES] = value.joinToString(",") }
 
+    /**
+     * Remonter les sous-titres « forcés » — ceux qui ne traduisent que les
+     * passages en langue étrangère.
+     *
+     * Faux par défaut, et ce n'est pas une timidité : servi sans être demandé,
+     * un forcé donne l'impression que les dialogues manquent. C'est aussi
+     * pourquoi le réglage existe plutôt qu'une heuristique — personne ne peut
+     * deviner à la place de l'utilisateur qu'il regarde un film majoritairement
+     * dans une langue qu'il comprend.
+     */
+    val subtitlePreferForced: Flow<Boolean> =
+        store.data.map { it[SUBTITLE_PREFER_FORCED] ?: false }
+
+    suspend fun setSubtitlePreferForced(value: Boolean) =
+        store.edit { it[SUBTITLE_PREFER_FORCED] = value }
+
+    /** Remonter les sous-titres pour sourds et malentendants (bruits, locuteurs). */
+    val subtitlePreferHearingImpaired: Flow<Boolean> =
+        store.data.map { it[SUBTITLE_PREFER_SDH] ?: false }
+
+    suspend fun setSubtitlePreferHearingImpaired(value: Boolean) =
+        store.edit { it[SUBTITLE_PREFER_SDH] = value }
+
+    /**
+     * Apparence des sous-titres, recomposée depuis trois clés indépendantes.
+     *
+     * Trois clés plutôt qu'une chaîne sérialisée : chacune se relit seule, et
+     * une valeur devenue inconnue (un enum renommé, une sauvegarde d'une version
+     * ultérieure) retombe sur son défaut **sans emporter les deux autres**.
+     */
+    val subtitleStyle: Flow<SubtitleStyle> = store.data.map { prefs ->
+        SubtitleStyle(
+            size = prefs[SUBTITLE_SIZE].toEnum(SubtitleSize.entries, SubtitleStyle.Default.size),
+            color = prefs[SUBTITLE_COLOR].toEnum(SubtitleColor.entries, SubtitleStyle.Default.color),
+            backdrop = prefs[SUBTITLE_BACKDROP]
+                .toEnum(SubtitleBackdrop.entries, SubtitleStyle.Default.backdrop),
+        )
+    }
+
+    suspend fun setSubtitleSize(value: SubtitleSize) =
+        store.edit { it[SUBTITLE_SIZE] = value.name }
+
+    suspend fun setSubtitleColor(value: SubtitleColor) =
+        store.edit { it[SUBTITLE_COLOR] = value.name }
+
+    suspend fun setSubtitleBackdrop(value: SubtitleBackdrop) =
+        store.edit { it[SUBTITLE_BACKDROP] = value.name }
+
     suspend fun setTmdbApiKey(value: String) =
         store.edit { it[TMDB_API_KEY] = value.trim() }
 
@@ -327,5 +379,22 @@ class SettingsRepository {
         val OS_TOKEN = stringPreferencesKey("os_token")
         val OS_TOKEN_AT = longPreferencesKey("os_token_at")
         val SUBTITLE_LANGUAGES = stringPreferencesKey("subtitle_languages")
+        val SUBTITLE_PREFER_FORCED = booleanPreferencesKey("subtitle_prefer_forced")
+        val SUBTITLE_PREFER_SDH = booleanPreferencesKey("subtitle_prefer_sdh")
+        val SUBTITLE_SIZE = stringPreferencesKey("subtitle_size")
+        val SUBTITLE_COLOR = stringPreferencesKey("subtitle_color")
+        val SUBTITLE_BACKDROP = stringPreferencesKey("subtitle_backdrop")
     }
 }
+
+/**
+ * Relit un enum enregistré par son nom, et retombe sur [fallback] si ce nom ne
+ * désigne plus rien.
+ *
+ * `valueOf` lève sur une valeur inconnue, et une exception ici se produirait
+ * *dans le flux des réglages* : tout ce qui les collecte tomberait avec. Le cas
+ * n'est pas théorique — une sauvegarde importée depuis une version plus récente
+ * porte des noms que celle-ci ne connaît pas encore.
+ */
+private fun <T : Enum<T>> String?.toEnum(values: List<T>, fallback: T): T =
+    values.firstOrNull { it.name == this } ?: fallback

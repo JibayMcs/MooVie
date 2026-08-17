@@ -1,5 +1,6 @@
 package fr.moovie.tv.desktop.mpv
 
+import fr.moovie.tv.core.subtitles.model.SubtitleStyle
 import fr.moovie.tv.ui.player.MooviePlayerController
 import fr.moovie.tv.ui.player.PlayerTrack
 import fr.moovie.tv.ui.player.PlayerTracks
@@ -66,6 +67,8 @@ internal class MpvPlayerController(private val moteur: MpvEngine) : MooviePlayer
     }
 
     override fun loadExternalSubtitle(path: String?) = moteur.sousTitreExterne(path)
+
+    override fun applySubtitleStyle(style: SubtitleStyle) = moteur.styleSousTitres(style)
 
     override fun videoFps(): Double = moteur.fps()
 }

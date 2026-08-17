@@ -102,6 +102,7 @@ import fr.moovie.tv.core.sources.model.PlayableStream
 import fr.moovie.tv.core.sources.model.StreamFormat
 import fr.moovie.tv.data.download.Download
 import fr.moovie.tv.data.download.DownloadQueue
+import fr.moovie.tv.ui.player.ApplySubtitleStyle
 import fr.moovie.tv.ui.player.PLAYER_AUTO_NEXT_SECONDS
 import fr.moovie.tv.ui.player.PLAYER_SEEK_STEP_MS
 import fr.moovie.tv.ui.player.PLAYER_UPDATE_CHIP_MS
@@ -264,6 +265,8 @@ internal fun DesktopPlayerScreen(
 
     /** Vue du lecteur exposée à la chrome partagée. */
     val controller = remember { MpvPlayerController(moteur) }
+
+    ApplySubtitleStyle(controller)
 
     // Même garde-fou que sur Android TV, et volontairement le même code : un
     // flux nettement plus court que le média annoncé emprunte le chemin d'échec

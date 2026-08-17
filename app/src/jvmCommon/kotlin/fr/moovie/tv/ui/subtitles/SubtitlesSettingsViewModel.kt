@@ -2,7 +2,11 @@ package fr.moovie.tv.ui.subtitles
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import fr.moovie.tv.core.subtitles.model.SubtitleBackdrop
+import fr.moovie.tv.core.subtitles.model.SubtitleColor
 import fr.moovie.tv.core.subtitles.model.SubtitleQuota
+import fr.moovie.tv.core.subtitles.model.SubtitleSize
+import fr.moovie.tv.core.subtitles.model.SubtitleStyle
 import fr.moovie.tv.data.settings.SettingsRepository
 import fr.moovie.tv.data.subtitles.OpenSubtitlesApi
 import fr.moovie.tv.data.subtitles.OpenSubtitlesCatalog
@@ -31,6 +35,11 @@ data class SubtitlesSettingsState(
     val quota: SubtitleQuota = SubtitleQuota.Unknown,
     /** Langues recherchées, dans l'ordre de préférence. */
     val languages: List<String> = emptyList(),
+    /** Préférences de *contenu* : quel fichier proposer en premier. */
+    val preferForced: Boolean = false,
+    val preferHearingImpaired: Boolean = false,
+    /** Préférence d'*apparence* : comment le texte est rendu à l'écran. */
+    val style: SubtitleStyle = SubtitleStyle.Default,
     val busy: Boolean = false,
     val error: OsLoginError? = null,
 )
@@ -62,6 +71,9 @@ class SubtitlesSettingsViewModel : ViewModel() {
         _state.value = _state.value.copy(
             account = account,
             languages = settings.subtitleLanguages.first(),
+            preferForced = settings.subtitlePreferForced.first(),
+            preferHearingImpaired = settings.subtitlePreferHearingImpaired.first(),
+            style = settings.subtitleStyle.first(),
         )
         if (account.connected) {
             _state.value = _state.value.copy(quota = catalog.quota())
@@ -118,6 +130,35 @@ class SubtitlesSettingsViewModel : ViewModel() {
         }
         settings.setSubtitleLanguages(next)
         _state.value = _state.value.copy(languages = next)
+    }
+
+    fun setPreferForced(value: Boolean) = io {
+        settings.setSubtitlePreferForced(value)
+        _state.value = _state.value.copy(preferForced = value)
+    }
+
+    fun setPreferHearingImpaired(value: Boolean) = io {
+        settings.setSubtitlePreferHearingImpaired(value)
+        _state.value = _state.value.copy(preferHearingImpaired = value)
+    }
+
+    // L'état local est mis à jour à la main plutôt que collecté depuis le
+    // magasin : l'écriture DataStore est asynchrone, et attendre son aller-retour
+    // laisse le bouton visiblement en arrière du geste sur une télécommande.
+
+    fun setSize(value: SubtitleSize) = io {
+        settings.setSubtitleSize(value)
+        _state.value = _state.value.copy(style = _state.value.style.copy(size = value))
+    }
+
+    fun setColor(value: SubtitleColor) = io {
+        settings.setSubtitleColor(value)
+        _state.value = _state.value.copy(style = _state.value.style.copy(color = value))
+    }
+
+    fun setBackdrop(value: SubtitleBackdrop) = io {
+        settings.setSubtitleBackdrop(value)
+        _state.value = _state.value.copy(style = _state.value.style.copy(backdrop = value))
     }
 
     private fun io(block: suspend () -> Unit) {

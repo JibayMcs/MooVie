@@ -323,6 +323,12 @@ fun PlayerScreen(
         }
     }
 
+    // La vue qui dessine les sous-titres appartient à la PlayerView, pas au
+    // Player : le contrôleur ne peut pas la trouver seul. On la lui donne ici.
+    // L'ordre vis-à-vis du style ne compte pas — il est réappliqué à l'attache.
+    LaunchedEffect(playerView) { controller.subtitleView = playerView.subtitleView }
+    ApplySubtitleStyle(controller)
+
     /**
      * Vidéo agrandie pour remplir l'écran, au prix d'un rognage.
      *

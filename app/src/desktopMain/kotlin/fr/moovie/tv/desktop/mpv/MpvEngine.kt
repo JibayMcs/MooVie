@@ -2,6 +2,7 @@ package fr.moovie.tv.desktop.mpv
 
 import com.sun.jna.Memory
 import com.sun.jna.Pointer
+import fr.moovie.tv.core.subtitles.model.SubtitleStyle
 import com.sun.jna.ptr.PointerByReference
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Semaphore
@@ -579,6 +580,18 @@ internal class MpvEngine(
     /** Vrai quand un sous-titre externe est monté — il n'y en a qu'un à la fois. */
     @Volatile
     private var sousTitreMonte = false
+
+    /**
+     * Applique l'apparence choisie par l'utilisateur.
+     *
+     * Réappliquée sans compter : mpv accepte ces propriétés à tout moment, y
+     * compris avant qu'un sous-titre soit monté, et le rendu suit à la trame
+     * suivante. C'est ce qui permet à l'écran de simplement republier le style
+     * quand il change, sans savoir où en est la lecture.
+     */
+    fun styleSousTitres(style: SubtitleStyle) {
+        mpvSubtitleProperties(style).forEach { (nom, valeur) -> poseTexte(nom, valeur) }
+    }
 
     fun sousTitreExterne(chemin: String?) {
         // Retirer ce qui n'existe pas n'est pas un ordre, c'est du bruit :

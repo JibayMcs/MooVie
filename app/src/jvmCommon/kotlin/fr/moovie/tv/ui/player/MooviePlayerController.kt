@@ -1,5 +1,7 @@
 package fr.moovie.tv.ui.player
 
+import fr.moovie.tv.core.subtitles.model.SubtitleStyle
+
 /**
  * Une piste sélectionnable (sous-titre ou audio), telle que la chrome partagée
  * a besoin de la voir : un identifiant opaque, un libellé, un état.
@@ -92,6 +94,20 @@ interface MooviePlayerController {
      * cadence, qui est pourtant la correction qui compte.
      */
     fun loadExternalSubtitle(path: String?)
+
+    /**
+     * Applique l'apparence des sous-titres — taille, couleur, fond.
+     *
+     * Contrairement au recalage, qui se fait sur le **fichier** parce qu'aucun
+     * des deux lecteurs ne sait étirer une cadence, l'apparence se règle sur le
+     * **lecteur** : chacun dessine son propre texte et sait le faire. Le port ne
+     * décrit donc qu'une intention, et chaque plateforme la traduit dans ses
+     * termes (CaptionStyleCompat côté Media3, propriétés `sub-*` côté mpv).
+     *
+     * Peut être appelée à tout moment, y compris sans sous-titre monté : le
+     * réglage s'applique au suivant.
+     */
+    fun applySubtitleStyle(style: SubtitleStyle)
 
     /**
      * Cadence du flux en images par seconde, 0 si inconnue.

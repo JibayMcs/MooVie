@@ -59,8 +59,44 @@ import fr.moovie.tv.resources.subtitles_languages_help
 import fr.moovie.tv.resources.subtitles_remember
 import fr.moovie.tv.resources.subtitles_remember_help
 import fr.moovie.tv.resources.subtitles_username
+import fr.moovie.tv.resources.subtitles_appearance
+import fr.moovie.tv.resources.subtitles_appearance_help
+import fr.moovie.tv.resources.subtitles_backdrop
+import fr.moovie.tv.resources.subtitles_backdrop_box
+import fr.moovie.tv.resources.subtitles_backdrop_none
+import fr.moovie.tv.resources.subtitles_backdrop_outline
+import fr.moovie.tv.resources.subtitles_backdrop_shadow
+import fr.moovie.tv.resources.subtitles_color
+import fr.moovie.tv.resources.subtitles_color_white
+import fr.moovie.tv.resources.subtitles_color_yellow
+import fr.moovie.tv.resources.subtitles_content
+import fr.moovie.tv.resources.subtitles_content_help
+import fr.moovie.tv.resources.subtitles_prefer_forced
+import fr.moovie.tv.resources.subtitles_prefer_forced_help
+import fr.moovie.tv.resources.subtitles_prefer_sdh
+import fr.moovie.tv.resources.subtitles_prefer_sdh_help
+import fr.moovie.tv.resources.subtitles_preview
+import fr.moovie.tv.resources.subtitles_size
+import fr.moovie.tv.resources.subtitles_size_huge
+import fr.moovie.tv.resources.subtitles_size_large
+import fr.moovie.tv.resources.subtitles_size_normal
+import fr.moovie.tv.resources.subtitles_size_small
+import fr.moovie.tv.core.subtitles.model.SubtitleBackdrop
+import fr.moovie.tv.core.subtitles.model.SubtitleColor
+import fr.moovie.tv.core.subtitles.model.SubtitleSize
+import fr.moovie.tv.core.subtitles.model.SubtitleStyle
+import fr.moovie.tv.core.subtitles.model.toOpaqueArgb
 import fr.moovie.tv.ui.components.MoovieButton
 import fr.moovie.tv.ui.theme.MoovieShape
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.text.style.TextAlign
 import org.jetbrains.compose.resources.stringResource
 
 private val DIM = Color(0xFF9A9A9A)
@@ -157,8 +193,160 @@ fun SubtitlesSection(
         )
         Help(stringResource(Res.string.subtitles_languages_help))
         LanguagePicker(selected = state.languages, onToggle = viewModel::toggleLanguage)
+
+        Text(
+            stringResource(Res.string.subtitles_content),
+            style = MaterialTheme.typography.titleMedium,
+        )
+        Help(stringResource(Res.string.subtitles_content_help))
+
+        Text(stringResource(Res.string.subtitles_prefer_forced), style = MaterialTheme.typography.bodyMedium)
+        Help(stringResource(Res.string.subtitles_prefer_forced_help))
+        OnOff(value = state.preferForced, onChange = viewModel::setPreferForced)
+
+        Text(stringResource(Res.string.subtitles_prefer_sdh), style = MaterialTheme.typography.bodyMedium)
+        Help(stringResource(Res.string.subtitles_prefer_sdh_help))
+        OnOff(value = state.preferHearingImpaired, onChange = viewModel::setPreferHearingImpaired)
+
+        Text(
+            stringResource(Res.string.subtitles_appearance),
+            style = MaterialTheme.typography.titleMedium,
+        )
+        Help(stringResource(Res.string.subtitles_appearance_help))
+        // L'aperçu **avant** les choix : c'est lui qu'on regarde en réglant, et
+        // il ne doit pas sortir de l'écran quand on descend d'un cran.
+        SubtitlePreview(state.style)
+
+        Choice(
+            label = stringResource(Res.string.subtitles_size),
+            values = SubtitleSize.entries,
+            selected = state.style.size,
+            name = { it.label() },
+            onPick = viewModel::setSize,
+        )
+        Choice(
+            label = stringResource(Res.string.subtitles_color),
+            values = SubtitleColor.entries,
+            selected = state.style.color,
+            name = { it.label() },
+            onPick = viewModel::setColor,
+        )
+        Choice(
+            label = stringResource(Res.string.subtitles_backdrop),
+            values = SubtitleBackdrop.entries,
+            selected = state.style.backdrop,
+            name = { it.label() },
+            onPick = viewModel::setBackdrop,
+        )
     }
 }
+
+/**
+ * Le réglage tel qu'il se verra, sur un fond qui ressemble à une image.
+ *
+ * Sans aperçu, chaque essai demande de lancer une vidéo, d'attendre un
+ * sous-titre et de revenir : personne ne règle une taille dans ces conditions,
+ * et le réglage resterait sur son défaut. Le dégradé imite une scène — un aplat
+ * uni rendrait le choix du fond incompréhensible, puisque c'est justement sur
+ * les zones claires que contour et bandeau se justifient.
+ *
+ * Ce n'est **pas** le rendu du lecteur : ExoPlayer et mpv dessinent leur propre
+ * texte. L'aperçu vise la ressemblance, pas l'identité — il répond à « est-ce
+ * assez gros », qui est la question posée.
+ */
+@Composable
+private fun SubtitlePreview(style: SubtitleStyle) {
+    val text = stringResource(Res.string.subtitles_preview)
+    val color = Color(style.color.rgb.toOpaqueArgb())
+    val size = MaterialTheme.typography.bodyLarge.fontSize * style.size.scale
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 96.dp)
+            .clip(MoovieShape)
+            .background(
+                Brush.horizontalGradient(
+                    listOf(Color(0xFF1A1A1A), Color(0xFF8A8A8A), Color(0xFF2A2A2A)),
+                ),
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text,
+            color = color,
+            fontSize = size,
+            textAlign = TextAlign.Center,
+            style = when (style.backdrop) {
+                SubtitleBackdrop.OUTLINE -> TextStyle(
+                    shadow = Shadow(Color.Black, Offset.Zero, blurRadius = 6f),
+                )
+                SubtitleBackdrop.SHADOW -> TextStyle(
+                    shadow = Shadow(Color.Black, Offset(3f, 3f), blurRadius = 2f),
+                )
+                SubtitleBackdrop.NONE, SubtitleBackdrop.BOX -> TextStyle.Default
+            },
+            modifier = Modifier
+                .padding(horizontal = 12.dp)
+                .then(
+                    if (style.backdrop == SubtitleBackdrop.BOX) {
+                        Modifier
+                            .background(Color.Black.copy(alpha = 0.75f))
+                            .padding(horizontal = 8.dp, vertical = 2.dp)
+                    } else {
+                        Modifier
+                    },
+                ),
+        )
+    }
+}
+
+/** Rangée « libellé + choix exclusifs », comme ailleurs dans les réglages. */
+@Composable
+private fun <T> Choice(
+    label: String,
+    values: List<T>,
+    selected: T,
+    name: @Composable (T) -> String,
+    onPick: (T) -> Unit,
+) {
+    Text(label, style = MaterialTheme.typography.bodyMedium, color = DIM)
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        values.forEach { value ->
+            MoovieButton(onClick = { onPick(value) }, selected = value == selected) {
+                Text(name(value))
+            }
+        }
+    }
+}
+
+@Composable
+private fun SubtitleSize.label(): String = stringResource(
+    when (this) {
+        SubtitleSize.SMALL -> Res.string.subtitles_size_small
+        SubtitleSize.NORMAL -> Res.string.subtitles_size_normal
+        SubtitleSize.LARGE -> Res.string.subtitles_size_large
+        SubtitleSize.HUGE -> Res.string.subtitles_size_huge
+    },
+)
+
+@Composable
+private fun SubtitleColor.label(): String = stringResource(
+    when (this) {
+        SubtitleColor.WHITE -> Res.string.subtitles_color_white
+        SubtitleColor.YELLOW -> Res.string.subtitles_color_yellow
+    },
+)
+
+@Composable
+private fun SubtitleBackdrop.label(): String = stringResource(
+    when (this) {
+        SubtitleBackdrop.NONE -> Res.string.subtitles_backdrop_none
+        SubtitleBackdrop.OUTLINE -> Res.string.subtitles_backdrop_outline
+        SubtitleBackdrop.SHADOW -> Res.string.subtitles_backdrop_shadow
+        SubtitleBackdrop.BOX -> Res.string.subtitles_backdrop_box
+    },
+)
 
 /**
  * Le quota, ou l'aveu qu'on ne le connaît pas.

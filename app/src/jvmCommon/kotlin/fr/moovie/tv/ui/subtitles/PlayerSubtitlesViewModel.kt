@@ -103,7 +103,17 @@ class PlayerSubtitlesViewModel : ViewModel() {
         val found = catalog.search(media, languages)
         _state.value = _state.value.copy(
             loading = false,
-            candidates = rankSubtitles(found, languages, this.streamFps),
+            // Les deux préférences de contenu passent ici, et nulle part
+            // ailleurs : c'est le classement qui décide quel fichier l'utilisateur
+            // se verra proposer en premier, et à cinq téléchargements par jour ce
+            // premier rang est presque toute la fonctionnalité.
+            candidates = rankSubtitles(
+                candidates = found,
+                preferredLanguages = languages,
+                streamFps = this.streamFps,
+                preferHearingImpaired = settings.subtitlePreferHearingImpaired.first(),
+                preferForced = settings.subtitlePreferForced.first(),
+            ),
             trouble = if (found.isEmpty()) SubtitleTrouble.NOTHING_FOUND else null,
             quota = catalog.quota(),
             downloaded = files.storedIds(mediaKey),

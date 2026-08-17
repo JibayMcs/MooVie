@@ -1,6 +1,12 @@
 package fr.moovie.tv.ui.player
 
+import android.graphics.Color
 import android.net.Uri
+import androidx.media3.ui.CaptionStyleCompat
+import androidx.media3.ui.SubtitleView
+import fr.moovie.tv.core.subtitles.model.SubtitleBackdrop
+import fr.moovie.tv.core.subtitles.model.SubtitleStyle
+import fr.moovie.tv.core.subtitles.model.toOpaqueArgb
 import androidx.media3.common.C
 import androidx.media3.common.Format
 import androidx.media3.common.MimeTypes
@@ -20,6 +26,25 @@ internal class ExoPlayerController(private val player: Player) : MooviePlayerCon
 
     /** Vrai tant que la piste externe attend d'être sélectionnée. */
     private var awaitingExternal = false
+
+    /**
+     * La vue qui dessine les sous-titres, fournie par l'écran.
+     *
+     * Le contrôleur ne connaît qu'un `Player`, et l'apparence se règle sur la
+     * **vue** : Media3 sépare les deux. L'écran la dépose donc ici en créant sa
+     * `PlayerView`.
+     *
+     * Poser la vue réapplique le dernier style demandé : l'ordre des deux
+     * n'est pas garanti — le style vient des réglages, donc d'une lecture
+     * asynchrone, et la vue de la composition.
+     */
+    internal var subtitleView: SubtitleView? = null
+        set(value) {
+            field = value
+            lastStyle?.let { applyStyleTo(value, it) }
+        }
+
+    private var lastStyle: SubtitleStyle? = null
 
     init {
         // Sélectionner la piste externe dès qu'elle apparaît. Sans ça, réactiver
@@ -95,6 +120,55 @@ internal class ExoPlayerController(private val player: Player) : MooviePlayerCon
      * l'appeler que sur un geste explicite, jamais en réaction continue à un
      * curseur de réglage.
      */
+    override fun applySubtitleStyle(style: SubtitleStyle) {
+        lastStyle = style
+        applyStyleTo(subtitleView, style)
+    }
+
+    /**
+     * Traduit l'intention en `CaptionStyleCompat`.
+     *
+     * ## Les styles du fichier restent, les tailles du fichier partent
+     *
+     * `setApplyEmbeddedStyles(false)` ferait gagner nos couleurs partout — et
+     * emporterait l'**italique**, que les SRT emploient pour la voix off et les
+     * répliques en langue étrangère. On perdrait une distinction portée par le
+     * sous-titre pour imposer une couleur que personne n'a demandé de forcer.
+     *
+     * Les *tailles* embarquées, elles, sont désactivées : ce sont elles qui
+     * feraient mentir le réglage, en rendant tel fichier plus petit que le
+     * précédent sans raison visible.
+     */
+    private fun applyStyleTo(view: SubtitleView?, style: SubtitleStyle) {
+        val target = view ?: return
+
+        target.setApplyEmbeddedStyles(true)
+        target.setApplyEmbeddedFontSizes(false)
+        target.setFractionalTextSize(SubtitleView.DEFAULT_TEXT_SIZE_FRACTION * style.size.scale)
+
+        val edge = when (style.backdrop) {
+            SubtitleBackdrop.OUTLINE -> CaptionStyleCompat.EDGE_TYPE_OUTLINE
+            SubtitleBackdrop.SHADOW -> CaptionStyleCompat.EDGE_TYPE_DROP_SHADOW
+            SubtitleBackdrop.NONE, SubtitleBackdrop.BOX -> CaptionStyleCompat.EDGE_TYPE_NONE
+        }
+        // Le bandeau est le seul à peindre derrière le texte. La « fenêtre »
+        // (troisième couleur) reste transparente dans tous les cas : elle
+        // couvrirait toute la largeur, y compris là où il n'y a pas de texte.
+        val background =
+            if (style.backdrop == SubtitleBackdrop.BOX) Color.BLACK else Color.TRANSPARENT
+
+        target.setStyle(
+            CaptionStyleCompat(
+                style.color.rgb.toOpaqueArgb(),
+                background,
+                Color.TRANSPARENT,
+                edge,
+                Color.BLACK,
+                null,
+            ),
+        )
+    }
+
     override fun loadExternalSubtitle(path: String?) {
         val current = player.currentMediaItem ?: return
         val position = player.currentPosition
