@@ -26,15 +26,23 @@ fun pairingOffered(): Boolean = LocalUiFlavor.current == UiFlavor.TV || PAIRING_
  *
  * Plus large que [pairingOffered], parce que la télécommande a **deux bouts** et
  * qu'un réglage existe à chacun : le téléviseur se laisse piloter (QR, révocation
- * des jetons), le téléphone pilote (quel téléviseur, et comment l'oublier).
+ * des jetons), les autres pilotent (quel téléviseur, et comment l'oublier).
  *
- * Le pointeur en est exclu, et lui seul : un ordinateur n'est ni l'un ni l'autre
- * — il ne sert pas de télécommande, et personne n'en pilote un depuis son
- * canapé. Lui montrer la section reviendrait à lui proposer un réglage sans
- * objet.
+ * ## Le pointeur en faisait partie, et c'était une erreur
+ *
+ * Il en était exclu au motif qu'« un ordinateur n'est ni l'un ni l'autre ». La
+ * première moitié tient : personne ne pilote un poste de travail depuis son
+ * canapé, et [pairingOffered] l'en garde toujours. La seconde était fausse — on
+ * regarde une fiche sur son ordinateur exactement comme sur son téléphone, et
+ * vouloir l'envoyer sur la télé du salon n'a rien de moins naturel là qu'ici.
+ *
+ * L'exclusion se voyait mal parce que le desktop **acceptait** déjà les
+ * diffusions sans savoir les jouer : le serveur répondait « accepté » et il ne
+ * se passait rien. Réserver le rôle de cible au téléviseur et donner celui
+ * d'émetteur à tout le reste rend les deux moitiés cohérentes.
  */
 @Composable
-fun remoteOffered(): Boolean = LocalUiFlavor.current != UiFlavor.POINTER || PAIRING_FORCED
+fun remoteOffered(): Boolean = true
 
 /**
  * Crochet de dev : `MOOVIE_PAIRING=1` montre l'appairage hors TV.
