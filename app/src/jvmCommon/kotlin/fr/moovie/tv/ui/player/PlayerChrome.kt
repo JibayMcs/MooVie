@@ -139,8 +139,14 @@ fun PlayerControlBar(
     onNudgeScrub: (Long) -> Unit,
     onPreviousEpisode: () -> Unit,
     onNextEpisode: () -> Unit,
-    onOpenSubtitles: () -> Unit,
-    onOpenSettings: () -> Unit,
+    /**
+     * Menus du lecteur. **Nuls quand il n'y a pas de lecteur à régler** — la
+     * télécommande pilote une box à distance et n'a accès ni à ses pistes ni à
+     * ses réglages. Même règle que [onReportSegment] juste en dessous : l'icône
+     * disparaît alors, une cible inerte étant une cible de trop.
+     */
+    onOpenSubtitles: (() -> Unit)? = null,
+    onOpenSettings: (() -> Unit)? = null,
     /**
      * Signalement d'un segment manquant à TheIntroDB. Null quand il n'y a rien
      * à signaler — segments déjà connus, ou pas de clé — auquel cas l'icône
@@ -229,11 +235,13 @@ fun PlayerControlBar(
                     contentDescription = stringResource(Res.string.player_next_episode),
                 )
             }
-            MoovieIconButton(
-                onClick = onOpenSubtitles,
-                icon = Icons.Default.ClosedCaption,
-                contentDescription = stringResource(Res.string.player_subtitles),
-            )
+            onOpenSubtitles?.let { open ->
+                MoovieIconButton(
+                    onClick = open,
+                    icon = Icons.Default.ClosedCaption,
+                    contentDescription = stringResource(Res.string.player_subtitles),
+                )
+            }
             onReportSegment?.let { report ->
                 MoovieIconButton(
                     onClick = report,
@@ -244,11 +252,13 @@ fun PlayerControlBar(
             onDownload?.let { enqueue ->
                 PlayerDownloadButton(mediaKey = mediaKey, onEnqueue = enqueue)
             }
-            MoovieIconButton(
-                onClick = onOpenSettings,
-                icon = Icons.Default.Settings,
-                contentDescription = stringResource(Res.string.player_settings),
-            )
+            onOpenSettings?.let { open ->
+                MoovieIconButton(
+                    onClick = open,
+                    icon = Icons.Default.Settings,
+                    contentDescription = stringResource(Res.string.player_settings),
+                )
+            }
             trailing()
         }
         Row(
