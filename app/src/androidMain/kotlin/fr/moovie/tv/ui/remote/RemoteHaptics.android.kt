@@ -5,29 +5,18 @@ import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import androidx.compose.runtime.Composable
+import fr.moovie.tv.data.remote.RemoteKey
 import fr.moovie.tv.data.store.appContext
 
 /**
- * Retour haptique de la télécommande.
+ * Le vibreur du téléphone.
  *
- * ### Pourquoi ce fichier existe
- *
- * La télécommande a d'abord été une page web, et sa vibration n'a jamais
- * fonctionné : l'API du navigateur ne demande aucune autorisation, elle est
- * simplement inopérante sur Chrome Android selon les réglages de l'appareil, et
- * absente sur iOS. Aucun correctif n'était possible côté page — c'était le
- * mauvais support. En natif, le vibreur est une API système, sans permission
- * (`VIBRATE` est de niveau normal) et sans conditions.
- *
- * ### Trois intensités, parce qu'une seule ne dit rien
- *
- * Le doigt ne regarde pas l'écran. Un cran sec quand la direction change, une
- * frappe plus franche sur OK, un motif à deux temps sur Retour : c'est ce qui
- * permet de sentir *ce qu'on vient de faire* sans lever les yeux.
+ * En natif, c'est une API système sans permission de haut niveau (`VIBRATE` est
+ * de niveau normal) et sans conditions — tout le contraire de ce que la page web
+ * pouvait offrir. Voir l'`expect` pour le reste du raisonnement.
  */
-object RemoteHaptics {
-
-    enum class Tick { STEP, PRESS, BACK }
+actual object RemoteHaptics {
 
     private val vibrator: Vibrator? by lazy {
         runCatching {
@@ -43,10 +32,10 @@ object RemoteHaptics {
     }
 
     /** Faux quand l'appareil n'a pas de vibreur : l'écran le dit plutôt que de laisser douter. */
-    val available: Boolean
+    actual val available: Boolean
         get() = runCatching { vibrator?.hasVibrator() == true }.getOrDefault(false)
 
-    fun tick(kind: Tick) {
+    actual fun tick(kind: HapticTick) {
         val v = vibrator ?: return
         runCatching {
             when {
@@ -55,10 +44,10 @@ object RemoteHaptics {
                 // moteur linéaire, il rend le petit cran attendu. Une durée en
                 // millisecondes, elle, donne un bourdonnement sur l'un et un
                 // claquement sur l'autre.
-                Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && kind == Tick.STEP ->
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && kind == HapticTick.STEP ->
                     v.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK))
 
-                Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && kind == Tick.PRESS ->
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && kind == HapticTick.PRESS ->
                     v.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK))
 
                 Build.VERSION.SDK_INT >= Build.VERSION_CODES.O -> v.vibrate(effect(kind))
@@ -66,20 +55,29 @@ object RemoteHaptics {
                 else -> {
                     @Suppress("DEPRECATION")
                     when (kind) {
-                        Tick.STEP -> v.vibrate(12)
-                        Tick.PRESS -> v.vibrate(24)
-                        Tick.BACK -> v.vibrate(longArrayOf(0, 10, 40, 16), -1)
+                        HapticTick.STEP -> v.vibrate(12)
+                        HapticTick.PRESS -> v.vibrate(24)
+                        HapticTick.BACK -> v.vibrate(longArrayOf(0, 10, 40, 16), -1)
                     }
                 }
             }
         }
     }
 
-    private fun effect(kind: Tick): VibrationEffect = when (kind) {
-        Tick.STEP -> VibrationEffect.createOneShot(12, 90)
-        Tick.PRESS -> VibrationEffect.createOneShot(24, VibrationEffect.DEFAULT_AMPLITUDE)
+    private fun effect(kind: HapticTick): VibrationEffect = when (kind) {
+        HapticTick.STEP -> VibrationEffect.createOneShot(12, 90)
+        HapticTick.PRESS -> VibrationEffect.createOneShot(24, VibrationEffect.DEFAULT_AMPLITUDE)
         // Deux temps : Retour est la seule touche qu'on regrette d'avoir
         // appuyée, elle doit se reconnaître d'un autre motif.
-        Tick.BACK -> VibrationEffect.createWaveform(longArrayOf(0, 10, 40, 16), -1)
+        HapticTick.BACK -> VibrationEffect.createWaveform(longArrayOf(0, 10, 40, 16), -1)
     }
 }
+
+/**
+ * Délègue à [RemoteVolumeKeys], qui garde l'autre moitié du détournement :
+ * `handle`, appelée depuis `dispatchKeyEvent` de l'`Activity`. Les deux moitiés
+ * ne peuvent pas vivre au même endroit — l'une est de la composition, l'autre
+ * une affaire de fenêtre.
+ */
+@Composable
+actual fun CaptureVolumeKeys(onKey: (RemoteKey) -> Unit) = RemoteVolumeKeys.Capture(onKey)

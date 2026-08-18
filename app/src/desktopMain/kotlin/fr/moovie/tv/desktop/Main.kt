@@ -43,6 +43,9 @@ import fr.moovie.tv.ui.navigation.Screen
 import fr.moovie.tv.ui.navigation.rememberNavStack
 import fr.moovie.tv.ui.onboarding.OnboardingScreen
 import fr.moovie.tv.ui.onboarding.rememberStartScreen
+import fr.moovie.tv.data.remote.RemoteTargetRepository
+import fr.moovie.tv.ui.remote.RemoteFab
+import fr.moovie.tv.ui.remote.RemoteScreen
 import fr.moovie.tv.ui.adaptive.AdaptiveRoot
 import fr.moovie.tv.ui.adaptive.UiFlavor
 import fr.moovie.tv.data.download.DownloadQueue
@@ -281,6 +284,10 @@ private fun DesktopApp(
 
         // Réseau : c'est lui qui décide de quelle application on se sert.
         val online by Connectivity.online.collectAsState()
+        // Le téléviseur que ce poste pilote. `RemoteFab` s'occupe de le sonder
+        // périodiquement — c'est lui qui décide si le bouton existe.
+        val remoteTarget by remember { RemoteTargetRepository().target }
+            .collectAsState(initial = null)
         // Même flux que celui de la barre basse d'Android : l'historique hors
         // ligne a besoin de savoir ce qui est lisible.
         val downloads by remember { DownloadRepository().downloads }
@@ -299,180 +306,212 @@ private fun DesktopApp(
             if (!online && nav.current !is Screen.Player) nav.popToRoot()
         }
 
-        when (val s = nav.current) {
-            // La télécommande pilote un téléviseur depuis un téléphone : sur un
-            // poste de travail elle n'a pas de sens, et rien n'y mène. La
-            // branche existe parce que la destination est partagée.
-            Screen.Remote -> Unit
-            // Un poste de travail n'est jamais la cible d'une diffusion : il ne
-            // fait pas tourner de serveur d'appairage, donc rien ne peut lui
-            // envoyer de titre. Même raison que ci-dessus — la destination est
-            // partagée, la branche doit exister.
-            is Screen.CastLaunch -> Unit
-            // Hors ligne, l'accueil cède la place à la bibliothèque locale :
-            // voir OfflineScreen.
-            Screen.Home -> if (!online) OfflineScreen(
-                onPlay = { d -> downloadPlayerScreen(d)?.let(nav::push) },
-                onOpenSettings = { nav.push(Screen.Settings) },
-            ) else DesktopHomeScreen(
-                onOpenTitle = { id, isTv -> nav.push(Screen.Details(id, isTv)) },
-                onResume = { e ->
-                    // Voir MainActivity : le rail ouvre la fiche, il ne lance
-                    // plus la lecture.
-                    nav.push(
-                        Screen.Details(
-                            tmdbId = e.tmdbId,
-                            isTv = e.isTv,
-                            resumeSeason = e.season,
-                            resumeEpisode = e.episode,
-                        ),
-                    )
-                },
-                onOpenSettings = { nav.push(Screen.Settings) },
-                onOpenSearch = { nav.push(Screen.Search) },
-                onOpenDiscovery = { nav.push(Screen.Discovery) },
-                onOpenHistory = { nav.push(Screen.History) },
-                onOpenDownloads = { nav.push(Screen.Downloads) },
-                onOpenCatalog = { nav.push(Screen.Catalog()) },
-                onOpenCatalogGenre = { nav.push(Screen.Catalog(it)) },
-            )
-            Screen.Onboarding -> OnboardingScreen(
-                onOpenSettings = { nav.push(Screen.Settings) },
-                // Remplace au lieu d'empiler : une fois installé, revenir sur
-                // l'écran d'installation n'aurait plus rien à proposer.
-                onReady = { nav.replace(Screen.Home) },
-            )
-            Screen.Downloads -> DownloadsScreen(
-                onPlay = { d -> downloadPlayerScreen(d)?.let(nav::push) },
-                onBack = { nav.pop() },
-                showBackButton = true,
-            )
-
-            Screen.Settings -> DesktopSettingsScreen(
-                onBack = { nav.pop() },
-                onPlayDownload = { download ->
-                    // Pas de résolution de sources : le fichier
-                    // est là, et hors ligne personne n'y
-                    // répondrait de toute façon.
-                    localStream(download.key)?.let { local ->
+        // Le contenu, et par-dessus l'accès à la télécommande.
+        Box(modifier = Modifier.fillMaxSize()) {
+            when (val s = nav.current) {
+                // Le téléviseur appairé, ou rien : sans cible la destination est
+                // inatteignable (le bouton qui y mène n'existe pas), mais la
+                // composition doit rester totale.
+                //
+                // Elle rendait `Unit` au motif qu'« une télécommande n'a pas de sens
+                // sur un poste de travail ». C'était vrai du poste **piloté**, pas
+                // du poste qui pilote : on regarde une fiche sur son ordinateur
+                // comme sur son téléphone, et l'envoyer au salon n'a rien de moins
+                // naturel. Voir `remoteOffered`.
+                Screen.Remote -> remoteTarget?.let {
+                    // La chrome se décide dans l'écran, depuis `LocalUiFlavor` :
+                    // clavier, pavé cliquable et bouton de sortie viennent avec
+                    // le pointeur, sans que l'appelant ait à le dire.
+                    RemoteScreen(target = it, onBack = { nav.pop() })
+                }
+                // Un poste de travail n'est **pas** une cible de diffusion, et c'est
+                // volontaire : `pairingOffered` réserve ce rôle au téléviseur, seul
+                // appareil où saisir se fait à la télécommande. Rien ne peut donc
+                // lui envoyer de titre, mais la destination est partagée et la
+                // branche doit exister.
+                is Screen.CastLaunch -> Unit
+                // Hors ligne, l'accueil cède la place à la bibliothèque locale :
+                // voir OfflineScreen.
+                Screen.Home -> if (!online) OfflineScreen(
+                    onPlay = { d -> downloadPlayerScreen(d)?.let(nav::push) },
+                    onOpenSettings = { nav.push(Screen.Settings) },
+                ) else DesktopHomeScreen(
+                    onOpenTitle = { id, isTv -> nav.push(Screen.Details(id, isTv)) },
+                    onResume = { e ->
+                        // Voir MainActivity : le rail ouvre la fiche, il ne lance
+                        // plus la lecture.
                         nav.push(
-                            Screen.Player(
-                                streamUrl = local.url,
-                                mediaKey = download.key,
-                                title = download.title,
-                                subtitle = download.subtitle,
-                                posterUrl = download.imageUrl.orEmpty(),
+                            Screen.Details(
+                                tmdbId = e.tmdbId,
+                                isTv = e.isTv,
+                                resumeSeason = e.season,
+                                resumeEpisode = e.episode,
                             ),
                         )
-                    }
-                },
-            )
-            is Screen.Person -> DesktopPersonScreen(
-                params = s,
-                onOpenTitle = { id, isTv -> nav.push(Screen.Details(id, isTv)) },
-                onBack = { nav.pop() },
-            )
-            is Screen.Catalog -> DesktopCatalogScreen(
-                select = s.select,
-                onOpenTitle = { id, isTv -> nav.push(Screen.Details(id, isTv)) },
-                onBack = { nav.pop() },
-            )
-            // Hors ligne, une vignette d'historique lit le fichier au lieu
-            // d'ouvrir une fiche qui ne chargerait pas : voir playableFor.
-            Screen.History -> DesktopHistoryScreen(
-                onOpenTitle = { id, isTv ->
-                    if (online) {
-                        nav.push(Screen.Details(id, isTv))
-                    } else {
-                        downloads.playableFor(id, isTv)
-                            ?.let { d -> downloadPlayerScreen(d)?.let(nav::push) }
-                    }
-                },
-                onBack = { nav.pop() },
-            )
-            // Hors ligne, chercher veut dire chercher dans ce qu'on possède :
-            // voir OfflineSearchScreen.
-            Screen.Search -> if (!online) OfflineSearchScreen(
-                onPlay = { d -> downloadPlayerScreen(d)?.let(nav::push) },
-            ) else DesktopSearchScreen(
-                onOpenTitle = { id, isTv -> nav.push(Screen.Details(id, isTv)) },
-                onBack = { nav.pop() },
-            )
-            // Hors ligne, la découverte n'a rien à découvrir : elle est bâtie
-            // sur TMDB de bout en bout. On renvoie à la bibliothèque locale
-            // plutôt que d'afficher une page vide.
-            Screen.Discovery -> if (!online) OfflineScreen(
-                onPlay = { d -> downloadPlayerScreen(d)?.let(nav::push) },
-                onOpenSettings = { nav.push(Screen.Settings) },
-            ) else DesktopDiscoveryScreen(
-                onOpenTitle = { id, isTv -> nav.push(Screen.Details(id, isTv)) },
-                onBack = { nav.pop() },
-            )
-            is Screen.Details -> DesktopDetailsScreen(
-                params = s,
-                onOpenPerson = { id, name -> nav.push(Screen.Person(id, name)) },
-                onPlay = { player ->
-                    // Neutralise l'auto-lecture sur l'entrée de la fiche avant
-                    // d'empiler le lecteur : sinon en revenir relancerait la
-                    // lecture, qui repousserait le lecteur — boucle sans issue.
-                    if (s.autoSources) nav.replace(s.copy(autoSources = false))
-                    nav.push(player)
-                },
-                onBack = { nav.pop() },
-                onRegisterBack = onRegisterBack,
-            )
-            is Screen.Player -> {
-                DesktopPlayerScreen(
-                    streamUrl = s.streamUrl,
-                    headers = s.headers,
-                    mediaKey = s.mediaKey,
-                    sourceUrl = s.sourceUrl,
-                    hoster = s.hoster,
-                    language = s.language,
-                    alternatives = s.alternatives,
-                    subtitles = s.subtitles,
-                    title = s.title,
-                    subtitle = s.subtitle,
-                    nextSeason = s.nextSeason,
-                    nextEpisode = s.nextEpisode,
-                    updateVersion = (updateState as? UpdateState.Available)?.version,
-                    onUpdateSelected = { bannerOnPlayer = true },
-                    posterUrl = s.posterUrl,
-                    expectedMinutes = s.expectedMinutes,
-                    isFullscreen = isFullscreen,
-                    onToggleFullscreen = onToggleFullscreen,
+                    },
+                    onOpenSettings = { nav.push(Screen.Settings) },
+                    onOpenSearch = { nav.push(Screen.Search) },
+                    onOpenDiscovery = { nav.push(Screen.Discovery) },
+                    onOpenHistory = { nav.push(Screen.History) },
+                    onOpenDownloads = { nav.push(Screen.Downloads) },
+                    onOpenCatalog = { nav.push(Screen.Catalog()) },
+                    onOpenCatalogGenre = { nav.push(Screen.Catalog(it)) },
+                )
+                Screen.Onboarding -> OnboardingScreen(
+                    onOpenSettings = { nav.push(Screen.Settings) },
+                    // Remplace au lieu d'empiler : une fois installé, revenir sur
+                    // l'écran d'installation n'aurait plus rien à proposer.
+                    onReady = { nav.replace(Screen.Home) },
+                )
+                Screen.Downloads -> DownloadsScreen(
+                    onPlay = { d -> downloadPlayerScreen(d)?.let(nav::push) },
                     onBack = { nav.pop() },
-                    // Le flux a cassé une fois ouvert : retour à la fiche, qui
-                    // reprend la cascade sur l'hébergeur suivant. Si plus rien
-                    // n'est à tenter, elle affiche son erreur habituelle.
-                    onPlaybackFailed = {
-                        nav.pop()
-                        Vm.details.retryAfterPlaybackFailure()
+                    showBackButton = true,
+                )
+
+                Screen.Settings -> DesktopSettingsScreen(
+                    onBack = { nav.pop() },
+                    onPlayDownload = { download ->
+                        // Pas de résolution de sources : le fichier
+                        // est là, et hors ligne personne n'y
+                        // répondrait de toute façon.
+                        localStream(download.key)?.let { local ->
+                            nav.push(
+                                Screen.Player(
+                                    streamUrl = local.url,
+                                    mediaKey = download.key,
+                                    title = download.title,
+                                    subtitle = download.subtitle,
+                                    posterUrl = download.imageUrl.orEmpty(),
+                                ),
+                            )
+                        }
                     },
-                    // Enchaînement : repasse par la fiche, qui résout la source
-                    // du nouvel épisode puis relance le lecteur.
-                    // Enchaînement : remplace l'entrée du lecteur par la fiche
-                    // du nouvel épisode, sinon chaque épisode ajouterait une
-                    // marche à remonter pour revenir à la série.
-                    // Prépare les sources de l'épisode suivant pendant que
-                    // celui-ci joue : le ViewModel de fiche vit à l'échelle
-                    // de la fenêtre, il connaît donc encore la série.
-                    onPrefetchNext = { Vm.details.prefetchEpisodeSources(s.nextSeason, s.nextEpisode) },
-                    onNextEpisode = { season, episode ->
-                        // `previous`, et non `current` : `current` **est** le
-                        // lecteur, le transtypage échouait donc toujours et
-                        // l'enchaînement retombait sur l'accueil. Passer le
-                        // générique renvoyait ainsi à la maison au lieu de
-                        // lancer l'épisode suivant.
-                        val details = nav.previous as? Screen.Details
-                        nav.replace(
-                            details?.copy(
-                                autoSources = true,
-                                resumeSeason = season,
-                                resumeEpisode = episode,
-                            ) ?: Screen.Home,
-                        )
+                )
+                is Screen.Person -> DesktopPersonScreen(
+                    params = s,
+                    onOpenTitle = { id, isTv -> nav.push(Screen.Details(id, isTv)) },
+                    onBack = { nav.pop() },
+                )
+                is Screen.Catalog -> DesktopCatalogScreen(
+                    select = s.select,
+                    onOpenTitle = { id, isTv -> nav.push(Screen.Details(id, isTv)) },
+                    onBack = { nav.pop() },
+                )
+                // Hors ligne, une vignette d'historique lit le fichier au lieu
+                // d'ouvrir une fiche qui ne chargerait pas : voir playableFor.
+                Screen.History -> DesktopHistoryScreen(
+                    onOpenTitle = { id, isTv ->
+                        if (online) {
+                            nav.push(Screen.Details(id, isTv))
+                        } else {
+                            downloads.playableFor(id, isTv)
+                                ?.let { d -> downloadPlayerScreen(d)?.let(nav::push) }
+                        }
                     },
+                    onBack = { nav.pop() },
+                )
+                // Hors ligne, chercher veut dire chercher dans ce qu'on possède :
+                // voir OfflineSearchScreen.
+                Screen.Search -> if (!online) OfflineSearchScreen(
+                    onPlay = { d -> downloadPlayerScreen(d)?.let(nav::push) },
+                ) else DesktopSearchScreen(
+                    onOpenTitle = { id, isTv -> nav.push(Screen.Details(id, isTv)) },
+                    onBack = { nav.pop() },
+                )
+                // Hors ligne, la découverte n'a rien à découvrir : elle est bâtie
+                // sur TMDB de bout en bout. On renvoie à la bibliothèque locale
+                // plutôt que d'afficher une page vide.
+                Screen.Discovery -> if (!online) OfflineScreen(
+                    onPlay = { d -> downloadPlayerScreen(d)?.let(nav::push) },
+                    onOpenSettings = { nav.push(Screen.Settings) },
+                ) else DesktopDiscoveryScreen(
+                    onOpenTitle = { id, isTv -> nav.push(Screen.Details(id, isTv)) },
+                    onBack = { nav.pop() },
+                )
+                is Screen.Details -> DesktopDetailsScreen(
+                    params = s,
+                    onOpenRemote = { nav.push(Screen.Remote) },
+                    onOpenPerson = { id, name -> nav.push(Screen.Person(id, name)) },
+                    onPlay = { player ->
+                        // Neutralise l'auto-lecture sur l'entrée de la fiche avant
+                        // d'empiler le lecteur : sinon en revenir relancerait la
+                        // lecture, qui repousserait le lecteur — boucle sans issue.
+                        if (s.autoSources) nav.replace(s.copy(autoSources = false))
+                        nav.push(player)
+                    },
+                    onBack = { nav.pop() },
+                    onRegisterBack = onRegisterBack,
+                )
+                is Screen.Player -> {
+                    DesktopPlayerScreen(
+                        streamUrl = s.streamUrl,
+                        headers = s.headers,
+                        mediaKey = s.mediaKey,
+                        sourceUrl = s.sourceUrl,
+                        hoster = s.hoster,
+                        language = s.language,
+                        alternatives = s.alternatives,
+                        subtitles = s.subtitles,
+                        title = s.title,
+                        subtitle = s.subtitle,
+                        nextSeason = s.nextSeason,
+                        nextEpisode = s.nextEpisode,
+                        updateVersion = (updateState as? UpdateState.Available)?.version,
+                        onUpdateSelected = { bannerOnPlayer = true },
+                        posterUrl = s.posterUrl,
+                        expectedMinutes = s.expectedMinutes,
+                        isFullscreen = isFullscreen,
+                        onToggleFullscreen = onToggleFullscreen,
+                        onBack = { nav.pop() },
+                        // Le flux a cassé une fois ouvert : retour à la fiche, qui
+                        // reprend la cascade sur l'hébergeur suivant. Si plus rien
+                        // n'est à tenter, elle affiche son erreur habituelle.
+                        onPlaybackFailed = {
+                            nav.pop()
+                            Vm.details.retryAfterPlaybackFailure()
+                        },
+                        // Enchaînement : repasse par la fiche, qui résout la source
+                        // du nouvel épisode puis relance le lecteur.
+                        // Enchaînement : remplace l'entrée du lecteur par la fiche
+                        // du nouvel épisode, sinon chaque épisode ajouterait une
+                        // marche à remonter pour revenir à la série.
+                        // Prépare les sources de l'épisode suivant pendant que
+                        // celui-ci joue : le ViewModel de fiche vit à l'échelle
+                        // de la fenêtre, il connaît donc encore la série.
+                        onPrefetchNext = { Vm.details.prefetchEpisodeSources(s.nextSeason, s.nextEpisode) },
+                        onNextEpisode = { season, episode ->
+                            // `previous`, et non `current` : `current` **est** le
+                            // lecteur, le transtypage échouait donc toujours et
+                            // l'enchaînement retombait sur l'accueil. Passer le
+                            // générique renvoyait ainsi à la maison au lieu de
+                            // lancer l'épisode suivant.
+                            val details = nav.previous as? Screen.Details
+                            nav.replace(
+                                details?.copy(
+                                    autoSources = true,
+                                    resumeSeason = season,
+                                    resumeEpisode = episode,
+                                ) ?: Screen.Home,
+                            )
+                        },
+                    )
+                }
+            }
+
+            // Accès à la télécommande, flottant au-dessus du contenu.
+            //
+            // Il n'apparaît que si le téléviseur vient de répondre — c'est
+            // `RemoteFab` qui en décide, et qui le sonde périodiquement. Sans
+            // lui, la télécommande ne serait joignable qu'au retour d'un envoi :
+            // on diffuserait un titre, on fermerait l'écran, et il faudrait
+            // rediffuser pour pouvoir mettre en pause.
+            //
+            // Jamais par-dessus le lecteur ni sur l'écran qu'il ouvre.
+            if (nav.current !is Screen.Player && nav.current !is Screen.Remote) {
+                RemoteFab(
+                    onClick = { nav.push(Screen.Remote) },
+                    modifier = Modifier.align(Alignment.BottomEnd),
                 )
             }
         }

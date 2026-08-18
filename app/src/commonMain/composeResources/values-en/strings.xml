@@ -553,6 +553,7 @@
     <string name="remote_link_hint">moovie://remote?h=…</string>
     <string name="remote_link_action">Pair</string>
     <string name="remote_link_invalid">Incomplete or unreadable link.</string>
+    <string name="remote_keyboard_hint">The keyboard drives the TV: arrows, Enter, Space, Backspace.</string>
     <string name="remote_reconnect">Reconnect to the TV</string>
     <string name="remote_reconnect_help">Checks that the TV answers. Useful right after turning it back on.</string>
     <string name="remote_reconnect_running">Looking for it…</string>

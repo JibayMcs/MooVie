@@ -44,13 +44,18 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.clickable
-import android.os.SystemClock
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -61,6 +66,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.sp
 import fr.moovie.tv.data.remote.TypingField
 import fr.moovie.tv.resources.remote_ok
+import fr.moovie.tv.resources.common_back
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.rememberScrollState
@@ -71,10 +77,13 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import fr.moovie.tv.ui.components.MoovieAsyncImage
+import fr.moovie.tv.ui.components.MoovieIconButton
 import fr.moovie.tv.ui.theme.MoovieShape
 import fr.moovie.tv.data.remote.NowPlaying
 import fr.moovie.tv.data.watch.ResumeEntry
 import fr.moovie.tv.data.watch.WatchProgressRepository
+import fr.moovie.tv.ui.player.PlayerControlBar
+import fr.moovie.tv.ui.player.PlayerTitleOverlay
 import fr.moovie.tv.ui.player.parseMediaKey
 import fr.moovie.tv.data.remote.RemoteClient
 import fr.moovie.tv.data.remote.RemoteKey
@@ -84,8 +93,10 @@ import fr.moovie.tv.data.remote.RemoteTarget
 import fr.moovie.tv.data.remote.RemoteTargetRepository
 import fr.moovie.tv.resources.Res
 import fr.moovie.tv.resources.remote_forget_target
+import fr.moovie.tv.resources.remote_keyboard_hint
 import fr.moovie.tv.resources.remote_offline
 import fr.moovie.tv.resources.remote_offline_help
+import fr.moovie.tv.ui.adaptive.isPointerUi
 import fr.moovie.tv.ui.components.MoovieButton
 import fr.moovie.tv.ui.theme.MOOVIE_MAGENTA
 import fr.moovie.tv.ui.theme.MOOVIE_ORANGE
@@ -114,11 +125,25 @@ import kotlin.math.hypot
  *   une flèche ne valide jamais, ce qui serait le pire des accidents à la
  *   navigation.
  *
- * ### Android uniquement, et c'est délibéré
+ * ### Partagée, mais pas identique — le pointeur change tout
  *
- * Le vibreur et la découverte réseau sont des API Android, et la télécommande
- * n'a de sens que sur l'appareil qu'on tient. Le desktop garde la page web,
- * qui reste servie pour les téléphones sans Moo-vie.
+ * Elle a longtemps été Android uniquement, au motif que « la télécommande n'a de
+ * sens que sur l'appareil qu'on tient ». C'était vrai de l'appareil **piloté**,
+ * pas de celui qui pilote : on regarde une fiche sur son ordinateur comme sur
+ * son téléphone, et l'envoyer au salon appelle les mêmes commandes ensuite.
+ *
+ * Ce qui se partage vraiment est la **moitié invisible** : le relevé d'état, la
+ * recopie de progression, la présence, la saisie de texte. La chrome, elle,
+ * diverge — et le joystick est la raison. Le porter tel quel donnait un geste au
+ * pouce à faire à la souris, ce que personne ne fait. Au pointeur, l'écran
+ * remplace donc le disque par des boutons ordinaires, **écoute le clavier**
+ * ([remoteKeyFor]) et se donne une sortie visible : il n'y a pas de touche
+ * Retour sur un clavier de bureau, et la flèche ronde du bas n'en est pas une —
+ * elle envoie `BACK` au téléviseur, exactement le contraire.
+ *
+ * Le reste des spécificités tient dans trois coutures : le vibreur
+ * ([RemoteHaptics]), les touches physiques de volume ([CaptureVolumeKeys]) et
+ * l'horloge monotone ([monotonicMs]).
  */
 @Composable
 fun RemoteScreen(
@@ -126,6 +151,17 @@ fun RemoteScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    /**
+     * Au pointeur, la télécommande change de nature.
+     *
+     * Lu depuis [LocalUiFlavor] et non reçu en paramètre : c'est la règle du
+     * projet, la distinction est d'**exécution**. Un drapeau passé à la main
+     * aurait fini par mentir — il suffit d'un appelant qui l'oublie.
+     */
+    val pointer = isPointerUi
+    val clavier = remember { FocusRequester() }
+    /** Dernière répétition clavier laissée passer. Voir [acceptKeyRepeat]. */
+    var derniereTouche by remember { mutableLongStateOf(0L) }
     val client = remember(target) { RemoteClient(target) }
     // Le magasin **du téléphone**. C'est lui qui fait foi : dès que les deux
     // appareils ne partagent pas le même compte de synchronisation, chacun a le
@@ -190,7 +226,7 @@ fun RemoteScreen(
     fun seekTo(positionMs: Long) {
         shownMs = positionMs
         scrubMs = null
-        trustAfter = SystemClock.uptimeMillis() + SEEK_SETTLE_MS
+        trustAfter = monotonicMs() + SEEK_SETTLE_MS
         scope.launch {
             val ok = client.seek(positionMs)
             online = ok
@@ -220,7 +256,7 @@ fun RemoteScreen(
                     typing = status.state.typing
                     val playing = status.state.now
                     if (playing != null && scrubMs == null &&
-                        SystemClock.uptimeMillis() >= trustAfter
+                        monotonicMs() >= trustAfter
                     ) {
                         shownMs = playing.positionMs
                     }
@@ -276,7 +312,7 @@ fun RemoteScreen(
         }
     }
 
-    fun fire(key: RemoteKey, tick: RemoteHaptics.Tick) {
+    fun fire(key: RemoteKey, tick: HapticTick) {
         RemoteHaptics.tick(tick)
         send(key)
     }
@@ -285,9 +321,9 @@ fun RemoteScreen(
     // cet écran est affiché. Il n'y a volontairement pas de bouton à l'écran en
     // face : le geste qu'on cherche ici est celui qu'on fait sans regarder, et
     // un doublon tactile n'ajouterait qu'une chose à lire. Voir
-    // [RemoteVolumeKeys] pour ce que coûte le détournement, et sa borne.
-    RemoteVolumeKeys.Capture { key ->
-        fire(key, if (key == RemoteKey.MUTE) RemoteHaptics.Tick.PRESS else RemoteHaptics.Tick.STEP)
+    // [CaptureVolumeKeys] pour ce que coûte le détournement, et sa borne.
+    CaptureVolumeKeys { key ->
+        fire(key, if (key == RemoteKey.MUTE) HapticTick.PRESS else HapticTick.STEP)
     }
 
     // Répétition au maintien : garder une flèche enfoncée fait défiler, comme
@@ -298,10 +334,89 @@ fun RemoteScreen(
         val key = held ?: return@LaunchedEffect
         delay(FIRST_REPEAT_MS)
         while (true) {
-            RemoteHaptics.tick(RemoteHaptics.Tick.STEP)
+            RemoteHaptics.tick(HapticTick.STEP)
             send(key)
             delay(REPEAT_MS)
         }
+    }
+
+    // Le clavier **est** la télécommande sur un poste de travail. Hissé en
+    // valeur parce que les deux mises en page — lecteur et navigation — doivent
+    // l'écouter également. Voir [remoteKeyFor] : Échap n'en fait pas partie,
+    // c'est la sortie de l'écran, et l'envoyer à la télé enfermerait.
+    val ecouteClavier =
+                if (!pointer) Modifier else Modifier
+                    .focusRequester(clavier)
+                    .focusable()
+                    .onPreviewKeyEvent { event ->
+                        // **Les deux moitiés de l'appui sont consommées**, la
+                        // seconde sans rien envoyer. C'est la leçon déjà écrite
+                        // dans `RemoteVolumeKeys.handle` côté Android, et le
+                        // chemin clavier du desktop l'a rejouée : Compose
+                        // active un bouton focalisé sur le **relâchement** de
+                        // Espace ou Entrée. En ne filtrant que l'appui, une
+                        // pression après un clic partait deux fois — une par
+                        // ici, une par le bouton d'en dessous. Mesuré : 2.
+                        if (event.key == Key.Escape) {
+                            if (event.type == KeyEventType.KeyDown) onBack()
+                            return@onPreviewKeyEvent true
+                        }
+                        val touche = remoteKeyFor(event.key) ?: return@onPreviewKeyEvent false
+                        if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent true
+                        // La répétition du système est gardée — c'est elle qui
+                        // fait défiler — mais amortie : maintenue, une flèche
+                        // produit 25 requêtes par seconde sur le réseau local.
+                        // On consomme quand même l'événement : le laisser
+                        // repartir déplacerait le focus de la fenêtre.
+                        val maintenant = monotonicMs()
+                        if (acceptKeyRepeat(maintenant, derniereTouche)) {
+                            derniereTouche = maintenant
+                            fire(touche, HapticTick.STEP)
+                        }
+                        true
+                    }
+
+    // Le focus au montage : sans lui, le clavier ne pilote rien tant qu'on n'a
+    // pas cliqué — exactement le geste qu'on cherche à éviter.
+    LaunchedEffect(pointer, now != null) {
+        if (pointer) runCatching { clavier.requestFocus() }
+    }
+
+    /**
+     * **L'écran suit ce que fait la box.**
+     *
+     * Elle joue quelque chose : c'est un lecteur qu'il faut, avec la jaquette à
+     * la place du flux et une barre qu'on clique. Une télécommande est un objet
+     * qu'on tient sans regarder ; devant un écran d'ordinateur, l'objet naturel
+     * est le lecteur, et le pavé directionnel n'y a rien à faire tant que rien
+     * n'est à naviguer.
+     *
+     * Elle est dans ses menus : les flèches reviennent, seules. Même règle que
+     * le mini-lecteur plus bas — un bloc absent ne pose aucune question, un
+     * contrôle sans objet en pose une.
+     */
+    val enLecture = now
+    if (pointer && enLecture != null) {
+        RemotePlayerLayout(
+            now = enLecture,
+            positionMs = scrubMs ?: shownMs,
+            listenKeyboard = ecouteClavier,
+            onBack = onBack,
+            onTogglePause = {
+                // L'icône bascule avant confirmation : attendre le relevé ferait
+                // un bouton qui met une seconde à réagir, donc un bouton sur
+                // lequel on appuie deux fois.
+                now = now?.let { it.copy(playing = !it.playing) }
+                fire(RemoteKey.PLAY_PAUSE, HapticTick.PRESS)
+            },
+            onSeekBack = { fire(RemoteKey.REWIND, HapticTick.STEP) },
+            onSeekForward = { fire(RemoteKey.FORWARD, HapticTick.STEP) },
+            onSeekToFraction = { part ->
+                if (enLecture.durationMs > 0) seekTo((part * enLecture.durationMs).toLong())
+            },
+            modifier = modifier,
+        )
+        return
     }
 
     Column(
@@ -310,11 +425,24 @@ fun RemoteScreen(
         // Retour finissait sous le bord.
         modifier = modifier
             .fillMaxSize()
+            .then(ecouteClavier)
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Spacer(Modifier.height(24.dp))
+        // La sortie d'abord, en haut à gauche : c'est là qu'on la cherche, et
+        // elle doit rester atteignable avant même de comprendre le reste.
+        if (pointer) {
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                MoovieIconButton(
+                    onClick = onBack,
+                    icon = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = stringResource(Res.string.common_back),
+                )
+                Spacer(Modifier.weight(1f))
+            }
+        }
         Text(
             target.name,
             style = MaterialTheme.typography.titleMedium,
@@ -365,74 +493,90 @@ fun RemoteScreen(
 
         Spacer(Modifier.height(28.dp))
 
-        Box(
-            modifier = Modifier
-                .size(288.dp)
-                .onSizeChanged { padSize = it }
-                .pointerInput(target) {
-                    awaitEachGesture {
-                        val centre = Offset(size.width / 2f, size.height / 2f)
-                        val dead = size.width * DEAD_ZONE
-                        val down = awaitFirstDown(requireUnconsumed = false)
+        // Le disque est un geste **au pouce** : on pose, on maintient, on
+        // tourne. Rien de tout ça ne se fait à la souris — d'où un pavé de
+        // boutons ordinaires au pointeur, et le clavier pour l'essentiel.
+        if (!pointer) {
+                Box(
+                    modifier = Modifier
+                        .size(288.dp)
+                        .onSizeChanged { padSize = it }
+                    .pointerInput(target) {
+                        awaitEachGesture {
+                            val centre = Offset(size.width / 2f, size.height / 2f)
+                            val dead = size.width * DEAD_ZONE
+                            val down = awaitFirstDown(requireUnconsumed = false)
 
-                        // Le geste qui **commence** au centre est un appui sur
-                        // OK, et rien d'autre : il ne se transforme pas en
-                        // direction si le doigt glisse ensuite.
-                        if ((down.position - centre).getDistance() < dead) {
-                            fire(RemoteKey.OK, RemoteHaptics.Tick.PRESS)
+                            // Le geste qui **commence** au centre est un appui sur
+                            // OK, et rien d'autre : il ne se transforme pas en
+                            // direction si le doigt glisse ensuite.
+                            if ((down.position - centre).getDistance() < dead) {
+                                fire(RemoteKey.OK, HapticTick.PRESS)
+                                do {
+                                    val e = awaitPointerEvent()
+                                } while (e.changes.any { it.pressed })
+                                return@awaitEachGesture
+                            }
+
+                            var current: RemoteKey? = null
+                            fun apply(position: Offset) {
+                                val next = directionAt(position, centre, dead, current)
+                                if (next == current) return
+                                current = next
+                                held = next
+                                next?.let { fire(it, HapticTick.STEP) }
+                            }
+                            apply(down.position)
+
                             do {
-                                val e = awaitPointerEvent()
-                            } while (e.changes.any { it.pressed })
-                            return@awaitEachGesture
+                                val event = awaitPointerEvent()
+                                event.changes.firstOrNull { it.id == down.id }?.let { apply(it.position) }
+                            } while (event.changes.any { it.pressed })
+
+                            held = null
                         }
-
-                        var current: RemoteKey? = null
-                        fun apply(position: Offset) {
-                            val next = directionAt(position, centre, dead, current)
-                            if (next == current) return
-                            current = next
-                            held = next
-                            next?.let { fire(it, RemoteHaptics.Tick.STEP) }
-                        }
-                        apply(down.position)
-
-                        do {
-                            val event = awaitPointerEvent()
-                            event.changes.firstOrNull { it.id == down.id }?.let { apply(it.position) }
-                        } while (event.changes.any { it.pressed })
-
-                        held = null
-                    }
-                },
-            contentAlignment = Alignment.Center,
-        ) {
-            DirectionDisc(held)
-
-            // Les flèches sont posées **au-dessus** du disque et ne reçoivent
-            // aucun geste : c'est le disque qui suit le doigt. Elles ne sont là
-            // que pour dire où viser.
-            Icon(Icons.Default.KeyboardArrowUp, null, tint = arrowTint(held, RemoteKey.UP), modifier = Modifier.align(Alignment.TopCenter).padding(top = 14.dp).size(38.dp))
-            Icon(Icons.Default.KeyboardArrowDown, null, tint = arrowTint(held, RemoteKey.DOWN), modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 14.dp).size(38.dp))
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, null, tint = arrowTint(held, RemoteKey.LEFT), modifier = Modifier.align(Alignment.CenterStart).padding(start = 14.dp).size(38.dp))
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = arrowTint(held, RemoteKey.RIGHT), modifier = Modifier.align(Alignment.CenterEnd).padding(end = 14.dp).size(38.dp))
-
-            Box(
-                modifier = Modifier
-                    .size(108.dp)
-                    .clip(CircleShape)
-                    .background(Brush.verticalGradient(listOf(Color(0xFF1D1D24), Color(0xFF141419))))
-                    .border(2.dp, MoovieGradient, CircleShape),
+                    },
                 contentAlignment = Alignment.Center,
             ) {
-                // Une pastille, parce qu'un anneau vide se lit comme un trou
-                // dans le disque et non comme une touche.
-                Box(Modifier.size(16.dp).clip(CircleShape).background(Color(0xFF5A5A66)))
+                DirectionDisc(held)
+
+                // Les flèches sont posées **au-dessus** du disque et ne reçoivent
+                // aucun geste : c'est le disque qui suit le doigt. Elles ne sont là
+                // que pour dire où viser.
+                Icon(Icons.Default.KeyboardArrowUp, null, tint = arrowTint(held, RemoteKey.UP), modifier = Modifier.align(Alignment.TopCenter).padding(top = 14.dp).size(38.dp))
+                Icon(Icons.Default.KeyboardArrowDown, null, tint = arrowTint(held, RemoteKey.DOWN), modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 14.dp).size(38.dp))
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, null, tint = arrowTint(held, RemoteKey.LEFT), modifier = Modifier.align(Alignment.CenterStart).padding(start = 14.dp).size(38.dp))
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = arrowTint(held, RemoteKey.RIGHT), modifier = Modifier.align(Alignment.CenterEnd).padding(end = 14.dp).size(38.dp))
+
+                Box(
+                    modifier = Modifier
+                        .size(108.dp)
+                        .clip(CircleShape)
+                        .background(Brush.verticalGradient(listOf(Color(0xFF1D1D24), Color(0xFF141419))))
+                        .border(2.dp, MoovieGradient, CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    // Une pastille, parce qu'un anneau vide se lit comme un trou
+                    // dans le disque et non comme une touche.
+                    Box(Modifier.size(16.dp).clip(CircleShape).background(Color(0xFF5A5A66)))
+                }
             }
+        } else {
+            PointerPad(onKey = { fire(it, HapticTick.STEP) })
+            Spacer(Modifier.height(14.dp))
+            // Les boutons restent, mais l'aide dit où est le vrai geste. Sans
+            // elle, personne ne devine qu'il n'a pas à viser à la souris.
+            Text(
+                stringResource(Res.string.remote_keyboard_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = Color(0xFF7A7A7A),
+                textAlign = TextAlign.Center,
+            )
         }
 
         Spacer(Modifier.height(36.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-            RoundKey(Icons.Default.FastRewind, 60.dp) { fire(RemoteKey.REWIND, RemoteHaptics.Tick.STEP) }
+            RoundKey(Icons.Default.FastRewind, 60.dp) { fire(RemoteKey.REWIND, HapticTick.STEP) }
             // L'icône dit l'état réel du téléviseur, et bascule **avant** d'en
             // avoir la confirmation : attendre le relevé suivant ferait un
             // bouton qui met une seconde à réagir, donc un bouton sur lequel on
@@ -442,13 +586,13 @@ fun RemoteScreen(
                 size = 72.dp,
             ) {
                 now = now?.let { it.copy(playing = !it.playing) }
-                fire(RemoteKey.PLAY_PAUSE, RemoteHaptics.Tick.PRESS)
+                fire(RemoteKey.PLAY_PAUSE, HapticTick.PRESS)
             }
-            RoundKey(Icons.Default.FastForward, 60.dp) { fire(RemoteKey.FORWARD, RemoteHaptics.Tick.STEP) }
+            RoundKey(Icons.Default.FastForward, 60.dp) { fire(RemoteKey.FORWARD, HapticTick.STEP) }
         }
         Spacer(Modifier.height(20.dp))
         RoundKey(Icons.AutoMirrored.Filled.ArrowBack, 60.dp) {
-            fire(RemoteKey.BACK, RemoteHaptics.Tick.BACK)
+            fire(RemoteKey.BACK, HapticTick.BACK)
         }
 
         // Pas de flèche pour quitter l'écran.
@@ -931,3 +1075,122 @@ internal suspend fun mirrorProgress(
  * perdrait à rouvrir le titre.
  */
 private const val MIRROR_STEP_MS = 10_000L
+
+/**
+ * Le pavé directionnel au pointeur : des boutons, pas un geste.
+ *
+ * Trois rangées en croix plutôt qu'un disque. Le disque suit le pouce — on pose,
+ * on maintient, on tourne — et rien de cela ne se transpose à une souris : il
+ * faudrait cliquer-glisser en arc de cercle pour ce que quatre boutons font en
+ * un clic.
+ *
+ * Volontairement secondaire à l'écran : c'est le clavier qui pilote
+ * ([remoteKeyFor]), et ces boutons ne sont là que pour la souris qui traîne et
+ * pour montrer ce que l'écran sait faire.
+ */
+@Composable
+private fun PointerPad(onKey: (RemoteKey) -> Unit) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        RoundKey(Icons.Default.KeyboardArrowUp, 56.dp) { onKey(RemoteKey.UP) }
+        Spacer(Modifier.height(8.dp))
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            RoundKey(Icons.AutoMirrored.Filled.KeyboardArrowLeft, 56.dp) { onKey(RemoteKey.LEFT) }
+            // OK garde l'anneau dégradé du disque : c'est la seule touche qu'on
+            // cherche des yeux, et l'identité visuelle de la télécommande.
+            Box(
+                modifier = Modifier
+                    .size(72.dp)
+                    .clip(CircleShape)
+                    .background(Brush.verticalGradient(listOf(Color(0xFF1D1D24), Color(0xFF141419))))
+                    .border(2.dp, MoovieGradient, CircleShape)
+                    .clickable { onKey(RemoteKey.OK) },
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(Modifier.size(14.dp).clip(CircleShape).background(Color(0xFF5A5A66)))
+            }
+            RoundKey(Icons.AutoMirrored.Filled.KeyboardArrowRight, 56.dp) { onKey(RemoteKey.RIGHT) }
+        }
+        Spacer(Modifier.height(8.dp))
+        RoundKey(Icons.Default.KeyboardArrowDown, 56.dp) { onKey(RemoteKey.DOWN) }
+    }
+}
+
+/**
+ * La télécommande sous forme de lecteur, quand la box joue quelque chose.
+ *
+ * ## Pourquoi un lecteur et pas une télécommande
+ *
+ * Un pavé directionnel est fait pour être tenu sans regarder — c'est un objet de
+ * canapé. Devant un écran d'ordinateur, personne ne vise quatre flèches à la
+ * souris pour mettre en pause : l'objet attendu est celui qu'on connaît déjà,
+ * un lecteur, avec sa barre qu'on clique.
+ *
+ * ## Notre lecteur, pas un lecteur inventé
+ *
+ * La chrome vient de [PlayerControlBar] et [PlayerTitleOverlay], celles du vrai
+ * lecteur : elles ne manipulent que des primitives et des lambdas, sans rien
+ * savoir de Media3 ni de mpv. La télécommande hérite donc de la même barre, des
+ * mêmes icônes et du même pas de 15 s — et de tout ce qui y sera corrigé
+ * ensuite. `onSeekToFraction` y était déjà prévu « là où la barre est pilotable
+ * au pointeur », ce qui est exactement ce cas.
+ *
+ * Trois choses n'ont pas de sens à distance et disparaissent d'elles-mêmes : le
+ * tampon (`bufferedMs = 0`, on ne connaît pas celui de la box), les pistes et
+ * les réglages du lecteur d'en face. Les rendre nuls efface les icônes plutôt
+ * que de les griser — une cible inerte est une cible de trop.
+ */
+@Composable
+private fun RemotePlayerLayout(
+    now: NowPlaying,
+    positionMs: Long,
+    listenKeyboard: Modifier,
+    onBack: () -> Unit,
+    onTogglePause: () -> Unit,
+    onSeekBack: () -> Unit,
+    onSeekForward: () -> Unit,
+    onSeekToFraction: (Float) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(modifier.fillMaxSize().background(Color.Black).then(listenKeyboard)) {
+        // La jaquette **à la place du flux**. Recadrée plein cadre : c'est ce
+        // que le lecteur ferait de la vidéo, et l'écran doit se lire comme lui.
+        if (now.artwork.isNotBlank()) {
+            MoovieAsyncImage(
+                model = now.artwork,
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+        PlayerTitleOverlay(
+            title = now.title,
+            subtitle = now.subtitle,
+            modifier = Modifier.align(Alignment.TopCenter),
+        )
+        Box(modifier = Modifier.align(Alignment.BottomCenter)) {
+            PlayerControlBar(
+                isPlaying = now.playing,
+                positionMs = positionMs,
+                durationMs = now.durationMs,
+                // Jamais : le mode scrub est un geste au D-pad, et ici la barre
+                // se clique directement.
+                scrubbing = false,
+                showEpisodeButtons = false,
+                canGoPrevious = false,
+                playFocus = remember { FocusRequester() },
+                onBack = onBack,
+                onTogglePause = onTogglePause,
+                onSeekBack = onSeekBack,
+                onSeekForward = onSeekForward,
+                onCommitScrub = {},
+                onNudgeScrub = {},
+                onPreviousEpisode = {},
+                onNextEpisode = {},
+                onActivity = {},
+                onSeekToFraction = onSeekToFraction,
+            )
+        }
+    }
+}

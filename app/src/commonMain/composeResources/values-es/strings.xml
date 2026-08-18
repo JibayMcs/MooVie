@@ -553,6 +553,7 @@
     <string name="remote_link_hint">moovie://remote?h=…</string>
     <string name="remote_link_action">Emparejar</string>
     <string name="remote_link_invalid">Enlace incompleto o ilegible.</string>
+    <string name="remote_keyboard_hint">El teclado maneja el televisor: flechas, Intro, Espacio, Retroceso.</string>
     <string name="remote_reconnect">Reconectar el televisor</string>
     <string name="remote_reconnect_help">Comprueba que el televisor responde. Útil si acaba de encenderse.</string>
     <string name="remote_reconnect_running">Buscando…</string>

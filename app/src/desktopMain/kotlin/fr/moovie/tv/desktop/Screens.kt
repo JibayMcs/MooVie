@@ -26,6 +26,8 @@ import fr.moovie.tv.ui.home.HomeScreenContent
 import fr.moovie.tv.ui.home.HomeViewModel
 import fr.moovie.tv.ui.person.PersonScreenContent
 import fr.moovie.tv.ui.person.PersonViewModel
+import fr.moovie.tv.data.remote.PlayRequest
+import fr.moovie.tv.ui.remote.rememberTvSender
 import fr.moovie.tv.ui.navigation.Screen
 import fr.moovie.tv.ui.search.SearchScreenContent
 import fr.moovie.tv.ui.search.SearchViewModel
@@ -275,6 +277,12 @@ internal fun DesktopDetailsScreen(
     onBack: () -> Unit,
     onOpenPerson: (personId: Int, name: String) -> Unit,
     onRegisterBack: ((() -> Unit)?) -> Unit,
+    /**
+     * Ouvre la télécommande après un envoi accepté. Le geste continue sur
+     * l'écran qui montre ce que la TV fait, plutôt que de laisser le poste sur
+     * une fiche devenue sans objet — exactement comme sur le téléphone.
+     */
+    onOpenRemote: () -> Unit = {},
 ) {
     val vm = Vm.details
     val state by vm.state.collectAsState()
@@ -298,6 +306,10 @@ internal fun DesktopDetailsScreen(
     val panelVisible by vm.panelVisible.collectAsState()
     val selectedEpisode by vm.selectedEpisode.collectAsState()
     val trailer by vm.trailer.collectAsState()
+
+    // Envoi vers le téléviseur du salon. Le composant porte lui-même sa modale
+    // de confirmation ; il n'expose ici qu'un « peut-on envoyer ».
+    val tvSender = rememberTvSender(onSent = onOpenRemote)
     val trailerExpanded by vm.trailerExpanded.collectAsState()
     val downloadSearching by vm.downloadSearching.collectAsState()
     val trailerAutoplay by vm.trailerAutoplay.collectAsState()
@@ -404,6 +416,38 @@ internal fun DesktopDetailsScreen(
         downloadList = downloadsBySource,
         sourceQualities = sourceQualities,
         sourceHeights = sourceHeights,
+        // Null quand aucun téléviseur ne répond : pas de bouton plutôt qu'un
+        // bouton inerte. Voir TvSender. Le raisonnement et le calcul de la clé
+        // sont ceux du téléphone — c'est le même geste, sur le même protocole.
+        onSendToTv = if (!tvSender.available) null else {
+            {
+                val episode = selectedEpisode
+                val season = episode?.season ?: params.resumeSeason
+                val number = episode?.episode?.episodeNumber ?: params.resumeEpisode
+                // La reprise **de ce poste**, pour que la TV continue là où on
+                // s'est arrêté plutôt qu'au début. La clé se recalcule au lieu
+                // d'être devinée : c'est la même que celle du magasin.
+                val key = if (params.isTv) {
+                    "tv:${params.tmdbId}:s${season}e$number"
+                } else {
+                    "movie:${params.tmdbId}"
+                }
+                val here = resume[key]
+                tvSender.ask(
+                    PlayRequest(
+                        tmdbId = params.tmdbId,
+                        isTv = params.isTv,
+                        season = season,
+                        episode = number,
+                        title = vm.playbackTitle,
+                        subtitle = vm.playbackSubtitle,
+                        artwork = vm.playbackPoster.orEmpty(),
+                        positionMs = here?.positionMs ?: 0,
+                        durationMs = here?.durationMs ?: 0,
+                    ),
+                )
+            }
+        },
         onRequestQuality = vm::requestQuality,
         trailer = trailer,
         onPlayTrailer = vm::openTrailer,
