@@ -550,6 +550,11 @@
     <string name="remote_paired_help">Le téléviseur piloté depuis cet appareil.</string>
     <string name="remote_none">Aucun téléviseur appairé</string>
     <string name="remote_none_help">Sur le téléviseur, ouvrir Réglages puis Télécommande, et scanner le QR code affiché.</string>
+    <string name="remote_link_title">Coller le lien du téléviseur</string>
+    <string name="remote_link_help">L'adresse est écrite en toutes lettres sous le QR code. Utile sans appareil photo.</string>
+    <string name="remote_link_hint">moovie://remote?h=…</string>
+    <string name="remote_link_action">Appairer</string>
+    <string name="remote_link_invalid">Lien incomplet ou illisible.</string>
     <string name="remote_reconnect">Reconnecter le téléviseur</string>
     <string name="remote_reconnect_help">Vérifie que le téléviseur répond. Utile s'il vient d'être rallumé.</string>
     <string name="remote_reconnect_running">Recherche en cours…</string>

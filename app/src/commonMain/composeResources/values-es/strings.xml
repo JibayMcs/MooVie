@@ -548,6 +548,11 @@
     <string name="remote_paired_help">El televisor que controla este dispositivo.</string>
     <string name="remote_none">Ningún televisor emparejado</string>
     <string name="remote_none_help">En el televisor, abrir Ajustes y luego Mando, y escanear el código QR que aparece.</string>
+    <string name="remote_link_title">Pegar el enlace del televisor</string>
+    <string name="remote_link_help">La dirección está escrita debajo del código QR. Útil sin cámara.</string>
+    <string name="remote_link_hint">moovie://remote?h=…</string>
+    <string name="remote_link_action">Emparejar</string>
+    <string name="remote_link_invalid">Enlace incompleto o ilegible.</string>
     <string name="remote_reconnect">Reconectar el televisor</string>
     <string name="remote_reconnect_help">Comprueba que el televisor responde. Útil si acaba de encenderse.</string>
     <string name="remote_reconnect_running">Buscando…</string>

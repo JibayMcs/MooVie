@@ -548,6 +548,11 @@
     <string name="remote_paired_help">The TV this device controls.</string>
     <string name="remote_none">No TV paired</string>
     <string name="remote_none_help">On the TV, open Settings then Remote, and scan the QR code it shows.</string>
+    <string name="remote_link_title">Paste the TV's link</string>
+    <string name="remote_link_help">The address is spelled out under the QR code. Handy without a camera.</string>
+    <string name="remote_link_hint">moovie://remote?h=…</string>
+    <string name="remote_link_action">Pair</string>
+    <string name="remote_link_invalid">Incomplete or unreadable link.</string>
     <string name="remote_reconnect">Reconnect to the TV</string>
     <string name="remote_reconnect_help">Checks that the TV answers. Useful right after turning it back on.</string>
     <string name="remote_reconnect_running">Looking for it…</string>

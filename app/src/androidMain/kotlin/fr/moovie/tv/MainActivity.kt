@@ -72,6 +72,7 @@ import fr.moovie.tv.data.pairing.PairingSession
 import fr.moovie.tv.data.remote.RemoteFocus
 import fr.moovie.tv.data.remote.RemoteCast
 import fr.moovie.tv.data.remote.RemoteSyncIdentity
+import fr.moovie.tv.data.remote.parseRemoteLink
 import fr.moovie.tv.data.remote.RemoteLaunch
 import fr.moovie.tv.data.watch.ResumeEntry
 import fr.moovie.tv.data.watch.WatchProgressRepository
@@ -891,16 +892,14 @@ class MainActivity : ComponentActivity() {
     private val pendingRemote = MutableStateFlow(false)
 
     private fun handleRemoteLink(intent: Intent?): Boolean {
-        val data = intent?.data ?: return false
-        if (data.scheme != "moovie" || data.host != "remote") return false
-        val host = data.getQueryParameter("h")?.takeIf { it.isNotBlank() } ?: return false
-        val port = data.getQueryParameter("p")?.toIntOrNull() ?: return false
-        val token = data.getQueryParameter("t")?.takeIf { it.isNotBlank() } ?: return false
-        val name = data.getQueryParameter("n")?.takeIf { it.isNotBlank() } ?: host
+        // L'analyse est partagée avec le desktop, qui n'a pas de caméra et reçoit
+        // le même lien collé à la main. Voir [parseRemoteLink] : la recopier ici
+        // l'aurait fait diverger au premier paramètre ajouté.
+        val target = parseRemoteLink(intent?.dataString) ?: return false
         lifecycleScope.launch {
             val repo = RemoteTargetRepository()
             val known = repo.target.first()
-            repo.remember(RemoteTarget(name, host, port, token))
+            repo.remember(target)
 
             // **Seulement pour un appairage neuf.**
             //
@@ -917,7 +916,7 @@ class MainActivity : ComponentActivity() {
             // reste intacte et revient telle quelle à la recréation suivante.
             // Le dépôt, lui, survit au processus — et c'est exactement la
             // question qu'on pose : « ce lien m'apprend-il quelque chose ? »
-            if (known?.token != token) pendingRemote.value = true
+            if (known?.token != target.token) pendingRemote.value = true
         }
         return true
     }

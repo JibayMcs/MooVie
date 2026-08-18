@@ -176,8 +176,14 @@ import androidx.compose.runtime.rememberCoroutineScope
 import fr.moovie.tv.data.pairing.PairingSession
 import fr.moovie.tv.data.remote.RemotePresence
 import fr.moovie.tv.data.remote.RemoteTargetRepository
+import fr.moovie.tv.data.remote.parseRemoteLink
 import fr.moovie.tv.ui.pairing.remoteOffered
 import fr.moovie.tv.resources.remote_none
+import fr.moovie.tv.resources.remote_link_invalid
+import fr.moovie.tv.resources.remote_link_action
+import fr.moovie.tv.resources.remote_link_hint
+import fr.moovie.tv.resources.remote_link_help
+import fr.moovie.tv.resources.remote_link_title
 import fr.moovie.tv.resources.remote_none_help
 import fr.moovie.tv.resources.remote_paired_help
 import fr.moovie.tv.resources.remote_reconnect
@@ -936,6 +942,92 @@ private fun RemoteSection(onPair: () -> Unit) {
             style = MaterialTheme.typography.bodySmall,
             color = Color(0xFF9A9A9A),
         )
+        RemoteLinkRow()
+    }
+}
+
+/**
+ * Appairage en collant le lien, pour qui ne peut pas scanner le QR.
+ *
+ * ## Ce que ça débloque
+ *
+ * **Un ordinateur n'a pas de caméra**, ou pas celle qu'il faut, et c'est le seul
+ * chemin qu'il ait vers un téléviseur — le QR suppose un appareil qu'on lève
+ * devant l'écran. Sans cette ligne, le desktop verrait « Aucun téléviseur
+ * appairé » sans le moindre moyen d'y remédier.
+ *
+ * Le téléphone y gagne aussi un recours : c'est exactement ce que
+ * [fr.moovie.tv.ui.pairing.PairingDialog] prévoyait en écrivant l'adresse en
+ * toutes lettres sous le QR — « un appareil photo qui ne veut rien savoir, un QR
+ * flou ». L'issue de secours existait, il manquait la porte.
+ *
+ * ## Le lien ne se valide pas tout seul
+ *
+ * [parseRemoteLink] refuse ce qui est incomplet, et on le dit. Enregistrer une
+ * cible amputée de son jeton donnerait un téléviseur qui répond 404 à chaque
+ * appel, sans que rien à l'écran n'explique pourquoi — le pire des deux mondes,
+ * puisque l'appairage aurait *l'air* d'avoir réussi.
+ */
+@Composable
+private fun RemoteLinkRow() {
+    val scope = rememberCoroutineScope()
+    var draft by remember { mutableStateOf("") }
+    var invalid by remember { mutableStateOf(false) }
+
+    SettingRow(
+        label = stringResource(Res.string.remote_link_title),
+        help = stringResource(
+            if (invalid) Res.string.remote_link_invalid else Res.string.remote_link_help,
+        ),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .border(1.dp, Color(0xFF555555), MoovieShape)
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+            ) {
+                if (draft.isEmpty()) {
+                    Text(stringResource(Res.string.remote_link_hint), color = Color(0xFF888888))
+                }
+                BasicTextField(
+                    value = draft,
+                    onValueChange = {
+                        draft = it
+                        // L'erreur s'efface dès qu'on retouche : la laisser
+                        // affichée pendant qu'on corrige donne l'impression que
+                        // la correction ne sert à rien.
+                        invalid = false
+                    },
+                    singleLine = true,
+                    textStyle = TextStyle(color = Color.White),
+                    cursorBrush = SolidColor(Color.White),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            MoovieButton(
+                enabled = draft.isNotBlank(),
+                onClick = {
+                    val cible = parseRemoteLink(draft)
+                    if (cible == null) {
+                        invalid = true
+                        return@MoovieButton
+                    }
+                    scope.launch {
+                        RemoteTargetRepository().remember(cible)
+                        // Sonder tout de suite : le dépôt se remplit, mais c'est
+                        // la présence qui fait exister le bouton de diffusion.
+                        // Sans ça, on vient d'appairer et rien ne change à
+                        // l'écran jusqu'au prochain contrôle périodique.
+                        RemotePresence.refresh()
+                        draft = ""
+                    }
+                },
+            ) { Text(stringResource(Res.string.remote_link_action)) }
+        }
     }
 }
 
