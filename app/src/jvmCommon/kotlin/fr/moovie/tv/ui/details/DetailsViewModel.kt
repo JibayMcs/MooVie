@@ -29,6 +29,8 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import fr.moovie.tv.data.sources.ProviderRegistry
 import fr.moovie.tv.data.sources.SourceCacheRepository
+import fr.moovie.tv.data.sources.StreamMeasure
+import fr.moovie.tv.data.sources.StreamMeasureRepository
 import fr.moovie.tv.ui.format.upcomingDate
 import fr.moovie.tv.ui.navigation.AltSource
 import fr.moovie.tv.data.tmdb.Episode
@@ -133,6 +135,50 @@ class DetailsViewModel : ViewModel() {
     private val qualityRequested = mutableSetOf<String>()
 
     /**
+     * Ce que les sondes des lancements précédents ont appris.
+     *
+     * Lu **une fois** par écran, pas une fois par lien : DataStore relit son
+     * fichier entier à chaque accès. Le verrou existe parce que le panneau
+     * demande ses quinze qualités d'un coup, et que quinze coroutines arrivant
+     * ensemble sur un champ nul le chargeraient quinze fois.
+     */
+    private val measureStore = StreamMeasureRepository()
+    private val measureLock = Mutex()
+    private var knownMeasures: Map<String, StreamMeasure>? = null
+
+    private suspend fun measures(): Map<String, StreamMeasure> = measureLock.withLock {
+        knownMeasures ?: runCatching { measureStore.all() }.getOrDefault(emptyMap())
+            .also { knownMeasures = it }
+    }
+
+    /**
+     * Publie une mesure, qu'elle vienne du réseau ou du magasin.
+     *
+     * Un seul chemin pour les deux : c'est ce qui garantit qu'une source relue
+     * du disque s'affiche et se classe exactement comme une source sondée à
+     * l'instant. Deux chemins auraient divergé au premier champ ajouté, et le
+     * symptôme aurait été un classement qui change après un redémarrage.
+     */
+    private fun applyMeasure(url: String, hauteurs: List<Int>, playable: Boolean) {
+        if (!playable) {
+            _linkStatus.value = _linkStatus.value + (url to LinkStatus.DEAD)
+            return
+        }
+        _linkStatus.value = _linkStatus.value + (url to LinkStatus.OK)
+        // La hauteur **et** le libellé : la première sert au classement des
+        // sources et au menu du lecteur, le second à l'affichage. Déduire
+        // l'une de l'autre après coup, c'est trier « 1080p » et « 720p »
+        // comme des chaînes de caractères.
+        hauteurs.firstOrNull()?.let { haut ->
+            _heights.value = _heights.value + (url to haut)
+            qualityLabel(haut)?.let { _qualities.value = _qualities.value + (url to it) }
+        }
+        if (hauteurs.isNotEmpty()) {
+            _variants.value = _variants.value + (url to hauteurs)
+        }
+    }
+
+    /**
      * Limite le nombre de mesures simultanées. Sans elle, ouvrir un panneau de
      * dix-sept sources déclencherait dix-sept résolutions d'un coup : de quoi
      * saturer une TV d'entrée de gamme et se faire remarquer des hébergeurs,
@@ -149,6 +195,14 @@ class DetailsViewModel : ViewModel() {
         if (!qualityRequested.add(link.url)) return
         _linkStatus.value = _linkStatus.value + (link.url to LinkStatus.CHECKING)
         viewModelScope.launch {
+            // Déjà sondé lors d'un lancement précédent : rien à re-résoudre.
+            // C'est tout l'objet du magasin — une fiche de quinze sources
+            // relançait quinze extractions pour retrouver des hauteurs connues.
+            measures()[link.url]?.let { connue ->
+                applyMeasure(link.url, connue.heights, connue.playable)
+                return@launch
+            }
+
             val outcome = runCatching {
                 qualitySlots.withPermit {
                     val stream = ExtractorRegistry.resolve(link)
@@ -170,22 +224,16 @@ class DetailsViewModel : ViewModel() {
                 // certains hôtes refusent un HEAD venu d'un contexte inhabituel.
                 // Cacher rendrait injoignable ce qui aurait peut-être marché ;
                 // griser laisse le choix tout en disant lequel prendre.
-                _linkStatus.value = _linkStatus.value + (link.url to LinkStatus.DEAD)
+                applyMeasure(link.url, emptyList(), playable = false)
+                // Retenu peu de temps, voir isMeasureFresh : la sonde a des faux
+                // négatifs, et un verdict d'échec gardé comme une mesure
+                // resterait grisé au lancement suivant sans recours visible.
+                runCatching { measureStore.put(link.url, emptyList(), playable = false) }
                 return@launch
             }
-            _linkStatus.value = _linkStatus.value + (link.url to LinkStatus.OK)
-            // La hauteur **et** le libellé : la première sert au classement des
-            // sources et au menu du lecteur, le second à l'affichage. Déduire
-            // l'une de l'autre après coup, c'est trier « 1080p » et « 720p »
-            // comme des chaînes de caractères.
             val hauteurs = outcome.second
-            hauteurs.firstOrNull()?.let { haut ->
-                _heights.value = _heights.value + (link.url to haut)
-                qualityLabel(haut)?.let { _qualities.value = _qualities.value + (link.url to it) }
-            }
-            if (hauteurs.isNotEmpty()) {
-                _variants.value = _variants.value + (link.url to hauteurs)
-            }
+            applyMeasure(link.url, hauteurs, playable = true)
+            runCatching { measureStore.put(link.url, hauteurs, playable = true) }
         }
     }
 

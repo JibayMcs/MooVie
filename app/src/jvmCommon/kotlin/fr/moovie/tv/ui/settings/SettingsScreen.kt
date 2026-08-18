@@ -146,6 +146,7 @@ import fr.moovie.tv.resources.settings_sources_cache_action
 import fr.moovie.tv.resources.settings_sources_cache_done
 import fr.moovie.tv.resources.settings_sources_cache_help
 import fr.moovie.tv.data.sources.SourceCacheRepository
+import fr.moovie.tv.data.sources.StreamMeasureRepository
 import fr.moovie.tv.resources.settings_stream_lang
 import fr.moovie.tv.resources.settings_title
 import fr.moovie.tv.resources.settings_tmdb_help
@@ -751,6 +752,13 @@ fun SettingsScreenContent(
                             onClick = {
                                 cacheScope.launch {
                                     SourceCacheRepository().clear()
+                                    // Les mesures de qualité aussi : les deux
+                                    // magasins répondent à la même question —
+                                    // « l'application me ressert du vieux » —
+                                    // et n'en vider qu'un laisserait la moitié
+                                    // du symptôme, les sources étant alors
+                                    // reclassées sur des hauteurs d'avant.
+                                    StreamMeasureRepository().clear()
                                     cleared = true
                                 }
                             },
