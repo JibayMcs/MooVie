@@ -1,4 +1,4 @@
-package fr.moovie.tv.desktop
+package fr.moovie.tv.data.net
 
 import fr.moovie.tv.data.sources.ExtractorRegistry
 import okhttp3.Request
@@ -59,9 +59,48 @@ internal class LocalStreamProxy(
      * de quelques secondes n'a rien à y gagner.
      */
     private val borneLesPlages: Boolean = false,
+    /**
+     * Ouvre l'écoute au **réseau local** au lieu de la seule boucle locale.
+     *
+     * Un Chromecast n'est pas dans notre processus : il lui faut une URL qu'il
+     * puisse joindre depuis le Wi-Fi. C'est le seul cas où on sort de la boucle,
+     * et il ne se prend pas à la légère — voir [jeton].
+     *
+     * Faux partout ailleurs : le lecteur local, lui, n'a aucune raison d'être
+     * joignable par le voisin.
+     */
+    private val ouvertAuReseau: Boolean = false,
+    /**
+     * Adresse du récepteur visé, quand on la connaît.
+     *
+     * Elle ne sert qu'à choisir la **bonne interface** — voir [adresseLocale].
+     * Nulle, on vise l'interface par défaut, ce qui suffit tant qu'il n'y a pas
+     * de VPN ni de second réseau.
+     */
+    private val versHote: String? = null,
 ) {
 
-    private val server = ServerSocket(0, 8, InetAddress.getByName("127.0.0.1"))
+    /**
+     * Jeton de session, dans le chemin de chaque URL servie.
+     *
+     * **C'est ce qui rend [ouvertAuReseau] acceptable.** L'adressage du relais
+     * est `/u/<url absolue en base64>` : sans garde, l'ouvrir au Wi-Fi ferait de
+     * l'appareil un **proxy ouvert**, que n'importe qui sur le réseau pourrait
+     * faire pointer où il veut — y compris vers un service interne que lui ne
+     * joint pas. Le jeton ne protège pas le flux, qui n'a rien de secret ; il
+     * empêche qu'on se serve du relais comme d'un rebond.
+     *
+     * Tiré au montage, jamais persisté : il meurt avec la lecture.
+     */
+    private val jeton: String =
+        java.math.BigInteger(96, java.security.SecureRandom()).toString(36)
+
+    private val server = ServerSocket(
+        0,
+        8,
+        // `null` fait écouter sur toutes les interfaces ; sinon la boucle seule.
+        if (ouvertAuReseau) null else InetAddress.getByName("127.0.0.1"),
+    )
 
     /**
      * Un fil par connexion. libVLC en ouvre plusieurs de front — la playlist,
@@ -84,8 +123,19 @@ internal class LocalStreamProxy(
         }
     }
 
-    /** URL locale à donner au lecteur à la place de [url]. */
-    fun localUrl(url: String): String = "http://127.0.0.1:${server.localPort}${localPath(url)}"
+    /**
+     * URL à donner au lecteur à la place de [url].
+     *
+     * En boucle locale c'est `127.0.0.1` ; ouvert au réseau, c'est l'adresse de
+     * l'appareil sur le Wi-Fi — un Chromecast ne saurait rien faire de
+     * `localhost`, qui désignerait le Chromecast lui-même.
+     */
+    fun localUrl(url: String): String =
+        "http://${hote()}:${server.localPort}${localPath(url)}"
+
+    /** Adresse joignable par le lecteur visé. */
+    private fun hote(): String =
+        if (!ouvertAuReseau) "127.0.0.1" else adresseLocale() ?: "127.0.0.1"
 
     fun shutdown() {
         running = false
@@ -94,7 +144,7 @@ internal class LocalStreamProxy(
     }
 
     private fun localPath(url: String): String =
-        "/u/" + Base64.getUrlEncoder().withoutPadding().encodeToString(url.toByteArray())
+        "/$jeton/u/" + Base64.getUrlEncoder().withoutPadding().encodeToString(url.toByteArray())
 
     private fun serve(socket: Socket) {
         val input = socket.getInputStream().bufferedReader()
@@ -366,11 +416,47 @@ internal class LocalStreamProxy(
         return debut to fin
     }
 
+    /**
+     * Extrait l'URL visée, **et refuse tout ce qui ne porte pas le jeton**.
+     *
+     * C'est le seul contrôle d'accès du relais, et il suffit à sa raison d'être :
+     * empêcher qu'un tiers du réseau s'en serve comme rebond. Voir [jeton].
+     */
     private fun decodeTarget(path: String): String? {
-        if (!path.startsWith("/u/")) return null
-        val encoded = path.removePrefix("/u/")
+        val prefixe = "/$jeton/u/"
+        if (!path.startsWith(prefixe)) return null
+        val encoded = path.removePrefix(prefixe)
         return runCatching { String(Base64.getUrlDecoder().decode(encoded)) }.getOrNull()
     }
+
+    /**
+     * Adresse de cet appareil **par laquelle le récepteur nous joindra**.
+     *
+     * ## Pourquoi on ne parcourt pas les interfaces
+     *
+     * Un premier jet prenait la première IPv4 site-local venue. Mesuré sur le
+     * poste de développement : **quatre** candidates — le Wi-Fi en
+     * `192.168.1.50`, et trois ponts Docker en `172.x`. Il a choisi
+     * `172.20.0.1`, qu'aucun Chromecast du salon ne joindra jamais. Un téléphone
+     * pose le même piège avec `rmnet` (données mobiles) et les interfaces de VPN.
+     *
+     * ## Ce qui décide juste
+     *
+     * On laisse le **système** trancher : un socket UDP « connecté » vers la
+     * destination ne fait aucun paquet, mais oblige le noyau à choisir la route,
+     * donc l'interface, donc l'adresse source. C'est celle-là, et pas une autre,
+     * que le récepteur verra. Sans destination connue, on vise une adresse
+     * publique — ce qui rend l'interface par défaut, la bonne dans la quasi-
+     * totalité des cas.
+     */
+    private fun adresseLocale(): String? = runCatching {
+        java.net.DatagramSocket().use { sonde ->
+            sonde.connect(java.net.InetAddress.getByName(versHote ?: "8.8.8.8"), 9)
+            (sonde.localAddress as? java.net.Inet4Address)
+                ?.hostAddress
+                ?.takeIf { it != "0.0.0.0" }
+        }
+    }.getOrNull()
 
     private fun isPlaylist(url: String, contentType: String?): Boolean =
         contentType?.contains("mpegurl", ignoreCase = true) == true ||

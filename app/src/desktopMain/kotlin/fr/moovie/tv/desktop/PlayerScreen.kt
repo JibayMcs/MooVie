@@ -1,5 +1,7 @@
 package fr.moovie.tv.desktop
 
+import fr.moovie.tv.data.net.LocalStreamProxy
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut

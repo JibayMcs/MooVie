@@ -239,7 +239,12 @@ tasks.withType<Test>().configureEach {
     System.getProperty("moovie.probe.download")
         ?.let { systemProperty("moovie.probe.download", it) }
     // Mêmes relais pour les sondes qui prennent un flux en paramètre.
-    listOf("moovie.stream", "moovie.referer", "moovie.ua", "moovie.mpv.path").forEach { key ->
+    listOf(
+        "moovie.stream", "moovie.referer", "moovie.ua", "moovie.mpv.path",
+        // Maintient le relais en vie le temps qu'un vrai appareil du réseau
+        // vienne y chercher le flux — voir LanRelayProbeTest.
+        "moovie.probe.hold",
+    ).forEach { key ->
         System.getProperty(key)?.let { systemProperty(key, it) }
     }
     // Les sondes OpenSubtitles interrogent la vraie API : sans la clé elles
