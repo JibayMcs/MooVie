@@ -67,6 +67,12 @@
     <string name="details_sources">Fuentes</string>
     <string name="details_send_to_tv">Reproducir en el televisor</string>
     <string name="cast_launching">Reproduciendo desde el teléfono…</string>
+    <string name="cast_pick_title">Emitir a</string>
+    <string name="cast_pick_moovie_help">El televisor busca la fuente por sí mismo. El teléfono puede guardarse.</string>
+    <string name="cast_pick_chromecast_help">Este teléfono proporciona el vídeo: debe seguir encendido y en el wifi.</string>
+    <string name="cast_searching">Buscando la fuente…</string>
+    <string name="cast_failed">No se pudo iniciar la emisión.</string>
+    <string name="cast_stop">Detener la emisión</string>
     <string name="remote_play_busy_title">El televisor ya está viendo algo</string>
     <string name="remote_play_busy_body">«%1$s» se está reproduciendo. ¿Reemplazarlo por este título?</string>
     <string name="remote_play_busy_confirm">Reemplazar</string>

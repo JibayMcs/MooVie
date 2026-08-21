@@ -11,6 +11,36 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import fr.moovie.tv.data.settings.tmdbCountry
 import fr.moovie.tv.data.remote.PlayRequest
+import androidx.compose.runtime.setValue
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import fr.moovie.tv.resources.Res
+import fr.moovie.tv.resources.cast_failed
+import fr.moovie.tv.resources.cast_searching
+import fr.moovie.tv.resources.common_cancel
+import fr.moovie.tv.ui.components.MoovieButton
+import fr.moovie.tv.ui.theme.MoovieShape
+import org.jetbrains.compose.resources.stringResource
+import fr.moovie.tv.data.cast.CastDevice
+import fr.moovie.tv.data.cast.CastNow
+import fr.moovie.tv.data.cast.CastPlayback
+import fr.moovie.tv.data.cast.CastPresence
+import fr.moovie.tv.data.cast.CastSession
+import fr.moovie.tv.ui.remote.CastTarget
+import fr.moovie.tv.ui.remote.CastTargetDialog
+import fr.moovie.tv.ui.remote.rememberCastFollow
 import fr.moovie.tv.ui.remote.rememberTvSender
 import fr.moovie.tv.ui.navigation.Screen
 
@@ -70,6 +100,70 @@ fun DetailsScreen(
     // de confirmation ; il n'expose ici qu'un « peut-on envoyer ».
     val tvSender = rememberTvSender(onSent = onOpenRemote)
 
+    // ── Chromecast ───────────────────────────────────────────────────────────
+    //
+    // La liste est tenue par [CastPresence], sondée pendant que la fiche est à
+    // l'écran : le bouton doit exister **avant** qu'on le touche, et un balayage
+    // mDNS prend quelques secondes. Lancer la recherche au moment du geste
+    // ferait attendre devant un bouton qu'on vient d'appuyer.
+    val chromecasts by CastPresence.devices.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit) {
+        while (true) {
+            runCatching { CastPresence.refresh() }
+            kotlinx.coroutines.delay(CAST_SCAN_MS)
+        }
+    }
+    /** Récepteur choisi, en attente de la résolution du flux. */
+    var castTo by remember { mutableStateOf<CastDevice?>(null) }
+    var castEnCours by remember { mutableStateOf(false) }
+    var castEchoue by remember { mutableStateOf(false) }
+    var castChoix by remember { mutableStateOf<List<CastTarget>>(emptyList()) }
+    val castFollow = rememberCastFollow()
+
+    /**
+     * Envoie vers la destination choisie.
+     *
+     * Les deux chemins n'ont **rien en commun** au-delà du geste : une Moo-vie
+     * reçoit une intention et résout elle-même ; un Chromecast attend une URL,
+     * donc c'est ce téléphone qui doit d'abord résoudre. D'où deux branches
+     * franches plutôt qu'une abstraction qui ferait croire à une symétrie.
+     */
+    fun envoieVers(cible: CastTarget) {
+        val episode = selectedEpisode
+        val season = episode?.season ?: resumeSeason
+        val number = episode?.episode?.episodeNumber ?: resumeEpisode
+        when (cible) {
+            is CastTarget.Moovie -> {
+                // La reprise **de ce téléphone**, pour que la TV continue là où
+                // on s'est arrêté plutôt qu'au début. La clé se recalcule au lieu
+                // d'être devinée : c'est la même que celle du magasin.
+                val key = if (isTv) "tv:$tmdbId:s${season}e$number" else "movie:$tmdbId"
+                val here = resume[key]
+                tvSender.ask(
+                    PlayRequest(
+                        tmdbId = tmdbId,
+                        isTv = isTv,
+                        season = season,
+                        episode = number,
+                        title = viewModel.playbackTitle,
+                        subtitle = viewModel.playbackSubtitle,
+                        artwork = viewModel.playbackPoster.orEmpty(),
+                        positionMs = here?.positionMs ?: 0,
+                        durationMs = here?.durationMs ?: 0,
+                    ),
+                )
+            }
+            // On note la cible, puis on déclenche la résolution : c'est
+            // `LaunchedEffect(resolved)` qui prendra le relais, sur la branche
+            // gardée par `castTo`.
+            is CastTarget.Chromecast -> {
+                castTo = cible.device
+                castEnCours = true
+                if (isTv) viewModel.quickPlayEpisode(season, number) else viewModel.quickPlayMovie()
+            }
+        }
+    }
+
     LaunchedEffect(tmdbId, isTv) { viewModel.start(tmdbId, isTv, resumeSeason, resumeEpisode) }
     LaunchedEffect(state) {
         if (autoSources && !autoConsumed.value) {
@@ -89,6 +183,50 @@ fun DetailsScreen(
     }
     LaunchedEffect(resolved) {
         resolved?.let { s ->
+            // ── Diffusion vers un Chromecast ─────────────────────────────────
+            //
+            // **Une branche à côté, jamais à la place.** Le chemin de lecture
+            // locale ci-dessous marche ; le modifier pour y glisser un cas
+            // supplémentaire, c'est risquer une régression là où personne ne
+            // l'attend. `castTo` est nul dans l'immense majorité des cas, et
+            // tout continue exactement comme avant.
+            val chromecast = castTo
+            if (chromecast != null && s.url.isNotBlank()) {
+                castTo = null
+                viewModel.closePanel()
+                castEnCours = true
+                val session = CastSession(chromecast)
+                val parti = runCatching {
+                    session.start(
+                        stream = s,
+                        title = viewModel.playbackTitle,
+                        subtitle = viewModel.playbackSubtitle,
+                        artwork = viewModel.playbackPoster.orEmpty(),
+                        positionMs = resume[viewModel.playbackKey]?.positionMs ?: 0,
+                    )
+                }.getOrDefault(false)
+                castEnCours = false
+                if (parti) {
+                    CastNow.start(
+                        session,
+                        CastPlayback(
+                            device = chromecast,
+                            title = viewModel.playbackTitle,
+                            subtitle = viewModel.playbackSubtitle,
+                            artwork = viewModel.playbackPoster.orEmpty(),
+                            mediaKey = viewModel.playbackKey,
+                        ),
+                    )
+                    castFollow()
+                    onOpenRemote()
+                } else {
+                    session.stop()
+                    castEchoue = true
+                }
+                viewModel.consumeResolved()
+                return@LaunchedEffect
+            }
+
             if (s.url.isNotBlank()) {
                 // Ferme le panneau avant de partir : au retour (ou sur une autre
                 // fiche, le ViewModel étant partagé), il ne doit pas rester ouvert.
@@ -116,6 +254,49 @@ fun DetailsScreen(
         }
     }
 
+
+    // Le choix de la destination, quand il y en a plusieurs. Le composant se
+    // tait tout seul en dessous de deux — voir CastTargetDialog.
+    CastTargetDialog(
+        targets = castChoix,
+        onPick = { cible ->
+            castChoix = emptyList()
+            envoieVers(cible)
+        },
+        onDismiss = { castChoix = emptyList() },
+    )
+
+    // La résolution se fait **ici**, pas sur le téléviseur : jusqu'à trente
+    // secondes à froid. Sans ce voile, on appuie et il ne se passe rien pendant
+    // une demi-minute, ce qui se lit comme un bouton mort.
+    if (castEnCours) {
+        Box(
+            modifier = Modifier.fillMaxSize().background(Color(0xCC000000)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                stringResource(Res.string.cast_searching),
+                style = MaterialTheme.typography.titleMedium,
+            )
+        }
+    }
+
+    if (castEchoue) {
+        Dialog(onDismissRequest = { castEchoue = false }) {
+            Column(
+                modifier = Modifier
+                    .clip(MoovieShape)
+                    .background(Color(0xFF1A1A1F))
+                    .padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Text(stringResource(Res.string.cast_failed))
+                MoovieButton(onClick = { castEchoue = false }) {
+                    Text(stringResource(Res.string.common_cancel))
+                }
+            }
+        }
+    }
 
     // Retour : ferme d'abord le panneau des sources, puis la fiche d'épisode,
     // et seulement ensuite remonte à l'accueil (BackHandler de MainActivity).
@@ -165,29 +346,23 @@ fun DetailsScreen(
         sourceHeights = sourceHeights,
         // Null quand aucun téléviseur ne répond : pas de bouton plutôt qu'un
         // bouton inerte. Voir TvSender.
-        onSendToTv = if (!tvSender.available) null else {
+        // Le bouton existe dès qu'**une** destination répond : un Chromecast
+        // suffit, et c'est précisément le cas de quelqu'un qui n'a pas
+        // d'Android TV. Le lier au seul appairage Moo-vie le rendait invisible
+        // pour lui.
+        onSendToTv = if (!tvSender.available && chromecasts.isEmpty()) null else {
             {
-                val episode = selectedEpisode
-                val season = episode?.season ?: resumeSeason
-                val number = episode?.episode?.episodeNumber ?: resumeEpisode
-                // La reprise **de ce téléphone**, pour que la TV continue là où
-                // on s'est arrêté plutôt qu'au début. La clé se recalcule au lieu
-                // d'être devinée : c'est la même que celle du magasin.
-                val key = if (isTv) "tv:$tmdbId:s${season}e$number" else "movie:$tmdbId"
-                val here = resume[key]
-                tvSender.ask(
-                    PlayRequest(
-                        tmdbId = tmdbId,
-                        isTv = isTv,
-                        season = season,
-                        episode = number,
-                        title = viewModel.playbackTitle,
-                        subtitle = viewModel.playbackSubtitle,
-                        artwork = viewModel.playbackPoster.orEmpty(),
-                        positionMs = here?.positionMs ?: 0,
-                        durationMs = here?.durationMs ?: 0,
-                    ),
-                )
+                val cibles = buildList {
+                    tvSender.target?.let { add(CastTarget.Moovie(it)) }
+                    chromecasts.forEach { add(CastTarget.Chromecast(it)) }
+                }
+                // Une seule destination ne se choisit pas : demander
+                // confirmation ferait un écran de plus pour rien.
+                when (cibles.size) {
+                    0 -> Unit
+                    1 -> envoieVers(cibles.first())
+                    else -> castChoix = cibles
+                }
             }
         },
         onRequestQuality = viewModel::requestQuality,
@@ -205,3 +380,12 @@ fun DetailsScreen(
         onBack = onBack,
     )
 }
+
+/**
+ * Entre deux balayages de récepteurs Cast.
+ *
+ * Plus espacé que la sonde de présence Moo-vie, qui n'est qu'un ping : une
+ * découverte mDNS dure plusieurs secondes et réveille la radio. Vingt secondes
+ * suffisent — on ne branche pas un Chromecast pendant qu'on lit un synopsis.
+ */
+private const val CAST_SCAN_MS = 20_000L

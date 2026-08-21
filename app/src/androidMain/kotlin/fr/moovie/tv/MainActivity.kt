@@ -52,6 +52,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import fr.moovie.tv.data.remote.PlayRequest
 import fr.moovie.tv.ui.remote.rememberTvSender
+import fr.moovie.tv.data.cast.CastNow
+import fr.moovie.tv.ui.remote.CastPlayerScreen
 import fr.moovie.tv.ui.remote.CastLaunchScreen
 import fr.moovie.tv.ui.remote.CastSessionService
 import fr.moovie.tv.ui.remote.catchUpWithTelevision
@@ -309,6 +311,10 @@ class MainActivity : ComponentActivity() {
                         // même composant que la fiche — il porte sa modale de
                         // remplacement — donc une seule règle pour les deux
                         // points d'entrée.
+                        // Ce qui part vers un Chromecast, s'il y a lieu : c'est
+                        // ce qui décide de la forme de l'écran Télécommande.
+                        val castPlayback by CastNow.playback.collectAsStateWithLifecycle()
+
                         val homeSender = rememberTvSender(onSent = { nav.push(Screen.Remote) })
 
                         var everPlayed by remember { mutableStateOf(false) }
@@ -531,8 +537,15 @@ class MainActivity : ComponentActivity() {
                             // destination est inatteignable (l'icône qui y mène
                             // n'existe pas), mais la composition doit rester
                             // totale.
-                            Screen.Remote -> remoteTarget?.let {
-                                RemoteScreen(target = it, onBack = { nav.pop() })
+                            // Une diffusion Chromecast passe **avant** la
+                            // télécommande : elle n'a pas de cible appairée, et
+                            // c'est un lecteur qu'il faut piloter, pas des menus.
+                            Screen.Remote -> if (castPlayback != null) {
+                                CastPlayerScreen(onBack = { nav.pop() })
+                            } else {
+                                remoteTarget?.let {
+                                    RemoteScreen(target = it, onBack = { nav.pop() })
+                                }
                             }
                             // Hors ligne, l'accueil cède la place à la
                             // bibliothèque locale : voir OfflineScreen.
