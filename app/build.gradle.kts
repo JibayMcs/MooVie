@@ -244,6 +244,8 @@ tasks.withType<Test>().configureEach {
         // Maintient le relais en vie le temps qu'un vrai appareil du réseau
         // vienne y chercher le flux — voir LanRelayProbeTest.
         "moovie.probe.hold",
+        // Adresse du récepteur Cast à éprouver — voir CastEndToEndProbeTest.
+        "moovie.cast.host", "moovie.cast.trace",
     ).forEach { key ->
         System.getProperty(key)?.let { systemProperty(key, it) }
     }

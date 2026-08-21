@@ -70,6 +70,10 @@ class CastSession(private val device: CastDevice) {
 
         val charge = client.load(
             url = proxy.localUrl(stream.url),
+            // **Le type vient du flux, pas de l'URL relayée.** Celle-ci finit
+            // par du base64 : la déduction par extension retombait sur MP4 et le
+            // récepteur refusait tout HLS. Voir castContentType.
+            contentType = castContentType(stream.format, stream.url),
             title = title,
             subtitle = subtitle,
             artwork = artwork,

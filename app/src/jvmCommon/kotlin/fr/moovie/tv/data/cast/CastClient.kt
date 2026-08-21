@@ -3,7 +3,7 @@ package fr.moovie.tv.data.cast
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -86,10 +86,18 @@ class CastClient(private val host: String) {
             val s = CastTls.connect(host)
             socket = s
             sortie = s.outputStream
+            // **Avant de lancer la boucle**, pas après : elle boucle sur ce
+            // drapeau, et démarrée à faux elle sortait aussitôt en appelant
+            // `close()`. Symptôme mesuré : le LAUNCH part, plus rien ne revient,
+            // pas même le PONG — une connexion muette qui a l'air d'un problème
+            // de réseau alors que c'est une course de deux lignes.
+            _connecte.value = true
+            // Le délai de lecture du handshake ne vaut pas pour la suite : cette
+            // connexion vit des heures et se tait entre deux battements.
+            runCatching { s.soTimeout = 0 }
             envoie(CAST_NS_CONNECTION, DESTINATION_RECEIVER, buildJsonObject { put("type", "CONNECT") })
             scope.launch { boucleDeLecture(DataInputStream(s.inputStream)) }
             scope.launch { battement() }
-            _connecte.value = true
             true
         }.getOrElse {
             close()
@@ -104,7 +112,15 @@ class CastClient(private val host: String) {
         runCatching { socket?.close() }
         socket = null
         sortie = null
-        scope.cancel()
+        // **Les enfants, pas le scope.** `cancel()` rend le scope inutilisable à
+        // jamais : la boucle de lecture relancée par un `connect()` ultérieur ne
+        // démarrait plus du tout. Symptôme mesuré — le LAUNCH part, aucune trame
+        // ne revient, et rien ne distingue ça d'un réseau qui ne répond pas.
+        //
+        // Le piège se referme tout seul : `CastSession.start` ferme la session
+        // précédente avant d'ouvrir la sienne, donc le tout premier `connect()`
+        // héritait déjà d'un scope mort.
+        runCatching { scope.coroutineContext.cancelChildren() }
     }
 
     /**
@@ -201,7 +217,12 @@ class CastClient(private val host: String) {
                 )
             },
         )
-        return reponse != null
+        // **`LOAD_FAILED` est une réponse.** Se contenter d'en avoir reçu une
+        // faisait dire « accepté » à un chargement refusé — mesuré pendant la
+        // mise au point, où l'écran aurait annoncé une diffusion partie alors
+        // que la télé affichait une erreur.
+        val type = reponse?.get("type")?.jsonPrimitive?.contentOrNull
+        return reponse != null && type != "LOAD_FAILED" && type != "INVALID_REQUEST"
     }
 
     suspend fun playPause() {
@@ -280,6 +301,9 @@ class CastClient(private val host: String) {
             payload.forEach { (k, v) -> put(k, v) }
             put("requestId", id)
         }
+        if (System.getProperty("moovie.cast.trace") == "1") {
+            println("[trace] -> ns=${namespace.substringAfterLast('.')} dst=$destination id=$id ${complet.toString().take(300)}")
+        }
         val resultat = kotlinx.coroutines.CompletableDeferred<JsonObject?>()
         attentes[id] = { reponse -> resultat.complete(reponse) }
         envoie(namespace, destination, complet)
@@ -290,6 +314,10 @@ class CastClient(private val host: String) {
     private suspend fun boucleDeLecture(entree: DataInputStream) {
         while (_connecte.value) {
             val message = runCatching { litTrame(entree) }.getOrNull() ?: break
+            if (System.getProperty("moovie.cast.trace") == "1") {
+                println("[trace] <- ns=${message.namespace.substringAfterLast('.')} " +
+                    "src=${message.source} ${message.payload.take(300)}")
+            }
             val corps = runCatching { json.parseToJsonElement(message.payload).jsonObject }.getOrNull()
                 ?: continue
 

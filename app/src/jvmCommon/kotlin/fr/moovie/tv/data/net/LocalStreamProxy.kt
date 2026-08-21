@@ -164,6 +164,16 @@ internal class LocalStreamProxy(
         }
 
         val output = BufferedOutputStream(socket.getOutputStream())
+
+        // `Range` n'est pas un en-tête « simple » : le récepteur envoie un
+        // préflight avant chaque segment. Y répondre ne coûte rien ; ne pas y
+        // répondre annule la requête qui suit, sans trace.
+        if (method.equals("OPTIONS", ignoreCase = true)) {
+            writeHead(output, 204, "No Content", "text/plain", 0L, null)
+            output.flush()
+            return
+        }
+
         val target = decodeTarget(path)
         if (target == null) {
             respondStatus(output, 404, "Not Found")
@@ -503,6 +513,22 @@ internal class LocalStreamProxy(
             contentLength?.let { append("Content-Length: $it\r\n") }
             contentRange?.let { append("Content-Range: $it\r\n") }
             append("Accept-Ranges: bytes\r\n")
+            // **CORS, et seulement quand on sert quelqu'un d'autre.**
+            //
+            // Le récepteur Cast par défaut est une page web : il lit une
+            // playlist HLS en XHR, donc le navigateur exige l'autorisation
+            // d'origine. Sans elle, le récepteur répond `LOAD_FAILED` puis
+            // `idleReason: "ERROR"` — mesuré — sans jamais dire que c'est le
+            // CORS qui manque. Le lecteur local, lui, n'en a que faire ; on ne
+            // les pose donc pas en boucle locale.
+            if (ouvertAuReseau) {
+                append("Access-Control-Allow-Origin: *\r\n")
+                append("Access-Control-Allow-Methods: GET, HEAD, OPTIONS\r\n")
+                append("Access-Control-Allow-Headers: *\r\n")
+                // Sans exposition, le lecteur ne voit ni la longueur ni la
+                // plage servie : il ne sait plus où il en est dans le fichier.
+                append("Access-Control-Expose-Headers: Content-Length, Content-Range, Accept-Ranges\r\n")
+            }
             // Une connexion par requête : libVLC en ouvre autant qu'il veut, et
             // la gestion du maintien en vie n'apporterait rien en local.
             append("Connection: close\r\n\r\n")

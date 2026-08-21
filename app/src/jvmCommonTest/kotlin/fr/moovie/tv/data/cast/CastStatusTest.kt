@@ -1,5 +1,6 @@
 package fr.moovie.tv.data.cast
 
+import fr.moovie.tv.core.sources.model.StreamFormat
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlin.test.Test
@@ -129,6 +130,33 @@ class CastStatusTest {
         assertEquals("application/vnd.apple.mpegurl", castContentType("http://x/a/master.m3u8?token=1"))
         assertEquals("application/dash+xml", castContentType("http://x/a/manifest.mpd"))
         assertEquals("video/mp4", castContentType("http://x/a/film.mp4"))
+    }
+
+    /**
+     * **Le test qui compte, et il a été payé.** L'URL remise au récepteur est
+     * celle du relais : elle finit par du base64 et n'a **aucune extension**.
+     * Déduire le type de là faisait annoncer `video/mp4` pour un HLS, et le vrai
+     * Chromecast répondait `LOAD_FAILED` puis `idleReason: "ERROR"` — sans
+     * jamais dire que le type était en cause.
+     *
+     * Le format, lui, est connu depuis l'extraction : on le prend à la source.
+     */
+    @Test
+    fun `le type vient du format, pas de l url relayee`() {
+        val relais = "http://192.168.1.50:41833/1d9ijg34uubgdtnpem0/u/aHR0cHM6Ly94"
+
+        assertEquals("application/vnd.apple.mpegurl", castContentType(StreamFormat.HLS, relais))
+        assertEquals("application/dash+xml", castContentType(StreamFormat.DASH, relais))
+        assertEquals("video/mp4", castContentType(StreamFormat.MP4, relais))
+    }
+
+    /** Format inconnu : l'URL d'origine reste le meilleur indice disponible. */
+    @Test
+    fun `sans format connu on retombe sur l url d origine`() {
+        assertEquals(
+            "application/vnd.apple.mpegurl",
+            castContentType(StreamFormat.UNKNOWN, "https://h.tld/a/master.m3u8"),
+        )
     }
 
     /**

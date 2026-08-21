@@ -204,7 +204,30 @@ fun transportIdOf(corps: JsonObject): String? =
         ?.firstOrNull { it["appId"]?.jsonPrimitive?.contentOrNull == CAST_DEFAULT_RECEIVER }
         ?.get("transportId")?.jsonPrimitive?.contentOrNull
 
-/** Type MIME déduit de l'URL, pour les récepteurs qui ne devinent pas. */
+/**
+ * Type MIME d'un flux, **d'après ce qu'il est** et non d'après l'URL qu'on sert.
+ *
+ * ## Le défaut que ça corrige
+ *
+ * Le récepteur par défaut choisit son moteur sur le type MIME. Or l'URL qu'on
+ * lui donne est celle du relais, qui finit par du base64 et n'a donc **aucune
+ * extension** : la déduction retombait sur `video/mp4`, et un HLS annoncé en MP4
+ * est refusé. Mesuré sur un vrai Chromecast — `LOAD_FAILED`, puis
+ * `idleReason: "ERROR"`, sans un mot sur le type.
+ *
+ * Le format, lui, est connu depuis l'extraction. On le prend à la source plutôt
+ * que de le redeviner à l'arrivée.
+ */
+fun castContentType(format: fr.moovie.tv.core.sources.model.StreamFormat, url: String): String =
+    when (format) {
+        fr.moovie.tv.core.sources.model.StreamFormat.HLS -> "application/vnd.apple.mpegurl"
+        fr.moovie.tv.core.sources.model.StreamFormat.DASH -> "application/dash+xml"
+        fr.moovie.tv.core.sources.model.StreamFormat.MP4 -> "video/mp4"
+        // Format inconnu : l'URL d'origine reste le meilleur indice qu'on ait.
+        fr.moovie.tv.core.sources.model.StreamFormat.UNKNOWN -> castContentType(url)
+    }
+
+/** Type MIME déduit de l'URL, quand c'est tout ce qu'on a. */
 fun castContentType(url: String): String = when {
     url.substringBefore('?').endsWith(".m3u8", true) -> "application/vnd.apple.mpegurl"
     url.substringBefore('?').endsWith(".mpd", true) -> "application/dash+xml"
