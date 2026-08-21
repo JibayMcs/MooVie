@@ -17,6 +17,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.MediaSession
 import androidx.media3.ui.PlayerNotificationManager
 import fr.moovie.tv.MainActivity
+import fr.moovie.tv.data.cast.CastNow
 import fr.moovie.tv.data.remote.CastPulse
 import fr.moovie.tv.data.remote.CastVerdict
 import fr.moovie.tv.data.remote.CastVigil
@@ -109,6 +110,22 @@ class CastSessionService : Service() {
         scope.launch {
             ensureChannel(getString(Res.string.cast_notification_channel))
 
+            // ── Diffusion Chromecast ─────────────────────────────────────
+            //
+            // **Le service n'a alors rien à relever, et tout à tenir.** Ce n'est
+            // pas la box qui joue : c'est ce téléphone qui sert les octets, par
+            // le relais. Son seul travail est d'empêcher Android de tuer le
+            // processus — le tuer couperait le film au salon.
+            //
+            // Placé avant la lecture de la cible appairée, parce qu'un
+            // Chromecast n'en a aucune : quelqu'un qui n'a pas d'Android TV
+            // tomberait sinon sur le `stopSelf` ci-dessous, et sa diffusion
+            // s'arrêterait dès l'écran éteint.
+            if (CastNow.playback != null) {
+                veilleSurLaDiffusion()
+                return@launch
+            }
+
             val target = RemoteTargetRepository().target.first()
             // Plus de téléviseur appairé : il n'y a rien à suivre, et une
             // notification sans destinataire serait un fantôme immédiat.
@@ -176,6 +193,25 @@ class CastSessionService : Service() {
                 is CastVerdict.Watch -> delay(verdict.delayMs)
             }
         }
+    }
+
+    /**
+     * Tient le processus en vie tant qu'une diffusion Chromecast dure.
+     *
+     * Aucun relevé réseau : le récepteur ne nous doit rien, et l'écran de
+     * contrôle interroge déjà la session quand il est ouvert. On se contente
+     * d'exister — c'est précisément ce qu'un service de premier plan sait faire.
+     *
+     * Il s'arrête dès que la diffusion cesse, quelle qu'en soit la raison :
+     * l'arrêt demandé, une session tombée, ou l'application qui se ferme. Sans
+     * cela ce serait la notification fantôme que [CastVigil] existe pour éviter,
+     * sous une autre forme.
+     */
+    private suspend fun veilleSurLaDiffusion() {
+        while (CastNow.playback != null) {
+            delay(VEILLE_MS)
+        }
+        stopSelf()
     }
 
     /**
@@ -344,6 +380,9 @@ class CastSessionService : Service() {
 
         /** Distinct des téléchargements (4201) et du lecteur (4202). */
         private const val NOTIFICATION_ID = 4203
+
+        /** Rythme de la veille : on ne fait qu'exister, inutile de s'agiter. */
+        private const val VEILLE_MS = 2_000L
 
         /** Démarre le suivi de la box. Sans effet s'il tourne déjà. */
         fun start(context: Context) {
