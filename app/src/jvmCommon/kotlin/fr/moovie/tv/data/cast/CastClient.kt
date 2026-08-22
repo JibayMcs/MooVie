@@ -301,9 +301,6 @@ class CastClient(private val host: String) {
             payload.forEach { (k, v) -> put(k, v) }
             put("requestId", id)
         }
-        if (System.getProperty("moovie.cast.trace") == "1") {
-            println("[trace] -> ns=${namespace.substringAfterLast('.')} dst=$destination id=$id ${complet.toString().take(300)}")
-        }
         val resultat = kotlinx.coroutines.CompletableDeferred<JsonObject?>()
         attentes[id] = { reponse -> resultat.complete(reponse) }
         envoie(namespace, destination, complet)
@@ -314,10 +311,6 @@ class CastClient(private val host: String) {
     private suspend fun boucleDeLecture(entree: DataInputStream) {
         while (_connecte.value) {
             val message = runCatching { litTrame(entree) }.getOrNull() ?: break
-            if (System.getProperty("moovie.cast.trace") == "1") {
-                println("[trace] <- ns=${message.namespace.substringAfterLast('.')} " +
-                    "src=${message.source} ${message.payload.take(300)}")
-            }
             val corps = runCatching { json.parseToJsonElement(message.payload).jsonObject }.getOrNull()
                 ?: continue
 

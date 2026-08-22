@@ -43,6 +43,39 @@ sealed interface CastTarget {
 }
 
 /**
+ * Les destinations à proposer, une fois écartées celles qui feraient double emploi.
+ *
+ * ## La règle : un appareil qui fait tourner Moo-vie n'est pas un Chromecast
+ *
+ * Beaucoup d'Android TV répondent **aussi** au protocole Cast. Une Mi Box qui a
+ * Moo-vie installé apparaissait donc deux fois : une fois par son appairage, une
+ * fois comme récepteur Cast — et la seconde ne marche pas, faute d'un récepteur
+ * média utilisable dessus. Mesuré : `connect` échoue, et rien à l'écran ne dit
+ * pourquoi.
+ *
+ * Quand les deux chemins existent, **celui de Moo-vie est meilleur** et pas
+ * seulement « équivalent » : le téléviseur résout la source avec ses propres
+ * catalogues et sa propre connexion, le téléphone peut être rangé, et rien ne
+ * transite par lui. Le Cast, lui, fait du téléphone le serveur du film.
+ *
+ * @param paired le téléviseur appairé, s'il répond.
+ * @param chromecasts ce que la découverte Cast a trouvé.
+ * @param moovieHosts adresses qui annoncent Moo-vie sur le réseau — qu'elles
+ *   soient appairées ou non. Une box vue ici mais non appairée est écartée du
+ *   Cast : la bonne réponse pour elle est l'appairage, pas un chemin dégradé.
+ */
+fun castTargetsFor(
+    paired: RemoteTarget?,
+    chromecasts: List<CastDevice>,
+    moovieHosts: Set<String> = emptySet(),
+): List<CastTarget> = buildList {
+    paired?.let { add(CastTarget.Moovie(it)) }
+    chromecasts
+        .filterNot { it.host == paired?.host || it.host in moovieHosts }
+        .forEach { add(CastTarget.Chromecast(it)) }
+}
+
+/**
  * Le choix de la destination, quand il y en a plusieurs.
  *
  * ## Pourquoi une modale, et pourquoi seulement parfois

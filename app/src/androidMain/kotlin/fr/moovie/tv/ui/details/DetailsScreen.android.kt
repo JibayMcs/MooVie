@@ -39,6 +39,7 @@ import fr.moovie.tv.data.cast.CastPlayback
 import fr.moovie.tv.data.cast.CastPresence
 import fr.moovie.tv.data.cast.CastSession
 import fr.moovie.tv.ui.remote.CastTarget
+import fr.moovie.tv.ui.remote.castTargetsFor
 import fr.moovie.tv.ui.remote.CastTargetDialog
 import fr.moovie.tv.ui.remote.rememberCastFollow
 import fr.moovie.tv.ui.remote.rememberTvSender
@@ -107,6 +108,7 @@ fun DetailsScreen(
     // mDNS prend quelques secondes. Lancer la recherche au moment du geste
     // ferait attendre devant un bouton qu'on vient d'appuyer.
     val chromecasts by CastPresence.devices.collectAsStateWithLifecycle()
+    val hotesMoovie by CastPresence.moovieHosts.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) {
         while (true) {
             runCatching { CastPresence.refresh() }
@@ -350,12 +352,11 @@ fun DetailsScreen(
         // suffit, et c'est précisément le cas de quelqu'un qui n'a pas
         // d'Android TV. Le lier au seul appairage Moo-vie le rendait invisible
         // pour lui.
-        onSendToTv = if (!tvSender.available && chromecasts.isEmpty()) null else {
+        onSendToTv = if (castTargetsFor(tvSender.target, chromecasts, hotesMoovie).isEmpty()) null else {
             {
-                val cibles = buildList {
-                    tvSender.target?.let { add(CastTarget.Moovie(it)) }
-                    chromecasts.forEach { add(CastTarget.Chromecast(it)) }
-                }
+                // Un appareil qui fait tourner Moo-vie n'est pas un Chromecast,
+                // même s'il répond au protocole. Voir castTargetsFor.
+                val cibles = castTargetsFor(tvSender.target, chromecasts, hotesMoovie)
                 // Une seule destination ne se choisit pas : demander
                 // confirmation ferait un écran de plus pour rien.
                 when (cibles.size) {

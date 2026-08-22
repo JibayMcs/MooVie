@@ -134,8 +134,15 @@ internal class LocalStreamProxy(
         "http://${hote()}:${server.localPort}${localPath(url)}"
 
     /** Adresse joignable par le lecteur visé. */
-    private fun hote(): String =
-        if (!ouvertAuReseau) "127.0.0.1" else adresseLocale() ?: "127.0.0.1"
+    private fun hote(): String {
+        if (!ouvertAuReseau) return "127.0.0.1"
+        // **Jamais de repli silencieux sur la boucle locale.** L'annoncer à un
+        // récepteur distant lui désigne lui-même : il ne trouve rien, et le
+        // symptôme — `LOAD_FAILED` — ne dit rien de l'adresse. Une exception
+        // remonte au moins jusqu'à l'écran, qui sait dire que ça n'a pas pris.
+        return adresseLocale()
+            ?: error("aucune adresse de réseau local : impossible de servir un récepteur distant")
+    }
 
     fun shutdown() {
         running = false
@@ -442,31 +449,73 @@ internal class LocalStreamProxy(
     /**
      * Adresse de cet appareil **par laquelle le récepteur nous joindra**.
      *
-     * ## Pourquoi on ne parcourt pas les interfaces
+     * ## Deux méthodes, parce qu'une seule ment
      *
-     * Un premier jet prenait la première IPv4 site-local venue. Mesuré sur le
-     * poste de développement : **quatre** candidates — le Wi-Fi en
-     * `192.168.1.50`, et trois ponts Docker en `172.x`. Il a choisi
-     * `172.20.0.1`, qu'aucun Chromecast du salon ne joindra jamais. Un téléphone
-     * pose le même piège avec `rmnet` (données mobiles) et les interfaces de VPN.
+     * **La route d'abord.** Un socket UDP « connecté » n'émet aucun paquet mais
+     * oblige le noyau à choisir la route, donc l'interface, donc l'adresse
+     * source. C'est la bonne réponse quand elle vient — mesuré sur le poste de
+     * développement, où parcourir les interfaces désignait un pont Docker parmi
+     * quatre candidates.
      *
-     * ## Ce qui décide juste
+     * **Le sous-réseau ensuite.** Sur Android, `localAddress` ne rend pas une
+     * `Inet4Address` et la première méthode échoue. Le repli d'alors était la
+     * boucle locale : on annonçait `127.0.0.1` à un Chromecast, pour qui cette
+     * adresse désigne **lui-même**. Il ne frappait jamais à la porte du relais
+     * et répondait `LOAD_FAILED`, sans que rien ne dise que l'adresse était en
+     * cause. On cherche donc l'interface dont le réseau contient le récepteur :
+     * elle est joignable par construction.
      *
-     * On laisse le **système** trancher : un socket UDP « connecté » vers la
-     * destination ne fait aucun paquet, mais oblige le noyau à choisir la route,
-     * donc l'interface, donc l'adresse source. C'est celle-là, et pas une autre,
-     * que le récepteur verra. Sans destination connue, on vise une adresse
-     * publique — ce qui rend l'interface par défaut, la bonne dans la quasi-
-     * totalité des cas.
+     * Rend null plutôt que la boucle locale — voir [hote] : mieux vaut une
+     * diffusion qui échoue franchement qu'une URL que personne ne peut suivre.
      */
-    private fun adresseLocale(): String? = runCatching {
+    private fun adresseLocale(): String? = parLaRoute() ?: parLeSousReseau()
+
+    /** Le noyau choisit l'interface ; on lui demande laquelle. */
+    private fun parLaRoute(): String? = runCatching {
         java.net.DatagramSocket().use { sonde ->
             sonde.connect(java.net.InetAddress.getByName(versHote ?: "8.8.8.8"), 9)
-            (sonde.localAddress as? java.net.Inet4Address)
+            sonde.localAddress
+                ?.takeIf { it is java.net.Inet4Address && !it.isAnyLocalAddress && !it.isLoopbackAddress }
                 ?.hostAddress
-                ?.takeIf { it != "0.0.0.0" }
         }
     }.getOrNull()
+
+    /**
+     * L'interface dont le réseau contient le récepteur.
+     *
+     * On compare les adresses masquées par la longueur de préfixe annoncée par
+     * l'interface : c'est ce qui distingue le Wi-Fi du salon d'un pont Docker ou
+     * d'un VPN, sans avoir à les nommer.
+     */
+    private fun parLeSousReseau(): String? = runCatching {
+        val cible = versHote?.let { java.net.InetAddress.getByName(it) } as? java.net.Inet4Address
+        val interfaces = java.net.NetworkInterface.getNetworkInterfaces().toList()
+            .filter { it.isUp && !it.isLoopback }
+
+        interfaces.forEach { face ->
+            face.interfaceAddresses.forEach { adr ->
+                val locale = adr.address as? java.net.Inet4Address ?: return@forEach
+                if (cible != null && memeReseau(locale, cible, adr.networkPrefixLength.toInt())) {
+                    return@runCatching locale.hostAddress
+                }
+            }
+        }
+        // Sans récepteur connu, la moins mauvaise réponse reste une adresse
+        // privée quelconque — mais jamais la boucle locale.
+        interfaces.asSequence()
+            .flatMap { it.inetAddresses.toList().asSequence() }
+            .filterIsInstance<java.net.Inet4Address>()
+            .firstOrNull { it.isSiteLocalAddress && !it.isLoopbackAddress }
+            ?.hostAddress
+    }.getOrNull()
+
+    private fun memeReseau(a: java.net.Inet4Address, b: java.net.Inet4Address, prefixe: Int): Boolean {
+        if (prefixe !in 1..32) return false
+        val masque = (-1 shl (32 - prefixe))
+        fun entier(adr: java.net.Inet4Address) =
+            adr.address.fold(0) { acc, octet -> (acc shl 8) or (octet.toInt() and 0xFF) }
+        return (entier(a) and masque) == (entier(b) and masque)
+    }
 
     private fun isPlaylist(url: String, contentType: String?): Boolean =
         contentType?.contains("mpegurl", ignoreCase = true) == true ||

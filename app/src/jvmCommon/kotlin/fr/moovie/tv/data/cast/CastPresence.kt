@@ -35,6 +35,17 @@ object CastPresence {
     /** Ce qu'on a trouvé au dernier balayage concluant. */
     val devices: StateFlow<List<CastDevice>> = _devices.asStateFlow()
 
+    private val _moovieHosts = MutableStateFlow<Set<String>>(emptySet())
+
+    /**
+     * Adresses qui annoncent **Moo-vie** sur le réseau, appairées ou non.
+     *
+     * Beaucoup d'Android TV répondent aussi au protocole Cast : sans cette
+     * liste, une box qui fait tourner Moo-vie apparaîtrait comme un Chromecast,
+     * par un chemin qui échoue chez elle. Voir `castTargetsFor`.
+     */
+    val moovieHosts: StateFlow<Set<String>> = _moovieHosts.asStateFlow()
+
     private val balayage = Mutex()
     private var muets = 0
 
@@ -43,6 +54,15 @@ object CastPresence {
      * ce qui est une réponse.
      */
     suspend fun refresh(timeoutMs: Long = 4_000) = balayage.withLock {
+        // Les deux annonces dans le même balayage : ce sont deux services mDNS,
+        // et les chercher séparément doublerait le réveil de la radio.
+        runCatching { fr.moovie.tv.data.remote.RemoteBeacons.discover(timeoutMs) }
+            .getOrDefault(emptyList())
+            .map { it.host }
+            .toSet()
+            .takeIf { it.isNotEmpty() }
+            ?.let { _moovieHosts.value = it }
+
         val trouves = runCatching { CastDiscovery.discover(timeoutMs) }.getOrDefault(emptyList())
         if (trouves.isNotEmpty()) {
             muets = 0
@@ -57,6 +77,7 @@ object CastPresence {
     fun forget() {
         muets = 0
         _devices.value = emptyList()
+        _moovieHosts.value = emptySet()
     }
 
     /**
