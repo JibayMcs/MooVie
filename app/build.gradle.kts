@@ -16,7 +16,7 @@ plugins {
 //
 // Un suffixe semver — « -rc.1 » — désigne une préversion : le tag correspondant
 // sort en pré-release GitHub et reste invisible pour les updaters intégrés.
-val appVersion = "1.22.0"
+val appVersion = "1.22.1-rc.1"
 
 /**
  * La même version, telle que **jpackage** l'accepte : purement numérique.
@@ -186,7 +186,7 @@ android {
         applicationId = "fr.moovie.tv"
         minSdk = 23
         targetSdk = 34
-        versionCode = 83
+        versionCode = 84
         versionName = appVersion
         buildConfigField("String", "OPENSUBTITLES_API_KEY", "\"$openSubtitlesApiKey\"")
     }
@@ -246,6 +246,9 @@ tasks.withType<Test>().configureEach {
         "moovie.probe.hold",
         // Adresse du récepteur Cast à éprouver — voir CastEndToEndProbeTest.
         "moovie.cast.host", "moovie.cast.trace",
+        // Autorise la sonde de volume à *écrire* sur l'appareil, et pas
+        // seulement à le lire — voir CastVolumeProbeTest.
+        "moovie.cast.volume",
     ).forEach { key ->
         System.getProperty(key)?.let { systemProperty(key, it) }
     }
