@@ -1,5 +1,7 @@
 package fr.moovie.tv.desktop
 
+import fr.moovie.tv.data.net.LocalStreamProxy
+
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable

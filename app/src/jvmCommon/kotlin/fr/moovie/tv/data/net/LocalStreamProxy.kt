@@ -1,4 +1,4 @@
-package fr.moovie.tv.desktop
+package fr.moovie.tv.data.net
 
 import fr.moovie.tv.data.sources.ExtractorRegistry
 import okhttp3.Request
@@ -59,9 +59,48 @@ internal class LocalStreamProxy(
      * de quelques secondes n'a rien à y gagner.
      */
     private val borneLesPlages: Boolean = false,
+    /**
+     * Ouvre l'écoute au **réseau local** au lieu de la seule boucle locale.
+     *
+     * Un Chromecast n'est pas dans notre processus : il lui faut une URL qu'il
+     * puisse joindre depuis le Wi-Fi. C'est le seul cas où on sort de la boucle,
+     * et il ne se prend pas à la légère — voir [jeton].
+     *
+     * Faux partout ailleurs : le lecteur local, lui, n'a aucune raison d'être
+     * joignable par le voisin.
+     */
+    private val ouvertAuReseau: Boolean = false,
+    /**
+     * Adresse du récepteur visé, quand on la connaît.
+     *
+     * Elle ne sert qu'à choisir la **bonne interface** — voir [adresseLocale].
+     * Nulle, on vise l'interface par défaut, ce qui suffit tant qu'il n'y a pas
+     * de VPN ni de second réseau.
+     */
+    private val versHote: String? = null,
 ) {
 
-    private val server = ServerSocket(0, 8, InetAddress.getByName("127.0.0.1"))
+    /**
+     * Jeton de session, dans le chemin de chaque URL servie.
+     *
+     * **C'est ce qui rend [ouvertAuReseau] acceptable.** L'adressage du relais
+     * est `/u/<url absolue en base64>` : sans garde, l'ouvrir au Wi-Fi ferait de
+     * l'appareil un **proxy ouvert**, que n'importe qui sur le réseau pourrait
+     * faire pointer où il veut — y compris vers un service interne que lui ne
+     * joint pas. Le jeton ne protège pas le flux, qui n'a rien de secret ; il
+     * empêche qu'on se serve du relais comme d'un rebond.
+     *
+     * Tiré au montage, jamais persisté : il meurt avec la lecture.
+     */
+    private val jeton: String =
+        java.math.BigInteger(96, java.security.SecureRandom()).toString(36)
+
+    private val server = ServerSocket(
+        0,
+        8,
+        // `null` fait écouter sur toutes les interfaces ; sinon la boucle seule.
+        if (ouvertAuReseau) null else InetAddress.getByName("127.0.0.1"),
+    )
 
     /**
      * Un fil par connexion. libVLC en ouvre plusieurs de front — la playlist,
@@ -84,8 +123,26 @@ internal class LocalStreamProxy(
         }
     }
 
-    /** URL locale à donner au lecteur à la place de [url]. */
-    fun localUrl(url: String): String = "http://127.0.0.1:${server.localPort}${localPath(url)}"
+    /**
+     * URL à donner au lecteur à la place de [url].
+     *
+     * En boucle locale c'est `127.0.0.1` ; ouvert au réseau, c'est l'adresse de
+     * l'appareil sur le Wi-Fi — un Chromecast ne saurait rien faire de
+     * `localhost`, qui désignerait le Chromecast lui-même.
+     */
+    fun localUrl(url: String): String =
+        "http://${hote()}:${server.localPort}${localPath(url)}"
+
+    /** Adresse joignable par le lecteur visé. */
+    private fun hote(): String {
+        if (!ouvertAuReseau) return "127.0.0.1"
+        // **Jamais de repli silencieux sur la boucle locale.** L'annoncer à un
+        // récepteur distant lui désigne lui-même : il ne trouve rien, et le
+        // symptôme — `LOAD_FAILED` — ne dit rien de l'adresse. Une exception
+        // remonte au moins jusqu'à l'écran, qui sait dire que ça n'a pas pris.
+        return adresseLocale()
+            ?: error("aucune adresse de réseau local : impossible de servir un récepteur distant")
+    }
 
     fun shutdown() {
         running = false
@@ -94,7 +151,7 @@ internal class LocalStreamProxy(
     }
 
     private fun localPath(url: String): String =
-        "/u/" + Base64.getUrlEncoder().withoutPadding().encodeToString(url.toByteArray())
+        "/$jeton/u/" + Base64.getUrlEncoder().withoutPadding().encodeToString(url.toByteArray())
 
     private fun serve(socket: Socket) {
         val input = socket.getInputStream().bufferedReader()
@@ -114,6 +171,16 @@ internal class LocalStreamProxy(
         }
 
         val output = BufferedOutputStream(socket.getOutputStream())
+
+        // `Range` n'est pas un en-tête « simple » : le récepteur envoie un
+        // préflight avant chaque segment. Y répondre ne coûte rien ; ne pas y
+        // répondre annule la requête qui suit, sans trace.
+        if (method.equals("OPTIONS", ignoreCase = true)) {
+            writeHead(output, 204, "No Content", "text/plain", 0L, null)
+            output.flush()
+            return
+        }
+
         val target = decodeTarget(path)
         if (target == null) {
             respondStatus(output, 404, "Not Found")
@@ -366,10 +433,88 @@ internal class LocalStreamProxy(
         return debut to fin
     }
 
+    /**
+     * Extrait l'URL visée, **et refuse tout ce qui ne porte pas le jeton**.
+     *
+     * C'est le seul contrôle d'accès du relais, et il suffit à sa raison d'être :
+     * empêcher qu'un tiers du réseau s'en serve comme rebond. Voir [jeton].
+     */
     private fun decodeTarget(path: String): String? {
-        if (!path.startsWith("/u/")) return null
-        val encoded = path.removePrefix("/u/")
+        val prefixe = "/$jeton/u/"
+        if (!path.startsWith(prefixe)) return null
+        val encoded = path.removePrefix(prefixe)
         return runCatching { String(Base64.getUrlDecoder().decode(encoded)) }.getOrNull()
+    }
+
+    /**
+     * Adresse de cet appareil **par laquelle le récepteur nous joindra**.
+     *
+     * ## Deux méthodes, parce qu'une seule ment
+     *
+     * **La route d'abord.** Un socket UDP « connecté » n'émet aucun paquet mais
+     * oblige le noyau à choisir la route, donc l'interface, donc l'adresse
+     * source. C'est la bonne réponse quand elle vient — mesuré sur le poste de
+     * développement, où parcourir les interfaces désignait un pont Docker parmi
+     * quatre candidates.
+     *
+     * **Le sous-réseau ensuite.** Sur Android, `localAddress` ne rend pas une
+     * `Inet4Address` et la première méthode échoue. Le repli d'alors était la
+     * boucle locale : on annonçait `127.0.0.1` à un Chromecast, pour qui cette
+     * adresse désigne **lui-même**. Il ne frappait jamais à la porte du relais
+     * et répondait `LOAD_FAILED`, sans que rien ne dise que l'adresse était en
+     * cause. On cherche donc l'interface dont le réseau contient le récepteur :
+     * elle est joignable par construction.
+     *
+     * Rend null plutôt que la boucle locale — voir [hote] : mieux vaut une
+     * diffusion qui échoue franchement qu'une URL que personne ne peut suivre.
+     */
+    private fun adresseLocale(): String? = parLaRoute() ?: parLeSousReseau()
+
+    /** Le noyau choisit l'interface ; on lui demande laquelle. */
+    private fun parLaRoute(): String? = runCatching {
+        java.net.DatagramSocket().use { sonde ->
+            sonde.connect(java.net.InetAddress.getByName(versHote ?: "8.8.8.8"), 9)
+            sonde.localAddress
+                ?.takeIf { it is java.net.Inet4Address && !it.isAnyLocalAddress && !it.isLoopbackAddress }
+                ?.hostAddress
+        }
+    }.getOrNull()
+
+    /**
+     * L'interface dont le réseau contient le récepteur.
+     *
+     * On compare les adresses masquées par la longueur de préfixe annoncée par
+     * l'interface : c'est ce qui distingue le Wi-Fi du salon d'un pont Docker ou
+     * d'un VPN, sans avoir à les nommer.
+     */
+    private fun parLeSousReseau(): String? = runCatching {
+        val cible = versHote?.let { java.net.InetAddress.getByName(it) } as? java.net.Inet4Address
+        val interfaces = java.net.NetworkInterface.getNetworkInterfaces().toList()
+            .filter { it.isUp && !it.isLoopback }
+
+        interfaces.forEach { face ->
+            face.interfaceAddresses.forEach { adr ->
+                val locale = adr.address as? java.net.Inet4Address ?: return@forEach
+                if (cible != null && memeReseau(locale, cible, adr.networkPrefixLength.toInt())) {
+                    return@runCatching locale.hostAddress
+                }
+            }
+        }
+        // Sans récepteur connu, la moins mauvaise réponse reste une adresse
+        // privée quelconque — mais jamais la boucle locale.
+        interfaces.asSequence()
+            .flatMap { it.inetAddresses.toList().asSequence() }
+            .filterIsInstance<java.net.Inet4Address>()
+            .firstOrNull { it.isSiteLocalAddress && !it.isLoopbackAddress }
+            ?.hostAddress
+    }.getOrNull()
+
+    private fun memeReseau(a: java.net.Inet4Address, b: java.net.Inet4Address, prefixe: Int): Boolean {
+        if (prefixe !in 1..32) return false
+        val masque = (-1 shl (32 - prefixe))
+        fun entier(adr: java.net.Inet4Address) =
+            adr.address.fold(0) { acc, octet -> (acc shl 8) or (octet.toInt() and 0xFF) }
+        return (entier(a) and masque) == (entier(b) and masque)
     }
 
     private fun isPlaylist(url: String, contentType: String?): Boolean =
@@ -417,6 +562,22 @@ internal class LocalStreamProxy(
             contentLength?.let { append("Content-Length: $it\r\n") }
             contentRange?.let { append("Content-Range: $it\r\n") }
             append("Accept-Ranges: bytes\r\n")
+            // **CORS, et seulement quand on sert quelqu'un d'autre.**
+            //
+            // Le récepteur Cast par défaut est une page web : il lit une
+            // playlist HLS en XHR, donc le navigateur exige l'autorisation
+            // d'origine. Sans elle, le récepteur répond `LOAD_FAILED` puis
+            // `idleReason: "ERROR"` — mesuré — sans jamais dire que c'est le
+            // CORS qui manque. Le lecteur local, lui, n'en a que faire ; on ne
+            // les pose donc pas en boucle locale.
+            if (ouvertAuReseau) {
+                append("Access-Control-Allow-Origin: *\r\n")
+                append("Access-Control-Allow-Methods: GET, HEAD, OPTIONS\r\n")
+                append("Access-Control-Allow-Headers: *\r\n")
+                // Sans exposition, le lecteur ne voit ni la longueur ni la
+                // plage servie : il ne sait plus où il en est dans le fichier.
+                append("Access-Control-Expose-Headers: Content-Length, Content-Range, Accept-Ranges\r\n")
+            }
             // Une connexion par requête : libVLC en ouvre autant qu'il veut, et
             // la gestion du maintien en vie n'apporterait rien en local.
             append("Connection: close\r\n\r\n")
