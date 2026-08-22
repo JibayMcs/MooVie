@@ -117,6 +117,98 @@ class CastStatusTest {
         assertNull(parseMediaStatus(objet("""{"type":"PONG"}""")))
     }
 
+    // ── Lire le son ──────────────────────────────────────────────────────────
+
+    @Test
+    fun `un statut de recepteur donne le niveau, la coupure et le pas`() {
+        val statut = objet(
+            """
+            {"type":"RECEIVER_STATUS","status":{
+              "volume":{"controlType":"attenuation","level":0.42,"muted":false,"stepInterval":0.05}
+            }}
+            """.trimIndent(),
+        )
+
+        val lu = parseReceiverVolume(statut)
+
+        assertEquals(0.42, lu?.level)
+        assertEquals(false, lu?.muted)
+        assertEquals(0.05, lu?.step)
+        assertTrue(lu?.reglable == true)
+    }
+
+    /**
+     * **Le test qui compte.** Un Chromecast branché en HDMI sur un téléviseur qui
+     * garde la main sur son volume annonce `controlType: "fixed"` : il **accepte**
+     * l'ordre et n'en fait rien. Sans cette lecture, l'écran afficherait un
+     * curseur qui bouge sous le doigt et ne change rien au son — soit exactement
+     * l'apparence d'une panne de l'application, alors que l'appareil a raison.
+     *
+     * Pire, on détournerait au passage les touches physiques du téléphone : le
+     * volume serait confisqué pour ne rien produire.
+     */
+    @Test
+    fun `un recepteur a volume fixe ne se laisse pas regler`() {
+        val fixe = objet(
+            """{"status":{"volume":{"controlType":"fixed","level":1.0,"muted":false}}}""",
+        )
+
+        assertEquals(false, parseReceiverVolume(fixe)?.reglable)
+    }
+
+    /**
+     * `master` est le cas courant d'une sortie HDMI qui pilote le téléviseur par
+     * CEC : le niveau part bien. Le confondre avec `fixed` priverait du curseur
+     * la configuration la plus répandue.
+     */
+    @Test
+    fun `un volume maitre se regle`() {
+        val maitre = objet("""{"status":{"volume":{"controlType":"master","level":0.3}}}""")
+
+        assertEquals(true, parseReceiverVolume(maitre)?.reglable)
+    }
+
+    /**
+     * Le récepteur émet des `RECEIVER_STATUS` pour d'autres raisons que le son —
+     * une application qui se lance — et ceux-là ne réénoncent ni le pas ni le
+     * type de contrôle. Les perdre ferait ralentir les touches physiques en cours
+     * de route, ou escamoterait le curseur, sans que rien ne l'explique.
+     */
+    @Test
+    fun `un statut partiel garde le pas et le type de controle connus`() {
+        val connu = CastVolume(level = 0.4, muted = false, reglable = false, step = 0.02)
+        val partiel = objet("""{"status":{"volume":{"level":0.6}}}""")
+
+        val lu = parseReceiverVolume(partiel, precedent = connu)
+
+        assertEquals(0.6, lu?.level)
+        assertEquals(0.02, lu?.step, "le pas connu a été perdu")
+        assertEquals(false, lu?.reglable, "le type de contrôle connu a été perdu")
+    }
+
+    /** Un message qui ne parle pas du son ne doit pas en effacer ce qu'on sait. */
+    @Test
+    fun `un statut sans volume ne produit rien`() {
+        assertNull(parseReceiverVolume(objet("""{"status":{"applications":[]}}""")))
+        assertNull(parseReceiverVolume(objet("""{"type":"PONG"}""")))
+    }
+
+    /** Un niveau hors bornes viendrait fausser la barre, qui se dessine en fraction. */
+    @Test
+    fun `un niveau aberrant est ramene entre zero et un`() {
+        assertEquals(1.0, parseReceiverVolume(objet("""{"status":{"volume":{"level":3.5}}}"""))?.level)
+        assertEquals(0.0, parseReceiverVolume(objet("""{"status":{"volume":{"level":-1.0}}}"""))?.level)
+    }
+
+    /** Sans pas déclaré, celui par défaut traverse l'échelle en vingt appuis. */
+    @Test
+    fun `sans pas declare on retombe sur un pas praticable`() {
+        val sansPas = objet("""{"status":{"volume":{"level":0.5}}}""")
+
+        assertEquals(PAS_VOLUME_DEFAUT, parseReceiverVolume(sansPas)?.step)
+        assertTrue(PAS_VOLUME_DEFAUT in 0.02..0.1, "un pas hors de cette plage se sentirait")
+    }
+
     // ── Le type de contenu ───────────────────────────────────────────────────
 
     /**

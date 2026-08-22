@@ -41,6 +41,9 @@ class CastSession(private val device: CastDevice) {
     val status: StateFlow<CastStatus> get() = client.status
     val connecte: StateFlow<Boolean> get() = client.connecte
 
+    /** Le son de l'appareil, qu'on le règle d'ici ou avec la télécommande de la télé. */
+    val volume: StateFlow<CastVolume> get() = client.volume
+
     /**
      * Ouvre la session et charge le flux. Rend faux si le récepteur n'a pas pris.
      *
@@ -86,6 +89,10 @@ class CastSession(private val device: CastDevice) {
     suspend fun playPause() = client.playPause()
 
     suspend fun seek(positionMs: Long) = client.seek(positionMs)
+
+    suspend fun setVolume(level: Double) = client.setVolume(level)
+
+    suspend fun setMuted(muted: Boolean) = client.setMuted(muted)
 
     /**
      * Arrête la lecture **et** coupe le relais.

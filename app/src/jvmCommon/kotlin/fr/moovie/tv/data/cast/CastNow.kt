@@ -1,8 +1,12 @@
 package fr.moovie.tv.data.cast
 
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
 /** Ce qu'on diffuse, et vers quoi. Null quand rien ne part d'ici. */
 data class CastPlayback(
@@ -65,4 +69,37 @@ object CastNow {
         courante = null
         _playback.value = null
     }
+
+    /**
+     * Rend l'écran au récepteur **et** ferme tout — ce que fait un utilisateur
+     * qui quitte la diffusion, par le bouton comme par le retour.
+     *
+     * ## Pourquoi ce n'est pas une fonction `suspend`
+     *
+     * L'appelant est un écran qui s'en va. Lancer le `STOP` sur le scope de la
+     * composition (`rememberCoroutineScope`) le ferait annuler à l'instant où
+     * l'écran quitte la composition, c'est-à-dire **avant que la trame soit
+     * écrite sur la socket** : le téléphone rangerait sa session pendant que la
+     * télé continue d'afficher le film. Le même piège que `CastClient.close`,
+     * qui a déjà coûté une mise au point entière.
+     *
+     * L'état visible tombe donc tout de suite — l'écran part sans attendre — et
+     * la politesse envers le récepteur se poursuit sur un scope qui, lui, ne
+     * dépend d'aucune composition.
+     */
+    fun stopAndClear() {
+        val partante = courante ?: return
+        courante = null
+        _playback.value = null
+        scope.launch {
+            runCatching { partante.stopPlayback() }
+            // `stopPlayback` ferme déjà le relais ; ce filet ne sert qu'au cas où
+            // le STOP échoue avant, faute de quoi le relais survivrait à servir
+            // des octets que plus personne ne demande.
+            runCatching { partante.stop() }
+        }
+    }
+
+    /** Survit à la composition : voir [stopAndClear]. */
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 }

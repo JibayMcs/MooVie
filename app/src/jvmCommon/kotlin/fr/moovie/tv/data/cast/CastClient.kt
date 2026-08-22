@@ -75,6 +75,18 @@ class CastClient(private val host: String) {
     private val _connecte = MutableStateFlow(false)
     val connecte: StateFlow<Boolean> = _connecte.asStateFlow()
 
+    /**
+     * Le son du récepteur, à part du reste.
+     *
+     * Il ne vient **pas** du même message que la lecture : le volume est une
+     * affaire de récepteur (`RECEIVER_STATUS`), la position une affaire de média
+     * (`MEDIA_STATUS`). Les mêler dans un seul état ferait qu'un message de l'un
+     * écrase ce que l'autre avait dit, ce qui est exactement le défaut que
+     * [parseMediaStatus] documente déjà pour la durée.
+     */
+    private val _volume = MutableStateFlow(CastVolume())
+    val volume: StateFlow<CastVolume> = _volume.asStateFlow()
+
     /** Réponses attendues, par `requestId`. */
     private val attentes = java.util.concurrent.ConcurrentHashMap<Int, (JsonObject) -> Unit>()
 
@@ -98,6 +110,11 @@ class CastClient(private val host: String) {
             envoie(CAST_NS_CONNECTION, DESTINATION_RECEIVER, buildJsonObject { put("type", "CONNECT") })
             scope.launch { boucleDeLecture(DataInputStream(s.inputStream)) }
             scope.launch { battement() }
+            // Le volume ne se devine pas. Sans cette demande, l'écran l'affiche
+            // au maximum jusqu'au premier `RECEIVER_STATUS` — c'est-à-dire
+            // jusqu'au LAUNCH — et un curseur qui saute une seconde après
+            // l'ouverture se lit comme un réglage qui a bougé tout seul.
+            scope.launch { refreshStatus() }
             true
         }.getOrElse {
             close()
@@ -255,6 +272,77 @@ class CastClient(private val host: String) {
         )
     }
 
+    /**
+     * Demande l'état du récepteur — volume compris — **sans rien lancer**.
+     *
+     * C'est la seule requête du protocole qui ne change rien à l'appareil : elle
+     * ne réveille pas l'écran, n'interrompt pas ce qui joue, ne prend la main sur
+     * rien. Ce qui en fait aussi la sonde à préférer quand on veut savoir ce
+     * qu'un vrai Chromecast raconte sans lui imposer quoi que ce soit.
+     */
+    suspend fun refreshStatus() {
+        envoie(
+            CAST_NS_RECEIVER,
+            DESTINATION_RECEIVER,
+            buildJsonObject {
+                put("type", "GET_STATUS")
+                put("requestId", prochainId.getAndIncrement())
+            },
+        )
+    }
+
+    /**
+     * Règle le niveau du récepteur, entre 0 et 1.
+     *
+     * ## Deux choix qui se voient à l'usage
+     *
+     * **Le canal est celui du récepteur, pas du média.** Le volume appartient à
+     * l'appareil : il survit au film, et un `transportId` n'est pas requis — ce
+     * qui permet de le régler avant même qu'un média soit chargé.
+     *
+     * **On démute en même temps.** Monter le son d'un récepteur coupé ne produit
+     * rien d'audible : on tirerait le curseur en n'entendant toujours rien, et
+     * l'appareil aurait pourtant obéi. Les deux champs partent donc ensemble.
+     *
+     * L'état local est mis à jour sans attendre la confirmation. Le récepteur
+     * répond par un `RECEIVER_STATUS` qui prend son temps, et un curseur qui
+     * attendrait ce retour paraîtrait collé — le même parti que la position dans
+     * [CastPlayerScreen][fr.moovie.tv.ui.remote.CastPlayerScreen].
+     */
+    suspend fun setVolume(level: Double) {
+        val borne = level.coerceIn(0.0, 1.0)
+        _volume.value = _volume.value.copy(level = borne, muted = false)
+        envoie(
+            CAST_NS_RECEIVER,
+            DESTINATION_RECEIVER,
+            buildJsonObject {
+                put("type", "SET_VOLUME")
+                put(
+                    "volume",
+                    buildJsonObject {
+                        put("level", borne)
+                        put("muted", false)
+                    },
+                )
+                put("requestId", prochainId.getAndIncrement())
+            },
+        )
+    }
+
+    /** Coupe ou rétablit le son, **sans toucher au niveau** : il sera retrouvé tel quel. */
+    suspend fun setMuted(muted: Boolean) {
+        _volume.value = _volume.value.copy(muted = muted)
+        envoie(
+            CAST_NS_RECEIVER,
+            DESTINATION_RECEIVER,
+            buildJsonObject {
+                put("type", "SET_VOLUME")
+                put("volume", buildJsonObject { put("muted", muted) })
+                put("requestId", prochainId.getAndIncrement())
+            },
+        )
+    }
+
     /** Arrête la lecture et rend l'écran au récepteur. */
     suspend fun stop() {
         val id = transport ?: return
@@ -321,7 +409,13 @@ class CastClient(private val host: String) {
                 // Le récepteur demande la fermeture : inutile d'insister.
                 "CLOSE" -> break
                 "MEDIA_STATUS" -> misAJour(corps)
-                "RECEIVER_STATUS" -> transportDe(corps)?.let { transport = it }
+                "RECEIVER_STATUS" -> {
+                    transportDe(corps)?.let { transport = it }
+                    // Le récepteur en émet **spontanément** : c'est ce qui fait
+                    // suivre le curseur quand quelqu'un touche à la télécommande
+                    // de la télé, sans que nous ayons rien demandé.
+                    parseReceiverVolume(corps, _volume.value)?.let { _volume.value = it }
+                }
             }
         }
         close()

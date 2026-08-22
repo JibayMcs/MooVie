@@ -1,6 +1,7 @@
 package fr.moovie.tv.data.cast
 
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.jsonArray
@@ -187,6 +188,58 @@ fun parseMediaStatus(corps: JsonObject, precedent: CastStatus = CastStatus()): C
         positionMs = ((etat["currentTime"]?.jsonPrimitive?.doubleOrNull ?: 0.0) * 1000).toLong(),
         durationMs = duree?.times(1000)?.toLong()?.takeIf { it > 0 } ?: precedent.durationMs,
         mediaSessionId = session ?: precedent.mediaSessionId,
+    )
+}
+
+/**
+ * Le son du récepteur, tel qu'il l'annonce dans ses `RECEIVER_STATUS`.
+ *
+ * @param level entre 0 et 1.
+ * @param muted coupé. **Indépendant du niveau** : un récepteur muet garde le
+ *   sien, et le rétablir ne consiste donc pas à remonter le volume.
+ * @param reglable faux quand le récepteur ne laisse pas fixer son niveau —
+ *   `controlType: "fixed"`, le cas d'une sortie HDMI dont le téléviseur garde la
+ *   main. Lui envoyer un niveau ne produit alors **rien**, sans erreur : d'où
+ *   l'intérêt de le savoir avant d'afficher un curseur qui ne ferait rien.
+ * @param step le pas que l'appareil déclare (`stepInterval`), pour que les
+ *   touches physiques avancent de ce qu'il attend plutôt que d'une valeur à nous.
+ */
+data class CastVolume(
+    val level: Double = 1.0,
+    val muted: Boolean = false,
+    val reglable: Boolean = true,
+    val step: Double = PAS_VOLUME_DEFAUT,
+)
+
+/**
+ * Le pas de volume par défaut, quand le récepteur n'en déclare pas.
+ *
+ * Vingt crans du silence au maximum : c'est l'ordre de grandeur des quinze crans
+ * d'Android, donc un appui sur la bascule produit un effet comparable à ce que le
+ * geste produit d'habitude.
+ */
+const val PAS_VOLUME_DEFAUT = 0.05
+
+/**
+ * Lit le volume d'un `RECEIVER_STATUS`, ou rend null s'il n'en porte pas.
+ *
+ * Même discipline que [parseMediaStatus] : les champs absents retombent sur
+ * [precedent] au lieu d'être remis à zéro. Un `RECEIVER_STATUS` émis pour une
+ * autre raison — une application qui se lance — ne réénonce pas forcément le
+ * `stepInterval`, et le perdre ferait ralentir les touches physiques en cours de
+ * route sans que rien ne l'explique.
+ */
+fun parseReceiverVolume(corps: JsonObject, precedent: CastVolume = CastVolume()): CastVolume? {
+    val volume = corps["status"]?.jsonObject?.get("volume")?.jsonObject ?: return null
+    val controle = volume["controlType"]?.jsonPrimitive?.contentOrNull
+    return CastVolume(
+        level = volume["level"]?.jsonPrimitive?.doubleOrNull?.coerceIn(0.0, 1.0) ?: precedent.level,
+        muted = volume["muted"]?.jsonPrimitive?.booleanOrNull ?: precedent.muted,
+        // Seul « fixed » interdit de régler. « master » et « attenuation »
+        // l'autorisent tous deux, et un type qu'on ne connaît pas est présumé
+        // réglable : refuser par défaut priverait du curseur sur la foi d'un mot.
+        reglable = controle?.let { !it.equals("fixed", ignoreCase = true) } ?: precedent.reglable,
+        step = volume["stepInterval"]?.jsonPrimitive?.doubleOrNull?.takeIf { it > 0 } ?: precedent.step,
     )
 }
 
