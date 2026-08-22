@@ -1,5 +1,6 @@
 package fr.moovie.tv.data.cast
 
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -73,6 +74,44 @@ object CastPresence {
         if (muets >= OUBLIS_AVANT_ABSENCE) _devices.value = emptyList()
     }
 
+    /**
+     * Balaye en boucle, tant que l'application est au premier plan.
+     *
+     * ## Le défaut que ça corrige
+     *
+     * La veille ne tournait **que sur une fiche de titre**, à cadence fixe de
+     * vingt secondes. Trois conséquences, toutes rapportées par un utilisateur
+     * qui n'a jamais vu le bouton apparaître :
+     *
+     * - ouvrir l'application et rester ailleurs ne cherchait **rien** — ni sur
+     *   l'accueil, ni dans le lecteur, où le bouton manque justement ;
+     * - une annonce mDNS perdue — c'est du multicast, ça se perd comme tout le
+     *   reste — coûtait vingt secondes avant la tentative suivante ;
+     * - la première recherche partait au moment où la fiche s'affichait, donc
+     *   plus tard que le premier regard porté sur la barre d'actions.
+     *
+     * ## La cadence
+     *
+     * Serrée tant qu'on n'a rien, lâche dès qu'on a trouvé. Chercher est ce qui
+     * coûte : une fois le récepteur connu, on ne balaye plus que pour vérifier
+     * qu'il est toujours là, et [OUBLIS_AVANT_ABSENCE] fait qu'il faut deux
+     * échecs d'affilée pour le retirer — un appareil ne clignote donc pas.
+     */
+    suspend fun veille() {
+        var passages = 0
+        while (true) {
+            runCatching { refresh() }
+            passages++
+            delay(
+                when {
+                    _devices.value.isNotEmpty() -> RELANCE_TROUVE_MS
+                    passages < PASSAGES_SERRES -> RELANCE_SERREE_MS
+                    else -> RELANCE_LARGE_MS
+                },
+            )
+        }
+    }
+
     /** Vide la liste sans attendre — à l'oubli d'un réseau, par exemple. */
     fun forget() {
         muets = 0
@@ -85,4 +124,22 @@ object CastPresence {
      * se perd comme n'importe quel paquet.
      */
     private const val OUBLIS_AVANT_ABSENCE = 2
+
+    /**
+     * Les premiers passages s'enchaînent presque sans pause : un balayage dure
+     * déjà quatre secondes, et c'est pendant les premières secondes après
+     * l'ouverture qu'on veut que le bouton apparaisse.
+     */
+    private const val PASSAGES_SERRES = 3
+    private const val RELANCE_SERREE_MS = 2_000L
+
+    /** Rien trouvé après les passages serrés : on ralentit sans abandonner. */
+    private const val RELANCE_LARGE_MS = 20_000L
+
+    /**
+     * Un récepteur est connu : on ne balaye plus que pour vérifier qu'il est
+     * toujours là. C'est le cas de loin le plus long, donc celui qui décide de
+     * ce que la veille coûte en batterie.
+     */
+    private const val RELANCE_TROUVE_MS = 60_000L
 }

@@ -3,6 +3,7 @@ package fr.moovie.tv.data.remote
 import android.content.Context
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
+import fr.moovie.tv.data.net.NsdGate
 import fr.moovie.tv.data.store.appContext
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
@@ -60,16 +61,22 @@ actual object RemoteBeacons {
     }
 
     actual suspend fun discover(timeoutMs: Long): List<RemoteBeacon> = scanning.withLock {
+        NsdGate.balayant { balaye(timeoutMs) }
+    }
+
+    private suspend fun balaye(timeoutMs: Long): List<RemoteBeacon> {
         val manager = nsd ?: return emptyList()
         val found = mutableMapOf<String, RemoteBeacon>()
 
-        // La résolution est sérialisée à la main : sur les versions antérieures
-        // à Android 12, `resolveService` ne supporte pas deux appels
-        // simultanés et rend FAILURE_ALREADY_ACTIVE sur le second. Deux
-        // téléviseurs sur le réseau suffisaient à en perdre un.
-        val resolveLock = Mutex()
-
-        suspend fun resolve(info: NsdServiceInfo) = resolveLock.withLock {
+        // La résolution est sérialisée : sur les versions antérieures à Android
+        // 12, `resolveService` ne supporte pas deux appels simultanés et rend
+        // FAILURE_ALREADY_ACTIVE sur le second. Deux téléviseurs sur le réseau
+        // suffisaient à en perdre un.
+        //
+        // Le verrou est **celui de [NsdGate]**, partagé avec la découverte des
+        // Chromecast : un verrou par objet rendait chacun correct isolément et
+        // les deux faux ensemble, les deux balayages tournant en même temps.
+        suspend fun resolve(info: NsdServiceInfo) = NsdGate.resolvant {
             val done = CompletableDeferred<RemoteBeacon?>()
             val listener = object : NsdManager.ResolveListener {
                 override fun onResolveFailed(info: NsdServiceInfo, code: Int) {

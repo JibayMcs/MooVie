@@ -15,5 +15,11 @@ package fr.moovie.tv.data.cast
  * casse rien.
  */
 actual object CastDiscovery {
-    actual suspend fun discover(timeoutMs: Long): List<CastDevice> = emptyList()
+    actual suspend fun discover(timeoutMs: Long): List<CastDevice> {
+        // Se déclarer non supporté plutôt que muet : les réglages disent alors
+        // « pas encore sur cet appareil » au lieu de « aucun récepteur trouvé »,
+        // qui enverrait chercher une panne de réseau qui n'existe pas.
+        CastScan.rapporte(demarre = false, annonces = 0, resolus = 0, supporte = false)
+        return emptyList()
+    }
 }

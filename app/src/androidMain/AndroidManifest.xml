@@ -3,6 +3,13 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!--
+        mDNS est du multicast, et beaucoup de puces Wi-Fi le filtrent en veille.
+        Sans ce droit, `MulticastLock` ne peut pas lever le filtre et la
+        découverte des Chromecast échoue en silence sur les appareils dont le
+        constructeur serre l'économie d'énergie. Voir NsdGate.
+    -->
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
     <!-- Lecture : garde le CPU/Wi-Fi éveillés (setWakeMode) pendant le streaming -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- Retour haptique de la télécommande virtuelle. Permission de niveau
