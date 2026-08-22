@@ -78,6 +78,14 @@ import fr.moovie.tv.data.settings.ScreensaverDelay
 import fr.moovie.tv.data.settings.StreamLanguage
 import fr.moovie.tv.data.settings.UpdateInterval
 import fr.moovie.tv.resources.Res
+import fr.moovie.tv.resources.cast_scan_action
+import fr.moovie.tv.resources.cast_scan_label
+import fr.moovie.tv.resources.cast_scan_never
+import fr.moovie.tv.resources.cast_scan_refused
+import fr.moovie.tv.resources.cast_scan_running
+import fr.moovie.tv.resources.cast_scan_silent
+import fr.moovie.tv.resources.cast_scan_unreachable
+import fr.moovie.tv.resources.cast_scan_unsupported
 import fr.moovie.tv.resources.common_back
 import fr.moovie.tv.resources.common_disabled
 import fr.moovie.tv.resources.common_enabled
@@ -174,6 +182,9 @@ import fr.moovie.tv.resources.pairing_scan
 import androidx.compose.material.icons.filled.SettingsRemote
 import androidx.compose.runtime.rememberCoroutineScope
 import fr.moovie.tv.data.pairing.PairingSession
+import fr.moovie.tv.data.cast.CastPresence
+import fr.moovie.tv.data.cast.CastScan
+import fr.moovie.tv.data.cast.CastScanVerdict
 import fr.moovie.tv.data.remote.RemotePresence
 import fr.moovie.tv.data.remote.RemoteTargetRepository
 import fr.moovie.tv.data.remote.parseRemoteLink
@@ -943,6 +954,60 @@ private fun RemoteSection(onPair: () -> Unit) {
             color = Color(0xFF9A9A9A),
         )
         RemoteLinkRow()
+    }
+
+    CastDiagnosticRow()
+}
+
+/**
+ * Ce que la recherche de Chromecast a donné, en toutes lettres.
+ *
+ * ## Pourquoi cette ligne existe
+ *
+ * Un utilisateur a signalé que le bouton de diffusion n'apparaissait **jamais**
+ * chez lui, sur le même Wi-Fi que son Chromecast. Rien dans l'application ne
+ * permettait de dire pourquoi : le bouton est absent quand la liste est vide, et
+ * la liste est vide aussi bien parce qu'il n'y a rien que parce que la recherche
+ * a échoué. Trois causes très différentes, un seul symptôme.
+ *
+ * [CastScanReport] les distingue ; cette ligne les affiche. Elle transforme un
+ * « ça ne marche pas » en une phrase exploitable — et le bouton force un
+ * balayage sans attendre la cadence de veille.
+ *
+ * C'est la même réponse que les sondes de couverture apportent aux catalogues :
+ * un échec silencieux est indistinguable d'un succès sans résultat, tant que
+ * personne ne compte.
+ */
+@Composable
+private fun CastDiagnosticRow() {
+    val scope = rememberCoroutineScope()
+    val rapport by CastScan.dernier.collectAsState()
+    val appareils by CastPresence.devices.collectAsState()
+    var encours by remember { mutableStateOf(false) }
+
+    val aide = when (rapport.verdict) {
+        CastScanVerdict.NON_SUPPORTE -> stringResource(Res.string.cast_scan_unsupported)
+        CastScanVerdict.JAMAIS -> stringResource(Res.string.cast_scan_never)
+        CastScanVerdict.TROUVE -> appareils.joinToString(", ") { it.name }
+        CastScanVerdict.RESEAU_MUET -> stringResource(Res.string.cast_scan_silent)
+        CastScanVerdict.RESOLUTION -> stringResource(Res.string.cast_scan_unreachable)
+        CastScanVerdict.PILE_REFUSE -> stringResource(Res.string.cast_scan_refused)
+    }
+
+    SettingRow(
+        label = stringResource(Res.string.cast_scan_label),
+        help = if (encours) stringResource(Res.string.cast_scan_running) else aide,
+    ) {
+        MoovieButton(
+            enabled = !encours,
+            onClick = {
+                scope.launch {
+                    encours = true
+                    runCatching { CastPresence.refresh() }
+                    encours = false
+                }
+            },
+        ) { Text(stringResource(Res.string.cast_scan_action)) }
     }
 }
 
