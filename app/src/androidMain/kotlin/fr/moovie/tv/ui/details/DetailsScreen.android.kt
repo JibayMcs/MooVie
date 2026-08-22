@@ -38,6 +38,7 @@ import fr.moovie.tv.data.cast.CastNow
 import fr.moovie.tv.data.cast.CastPlayback
 import fr.moovie.tv.data.cast.CastPresence
 import fr.moovie.tv.data.cast.CastSession
+import fr.moovie.tv.ui.remote.CastFailureDialog
 import fr.moovie.tv.ui.remote.CastTarget
 import fr.moovie.tv.ui.remote.castTargetsFor
 import fr.moovie.tv.ui.remote.CastTargetDialog
@@ -103,18 +104,14 @@ fun DetailsScreen(
 
     // ── Chromecast ───────────────────────────────────────────────────────────
     //
-    // La liste est tenue par [CastPresence], sondée pendant que la fiche est à
-    // l'écran : le bouton doit exister **avant** qu'on le touche, et un balayage
-    // mDNS prend quelques secondes. Lancer la recherche au moment du geste
-    // ferait attendre devant un bouton qu'on vient d'appuyer.
+    // La liste est tenue par [CastPresence], dont la veille tourne **au niveau
+    // de l'application** (MainActivity) et non ici : le bouton doit exister
+    // avant qu'on le touche, et un balayage mDNS prend quelques secondes.
+    // Chercher depuis cet écran seul faisait démarrer la recherche au moment où
+    // la fiche s'affiche, donc après le premier regard porté sur la barre — et
+    // ne cherchait rien du tout sur l'accueil ou dans le lecteur.
     val chromecasts by CastPresence.devices.collectAsStateWithLifecycle()
     val hotesMoovie by CastPresence.moovieHosts.collectAsStateWithLifecycle()
-    LaunchedEffect(Unit) {
-        while (true) {
-            runCatching { CastPresence.refresh() }
-            kotlinx.coroutines.delay(CAST_SCAN_MS)
-        }
-    }
     /** Récepteur choisi, en attente de la résolution du flux. */
     var castTo by remember { mutableStateOf<CastDevice?>(null) }
     var castEnCours by remember { mutableStateOf(false) }
@@ -283,21 +280,10 @@ fun DetailsScreen(
         }
     }
 
+    // La même modale que dans le lecteur : les deux échouent pour les mêmes
+    // raisons, et deux libellés qui divergent seraient deux libellés à tenir.
     if (castEchoue) {
-        Dialog(onDismissRequest = { castEchoue = false }) {
-            Column(
-                modifier = Modifier
-                    .clip(MoovieShape)
-                    .background(Color(0xFF1A1A1F))
-                    .padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                Text(stringResource(Res.string.cast_failed))
-                MoovieButton(onClick = { castEchoue = false }) {
-                    Text(stringResource(Res.string.common_cancel))
-                }
-            }
-        }
+        CastFailureDialog(onDismiss = { castEchoue = false })
     }
 
     // Retour : ferme d'abord le panneau des sources, puis la fiche d'épisode,
@@ -382,11 +368,3 @@ fun DetailsScreen(
     )
 }
 
-/**
- * Entre deux balayages de récepteurs Cast.
- *
- * Plus espacé que la sonde de présence Moo-vie, qui n'est qu'un ping : une
- * découverte mDNS dure plusieurs secondes et réveille la radio. Vingt secondes
- * suffisent — on ne branche pas un Chromecast pendant qu'on lit un synopsis.
- */
-private const val CAST_SCAN_MS = 20_000L

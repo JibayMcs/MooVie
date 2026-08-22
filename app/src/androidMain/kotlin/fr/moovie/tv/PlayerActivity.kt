@@ -110,6 +110,15 @@ class PlayerActivity : ComponentActivity() {
                                     )
                                 },
                                 onBack = { finish() },
+                                // La diffusion a pris : cette fenêtre n'a plus
+                                // rien à montrer, mais la refermer sèchement
+                                // ramènerait à la fiche sans dire que le film
+                                // joue sur la télé. On demande l'écran de
+                                // diffusion à MainActivity, puis on s'efface.
+                                onCastStarted = {
+                                    PlayerHost.demande(PlayerHost.Demande.Diffusion)
+                                    finish()
+                                },
                                 onPlaybackFailed = {
                                     PlayerHost.demande(PlayerHost.Demande.Echec)
                                     finish()

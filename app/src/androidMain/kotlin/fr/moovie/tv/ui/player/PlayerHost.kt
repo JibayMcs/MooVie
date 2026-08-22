@@ -67,6 +67,17 @@ object PlayerHost {
 
         /** Enchaîner : la fiche résout la source, puis relance le lecteur. */
         data class Episode(val tmdbId: Int, val saison: Int, val episode: Int) : Demande
+
+        /**
+         * La lecture est partie sur un Chromecast : montrer l'écran qui la pilote.
+         *
+         * **C'est la seule Activity qui puisse le faire.** Le lecteur détaché a
+         * une fenêtre à lui, et se contenter de la refermer laissait retomber sur
+         * la fiche — le film jouait sur la télé et rien ne le disait. La
+         * télécommande de diffusion vit dans la navigation de `MainActivity`, donc
+         * la demande doit y remonter, comme les trois autres.
+         */
+        data object Diffusion : Demande
     }
 
     // `extraBufferCapacity` plutôt qu'un canal : le lecteur émet au moment où il

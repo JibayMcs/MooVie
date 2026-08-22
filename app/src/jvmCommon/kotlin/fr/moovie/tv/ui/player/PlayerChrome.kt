@@ -28,6 +28,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Cast
 import androidx.compose.material.icons.filled.ClosedCaption
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -78,6 +79,7 @@ import fr.moovie.tv.resources.common_cancel
 import fr.moovie.tv.resources.player_audio
 import fr.moovie.tv.resources.player_next_episode
 import fr.moovie.tv.resources.player_next_in
+import fr.moovie.tv.resources.player_cast
 import fr.moovie.tv.resources.player_pause
 import fr.moovie.tv.resources.player_play
 import fr.moovie.tv.resources.player_prev_episode
@@ -161,6 +163,16 @@ fun PlayerControlBar(
      * cible inerte étant une cible de trop au D-pad.
      */
     onDownload: (() -> Unit)? = null,
+    /**
+     * Reprend la lecture en cours sur un récepteur Cast.
+     *
+     * Null quand aucun récepteur ne répond — même règle que les précédents. Ce
+     * bouton **manquait**, et son absence a été rapportée comme un défaut : on
+     * lance un film, on veut le passer sur la télé, et l'icône n'existe que sur
+     * la fiche qu'on vient de quitter. Décider de diffuser au moment où l'on
+     * regarde est le cas normal, pas l'exception.
+     */
+    onCast: (() -> Unit)? = null,
     /** Clé média, pour lire l'avancement du téléchargement sur le bouton. */
     mediaKey: String = "",
     onActivity: () -> Unit,
@@ -247,6 +259,13 @@ fun PlayerControlBar(
                     onClick = report,
                     icon = Icons.Default.MoreTime,
                     contentDescription = stringResource(Res.string.report_segment),
+                )
+            }
+            onCast?.let { diffuse ->
+                MoovieIconButton(
+                    onClick = diffuse,
+                    icon = Icons.Default.Cast,
+                    contentDescription = stringResource(Res.string.player_cast),
                 )
             }
             onDownload?.let { enqueue ->

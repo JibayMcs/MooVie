@@ -73,6 +73,16 @@
     <string name="cast_searching">Looking for the stream…</string>
     <string name="cast_failed">Casting could not start.</string>
     <string name="cast_stop">Stop casting</string>
+    <string name="cast_scan_label">Cast receiver search</string>
+    <string name="cast_scan_action">Search</string>
+    <string name="cast_scan_running">Searching…</string>
+    <string name="cast_scan_never">No search run yet.</string>
+    <string name="cast_scan_silent">No receiver answered. Check that the device is on the same Wi-Fi network, and that your router does not isolate clients from each other.</string>
+    <string name="cast_scan_unreachable">A device announced itself but could not be reached. Run the search again.</string>
+    <string name="cast_scan_refused">The system refused the network search. Restart the app, or turn Wi-Fi off and back on.</string>
+    <string name="cast_scan_unsupported">Receiver search is not available on this device yet.</string>
+    <string name="cast_mute">Mute the TV</string>
+    <string name="cast_unmute">Unmute the TV</string>
     <string name="remote_play_busy_title">The television is already watching something</string>
     <string name="remote_play_busy_body">“%1$s” is playing. Replace it with this title?</string>
     <string name="remote_play_busy_confirm">Replace</string>
@@ -133,6 +143,7 @@
     <string name="player_notification_channel">Now playing</string>
     <string name="player_speed">Playback speed</string>
     <string name="player_mute">Mute</string>
+    <string name="player_cast">Cast to a TV</string>
     <string name="player_unmute">Unmute</string>
     <string name="player_fullscreen">Fullscreen</string>
     <string name="player_fullscreen_exit">Exit fullscreen</string>

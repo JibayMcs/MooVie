@@ -75,6 +75,16 @@
     <string name="cast_searching">Recherche du flux…</string>
     <string name="cast_failed">La diffusion n'a pas pu démarrer.</string>
     <string name="cast_stop">Arrêter la diffusion</string>
+    <string name="cast_scan_label">Recherche de récepteurs Cast</string>
+    <string name="cast_scan_action">Chercher</string>
+    <string name="cast_scan_running">Recherche en cours…</string>
+    <string name="cast_scan_never">Aucune recherche menée pour l'instant.</string>
+    <string name="cast_scan_silent">Aucun récepteur n'a répondu. Vérifier que l'appareil est sur le même réseau Wi-Fi, et que le routeur n'isole pas ses clients entre eux.</string>
+    <string name="cast_scan_unreachable">Un appareil s'est annoncé mais n'a pas pu être joint. Relancer la recherche.</string>
+    <string name="cast_scan_refused">Le système a refusé la recherche réseau. Redémarrer l'application, ou couper puis rétablir le Wi-Fi.</string>
+    <string name="cast_scan_unsupported">La recherche de récepteurs n'est pas encore disponible sur cet appareil.</string>
+    <string name="cast_mute">Couper le son du téléviseur</string>
+    <string name="cast_unmute">Rétablir le son du téléviseur</string>
     <string name="remote_play_busy_title">Le téléviseur regarde déjà quelque chose</string>
     <string name="remote_play_busy_body">« %1$s » est en cours. Le remplacer par ce titre ?</string>
     <string name="remote_play_busy_confirm">Remplacer</string>
@@ -135,6 +145,7 @@
     <string name="player_notification_channel">Lecture en cours</string>
     <string name="player_speed">Vitesse de lecture</string>
     <string name="player_mute">Couper le son</string>
+    <string name="player_cast">Diffuser sur un téléviseur</string>
     <string name="player_unmute">Rétablir le son</string>
     <string name="player_fullscreen">Plein écran</string>
     <string name="player_fullscreen_exit">Quitter le plein écran</string>

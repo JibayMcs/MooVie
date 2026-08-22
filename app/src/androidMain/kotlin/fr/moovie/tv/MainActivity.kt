@@ -53,6 +53,7 @@ import kotlinx.coroutines.flow.first
 import fr.moovie.tv.data.remote.PlayRequest
 import fr.moovie.tv.ui.remote.rememberTvSender
 import fr.moovie.tv.data.cast.CastNow
+import fr.moovie.tv.data.cast.CastPresence
 import fr.moovie.tv.ui.remote.CastPlayerScreen
 import fr.moovie.tv.ui.remote.CastLaunchScreen
 import fr.moovie.tv.ui.remote.CastSessionService
@@ -315,6 +316,14 @@ class MainActivity : ComponentActivity() {
                         // ce qui décide de la forme de l'écran Télécommande.
                         val castPlayback by CastNow.playback.collectAsStateWithLifecycle()
 
+                        // **La veille Cast vit ici**, et non dans un écran. Elle
+                        // ne tournait que sur une fiche de titre : ouvrir
+                        // l'application et rester ailleurs ne cherchait aucun
+                        // récepteur, et l'icône ne pouvait donc pas apparaître là
+                        // où on l'attend — dans le lecteur, notamment. Voir
+                        // CastPresence.veille pour la cadence.
+                        LaunchedEffect(Unit) { CastPresence.veille() }
+
                         val homeSender = rememberTvSender(onSent = { nav.push(Screen.Remote) })
 
                         var everPlayed by remember { mutableStateOf(false) }
@@ -514,6 +523,13 @@ class MainActivity : ComponentActivity() {
                                             demande.saison,
                                             demande.episode,
                                         )
+                                    // La lecture continue sur un Chromecast :
+                                    // `push` et non `replace`, la pile étant
+                                    // déjà revenue sur la fiche — c'est elle
+                                    // qu'on veut retrouver en quittant la
+                                    // diffusion.
+                                    PlayerHost.Demande.Diffusion ->
+                                        nav.push(Screen.Remote)
                                     // Pas de `pop` : la pile est déjà revenue sur
                                     // la fiche au moment où le lecteur s'est
                                     // détaché.
@@ -541,6 +557,17 @@ class MainActivity : ComponentActivity() {
                             // télécommande : elle n'a pas de cible appairée, et
                             // c'est un lecteur qu'il faut piloter, pas des menus.
                             Screen.Remote -> if (castPlayback != null) {
+                                // Le retour système **coupe la diffusion**, comme
+                                // le bouton de l'écran. Ce BackHandler-ci est plus
+                                // profond que celui de la navigation, donc il
+                                // passe avant : sans lui, le geste de retour
+                                // sortirait de l'écran en laissant tourner un
+                                // relais que plus rien ne pilote. Voir
+                                // CastPlayerScreen pour la raison de fond.
+                                BackHandler {
+                                    CastNow.stopAndClear()
+                                    nav.pop()
+                                }
                                 CastPlayerScreen(onBack = { nav.pop() })
                             } else {
                                 remoteTarget?.let {
@@ -746,6 +773,12 @@ class MainActivity : ComponentActivity() {
                                 posterUrl = s.posterUrl,
                                 expectedMinutes = s.expectedMinutes,
                                 onBack = { nav.pop() },
+                                // La lecture est partie sur un Chromecast :
+                                // `replace` et non `push`, le lecteur local
+                                // n'ayant plus rien à montrer — et un retour
+                                // depuis la télécommande doit ramener à la
+                                // fiche, pas à un lecteur en pause derrière.
+                                onCastStarted = { nav.replace(Screen.Remote) },
                                 // Le flux a cassé une fois ouvert : retour à la
                                 // fiche, qui reprend la cascade sur l'hébergeur
                                 // suivant. Si plus rien n'est à tenter, elle
@@ -797,7 +830,18 @@ class MainActivity : ComponentActivity() {
                         // la barre d'onglets restait posée en travers de la
                         // vidéo — ce que la règle d'à côté interdit justement
                         // au lecteur.
-                        if (useBottomNav && !hidesBottomBar(nav.current) && !onVideo) {
+                        //
+                        // `castPlayback` en plus : l'écran de diffusion **est** un
+                        // lecteur — même chrome, même gestes — et la barre
+                        // d'onglets posée dessous le faisait lire comme une page
+                        // parmi d'autres. C'est une distinction d'état et non de
+                        // destination : `Screen.Remote` héberge aussi la
+                        // télécommande, qui garde sa barre.
+                        if (useBottomNav &&
+                            !hidesBottomBar(nav.current) &&
+                            !onVideo &&
+                            !(nav.current is Screen.Remote && castPlayback != null)
+                        ) {
                             MoovieBottomBar(
                                 current = nav.current,
                                 onSelect = { nav.switchTop(it) },

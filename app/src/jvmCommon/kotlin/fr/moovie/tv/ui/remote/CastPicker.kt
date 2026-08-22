@@ -26,8 +26,10 @@ import fr.moovie.tv.data.remote.RemoteTarget
 import fr.moovie.tv.resources.Res
 import fr.moovie.tv.resources.cast_pick_chromecast_help
 import fr.moovie.tv.resources.cast_pick_moovie_help
+import fr.moovie.tv.resources.cast_failed
 import fr.moovie.tv.resources.cast_pick_title
 import fr.moovie.tv.resources.common_cancel
+import fr.moovie.tv.resources.common_close
 import fr.moovie.tv.ui.components.MoovieButton
 import fr.moovie.tv.ui.theme.MoovieShape
 import org.jetbrains.compose.resources.stringResource
@@ -124,6 +126,33 @@ fun CastTargetDialog(
                 MoovieButton(onClick = onDismiss) {
                     Text(stringResource(Res.string.common_cancel))
                 }
+            }
+        }
+    }
+}
+
+/**
+ * « La diffusion n'a pas pu démarrer. »
+ *
+ * Partagée par la fiche et le lecteur, qui échouent pour les mêmes raisons —
+ * récepteur injoignable, `LOAD` refusé, relais qui n'a pas d'adresse à annoncer.
+ * Le dire est le minimum : sans cette modale, un bouton qui ne fait rien est
+ * indistinguable d'un bouton mort, et c'est l'application qu'on soupçonne.
+ */
+@Composable
+fun CastFailureDialog(onDismiss: () -> Unit) {
+    Dialog(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .widthIn(max = 420.dp)
+                .clip(MoovieShape)
+                .background(Color(0xFF1A1A1F))
+                .padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Text(stringResource(Res.string.cast_failed))
+            MoovieButton(onClick = onDismiss) {
+                Text(stringResource(Res.string.common_close))
             }
         }
     }

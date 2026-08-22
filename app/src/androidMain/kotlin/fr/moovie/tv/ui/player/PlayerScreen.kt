@@ -4,6 +4,14 @@ import fr.moovie.tv.data.download.DownloadQueue
 import fr.moovie.tv.data.download.Download
 import fr.moovie.tv.core.sources.model.StreamFormat
 import fr.moovie.tv.core.sources.model.PlayableStream
+import fr.moovie.tv.data.cast.CastDevice
+import fr.moovie.tv.data.cast.CastNow
+import fr.moovie.tv.data.cast.CastPlayback
+import fr.moovie.tv.data.cast.CastPresence
+import fr.moovie.tv.data.cast.CastSession
+import fr.moovie.tv.ui.remote.CastFailureDialog
+import fr.moovie.tv.ui.remote.CastTarget
+import fr.moovie.tv.ui.remote.CastTargetDialog
 import android.app.Activity
 import android.net.Uri
 import android.view.ViewGroup
@@ -210,6 +218,11 @@ fun PlayerScreen(
     /** Autres sources de la même langue, pour le menu « Qualité ». */
     alternatives: List<AltSource> = emptyList(),
     onBack: () -> Unit,
+    /**
+     * La lecture est partie sur un Chromecast : l'écran doit céder la place à
+     * celui qui la pilote. Appelé **après** que la session a pris.
+     */
+    onCastStarted: () -> Unit = {},
     onNextEpisode: (tmdbId: Int, season: Int, episode: Int) -> Unit = { _, _, _ -> },
     /** Appelé une fois quand l'épisode approche de sa fin (voir PREFETCH_AT). */
     onPrefetchNext: () -> Unit = {},
@@ -347,6 +360,70 @@ fun PlayerScreen(
             AspectRatioFrameLayout.RESIZE_MODE_ZOOM
         } else {
             AspectRatioFrameLayout.RESIZE_MODE_FIT
+        }
+    }
+
+    // ── Diffusion vers un Chromecast, depuis le lecteur ──────────────────────
+    //
+    // La liste vient de la veille globale ([CastPresence]) : ce n'est pas au
+    // lecteur de balayer le réseau, et c'est justement parce que la veille ne
+    // tournait que sur la fiche que ce bouton était impossible ici.
+    val castAppareils by CastPresence.devices.collectAsStateWithLifecycle()
+    val castHotesMoovie by CastPresence.moovieHosts.collectAsStateWithLifecycle()
+    val castCibles = remember(castAppareils, castHotesMoovie) {
+        // Un appareil qui fait tourner Moo-vie n'est pas un Chromecast, même
+        // s'il répond au protocole : voir castTargetsFor, dont c'est la règle.
+        castAppareils.filterNot { it.host in castHotesMoovie }
+    }
+    var castChoix by remember { mutableStateOf<List<CastDevice>>(emptyList()) }
+    var castEchoue by remember { mutableStateOf(false) }
+    val castScope = rememberCoroutineScope()
+
+    /**
+     * Reprend sur le récepteur ce qui joue ici, **à la seconde où on en est**.
+     *
+     * Rien n'est re-résolu : le flux est déjà là, avec ses en-têtes, et c'est
+     * exactement ce dont le relais a besoin. C'est ce qui rend la reprise
+     * immédiate, là où partir de la fiche coûte la cascade complète.
+     */
+    fun diffuseVers(appareil: CastDevice) {
+        castChoix = emptyList()
+        val depart = controller.positionMs()
+        // Couper ici avant de partir là-bas : deux lectures du même flux, c'est
+        // deux fois la bande passante d'un hébergeur qui la compte, pour une
+        // seule image regardée.
+        runCatching { player.pause() }
+        castScope.launch {
+            val session = CastSession(appareil)
+            val parti = session.start(
+                stream = PlayableStream(
+                    url = streamUrl,
+                    format = StreamFormat.UNKNOWN,
+                    headers = headers,
+                ),
+                title = title,
+                subtitle = subtitle,
+                artwork = posterUrl,
+                positionMs = depart,
+            )
+            if (!parti) {
+                // La lecture locale reste où elle était : un échec de diffusion
+                // ne doit pas coûter le film qu'on était en train de regarder.
+                session.stop()
+                castEchoue = true
+                return@launch
+            }
+            CastNow.start(
+                session,
+                CastPlayback(
+                    device = appareil,
+                    title = title,
+                    subtitle = subtitle,
+                    artwork = posterUrl,
+                    mediaKey = mediaKey,
+                ),
+            )
+            onCastStarted()
         }
     }
 
@@ -1267,6 +1344,24 @@ fun PlayerScreen(
                 },
                 onOpenSubtitles = { dialog = PlayerDialogKind.SUBTITLES },
                 onOpenSettings = { dialog = PlayerDialogKind.SETTINGS },
+                // **Reprendre sur la télé ce qui joue ici.** Null tant qu'aucun
+                // récepteur ne répond : une icône inerte est une cible de trop.
+                //
+                // Seuls les Chromecast sont proposés, et non les téléviseurs
+                // Moo-vie : ces derniers ne reçoivent pas un flux mais une
+                // intention, qu'ils résolvent avec leurs propres sources. Passer
+                // *cette* lecture-ci à une Moo-vie n'est donc pas le même geste,
+                // et mérite mieux qu'un raccourci qui ferait croire à une
+                // symétrie. La fiche, elle, propose bien les deux.
+                onCast = castCibles.firstOrNull()?.let { premier ->
+                    {
+                        if (castCibles.size > 1) {
+                            castChoix = castCibles
+                        } else {
+                            diffuseVers(premier)
+                        }
+                    }
+                },
                 onDownload = if (mediaKey.isNotBlank() && sourceUrl.isNotBlank()) {
                     {
                         // On cherche mieux avant de mettre en file : le fichier
@@ -1348,6 +1443,24 @@ fun PlayerScreen(
                     }
                 },
             )
+        }
+
+        // Plusieurs récepteurs : on demande lequel. Un seul ne se choisit pas —
+        // la modale ne s'ouvre qu'à partir de deux, comme sur la fiche.
+        if (castChoix.size > 1) {
+            CastTargetDialog(
+                targets = castChoix.map { CastTarget.Chromecast(it) },
+                onPick = { cible ->
+                    (cible as? CastTarget.Chromecast)?.let { diffuseVers(it.device) }
+                },
+                onDismiss = { castChoix = emptyList() },
+            )
+        }
+
+        // La diffusion n'a pas pris : on le dit, et la lecture locale continue
+        // là où elle était. Rester muet ferait croire à un bouton mort.
+        if (castEchoue) {
+            CastFailureDialog(onDismiss = { castEchoue = false })
         }
 
         // Sous-titres en ligne : la recherche ne part qu'à l'ouverture du menu.
