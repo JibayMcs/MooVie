@@ -77,12 +77,65 @@ class OkHttpGateway(private val client: OkHttpClient) : HttpGateway {
                         else -> resp.body?.string()
                     },
                     bytes = if (request.binary && request.method != HttpMethod.HEAD) {
-                        resp.body?.bytes()
+                        resp.body?.let(::litPlafonne)
                     } else {
                         null
                     },
                 )
             }
         }.getOrNull()
+    }
+
+    /**
+     * Lit un corps binaire, **borné**.
+     *
+     * ## Le défaut que ça corrige
+     *
+     * `bytes()` matérialise tout le corps. Les seuls appels binaires servent à
+     * lire un en-tête MP4, et demandent donc une plage de quelques centaines de
+     * kilo-octets — sauf qu'un `Range` est une *demande*, pas une garantie.
+     *
+     * Mesuré le 24/08/2026 sur SwiftFlow : l'URL du catalogue redirige vers un
+     * proxy qui **ne transmet pas l'en-tête `Range`**. La plage disparaît, le
+     * serveur répond 200 avec le fichier entier, et `bytes()` entreprend de
+     * charger **3,8 Go** en mémoire pour y lire quatre nombres. L'URL signée
+     * finale, elle, répond bien 206 — c'est le saut intermédiaire qui perd la
+     * plage, ce qui rend le défaut invisible à qui teste l'adresse d'arrivée.
+     *
+     * Sur un téléphone ou sur la box, c'est l'`OutOfMemoryError` que ce projet
+     * a déjà payé une fois, sur un fichier de 1,24 Go. Le lecteur ne s'ouvrait
+     * même pas : la mesure de qualité tuait l'application avant.
+     *
+     * ## Pourquoi un plafond plutôt qu'un refus
+     *
+     * Un en-tête tronqué reste exploitable — `mp4Height` cherche des boîtes dans
+     * ce qu'on lui donne et rend null s'il ne trouve pas. Refuser tout corps non
+     * borné priverait de la qualité les hôtes qui ignorent `Range` mais servent
+     * un fichier « faststart », dont l'en-tête tient dans les premiers octets.
+     *
+     * Le plafond est au-dessus de ce que demande le plus gros appel
+     * (`MAX_MP4_HEADER_BYTES`, 512 Ko) : il ne tronque donc jamais une réponse
+     * correctement bornée, et n'agit que quand le serveur a ignoré la consigne.
+     */
+    private fun litPlafonne(corps: okhttp3.ResponseBody): ByteArray = corps.byteStream().use { flux ->
+        val tampon = ByteArray(PLAFOND_BINAIRE)
+        var lus = 0
+        while (lus < tampon.size) {
+            // `read` à la main : `readNBytes` est une API Java 9, et ce fichier
+            // est compilé pour minSdk 23 — elle passerait les tests sur le poste
+            // de travail et lèverait sur la box.
+            val n = flux.read(tampon, lus, tampon.size - lus)
+            if (n < 0) break
+            lus += n
+        }
+        if (lus == tampon.size) tampon else tampon.copyOf(lus)
+    }
+
+    private companion object {
+        /**
+         * Un `moov` de long métrage pèse quelques centaines de kilo-octets. Un
+         * mégaoctet laisse de la marge sans jamais approcher le poids d'un média.
+         */
+        const val PLAFOND_BINAIRE = 1 shl 20
     }
 }
