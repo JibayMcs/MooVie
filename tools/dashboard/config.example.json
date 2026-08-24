@@ -1,0 +1,7 @@
+{
+  "port": 7788,
+  "intervalHours": 6,
+  "runOnStart": true,
+  "webhookUrl": "",
+  "gradle": "./gradlew"
+}

@@ -105,6 +105,31 @@ class QuickCoverageProbeTest {
         val parHebergeur = lignes.mapNotNull { it.hoster }.groupingBy { it }.eachCount()
         parHebergeur.toList().sortedByDescending { it.second }
             .forEach { (h, n) -> println("HEBERGEUR $h $n") }
+
+        // Le même relevé en JSON, pour le tableau de bord — voir ProbeReport.
+        if (ProbeReport.demande) {
+            ProbeReport.ecris(
+                "providers",
+                buildString {
+                    append("""{"providers":[""")
+                    ProviderRegistry.all.map { it.name }.sorted().forEachIndexed { i, nom ->
+                        if (i > 0) append(',')
+                        val titres = parProvider[nom] ?: 0
+                        append("""{"name":${ProbeReport.texte(nom)},"titles":$titres,""")
+                        append(""""alive":${titres > 0}}""")
+                    }
+                    append("""],"covered":$ok,"total":${lignes.size},"titles":[""")
+                    lignes.forEachIndexed { i, l ->
+                        if (i > 0) append(',')
+                        append("""{"title":${ProbeReport.texte(l.titre)},""")
+                        append(""""kind":${ProbeReport.texte(l.genre)},""")
+                        append(""""playable":${l.hoster != null},""")
+                        append(""""hoster":${l.hoster?.let { ProbeReport.texte(it) } ?: "null"}}""")
+                    }
+                    append("]}")
+                },
+            )
+        }
     }
 
     private data class Releve(

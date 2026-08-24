@@ -106,6 +106,26 @@ class HosterHealthProbeTest {
         println("LIENS TESTES ${resultats.sumOf { it.testes }} sur ${resultats.sumOf { it.total }}")
         resultats.filter { it.jouables == 0 }
             .forEach { println("MORT ${it.hoster}") }
+
+        // Le même relevé, pour le tableau de bord. Voir ProbeReport : c'est la
+        // comparaison de deux relevés qui dit qu'un hébergeur *est tombé*, ce
+        // qu'aucune lecture isolée ne peut établir.
+        if (ProbeReport.demande) {
+            ProbeReport.ecris(
+                "hosters",
+                buildString {
+                    append("""{"hosters":[""")
+                    resultats.forEachIndexed { i, l ->
+                        if (i > 0) append(',')
+                        append("""{"name":${ProbeReport.texte(l.hoster)},""")
+                        append(""""tested":${l.testes},"resolved":${l.resolus},""")
+                        append(""""playable":${l.jouables},"links":${l.total},""")
+                        append(""""alive":${l.jouables > 0}}""")
+                    }
+                    append("""],"alive":$vivants,"total":${resultats.size}}""")
+                },
+            )
+        }
     }
 
     private data class Ligne(

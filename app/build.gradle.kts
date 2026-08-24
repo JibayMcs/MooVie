@@ -249,6 +249,9 @@ tasks.withType<Test>().configureEach {
         // Autorise la sonde de volume à *écrire* sur l'appareil, et pas
         // seulement à le lire — voir CastVolumeProbeTest.
         "moovie.cast.volume",
+        // Dossier où les sondes déposent leur relevé JSON, lu par le tableau de
+        // bord (tools/dashboard). Absent = rien n'est écrit.
+        "moovie.report",
     ).forEach { key ->
         System.getProperty(key)?.let { systemProperty(key, it) }
     }

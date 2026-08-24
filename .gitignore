@@ -31,3 +31,8 @@ opensubtitles.properties
 # Relevés du contrôle de santé des sources (tools/check-sources.sh) :
 # des mesures, propres à une machine et à un instant — rien à versionner.
 tools/reports/
+
+# Tableau de bord des sources : le fichier porte un webhook Discord, qui est un
+# secret au même titre que le keystore — quiconque l'a peut écrire dans le salon.
+# tools/dashboard/config.example.json est la version publiable.
+/tools/dashboard/config.json

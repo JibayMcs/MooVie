@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Moo-vie · sources</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin:0; padding:24px; background:#0e0e12; color:#e6e6e6;
+         font:14px/1.55 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; }
+  h1 { font-size:20px; margin:0 0 4px; }
+  h2 { font-size:14px; text-transform:uppercase; letter-spacing:.08em;
+       color:#8a8a95; margin:32px 0 10px; font-weight:600; }
+  .sub { color:#8a8a95; margin-bottom:20px; }
+  .bar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:8px; }
+  button { background:#1e1e26; color:#e6e6e6; border:1px solid #33333f;
+           border-radius:8px; padding:8px 14px; cursor:pointer; font-size:13px; }
+  button:hover:not(:disabled) { background:#282833; }
+  button:disabled { opacity:.5; cursor:default; }
+  .kpis { display:flex; gap:12px; flex-wrap:wrap; margin:14px 0 4px; }
+  .kpi { background:#16161c; border:1px solid #26262f; border-radius:10px;
+         padding:12px 16px; min-width:130px; }
+  .kpi b { display:block; font-size:22px; font-weight:600; }
+  .kpi span { color:#8a8a95; font-size:12px; }
+  table { border-collapse:collapse; width:100%; max-width:760px; }
+  td, th { padding:7px 10px; border-bottom:1px solid #1e1e26; text-align:left; }
+  th { color:#8a8a95; font-weight:600; font-size:12px; text-transform:uppercase;
+       letter-spacing:.05em; }
+  td.num { text-align:right; color:#9a9aa5; font-variant-numeric:tabular-nums; }
+  .dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:8px; }
+  .up { background:#3fbf6f; } .down { background:#e05252; }
+  .dead td:first-child { color:#9a9aa5; }
+  .ev { padding:7px 0; border-bottom:1px solid #1e1e26; }
+  .ev time { color:#8a8a95; margin-right:10px; font-variant-numeric:tabular-nums; }
+  .fell { color:#e05252; } .back { color:#3fbf6f; }
+  .empty { color:#8a8a95; font-style:italic; }
+</style>
+</head>
+<body>
+<h1>Moo-vie · sources</h1>
+<div class="sub" id="meta">chargement…</div>
+
+<div class="bar">
+  <button id="run">Lancer un relevé</button>
+  <span id="hint" class="sub" style="margin:0"></span>
+</div>
+
+<div class="kpis" id="kpis"></div>
+
+<h2>Bascules — ce qui a changé</h2>
+<div id="events"><span class="empty">—</span></div>
+
+<h2>Hébergeurs</h2>
+<table><thead><tr><th>Hébergeur</th><th>Jouables</th><th>Résolus</th><th>Testés</th></tr></thead>
+<tbody id="hosters"></tbody></table>
+
+<h2>Catalogues</h2>
+<table><thead><tr><th>Catalogue</th><th>Titres servis</th></tr></thead>
+<tbody id="providers"></tbody></table>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const fr = (iso) => new Date(iso).toLocaleString('fr-FR', { dateStyle:'short', timeStyle:'short' });
+
+/**
+ * Les bascules, recalculées côté page.
+ *
+ * Le serveur les calcule aussi, pour alerter — mais il ne garde que les
+ * instantanés. Les recalculer ici évite un second format à tenir, et donne
+ * l'historique complet plutôt que la dernière notification.
+ *
+ * Un nom absent d'un des deux relevés est ignoré : les catalogues ne rendent pas
+ * toujours les mêmes hébergeurs, et une absence n'est pas une mort.
+ */
+function bascules(hist) {
+  const out = [];
+  for (let i = 1; i < hist.length; i++) {
+    for (const genre of ['hosters', 'providers']) {
+      const avant = new Map((hist[i-1][genre] || []).map(x => [x.name, x.alive]));
+      for (const item of hist[i][genre] || []) {
+        if (!avant.has(item.name)) continue;
+        if (avant.get(item.name) !== item.alive) {
+          out.push({ at: hist[i].at, name: item.name, alive: item.alive,
+                     kind: genre === 'hosters' ? 'hébergeur' : 'catalogue' });
+        }
+      }
+    }
+  }
+  return out.reverse();
+}
+
+async function charge() {
+  const [hist, statut] = await Promise.all([
+    fetch('/api/history').then(r => r.json()),
+    fetch('/api/status').then(r => r.json()),
+  ]);
+  $('run').disabled = statut.running;
+  $('hint').textContent = statut.running
+    ? 'relevé en cours, comptez 3 à 4 minutes…'
+    : `relevé automatique toutes les ${statut.intervalHours} h · alerte Discord ${statut.alerting ? 'activée' : 'désactivée'}`;
+
+  if (!hist.length) {
+    $('meta').textContent = 'Aucun relevé pour l’instant.';
+    return;
+  }
+  const last = hist[hist.length - 1];
+  $('meta').textContent = `Dernier relevé : ${fr(last.at)} · ${hist.length} relevé(s) dans l’historique`;
+
+  const vivants = last.hosters.filter(h => h.alive).length;
+  $('kpis').innerHTML = [
+    ['Hébergeurs vivants', `${vivants}/${last.hosters.length}`],
+    ['Catalogues actifs', `${last.providers.filter(p => p.alive).length}/${last.providers.length}`],
+    last.coverage ? ['Couverture', `${last.coverage.covered}/${last.coverage.total}`] : null,
+  ].filter(Boolean).map(([l, v]) => `<div class="kpi"><b>${v}</b><span>${l}</span></div>`).join('');
+
+  const ev = bascules(hist);
+  $('events').innerHTML = ev.length
+    ? ev.slice(0, 40).map(e => `<div class="ev"><time>${fr(e.at)}</time>` +
+        `<span class="${e.alive ? 'back' : 'fell'}">${e.alive ? '🟢 de retour' : '🔴 tombé'}</span> ` +
+        `<b>${e.name}</b> <span class="sub">${e.kind}</span></div>`).join('')
+    : '<span class="empty">Aucune bascule depuis le premier relevé.</span>';
+
+  // Les morts d'abord : ce sont eux qui demandent du travail.
+  const rows = [...last.hosters].sort((a, b) =>
+    (a.alive - b.alive) || a.name.localeCompare(b.name));
+  $('hosters').innerHTML = rows.map(h =>
+    `<tr class="${h.alive ? '' : 'dead'}"><td><span class="dot ${h.alive ? 'up' : 'down'}"></span>${h.name}</td>` +
+    `<td class="num">${h.playable}</td><td class="num">${h.resolved}</td><td class="num">${h.tested}</td></tr>`).join('');
+
+  $('providers').innerHTML = [...last.providers]
+    .sort((a, b) => (a.alive - b.alive) || a.name.localeCompare(b.name))
+    .map(p => `<tr class="${p.alive ? '' : 'dead'}"><td><span class="dot ${p.alive ? 'up' : 'down'}"></span>${p.name}</td>` +
+      `<td class="num">${p.titles}</td></tr>`).join('');
+}
+
+$('run').onclick = async () => {
+  $('run').disabled = true;
+  $('hint').textContent = 'relevé en cours, comptez 3 à 4 minutes…';
+  await fetch('/api/run', { method: 'POST' });
+  charge();
+};
+
+charge();
+setInterval(charge, 15000);
+</script>
+</body>
+</html>
