@@ -7,6 +7,7 @@ import fr.moovie.tv.data.settings.StreamLanguage
 import fr.moovie.tv.data.settings.currentTmdbLanguage
 import fr.moovie.tv.core.sources.model.EmbedLink
 import fr.moovie.tv.core.sources.model.MediaRef
+import fr.moovie.tv.core.sources.usecase.keepSupportedHosters
 import fr.moovie.tv.core.watch.EpisodeRef
 import fr.moovie.tv.core.watch.episodeToResume
 import fr.moovie.tv.core.watch.parseEpisodeKey
@@ -934,7 +935,9 @@ class DetailsViewModel : ViewModel() {
                     if (generation != loadGeneration) return@launch
                     servedFromCache = true
                     _sources.value = SourcesState.Active(
-                        links = cached,
+                        // Filtré aussi ici : une entrée de cache écrite avant
+                        // que la liste existe contient encore ces hébergeurs.
+                        links = keepSupportedHosters(cached),
                         providers = cachedProviders.map { ProviderProgress(it, ProviderStatus.DONE) },
                     )
                     return@launch
@@ -956,7 +959,13 @@ class DetailsViewModel : ViewModel() {
                         if (generation != loadGeneration) return@launch
                         _sources.update { st ->
                             val active = st as? SourcesState.Active ?: return@update st
-                            val links = result.getOrNull().orEmpty().map { it.copy(provider = provider.name) }
+                            // Écartés **avant** d'être comptés et affichés : un
+                            // hébergeur qu'on n'a jamais su lire n'est pas une
+                            // source, et le lister ne fait que noyer les bonnes.
+                            // Voir keepSupportedHosters, et la sonde qui établit
+                            // la liste.
+                            val links = keepSupportedHosters(result.getOrNull().orEmpty())
+                                .map { it.copy(provider = provider.name) }
                             val status = when {
                                 result.isFailure || result.getOrNull() == null -> ProviderStatus.FAILED
                                 links.isEmpty() -> ProviderStatus.EMPTY
@@ -1051,7 +1060,8 @@ class DetailsViewModel : ViewModel() {
                         // Un catalogue en panne n'est pas « interrogé » : sans ça
                         // son absence serait figée dans le cache pour six heures.
                         if (result != null) answered += provider.name
-                        result.orEmpty().map { it.copy(provider = provider.name) }
+                        keepSupportedHosters(result.orEmpty())
+                            .map { it.copy(provider = provider.name) }
                     }
                 }.awaitAll().flatten()
             }.distinctBy { it.url }
@@ -1645,7 +1655,7 @@ class DetailsViewModel : ViewModel() {
                     result.orEmpty().map { it.copy(provider = provider.name) }
                 }
             }.awaitAll().flatten()
-        }.distinctBy { it.url }
+        }.let(::keepSupportedHosters).distinctBy { it.url }
         if (links.isNotEmpty()) sourceCache.put(key, links, answered)
         return links
     }
