@@ -53,7 +53,42 @@ class SwiftFlowExtractor : SourceExtractor {
     )
 
     private companion object {
-        val HOST = Regex("""deliciouss|blinkflux""", RegexOption.IGNORE_CASE)
-        const val REFERER = "https://french.deliciouss.lol/"
+        /**
+         * Les domaines connus du CDN — **un filet, plus le chemin principal**.
+         *
+         * SwiftFlow a migré de `deliciouss` vers `edge-nN.site`, avec un
+         * intermédiaire `falzey.lol`. Cette liste ne suivra jamais la prochaine
+         * rotation : c'est le routage par nom d'hébergeur
+         * ([StreamResolution.extractorNamed][fr.moovie.tv.core.sources.usecase.StreamResolution])
+         * qui sélectionne désormais cet extracteur, le lien portant
+         * `hoster = "swiftflow"` depuis le catalogue. On garde la liste pour les
+         * chemins qui ne passent pas par un lien nommé.
+         */
+        val HOST = Regex(
+            """deliciouss|blinkflux|edge-n\d|falzey""",
+            RegexOption.IGNORE_CASE,
+        )
+
+        /**
+         * Le site du lecteur, **et non l'ancien domaine du CDN**.
+         *
+         * Mesuré le 24/08/2026 sur `alpa.edge-n2.site`, en suivant les deux
+         * redirections :
+         *
+         * | `Referer` | Type rendu |
+         * |---|---|
+         * | aucun | `text/html` |
+         * | `french.deliciouss.lol` (l'ancien) | `text/html` |
+         * | `blinkflux.lol` | `video/mp4` |
+         *
+         * Le piège tient dans la colonne manquante : **les trois répondent
+         * 200**. Le refus ne se voit pas au code HTTP, seulement au type — d'où
+         * le contrôle de `isPlayableContentType`, sans lequel la source serait
+         * passée pour bonne et aurait ouvert le lecteur sur une page web.
+         *
+         * Doit rester l'origine de `SwiftFlowProvider.API_BASE` : c'est le site
+         * qui sert le lecteur, donc celui que le CDN attend.
+         */
+        const val REFERER = "https://blinkflux.lol/"
     }
 }

@@ -151,4 +151,62 @@ class StreamResolutionTest {
         assertEquals(false, resolution.claimsDomain(inconnu.url))
         assertEquals("https://cdn/x.m3u8", resolution.resolve(inconnu)?.url)
     }
+
+    // --- Routage par nom d'hébergeur -----------------------------------------
+
+    /**
+     * **Le test qui compte, et il a été payé.** SwiftFlow a changé le domaine de
+     * son CDN. Son extracteur ne reconnaissait plus l'URL, le lien est tombé sur
+     * celui qui revendique tout `.mp4`, et il est reparti sans le `Referer` que
+     * le CDN exige — lequel répond alors une page HTML **en 200**. La source la
+     * plus fiable du catalogue s'est éteinte sans qu'aucun test n'échoue.
+     *
+     * Le lien portait pourtant le nom de son hébergeur depuis le catalogue.
+     * Router dessus rend la résolution insensible aux rotations de CDN.
+     */
+    @Test
+    fun `un lien nomme va a son extracteur, meme si l URL a change de domaine`() = runTest {
+        val flux = PlayableStream("https://cdn/f.mp4", StreamFormat.MP4)
+        // Il ne revendique plus l'URL : le domaine a tourné sous lui.
+        val nomme = FakeExtractor("swiftflow", claims = { false }, onExtract = { flux })
+        // Et celui-ci ramasse tout .mp4, comme le fait DirectStreamExtractor.
+        val attrapeTout = FakeExtractor("direct", claims = { it.endsWith(".mp4") })
+
+        val resolution = StreamResolution(listOf(attrapeTout, nomme))
+        val rendu = resolution.resolve(
+            EmbedLink(url = "https://nouveau-cdn.test/f.mp4", hoster = "swiftflow"),
+        )
+
+        assertEquals(flux, rendu)
+        assertEquals(1, nomme.calls, "l'extracteur nommé n'a pas été sollicité")
+        assertEquals(0, attrapeTout.calls, "l'attrape-tout est passé devant le nom")
+    }
+
+    /** Un nom inconnu ne bloque rien : on retombe sur la reconnaissance d'URL. */
+    @Test
+    fun `un hebergeur sans extracteur retombe sur le domaine`() = runTest {
+        val flux = PlayableStream("https://cdn/f.mp4", StreamFormat.MP4)
+        val parDomaine = FakeExtractor("direct", claims = { true }, onExtract = { flux })
+
+        val rendu = StreamResolution(listOf(parDomaine))
+            .resolve(EmbedLink(url = "https://x.test/f.mp4", hoster = "premium"))
+
+        assertEquals(flux, rendu)
+        assertEquals(1, parDomaine.calls)
+    }
+
+    /** L'extracteur nommé échoue : le chemin par domaine reste disponible. */
+    @Test
+    fun `un extracteur nomme qui echoue laisse sa chance au domaine`() = runTest {
+        val flux = PlayableStream("https://cdn/f.mp4", StreamFormat.MP4)
+        val nomme = FakeExtractor("voe", claims = { false }, onExtract = { null })
+        val parDomaine = FakeExtractor("direct", claims = { true }, onExtract = { flux })
+
+        val rendu = StreamResolution(listOf(nomme, parDomaine))
+            .resolve(EmbedLink(url = "https://x.test/f.mp4", hoster = "voe"))
+
+        assertEquals(flux, rendu)
+        assertEquals(1, nomme.calls)
+        assertEquals(1, parDomaine.calls)
+    }
 }
