@@ -29,6 +29,9 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPlacement
+import kotlinx.coroutines.delay
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import org.jetbrains.compose.resources.painterResource
@@ -77,6 +80,17 @@ import androidx.compose.runtime.key
  * état `Screen`, Échap = retour. Le lecteur vidéo (VLCJ) n'est pas encore
  * branché — écran d'attente à la place.
  */
+/** Délai laissé à la transition plein écran avant de constater son effet. */
+private const val VERIF_PLEIN_ECRAN_MS = 900L
+
+/**
+ * Écart toléré entre l'écran et ce que la composition mesure.
+ *
+ * Large à dessein : on cherche une surface restée à sa taille de fenêtre, pas
+ * quelques pixels de bordure. 200 px séparent sans ambiguïté les deux cas.
+ */
+private const val MARGE_PLEIN_ECRAN = 200
+
 fun main() {
     // **Avant tout le reste** : `Locale.setDefault` décide de ce que les
     // ressources Compose, les formateurs de dates et la requête TMDB rendront.
@@ -139,13 +153,72 @@ fun main() {
         // Et comme l'intention survit à l'écran, revenir au lecteur pour
         // l'épisode suivant retrouve le plein écran sans rien redemander.
         var wantsFullscreen by remember { mutableStateOf(false) }
+
+        /**
+         * Le vrai plein écran ne fonctionne pas sur cette machine.
+         *
+         * ## Ce qu'on a mesuré
+         *
+         * Sur un poste à Quadro 2000 (pilote de 2015), `WindowPlacement.Fullscreen`
+         * agrandit bien la fenêtre — relevé à 0,0 → 1920×1080 — mais **la surface
+         * Compose reste dessinée à l'ancienne taille**, dans le coin haut-gauche,
+         * le reste de l'écran en noir. Le film continue de jouer, invisible.
+         *
+         * Trois pistes écartées sur place : changer de moteur Skiko (DirectX puis
+         * OpenGL) ne change rien, forcer un redimensionnement natif ne récupère
+         * pas la surface, et l'agrandissement ordinaire (`Maximized`) rend
+         * parfaitement en 1920×1080. Le défaut est donc dans le plein écran
+         * exclusif lui-même, pas dans le rendu.
+         *
+         * ## Pourquoi un repli et pas un choix figé
+         *
+         * Renoncer au plein écran partout punirait toutes les machines saines
+         * pour une seule. On tente donc le vrai plein écran, on **vérifie** que la
+         * composition a bien reçu la nouvelle taille, et on retombe sur
+         * l'agrandissement si elle ne l'a pas reçue. La barre de titre reste
+         * visible dans ce cas — c'est laid, et infiniment préférable à un écran
+         * noir sur lequel il n'y a rien à faire.
+         *
+         * Une fois constaté, l'échec est mémorisé pour la session : réessayer à
+         * chaque bascule ferait clignoter la fenêtre à chaque fois.
+         */
+        var pleinEcranInerte by remember { mutableStateOf(false) }
+
+        /** Ce que la composition croit mesurer, en pixels. Voir [pleinEcranInerte]. */
+        var tailleCompose by remember { mutableStateOf(IntSize.Zero) }
+
         val inPlayer = nav.current is Screen.Player
-        LaunchedEffect(inPlayer, wantsFullscreen) {
+        LaunchedEffect(inPlayer, wantsFullscreen, pleinEcranInerte) {
             when {
-                inPlayer && wantsFullscreen -> windowState.placement = WindowPlacement.Fullscreen
+                inPlayer && wantsFullscreen -> {
+                    windowState.placement = if (pleinEcranInerte) {
+                        WindowPlacement.Maximized
+                    } else {
+                        WindowPlacement.Fullscreen
+                    }
+                    if (!pleinEcranInerte) {
+                        // Laisser la transition se faire, puis constater. Le seuil
+                        // est large : on ne cherche pas un écart de quelques
+                        // pixels de bordure mais une surface restée à sa taille
+                        // de fenêtre, soit un tiers d'écran de moins.
+                        delay(VERIF_PLEIN_ECRAN_MS)
+                        val ecran = java.awt.Toolkit.getDefaultToolkit().screenSize
+                        val vue = tailleCompose
+                        if (vue.width > 0 && vue.width < ecran.width - MARGE_PLEIN_ECRAN) {
+                            println(
+                                "[fenêtre] plein écran inerte : la composition mesure " +
+                                    "${vue.width}×${vue.height} pour un écran de " +
+                                    "${ecran.width}×${ecran.height} — repli sur l'agrandissement",
+                            )
+                            pleinEcranInerte = true
+                        }
+                    }
+                }
                 // Uniquement depuis le plein écran : une fenêtre que
                 // l'utilisateur a maximisée lui-même doit le rester.
-                isFullscreen -> windowState.placement = WindowPlacement.Floating
+                isFullscreen || (pleinEcranInerte && !wantsFullscreen &&
+                    windowState.placement == WindowPlacement.Maximized) ->
+                    windowState.placement = WindowPlacement.Floating
             }
         }
 
@@ -212,7 +285,14 @@ fun main() {
                 // racine à la main : changer de profil et retomber sur la fiche
                 // d'épisode du précédent serait le contraire de ce qu'on demande.
                 LaunchedEffect(profileId) { nav.popToRoot() }
-                Box(modifier = Modifier.fillMaxSize()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        // C'est **cette** mesure qui dit si le plein écran a pris :
+                        // la fenêtre peut mentir (elle annonce 1920×1080), la
+                        // composition non — elle rapporte ce qu'elle dessine.
+                        .onSizeChanged { tailleCompose = it },
+                ) {
                     if (start != null) {
                     DesktopApp(
                         nav = nav,
