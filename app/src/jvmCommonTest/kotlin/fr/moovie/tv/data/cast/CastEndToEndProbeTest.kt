@@ -52,10 +52,36 @@ class CastEndToEndProbeTest {
 
         val session = CastSession(CastDevice(name = "sonde", host = hote))
         runBlocking {
+            // Une piste de sous-titres, si on en demande une : `-Dmoovie.vtt=1`
+            // fabrique un SRT de trois répliques et le laisse suivre le chemin
+            // complet — conversion, mise à disposition, déclaration au LOAD.
+            val srt = System.getProperty("moovie.vtt")?.takeIf { it == "1" }?.let {
+                java.io.File.createTempFile("moovie-sonde", ".srt").apply {
+                    writeText(
+                        """
+                        1
+                        00:00:02,000 --> 00:00:08,000
+                        Sous-titre de contrôle, un.
+
+                        2
+                        00:00:09,000 --> 00:00:15,000
+                        Deux — avec une virgule, exprès.
+
+                        3
+                        00:00:16,000 --> 00:00:22,000
+                        Trois, et fin.
+                        """.trimIndent(),
+                    )
+                    deleteOnExit()
+                }
+            }
+            println("[sonde] sous-titres : ${srt?.name ?: "aucun (-Dmoovie.vtt=1 pour en envoyer)"}")
+
             val parti = session.start(
                 stream = PlayableStream(url = url, format = StreamFormat.HLS, headers = entetes),
                 title = "Moo-vie — épreuve",
                 subtitle = "sonde de bout en bout",
+                sousTitres = srt,
             )
             println("[sonde] LOAD        : ${if (parti) "accepté" else "refusé"}")
 

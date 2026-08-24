@@ -249,6 +249,8 @@ tasks.withType<Test>().configureEach {
         // Autorise la sonde de volume à *écrire* sur l'appareil, et pas
         // seulement à le lire — voir CastVolumeProbeTest.
         "moovie.cast.volume",
+        // Fait envoyer une piste de sous-titres par la sonde de bout en bout.
+        "moovie.vtt",
         // Dossier où les sondes déposent leur relevé JSON, lu par le tableau de
         // bord (tools/dashboard). Absent = rien n'est écrit.
         "moovie.report",

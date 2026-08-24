@@ -1,6 +1,7 @@
 package fr.moovie.tv.data.cast
 
 import fr.moovie.tv.core.sources.model.PlayableStream
+import fr.moovie.tv.core.subtitles.usecase.srtToVtt
 import fr.moovie.tv.data.net.LocalStreamProxy
 import kotlinx.coroutines.flow.StateFlow
 
@@ -56,6 +57,15 @@ class CastSession(private val device: CastDevice) {
         subtitle: String = "",
         artwork: String = "",
         positionMs: Long = 0,
+        /**
+         * Un fichier `.srt` local à envoyer comme piste de sous-titres.
+         *
+         * Converti en WebVTT et servi par le relais : le récepteur ne lit que ce
+         * format, et va le chercher lui-même — d'où le CORS, que le relais pose
+         * déjà en mode réseau. Null = pas de sous-titres, comme avant.
+         */
+        sousTitres: java.io.File? = null,
+        langueSousTitres: String = "fr",
     ): Boolean {
         stop()
 
@@ -71,6 +81,23 @@ class CastSession(private val device: CastDevice) {
             return false
         }
 
+        // Les sous-titres avant le LOAD : leur URL doit exister pour y figurer,
+        // et une piste ajoutée après coup demanderait un EDIT_TRACKS_INFO que
+        // rien ici ne déclenche.
+        val piste = sousTitres
+            ?.takeIf { it.isFile }
+            ?.let { fichier ->
+                runCatching {
+                    CastPisteTexte(
+                        url = proxy.serviTexte(
+                            srtToVtt(fichier.readText()),
+                            "text/vtt; charset=utf-8",
+                        ),
+                        langue = langueSousTitres,
+                    )
+                }.getOrNull()
+            }
+
         val charge = client.load(
             url = proxy.localUrl(stream.url),
             // **Le type vient du flux, pas de l'URL relayée.** Celle-ci finit
@@ -81,6 +108,7 @@ class CastSession(private val device: CastDevice) {
             subtitle = subtitle,
             artwork = artwork,
             positionMs = positionMs,
+            sousTitres = piste,
         )
         if (!charge) stop()
         return charge

@@ -38,6 +38,7 @@ import fr.moovie.tv.data.cast.CastNow
 import fr.moovie.tv.data.cast.CastPlayback
 import fr.moovie.tv.data.cast.CastPresence
 import fr.moovie.tv.data.cast.CastSession
+import fr.moovie.tv.data.subtitles.SubtitleFileStore
 import fr.moovie.tv.ui.remote.CastFailureDialog
 import fr.moovie.tv.ui.remote.CastTarget
 import fr.moovie.tv.ui.remote.castTargetsFor
@@ -202,6 +203,12 @@ fun DetailsScreen(
                         subtitle = viewModel.playbackSubtitle,
                         artwork = viewModel.playbackPoster.orEmpty(),
                         positionMs = resume[viewModel.playbackKey]?.positionMs ?: 0,
+                        // Le sous-titre déjà téléchargé pour ce titre, s'il y en
+                        // a un. Le récepteur ne lit que du WebVTT : la
+                        // conversion et la mise à disposition sont l'affaire de
+                        // CastSession. Rien de téléchargé, rien d'envoyé — le
+                        // Chromecast ne sait pas chercher de sous-titres.
+                        sousTitres = SubtitleFileStore().dernierUtilise(viewModel.playbackKey),
                     )
                 }.getOrDefault(false)
                 castEnCours = false

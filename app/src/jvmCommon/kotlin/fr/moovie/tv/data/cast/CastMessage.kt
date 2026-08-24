@@ -286,3 +286,16 @@ fun castContentType(url: String): String = when {
     url.substringBefore('?').endsWith(".mpd", true) -> "application/dash+xml"
     else -> "video/mp4"
 }
+
+/**
+ * Une piste de sous-titres à remettre au récepteur.
+ *
+ * [url] doit être **joignable par le récepteur** et servie avec le CORS : c'est
+ * une page web qui va la chercher, en XHR. Le relais s'en charge, et c'est
+ * exactement ce qui manquait la première fois qu'on a fait jouer un flux.
+ */
+data class CastPisteTexte(
+    val url: String,
+    val langue: String = "fr",
+    val nom: String = "Sous-titres",
+)

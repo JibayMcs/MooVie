@@ -197,6 +197,7 @@ class CastClient(private val host: String) {
         artwork: String = "",
         contentType: String = "",
         positionMs: Long = 0,
+        sousTitres: CastPisteTexte? = null,
     ): Boolean {
         val id = launch() ?: return false
         val reponse = demande(
@@ -205,12 +206,46 @@ class CastClient(private val host: String) {
             buildJsonObject {
                 put("type", "LOAD")
                 put("autoplay", true)
+                // **La piste doit être activée à l'appel.** Déclarée seule, elle
+                // apparaît dans le menu du récepteur et rien ne s'affiche : il
+                // n'allume pas de sous-titres qu'on ne lui a pas demandés, et
+                // le menu n'est pas atteignable depuis un téléphone.
+                sousTitres?.let {
+                    put(
+                        "activeTrackIds",
+                        kotlinx.serialization.json.buildJsonArray {
+                            add(kotlinx.serialization.json.JsonPrimitive(PISTE_TEXTE))
+                        },
+                    )
+                }
                 if (positionMs > 0) put("currentTime", positionMs / 1000.0)
                 put(
                     "media",
                     buildJsonObject {
                         put("contentId", url)
                         put("streamType", "BUFFERED")
+                        sousTitres?.let { piste ->
+                            put(
+                                "tracks",
+                                kotlinx.serialization.json.buildJsonArray {
+                                    add(
+                                        buildJsonObject {
+                                            put("trackId", PISTE_TEXTE)
+                                            put("type", "TEXT")
+                                            put("subtype", "SUBTITLES")
+                                            // Le récepteur **ne lit que du
+                                            // WebVTT**. Un SRT est accepté au
+                                            // chargement puis ignoré, sans
+                                            // erreur ni piste — voir srtToVtt.
+                                            put("trackContentType", "text/vtt")
+                                            put("trackContentId", piste.url)
+                                            put("language", piste.langue)
+                                            put("name", piste.nom)
+                                        },
+                                    )
+                                },
+                            )
+                        }
                         put("contentType", contentType.ifBlank { castContentType(url) })
                         put(
                             "metadata",
@@ -436,6 +471,9 @@ class CastClient(private val host: String) {
     private fun transportDe(corps: JsonObject): String? = transportIdOf(corps)
 
     private companion object {
+        /** Identifiant de notre unique piste texte : on n'en propose qu'une. */
+        const val PISTE_TEXTE = 1
+
         const val SOURCE = "sender-moovie"
         const val DESTINATION_RECEIVER = "receiver-0"
         const val BATTEMENT_MS = 5_000L

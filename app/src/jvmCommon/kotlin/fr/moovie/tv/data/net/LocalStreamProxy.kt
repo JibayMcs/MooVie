@@ -150,6 +150,31 @@ internal class LocalStreamProxy(
         runCatching { workers.shutdownNow() }
     }
 
+    /**
+     * Textes servis depuis la mémoire, par identifiant.
+     *
+     * Une piste de sous-titres n'est pas une ressource distante à relayer : elle
+     * est déjà chez nous, convertie en WebVTT. Lui inventer une URL http à
+     * proxifier serait un détour absurde — on la sert directement.
+     */
+    private val textes = java.util.concurrent.ConcurrentHashMap<String, Pair<String, String>>()
+
+    /**
+     * Publie un texte et rend son URL, joignable par le récepteur.
+     *
+     * Sert les sous-titres : le récepteur Cast va les chercher lui-même, par
+     * XHR, et exige donc le CORS que [writeHead] pose déjà en mode réseau.
+     *
+     * L'identifiant est tiré du même jeton que le reste : sans lui, ouvrir le
+     * relais au Wi-Fi offrirait au voisin la lecture de n'importe quoi qu'on y
+     * aurait déposé.
+     */
+    fun serviTexte(contenu: String, type: String): String {
+        val id = java.lang.Long.toString(java.security.SecureRandom().nextLong() ushr 1, 36)
+        textes[id] = contenu to type
+        return "http://${hote()}:${server.localPort}/$jeton/t/$id"
+    }
+
     private fun localPath(url: String): String =
         "/$jeton/u/" + Base64.getUrlEncoder().withoutPadding().encodeToString(url.toByteArray())
 
@@ -177,6 +202,22 @@ internal class LocalStreamProxy(
         // répondre annule la requête qui suit, sans trace.
         if (method.equals("OPTIONS", ignoreCase = true)) {
             writeHead(output, 204, "No Content", "text/plain", 0L, null)
+            output.flush()
+            return
+        }
+
+        // Route des textes servis en mémoire — les sous-titres. Avant le
+        // décodage d'URL : ce chemin ne porte pas d'adresse à relayer.
+        val prefixeTexte = "/$jeton/t/"
+        if (path.startsWith(prefixeTexte)) {
+            val texte = textes[path.removePrefix(prefixeTexte).substringBefore('?')]
+            if (texte == null) {
+                respondStatus(output, 404, "Not Found")
+                return
+            }
+            val octets = texte.first.toByteArray(Charsets.UTF_8)
+            writeHead(output, 200, "OK", texte.second, octets.size.toLong(), null)
+            if (!method.equals("HEAD", ignoreCase = true)) output.write(octets)
             output.flush()
             return
         }

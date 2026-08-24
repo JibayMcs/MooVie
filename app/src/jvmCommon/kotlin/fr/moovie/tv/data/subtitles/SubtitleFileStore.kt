@@ -87,6 +87,27 @@ class SubtitleFileStore(
     fun existing(mediaKey: String, candidate: SubtitleCandidate): File? =
         File(dir, "${safe(mediaKey)}_${candidate.fileId}.srt").takeIf { it.isFile }
 
+    /**
+     * Le dernier sous-titre utilisé pour ce média, s'il y en a un.
+     *
+     * ## Pourquoi « le dernier » et pas « le choisi »
+     *
+     * Le choix vit dans le ViewModel du lecteur, et la diffusion Chromecast part
+     * de la fiche — le lecteur n'a jamais été ouvert, il n'y a donc pas de choix
+     * à lire. Ce qui reste sur le disque est en revanche parlant : c'est ce que
+     * l'utilisateur a téléchargé pour ce titre, et recalé s'il l'a fait.
+     *
+     * D'où le tri par date de modification, qui fait remonter la **version
+     * recalée** (`_v<n>`) avant l'originale : entre les deux, celle qu'on veut
+     * envoyer est celle qu'il a ajustée.
+     */
+    fun dernierUtilise(mediaKey: String): File? {
+        val prefix = safe(mediaKey) + "_"
+        return dir.listFiles()
+            ?.filter { it.isFile && it.name.startsWith(prefix) && it.name.endsWith(".srt") }
+            ?.maxByOrNull { it.lastModified() }
+    }
+
     /** `tv:1396:s1e1` porte des deux-points, que Windows refuse dans un nom. */
     private fun safe(mediaKey: String): String =
         mediaKey.replace(Regex("""[^A-Za-z0-9_-]"""), "_")
