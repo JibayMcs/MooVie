@@ -106,19 +106,15 @@ class QuickCoverageProbeTest {
         parHebergeur.toList().sortedByDescending { it.second }
             .forEach { (h, n) -> println("HEBERGEUR $h $n") }
 
-        // Le même relevé en JSON, pour le tableau de bord — voir ProbeReport.
+        // Seule la **couverture** part d'ici. Le compte par catalogue était
+        // faux comme mesure de santé : cette sonde ne retient que la VF, donc
+        // vidapi — qui ne produit que de la VO, par construction — affichait
+        // zéro depuis toujours et passait pour mort. Voir ProviderHealthProbeTest.
         if (ProbeReport.demande) {
             ProbeReport.ecris(
-                "providers",
+                "coverage",
                 buildString {
-                    append("""{"providers":[""")
-                    ProviderRegistry.all.map { it.name }.sorted().forEachIndexed { i, nom ->
-                        if (i > 0) append(',')
-                        val titres = parProvider[nom] ?: 0
-                        append("""{"name":${ProbeReport.texte(nom)},"titles":$titres,""")
-                        append(""""alive":${titres > 0}}""")
-                    }
-                    append("""],"covered":$ok,"total":${lignes.size},"titles":[""")
+                    append("""{"covered":$ok,"total":${lignes.size},"titles":[""")
                     lignes.forEachIndexed { i, l ->
                         if (i > 0) append(',')
                         append("""{"title":${ProbeReport.texte(l.titre)},""")

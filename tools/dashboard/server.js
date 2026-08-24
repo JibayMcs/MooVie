@@ -89,6 +89,7 @@ function releve() {
     const args = [
       ':app:desktopTest',
       '--tests', '*HosterHealthProbeTest',
+      '--tests', '*ProviderHealthProbeTest',
       '--tests', '*QuickCoverageProbeTest',
       '-Dmoovie.probe=1',
       `-Dmoovie.report=${sortie}`,
@@ -111,6 +112,7 @@ function releve() {
       enCours = false;
       const hosters = litJson(path.join(sortie, 'hosters.json'));
       const providers = litJson(path.join(sortie, 'providers.json'));
+      const coverage = litJson(path.join(sortie, 'coverage.json'));
       fs.rmSync(sortie, { recursive: true, force: true });
 
       if (!hosters && !providers) {
@@ -126,7 +128,7 @@ function releve() {
         at: new Date().toISOString(),
         hosters: hosters?.hosters ?? [],
         providers: providers?.providers ?? [],
-        coverage: providers ? { covered: providers.covered, total: providers.total } : null,
+        coverage: coverage ? { covered: coverage.covered, total: coverage.total } : null,
       };
       const precedent = dernierInstantane();
       ajoute(instantane);
