@@ -175,8 +175,53 @@ internal interface Libmpv : Library {
         val instance: Libmpv? by lazy {
             regleLocaleNumerique()
             val chemins = listOfNotNull(System.getProperty("moovie.mpv.path"), embarquee()) + NOMS
-            chemins.firstNotNullOfOrNull { nom ->
-                runCatching { Native.load(nom, Libmpv::class.java) }.getOrNull()
+            var dernierEchec: Throwable? = null
+            val charge = chemins.firstNotNullOfOrNull { nom ->
+                runCatching { Native.load(nom, Libmpv::class.java) }
+                    .onFailure { dernierEchec = it }
+                    .getOrNull()
+            }
+            if (charge == null) diagnostic = expliqueEchec(dernierEchec)
+            charge
+        }
+
+        /**
+         * Pourquoi le chargement a échoué, en une phrase montrable.
+         *
+         * ## Le défaut que ça corrige
+         *
+         * L'écran disait « lecteur introuvable » et conseillait de réinstaller.
+         * Or sur la machine où ça s'est produit, **le fichier était là**, au bon
+         * endroit et à la bonne taille : c'est une de ses dépendances qui
+         * manquait. Le conseil était donc faux, et la réinstallation n'aurait
+         * rien changé — on a cherché un fichier absent pendant qu'il était sous
+         * nos yeux.
+         *
+         * Windows dit `LoadLibrary` **erreur 126, module introuvable** en
+         * désignant la bibliothèque qu'on lui a demandée, jamais celle qui
+         * manque réellement. C'est le piège, et il vaut la peine de le nommer :
+         * quand le fichier existe, l'erreur ne parle pas de lui.
+         */
+        @Volatile
+        var diagnostic: String? = null
+            private set
+
+        private fun expliqueEchec(cause: Throwable?): String {
+            val chemin = embarquee()
+            val message = cause?.message.orEmpty()
+            return when {
+                chemin == null ->
+                    "libmpv n'est pas fournie avec cette installation."
+                !java.io.File(chemin).isFile ->
+                    "libmpv est déclarée dans $chemin mais le fichier n'y est pas."
+                // Le cas mesuré : le fichier est présent et le chargeur refuse
+                // quand même. Sous Windows, presque toujours une dépendance
+                // absente — `vulkan-1.dll` sur une machine dont le pilote GPU
+                // est trop ancien pour la fournir.
+                else ->
+                    "libmpv est présente ($chemin) mais n'a pas pu être chargée : " +
+                        "une bibliothèque dont elle dépend manque sur ce système. " +
+                        message.take(200)
             }
         }
 

@@ -58,6 +58,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asComposeImageBitmap
 import androidx.compose.ui.input.key.Key
@@ -1205,6 +1206,18 @@ private fun MissingMpv(onBack: () -> Unit) {
             style = MaterialTheme.typography.headlineMedium,
         )
         Text(stringResource(Res.string.player_mpv_help), color = Color(0xFF9A9A9A))
+        // La raison exacte, quand on la connaît. Le conseil générique
+        // (« réinstaller ») est **faux** dans le cas mesuré : le fichier était
+        // présent et c'est une de ses dépendances qui manquait. Sans cette
+        // ligne, l'écran envoie réinstaller une application intacte.
+        Libmpv.diagnostic?.let { raison ->
+            Text(
+                raison,
+                style = MaterialTheme.typography.bodySmall,
+                color = Color(0xFF7A7A85),
+                textAlign = TextAlign.Center,
+            )
+        }
         MoovieButton(onClick = onBack) { Text(stringResource(Res.string.common_back)) }
     }
 }
