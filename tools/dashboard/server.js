@@ -176,6 +176,21 @@ function dernierInstantane() {
 }
 
 /**
+ * La forme d'un relevé, déduite des champs qu'il porte.
+ *
+ * Sert à reconnaître qu'on a changé de **mesure** entre deux passages. Rien
+ * n'est persisté : la signature se recalcule depuis les données, ce qui la rend
+ * valable aussi sur les relevés écrits avant qu'elle existe.
+ *
+ * `null` sur une liste vide — il n'y a alors rien à comparer de toute façon, et
+ * la traiter comme une forme à part suspendrait des comparaisons parfaitement
+ * valides sur l'autre moitié du relevé.
+ */
+function signatureDe(liste) {
+  return liste?.length ? Object.keys(liste[0]).sort().join(',') : null;
+}
+
+/**
  * Les bascules entre deux relevés.
  *
  * Un nom **absent** d'un des deux relevés n'est pas une bascule : les
@@ -183,11 +198,34 @@ function dernierInstantane() {
  * traiter une absence comme une mort ferait alerter au gré des humeurs des
  * catalogues. Même leçon que les pierres tombales de la synchronisation : une
  * absence n'est pas une décision.
+ *
+ * ## Un changement de mesure n'est pas un changement du monde
+ *
+ * Le 24/08/2026, le relevé des catalogues est passé d'une sonde qui ne comptait
+ * que la VF à une sonde sans filtre de langue. `vidapi` ne sert que de la
+ * version originale : il lisait zéro depuis toujours, et il a suffi de changer
+ * l'instrument pour qu'il paraisse **ressusciter**. Une notification est partie,
+ * pour un événement qui n'a jamais eu lieu.
+ *
+ * On compare donc la forme des deux relevés, par nature — hébergeurs et
+ * catalogues séparément, l'un pouvant changer sans l'autre — et on suspend la
+ * comparaison quand elle diffère. Perdre une bascule réelle ce jour-là est sans
+ * gravité : le passage suivant la verra. Crier au loup, non : un moniteur qui
+ * annonce de faux événements cesse d'être lu, et ne sert alors plus à rien.
  */
 function compare(avant, apres) {
   if (!avant) return [];
   const bascules = [];
   for (const genre of ['hosters', 'providers']) {
+    const forme = signatureDe(avant[genre]);
+    const formeApres = signatureDe(apres[genre]);
+    if (forme && formeApres && forme !== formeApres) {
+      console.log(
+        `[relevé] la forme du relevé « ${genre} » a changé — comparaison suspendue ` +
+        'pour ce passage (voir compare)',
+      );
+      continue;
+    }
     const ancien = new Map((avant[genre] ?? []).map((x) => [x.name, x.alive]));
     for (const item of apres[genre] ?? []) {
       if (!ancien.has(item.name)) continue;
@@ -271,9 +309,15 @@ function json(res, data) {
   res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' }).end(JSON.stringify(data));
 }
 
+// Démarré seulement en exécution directe : requis comme module — pour vérifier
+// `compare` sur l'historique réel, par exemple — il ne doit pas ouvrir de port.
+if (require.main === module) {
 serveur.listen(config.port, '127.0.0.1', () => {
   console.log(`Moo-vie · sources — http://127.0.0.1:${config.port}`);
   console.log(`  relevé toutes les ${config.intervalHours} h · alerte ${config.webhookUrl ? 'activée' : 'désactivée'}`);
   if (config.runOnStart) releve();
   setInterval(releve, Math.max(1, config.intervalHours) * 3600 * 1000);
 });
+}
+
+module.exports = { compare, signatureDe, litHistorique };

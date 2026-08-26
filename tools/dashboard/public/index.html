@@ -62,6 +62,11 @@
 const $ = (id) => document.getElementById(id);
 const fr = (iso) => new Date(iso).toLocaleString('fr-FR', { dateStyle:'short', timeStyle:'short' });
 
+/** La forme d'un relevé, déduite de ses champs. Voir `compare` côté serveur. */
+function signatureDe(liste) {
+  return liste && liste.length ? Object.keys(liste[0]).sort().join(',') : null;
+}
+
 /**
  * Les bascules, recalculées côté page.
  *
@@ -71,11 +76,20 @@ const fr = (iso) => new Date(iso).toLocaleString('fr-FR', { dateStyle:'short', t
  *
  * Un nom absent d'un des deux relevés est ignoré : les catalogues ne rendent pas
  * toujours les mêmes hébergeurs, et une absence n'est pas une mort.
+ *
+ * Et un **changement de mesure n'est pas un changement du monde** : quand la
+ * forme du relevé change entre deux passages, la comparaison est suspendue. La
+ * même règle qu'au serveur, pour la même raison — sans elle, la page afficherait
+ * éternellement la fausse résurrection de vidapi du 24/08/2026, celle qui venait
+ * du remplacement d'une sonde filtrée VF par une sonde sans filtre.
  */
 function bascules(hist) {
   const out = [];
   for (let i = 1; i < hist.length; i++) {
     for (const genre of ['hosters', 'providers']) {
+      const forme = signatureDe(hist[i-1][genre]);
+      const formeApres = signatureDe(hist[i][genre]);
+      if (forme && formeApres && forme !== formeApres) continue;
       const avant = new Map((hist[i-1][genre] || []).map(x => [x.name, x.alive]));
       for (const item of hist[i][genre] || []) {
         if (!avant.has(item.name)) continue;
