@@ -226,9 +226,29 @@ internal class MpvEngine(
         lib.mpv_set_option_string(contexte, "audio-display", "no")
         lib.mpv_set_option_string(contexte, "vo", "libmpv")
         lib.mpv_set_option_string(contexte, "idle", "yes")
-        // Décodage logiciel : le rendu l'est aussi, et rapatrier des trames
-        // matérielles pour les recopier coûte plus que décoder en logiciel.
-        lib.mpv_set_option_string(contexte, "hwdec", "no")
+        // ── Décodage matériel, avec recopie en mémoire centrale ──────────────
+        //
+        // Le rendu est logiciel : il nous faut les trames en RAM, donc les
+        // surfaces GPU ne servent à rien telles quelles. D'où `-copy`, qui
+        // décode sur le GPU puis rapatrie — et **non** `auto`, dont les trames
+        // resteraient inatteignables pour notre tampon.
+        //
+        // Le réglage précédent était `no`, au motif que la recopie coûterait
+        // plus cher que décoder en logiciel. C'était vrai pour du 1080p H.264 ;
+        // ça ne l'est pas pour ce que les catalogues servent aujourd'hui.
+        // Mesuré sur un HEVC 10 bits 3840×1920, 240 trames, recopie comprise :
+        //
+        // | décodage        | durée  | CPU    |
+        // |-----------------|--------|--------|
+        // | `no`            | 1,85 s | 951 %  |
+        // | `auto-copy`     | 1,78 s | 246 %  |
+        //
+        // Quatre fois moins de processeur à vitesse égale. Sur une machine sans
+        // décodeur HEVC — un Xeon de 2012 avec sa Quadro 2000, mesuré à une
+        // dizaine d'images par seconde — ça ne change rien : mpv retombe seul
+        // sur le logiciel, et c'est la raison de choisir `auto-copy` plutôt
+        // qu'un décodeur nommé, qui échouerait au lieu de se replier.
+        lib.mpv_set_option_string(contexte, "hwdec", "auto-copy")
         // La veille système est gérée par l'application (KeepAwake), pas par mpv.
         lib.mpv_set_option_string(contexte, "stop-screensaver", "no")
         // Amplification jusqu'à 200 % : le curseur du lecteur va au-delà de
@@ -325,6 +345,19 @@ internal class MpvEngine(
                 Libmpv.EVENT_FILE_LOADED -> {
                     charge = true
                     ouvertureReussie = true
+                    // **Ce que le décodage a réellement obtenu.** `auto-copy` est
+                    // une demande, pas une garantie : sans décodeur pour ce
+                    // format, mpv retombe en logiciel sans rien dire. Sur une
+                    // machine trop lente, la question « est-ce que le matériel a
+                    // pris ? » est la première à se poser, et jusqu'ici rien ne
+                    // permettait d'y répondre — un Xeon de 2012 rendait dix
+                    // images par seconde et il fallait le déduire.
+                    println(
+                        "[lecteur] décodage=${lisTexte("hwdec-current") ?: "?"}" +
+                            " format=${lisTexte("video-format") ?: "?"}" +
+                            " ${lisTexte("width") ?: "?"}×${lisTexte("height") ?: "?"}" +
+                            " gamma=${lisTexte("video-params/gamma") ?: "?"}",
+                    )
                     ouverture?.countDown()
                 }
                 Libmpv.EVENT_PLAYBACK_RESTART -> seekCible = -1L
