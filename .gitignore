@@ -36,3 +36,6 @@ tools/reports/
 # secret au même titre que le keystore — quiconque l'a peut écrire dans le salon.
 # tools/dashboard/config.example.json est la version publiable.
 /tools/dashboard/config.json
+
+# Bibliothèques mpv portables, déposées par tools/fetch-mpv-linux.sh
+app/mpv-linux/

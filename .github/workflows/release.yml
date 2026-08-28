@@ -299,17 +299,21 @@ jobs:
         run: |
           apt-get update
           # binutils : jlink appelle objcopy pour --strip-debug, et un conteneur
-          # nu ne l'a pas — contrairement à un poste de développement.
-          # libmpv1 : source de la bibliothèque embarquée dans l'AppImage.
-          # Sans elle, packageAppImage échoue explicitement plutôt que de
-          # livrer une image sans lecteur vidéo. Une seule bibliothèque là où
-          # libVLC en réclamait une centaine (voir bundleMpv) ; 22.04 sert
-          # `libmpv1`, les bases plus récentes `libmpv2`.
-          apt-get install -y openjdk-17-jdk binutils curl file zsync git ca-certificates \
-            libmpv1 || apt-get install -y openjdk-17-jdk binutils curl file zsync git \
-            ca-certificates libmpv2
+          # nu ne l'a pas — contrairement à un poste de développement. Sert
+          # aussi à `strip` les bibliothèques mpv (63 Mo de symboles).
+          # bzip2 : micromamba est servi en tar.bz2.
+          # La libmpv n'est plus installée par apt : elle vient de
+          # tools/fetch-mpv-linux.sh, pour les raisons documentées là-bas.
+          apt-get install -y openjdk-17-jdk binutils bzip2 curl file zsync git ca-certificates
 
       - uses: actions/checkout@v4
+
+      # Avant le build : sans ce répertoire, `bundleMpv` retomberait sur la
+      # libmpv du conteneur — 22.04 sert la 0.34.1, qui rend toute source 4K
+      # cramée. Le repli est délibérément absent ici : un échec de cette étape
+      # doit arrêter la release, pas produire une image dégradée en silence.
+      - name: Embarquer une libmpv portable
+        run: ./tools/fetch-mpv-linux.sh
 
       # Le runtime embarqué ne peut pas être Temurin : le décodage natif part
       # en SIGSEGV dès le démarrage d'une lecture (reproduit 7/7 sous libVLC,

@@ -370,8 +370,24 @@ private val appImageToolUrl =
  * Ses dépendances (FFmpeg, libass, freetype…) ne sont pas listées non plus :
  * la fermeture ELF calculée plus bas les ramasse toutes seules, comme pour le
  * reste du paquet.
+ *
+ * **Deux sources possibles, et la première l'emporte.** `app/mpv-linux/`, si
+ * elle existe, contient une libmpv portable et sa fermeture, déposées par
+ * `tools/fetch-mpv-linux.sh` (voir ce script pour le pourquoi : la libmpv de la
+ * base de build décidait de la qualité de l'image, et 22.04 en sert une qui ne
+ * sait pas convertir le HDR). À défaut, on retombe sur la bibliothèque système
+ * — ce qui garde un `./gradlew packageAppImage` utilisable sans réseau.
  */
 fun bundleMpv(appDir: File) {
+    val portable = File(projectDir, "mpv-linux")
+    if (File(portable, "libmpv.so.2").isFile) {
+        bundleMpvPortable(appDir, portable)
+        return
+    }
+    logger.lifecycle(
+        "app/mpv-linux/ absent — repli sur la libmpv du système. " +
+            "Lancer tools/fetch-mpv-linux.sh pour embarquer la version portable.",
+    )
     val libDirs = listOf(
         File("/usr/lib/x86_64-linux-gnu"),
         File("/usr/lib64"),
@@ -399,6 +415,30 @@ fun bundleMpv(appDir: File) {
     sansVersion.delete()
     Files.createSymbolicLink(sansVersion.toPath(), File(lib.name).toPath())
     logger.lifecycle("libmpv embarquée : ${lib.name} (${cible.length() / 1024 / 1024} Mo)")
+}
+
+/**
+ * Copie la libmpv portable **et toute sa fermeture** dans l'AppDir.
+ *
+ * Le répertoire a déjà été trié par `tools/fetch-mpv-linux.sh` : ce qui s'y
+ * trouve s'y trouve parce qu'on l'a mesuré nécessaire, et ce qui n'y est pas
+ * appartient à l'hôte. On recopie donc sans refiltrer — la fermeture ELF plus
+ * bas verra ces fichiers déjà présents et n'ira pas chercher les homonymes du
+ * système, qui seraient d'une autre génération.
+ */
+fun bundleMpvPortable(appDir: File, source: File) {
+    val bundled = File(appDir, "usr/lib/bundled").apply { mkdirs() }
+    val libs = source.listFiles()?.filter { it.isFile && it.name.contains(".so") }.orEmpty()
+    libs.forEach { it.copyTo(File(bundled, it.name), overwrite = true) }
+    // JNA résout « mpv » en « libmpv.so », sans suffixe de version : sans ce
+    // lien il ne trouverait rien dans notre répertoire et retomberait sur la
+    // bibliothèque de l'hôte — celle dont on ne sait rien.
+    val sansVersion = File(bundled, "libmpv.so")
+    sansVersion.delete()
+    Files.createSymbolicLink(sansVersion.toPath(), File("libmpv.so.2").toPath())
+    val version = File(source, "VERSION").takeIf { it.isFile }?.readText()?.trim() ?: "?"
+    val poids = libs.sumOf { it.length() } / 1024 / 1024
+    logger.lifecycle("libmpv portable embarquée : mpv $version, ${libs.size} bibliothèques ($poids Mo)")
 }
 
 val packageAppImage by tasks.registering {
@@ -498,7 +538,12 @@ val packageAppImage by tasks.registering {
                 "|libXtst|libXau|libXdmcp|libxcb.*|libasound|libpulse.*|libdrm.*)\\..*",
         )
         val bundled = File(appDir, "usr/lib/bundled").apply { mkdirs() }
-        val seen = mutableSetOf<String>()
+        // Ce que `bundleMpv` a déjà déposé est réputé bon et n'est pas
+        // reconsidéré. Sans cette amorce, `ldd` d'une libmpv portable résoudrait
+        // ses dépendances contre le *système* de la machine de build, et une
+        // freetype d'Ubuntu 22.04 viendrait écraser celle qui accompagne la
+        // libmpv qu'on a choisie — deux générations mélangées dans un process.
+        val seen = bundled.list()?.toMutableSet() ?: mutableSetOf()
         fun closure(file: File) {
             val out = providers.exec {
                 commandLine("ldd", file.absolutePath)
