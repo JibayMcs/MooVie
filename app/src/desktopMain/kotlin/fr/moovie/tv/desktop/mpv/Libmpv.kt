@@ -104,6 +104,10 @@ internal interface Libmpv : Library {
     companion object {
 
         // mpv_format
+        // NONE : on demande à être prévenu du changement, pas à en recevoir la
+        // valeur — on la relit ensuite, ce qui évite d'avoir à décoder une chaîne
+        // depuis la structure d'événement.
+        const val FORMAT_NONE = 0
         const val FORMAT_FLAG = 3
         const val FORMAT_INT64 = 4
         const val FORMAT_DOUBLE = 5

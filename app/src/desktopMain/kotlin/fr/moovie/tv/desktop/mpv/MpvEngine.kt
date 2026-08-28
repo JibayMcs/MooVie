@@ -99,6 +99,10 @@ internal class MpvEngine(
     @Volatile
     private var ouvertureReussie = false
 
+    /** Le décodeur retenu n'est annoncé qu'une fois par média. */
+    @Volatile
+    private var decodeurAnnonce = false
+
     /**
      * Cible d'un seek pas encore abouti, et l'instant de la demande.
      *
@@ -274,6 +278,7 @@ internal class MpvEngine(
         }
         lib.mpv_request_log_messages(contexte, "warn")
         lib.mpv_observe_property(contexte, ETIQUETTE_EOF, "eof-reached", Libmpv.FORMAT_FLAG)
+        lib.mpv_observe_property(contexte, ETIQUETTE_DECODEUR, "hwdec-current", Libmpv.FORMAT_NONE)
 
         val creation = ParamsRendu(
             listOf(Libmpv.RENDER_PARAM_API_TYPE to ParamsRendu.texte(Libmpv.RENDER_API_SW)),
@@ -345,18 +350,13 @@ internal class MpvEngine(
                 Libmpv.EVENT_FILE_LOADED -> {
                     charge = true
                     ouvertureReussie = true
-                    // **Ce que le décodage a réellement obtenu.** `auto-copy` est
-                    // une demande, pas une garantie : sans décodeur pour ce
-                    // format, mpv retombe en logiciel sans rien dire. Sur une
-                    // machine trop lente, la question « est-ce que le matériel a
-                    // pris ? » est la première à se poser, et jusqu'ici rien ne
-                    // permettait d'y répondre — un Xeon de 2012 rendait dix
-                    // images par seconde et il fallait le déduire.
+                    decodeurAnnonce = false
+                    // Ce que le démultiplexeur sait déjà. La courbe de transfert
+                    // et le décodeur retenu, eux, n'existent qu'une fois le
+                    // décodeur initialisé — ils sont annoncés plus bas.
                     println(
-                        "[lecteur] décodage=${lisTexte("hwdec-current") ?: "?"}" +
-                            " format=${lisTexte("video-format") ?: "?"}" +
-                            " ${lisTexte("width") ?: "?"}×${lisTexte("height") ?: "?"}" +
-                            " gamma=${lisTexte("video-params/gamma") ?: "?"}",
+                        "[lecteur] format=${lisTexte("video-format") ?: "?"}" +
+                            " ${lisTexte("width") ?: "?"}×${lisTexte("height") ?: "?"}",
                     )
                     ouverture?.countDown()
                 }
@@ -365,7 +365,33 @@ internal class MpvEngine(
                 // et position restent lisibles — et c'est ce drapeau qui dit
                 // que la lecture a épuisé le flux. Sur la transition seulement :
                 // il redevient faux à chaque seek en arrière ou nouveau média.
-                Libmpv.EVENT_PROPERTY_CHANGE -> if (evenement.etiquette == ETIQUETTE_EOF) {
+                // **Ce que le décodage a réellement obtenu.** `auto-copy` est une
+                // demande, pas une garantie : sans décodeur pour ce format, mpv
+                // retombe en logiciel sans rien dire. Sur une machine trop lente,
+                // « est-ce que le matériel a pris ? » est la première question à
+                // poser — un Xeon de 2012 rendait dix images par seconde et il
+                // fallait le déduire.
+                //
+                // La réponse ne s'obtient pas à FILE_LOADED : le décodeur n'est pas
+                // encore initialisé et `hwdec-current` répond NULL, ce qui donnait
+                // un « décodage=? » qu'on prenait pour une absence de matériel. On
+                // attend donc que la propriété se manifeste.
+                Libmpv.EVENT_PROPERTY_CHANGE -> if (evenement.etiquette == ETIQUETTE_DECODEUR) {
+                    if (!decodeurAnnonce) {
+                        lisTexte("hwdec-current")?.let {
+                            decodeurAnnonce = true
+                            // `gamma` accompagne le décodeur pour la même raison
+                            // qu'il manquait à FILE_LOADED : c'est le décodeur qui
+                            // renseigne les paramètres de l'image. Il dit `pq` sur
+                            // une source HDR — la mention qui permet de rattacher
+                            // une plainte sur l'exposition à ce qu'on a vraiment lu.
+                            println(
+                                "[lecteur] décodage=$it" +
+                                    " gamma=${lisTexte("video-params/gamma") ?: "?"}",
+                            )
+                        }
+                    }
+                } else if (evenement.etiquette == ETIQUETTE_EOF) {
                     val atteint = evenement.drapeau == true
                     if (atteint && !termine && charge) {
                         termine = true
@@ -726,6 +752,9 @@ internal class MpvEngine(
 
         /** Étiquette de l'observation `eof-reached`. */
         const val ETIQUETTE_EOF = 1L
+
+        /** Étiquette de l'observation `hwdec-current`. */
+        const val ETIQUETTE_DECODEUR = 2L
         const val VOLUME_MAX = 100
         const val AMPLIFICATION_MAX = 200
         const val REMPLI = 100f
