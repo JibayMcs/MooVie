@@ -4,6 +4,7 @@ import fr.moovie.tv.data.backup.BackupRepository
 import fr.moovie.tv.data.net.Connectivity
 import fr.moovie.tv.data.settings.SettingsRepository
 import fr.moovie.tv.data.watch.WatchProgressRepository
+import kotlin.concurrent.Volatile
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock

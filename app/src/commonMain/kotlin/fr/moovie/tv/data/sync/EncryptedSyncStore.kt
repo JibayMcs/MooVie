@@ -1,13 +1,13 @@
 package fr.moovie.tv.data.sync
 
-import java.security.SecureRandom
-import java.util.Base64
-import java.util.concurrent.ConcurrentHashMap
-import javax.crypto.Cipher
-import javax.crypto.SecretKeyFactory
-import javax.crypto.spec.GCMParameterSpec
-import javax.crypto.spec.PBEKeySpec
-import javax.crypto.spec.SecretKeySpec
+import fr.moovie.tv.shared.Verrou
+import fr.moovie.tv.shared.avec
+import fr.moovie.tv.shared.chiffrerAesGcm
+import fr.moovie.tv.shared.dechiffrerAesGcm
+import fr.moovie.tv.shared.deriverCleAes
+import fr.moovie.tv.shared.octetsAleatoires
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 
 /**
  * Chiffre ce qui part sur le dépôt, avec une phrase de passe.
@@ -25,6 +25,7 @@ import javax.crypto.spec.SecretKeySpec
  * et c'est le prix d'un chiffrement que nous ne pouvons pas défaire non plus.
  * Les données locales, elles, sont intactes : seul le dépôt devient illisible.
  */
+@OptIn(ExperimentalEncodingApi::class)
 internal class EncryptedSyncStore(
     private val delegate: SyncStore,
     private val passphrase: String,
@@ -40,14 +41,12 @@ internal class EncryptedSyncStore(
     override suspend fun write(name: String, content: String): Long =
         delegate.write(name, encrypt(content))
 
-    private fun encrypt(plain: String): String {
-        val salt = ByteArray(SALT_BYTES).also(random::nextBytes)
-        val iv = ByteArray(IV_BYTES).also(random::nextBytes)
-        val cipher = Cipher.getInstance(TRANSFORMATION).apply {
-            init(Cipher.ENCRYPT_MODE, keyFor(salt), GCMParameterSpec(TAG_BITS, iv))
-        }
-        val body = cipher.doFinal(plain.toByteArray())
-        return PREFIX + encoder.encodeToString(salt + iv + body)
+    private suspend fun encrypt(plain: String): String {
+        val salt = octetsAleatoires(SALT_BYTES)
+        // `chiffrerAesGcm` rend `iv || chiffré || tag` : l'enveloppe reste donc
+        // `sel || iv || corps`, à l'octet près ce qu'écrivait la version
+        // précédente. Un appareil déjà synchronisé relit ses fichiers.
+        return PREFIX + Base64.encode(salt + chiffrerAesGcm(keyFor(salt), plain.encodeToByteArray()))
     }
 
     /**
@@ -59,17 +58,13 @@ internal class EncryptedSyncStore(
      * suivant — mieux vaut synchroniser avec deux appareils sur trois que pas du
      * tout.
      */
-    private fun decrypt(raw: String): String? {
+    private suspend fun decrypt(raw: String): String? {
         if (!raw.startsWith(PREFIX)) return null
         return runCatching {
-            val blob = Base64.getDecoder().decode(raw.removePrefix(PREFIX))
+            val blob = Base64.decode(raw.removePrefix(PREFIX))
             val salt = blob.copyOfRange(0, SALT_BYTES)
-            val iv = blob.copyOfRange(SALT_BYTES, SALT_BYTES + IV_BYTES)
-            val body = blob.copyOfRange(SALT_BYTES + IV_BYTES, blob.size)
-            val cipher = Cipher.getInstance(TRANSFORMATION).apply {
-                init(Cipher.DECRYPT_MODE, keyFor(salt), GCMParameterSpec(TAG_BITS, iv))
-            }
-            String(cipher.doFinal(body))
+            val reste = blob.copyOfRange(SALT_BYTES, blob.size)
+            dechiffrerAesGcm(keyFor(salt), reste).decodeToString()
         }.getOrNull()
     }
 
@@ -87,24 +82,26 @@ internal class EncryptedSyncStore(
      * différentes tombaient sur la même entrée, et une **mauvaise phrase
      * déchiffrait**. C'est un test qui l'a dit, pas une relecture.
      */
-    private fun keyFor(salt: ByteArray) = keys.getOrPut(passphrase to encoder.encodeToString(salt)) {
-        val spec = PBEKeySpec(passphrase.toCharArray(), salt, ITERATIONS, KEY_BITS)
-        SecretKeySpec(SecretKeyFactory.getInstance(KDF).generateSecret(spec).encoded, "AES")
+    private suspend fun keyFor(salt: ByteArray): ByteArray {
+        val cle = passphrase to Base64.encode(salt)
+        verrou.avec { keys[cle] }?.let { return it }
+        // La dérivation est hors du verrou : elle prend deux cent mille
+        // itérations, et la tenir bloquerait toutes les autres. Deux appels
+        // concurrents sur le même sel la feront deux fois et écriront la même
+        // valeur — un gaspillage rare, préférable à une TV figée.
+        val derivee = deriverCleAes(passphrase, salt, ITERATIONS, KEY_BITS)
+        verrou.avec { keys[cle] = derivee }
+        return derivee
     }
 
     private companion object {
         /** Marqueur de version : un jour on changera de paramètres. */
         const val PREFIX = "MOOVIE-ENC1:"
-        const val TRANSFORMATION = "AES/GCM/NoPadding"
-        const val KDF = "PBKDF2WithHmacSHA256"
         const val SALT_BYTES = 16
-        const val IV_BYTES = 12
-        const val TAG_BITS = 128
         const val KEY_BITS = 256
         const val ITERATIONS = 210_000
 
-        val random = SecureRandom()
-        val encoder: Base64.Encoder = Base64.getEncoder()
-        val keys = ConcurrentHashMap<Pair<String, String>, SecretKeySpec>()
+        val verrou = Verrou()
+        val keys = mutableMapOf<Pair<String, String>, ByteArray>()
     }
 }

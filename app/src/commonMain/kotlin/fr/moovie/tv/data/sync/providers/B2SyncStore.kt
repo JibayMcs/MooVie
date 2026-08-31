@@ -7,20 +7,27 @@ import fr.moovie.tv.data.sync.SyncFile
 import fr.moovie.tv.data.sync.SyncProvider
 import fr.moovie.tv.data.sync.SyncProviderDescriptor
 import fr.moovie.tv.data.sync.SyncStore
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
-import java.io.IOException
-import java.net.URLEncoder
-import java.security.MessageDigest
-import java.util.Base64
-import java.util.concurrent.TimeUnit
+import fr.moovie.tv.shared.dispatcherEs
+import fr.moovie.tv.shared.sha1 as sha1Octets
+import io.ktor.client.HttpClient
+import io.ktor.client.plugins.HttpTimeout
+import io.ktor.client.request.get
+import io.ktor.client.request.header
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.client.statement.HttpResponse
+import io.ktor.client.statement.bodyAsText
+import io.ktor.http.ContentType
+import io.ktor.http.contentType
+import io.ktor.http.encodeURLParameter
+import io.ktor.http.isSuccess
+import kotlin.concurrent.Volatile
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 
 const val B2_KEY_ID = "b2_key_id"
 const val B2_APP_KEY = "b2_app_key"
@@ -61,10 +68,11 @@ private data class B2Session(
     val bucketName: String,
 )
 
+@OptIn(ExperimentalEncodingApi::class)
 internal class B2SyncStore(
     private val keyId: String,
     private val applicationKey: String,
-    private val client: OkHttpClient = defaultClient(),
+    private val client: HttpClient = defaultClient(),
 ) : SyncStore {
 
     private val json = Json { ignoreUnknownKeys = true }
@@ -87,15 +95,13 @@ internal class B2SyncStore(
     }
 
     override suspend fun read(name: String): String? = withSession { s ->
-        val request = Request.Builder()
-            .url("${s.downloadUrl}/file/${s.bucketName}/${encode(name)}")
-            .header("Authorization", s.token)
-            .build()
-        call(request) { response ->
-            // 404 = le fichier a disparu entre le listage et la lecture. Ce
-            // n'est pas une panne : un autre appareil a pu le remplacer.
-            if (response.code == 404) null else response.body?.string()
+        val reponse = client.get("${s.downloadUrl}/file/${s.bucketName}/${encode(name)}") {
+            header("Authorization", s.token)
         }
+        verdict(reponse)
+        // 404 = le fichier a disparu entre le listage et la lecture. Ce n'est
+        // pas une panne : un autre appareil a pu le remplacer.
+        if (reponse.status.value == 404) null else reponse.bodyAsText()
     }
 
     override suspend fun write(name: String, content: String): Long = withSession { s ->
@@ -106,15 +112,16 @@ internal class B2SyncStore(
                 payload = """{"bucketId":"${s.bucketId}"}""",
             ),
         )
-        val bytes = content.toByteArray()
-        val request = Request.Builder()
-            .url(upload.uploadUrl)
-            .header("Authorization", upload.authorizationToken)
-            .header("X-Bz-File-Name", encode(name))
-            .header("X-Bz-Content-Sha1", sha1(bytes))
-            .post(bytes.toRequestBody(JSON_MEDIA))
-            .build()
-        val body = call(request) { it.body?.string().orEmpty() }
+        val bytes = content.encodeToByteArray()
+        val reponse = client.post(upload.uploadUrl) {
+            header("Authorization", upload.authorizationToken)
+            header("X-Bz-File-Name", encode(name))
+            header("X-Bz-Content-Sha1", sha1(bytes))
+            contentType(ContentType.Application.Json)
+            setBody(bytes)
+        }
+        verdict(reponse)
+        val body = reponse.bodyAsText()
         // L'horodatage rendu est celui du serveur : c'est notre référence de
         // temps, la seule que tous les appareils partagent.
         json.decodeFromString<UploadedFile>(body).uploadTimestamp
@@ -126,7 +133,7 @@ internal class B2SyncStore(
      * que ça tomberait sinon sur un 401 à chaque synchro.
      */
     private suspend fun <T> withSession(block: suspend (B2Session) -> T): T =
-        withContext(Dispatchers.IO) {
+        withContext(dispatcherEs) {
             val current = session ?: authorize().also { session = it }
             try {
                 block(current)
@@ -138,13 +145,15 @@ internal class B2SyncStore(
             }
         }
 
-    private fun authorize(): B2Session {
-        val basic = Base64.getEncoder().encodeToString("$keyId:$applicationKey".toByteArray())
-        val request = Request.Builder()
-            .url("https://api.backblazeb2.com/b2api/$API_VERSION/b2_authorize_account")
-            .header("Authorization", "Basic $basic")
-            .build()
-        val auth = json.decodeFromString<AuthResponse>(call(request) { it.body?.string().orEmpty() })
+    private suspend fun authorize(): B2Session {
+        val basic = Base64.encode("$keyId:$applicationKey".encodeToByteArray())
+        val reponse = client.get(
+            "https://api.backblazeb2.com/b2api/$API_VERSION/b2_authorize_account",
+        ) {
+            header("Authorization", "Basic $basic")
+        }
+        verdict(reponse)
+        val auth = json.decodeFromString<AuthResponse>(reponse.bodyAsText())
         val storage = auth.apiInfo.storageApi
 
         // Une clé de compte ne restreint aucun bucket : la liste est vide. On la
@@ -176,13 +185,14 @@ internal class B2SyncStore(
         )
     }
 
-    private fun post(url: String, token: String, payload: String): String {
-        val request = Request.Builder()
-            .url(url)
-            .header("Authorization", token)
-            .post(payload.toRequestBody(JSON_MEDIA))
-            .build()
-        return call(request) { it.body?.string().orEmpty() }
+    private suspend fun post(url: String, token: String, payload: String): String {
+        val reponse = client.post(url) {
+            header("Authorization", token)
+            contentType(ContentType.Application.Json)
+            setBody(payload)
+        }
+        verdict(reponse)
+        return reponse.bodyAsText()
     }
 
     /**
@@ -190,23 +200,31 @@ internal class B2SyncStore(
      * connaître des codes de statut : au-delà, le domaine ne voit que des
      * causes.
      */
-    private fun <T> call(request: Request, onSuccess: (okhttp3.Response) -> T): T = try {
-        client.newCall(request).execute().use { response ->
-            when {
-                response.isSuccessful || response.code == 404 -> onSuccess(response)
-                response.code == 401 || response.code == 403 ->
-                    throw SyncException(SyncFailure.CREDENTIALS, "B2 a refusé les identifiants")
-                else -> throw SyncException(SyncFailure.STORE, "B2 a répondu ${response.code}")
-            }
+    private fun verdict(reponse: HttpResponse) {
+        val code = reponse.status.value
+        when {
+            reponse.status.isSuccess() || code == 404 -> Unit
+            code == 401 || code == 403 ->
+                throw SyncException(SyncFailure.CREDENTIALS, "B2 a refusé les identifiants")
+            else -> throw SyncException(SyncFailure.STORE, "B2 a répondu $code")
         }
-    } catch (e: IOException) {
-        throw SyncException(SyncFailure.NETWORK, e.message, e)
     }
 
-    private fun encode(name: String): String = URLEncoder.encode(name, "UTF-8").replace("+", "%20")
+    /**
+     * `encodeURLParameter` puis `+` remplacé par `%20` : c'est exactement ce que
+     * faisait `URLEncoder.encode(name, "UTF-8")` suivi du même remplacement. B2
+     * attend un nom de fichier percent-encodé, où un `+` littéral resterait un
+     * `+` et non une espace.
+     */
+    private fun encode(name: String): String =
+        name.encodeURLParameter(spaceToPlus = true).replace("+", "%20")
 
+    /** Hexadécimal minuscule, la forme que B2 attend dans `X-Bz-Content-Sha1`. */
     private fun sha1(bytes: ByteArray): String =
-        MessageDigest.getInstance("SHA-1").digest(bytes).joinToString("") { "%02x".format(it) }
+        sha1Octets(bytes).joinToString("") { octet ->
+            val v = octet.toInt() and 0xFF
+            HEX[v shr 4].toString() + HEX[v and 0x0F]
+        }
 
     private companion object {
         /**
@@ -222,14 +240,17 @@ internal class B2SyncStore(
 
         /** Préfixe commun : le bucket peut servir à autre chose que Moo-vie. */
         const val PREFIX = "moovie-sync-"
-        val JSON_MEDIA = "application/json".toMediaType()
+        const val HEX = "0123456789abcdef"
 
-        fun defaultClient() = OkHttpClient.Builder()
+        fun defaultClient() = HttpClient {
             // B2 n'est bloqué par aucun FAI : DNS système, pas de DoH. Voir la
             // même décision pour TMDB et TheIntroDB.
-            .connectTimeout(15, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
-            .build()
+            expectSuccess = false
+            install(HttpTimeout) {
+                connectTimeoutMillis = 15_000
+                requestTimeoutMillis = 30_000
+            }
+        }
     }
 }
 

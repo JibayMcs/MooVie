@@ -90,7 +90,15 @@ class SyncSettingsRepository {
         val creds = credentials.first()
         val material = buildString {
             append(active.name)
-            creds.toSortedMap().forEach { (k, v) -> append('\u0000').append(k).append('=').append(v) }
+            // `toSortedMap()` n'existe que sur la JVM. Trier les entrées par
+            // clé donne le **même ordre** — l'ordre naturel des chaînes dans
+            // les deux cas — donc la même empreinte. Ce point n'est pas
+            // anodin : l'empreinte décide si un appareil a le droit
+            // d'enregistrer ce qu'on lui diffuse, et un ordre différent
+            // l'invaliderait silencieusement à chaque synchro.
+            creds.entries.sortedBy { it.key }.forEach { (k, v) ->
+                append('\u0000').append(k).append('=').append(v)
+            }
             append('\u0000').append(passphrase.first())
             append('\u0000').append(fr.moovie.tv.data.store.ActiveProfile.id)
         }

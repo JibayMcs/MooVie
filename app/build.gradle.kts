@@ -229,6 +229,12 @@ kotlin {
                 // NSURLSession, seule pile HTTP disponible sans JVM.
                 implementation("io.ktor:ktor-client-core:3.0.3")
                 implementation("io.ktor:ktor-client-darwin:3.0.3")
+                // Chiffrement. Uniquement côté iOS : la JVM garde `javax.crypto`
+                // tel quel, il n'y a aucune raison de remplacer une pile qui
+                // marche chez les utilisateurs Android et desktop. Le provider
+                // Apple s'adosse à CommonCrypto et CryptoKit.
+                implementation("dev.whyoleg.cryptography:cryptography-core:0.4.0")
+                implementation("dev.whyoleg.cryptography:cryptography-provider-apple:0.4.0")
             }
         }
         val iosX64Main by getting { dependsOn(iosMain) }
