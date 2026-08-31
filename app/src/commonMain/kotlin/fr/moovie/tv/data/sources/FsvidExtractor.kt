@@ -6,20 +6,22 @@ import fr.moovie.tv.core.sources.model.StreamFormat
 import fr.moovie.tv.core.sources.port.HttpGateway
 import fr.moovie.tv.core.sources.port.getBody
 import fr.moovie.tv.core.sources.port.SourceExtractor
-import kotlinx.coroutines.Dispatchers
+import fr.moovie.tv.shared.dispatcherEs
 import kotlinx.coroutines.withContext
 
 /**
- * Extracteur vidzy.org — même packer que fsvid (port de vidzy_extract_handler).
+ * Extracteur fsvid.lol — page d'embed → dé-obfuscation du packer → m3u8.
+ * Port de fsvid_extract_handler (API/proxiesembed/server.py).
  */
-class VidzyExtractor(private val http: HttpGateway) : SourceExtractor {
+class FsvidExtractor(private val http: HttpGateway) : SourceExtractor {
 
-    override val hoster = "vidzy"
+    override val hoster = "fsvid"
 
-    override fun canHandle(url: String): Boolean = url.contains("vidzy", ignoreCase = true)
+    // "fsvid" en substring (et non "fsvid.lol") : l'hôte peut changer de TLD.
+    override fun canHandle(url: String): Boolean = url.contains("fsvid", ignoreCase = true)
 
-    override suspend fun extract(link: EmbedLink): PlayableStream? = withContext(Dispatchers.IO) {
-        val origin = originOf(link.url, "https://vidzy.org")
+    override suspend fun extract(link: EmbedLink): PlayableStream? = withContext(dispatcherEs) {
+        val origin = originOf(link.url, "https://fsvid.lol")
 
         runCatching {
             val html = http.getBody(

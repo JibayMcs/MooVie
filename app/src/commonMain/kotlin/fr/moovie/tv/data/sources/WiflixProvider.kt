@@ -105,7 +105,7 @@ class WiflixProvider(private val http: HttpGateway) : SourceProvider {
          * `let allSources = [ … ];` — le tableau est du JSON valide, y compris
          * ses `\/` échappés, que kotlinx désérialise sans aide.
          */
-        private val ALL_SOURCES = Regex("""let allSources\s*=\s*(\[.*?\])\s*;""", RegexOption.DOT_MATCHES_ALL)
+        private val ALL_SOURCES = Regex("""let allSources\s*=\s*(\[[\s\S]*?\])\s*;""")
 
         /**
          * wiflix n'étiquette que « VF » et « VOSTFR ». Tout autre libellé est

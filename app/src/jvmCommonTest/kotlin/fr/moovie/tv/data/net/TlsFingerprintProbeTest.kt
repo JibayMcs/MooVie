@@ -1,5 +1,6 @@
 package fr.moovie.tv.data.net
 
+import fr.moovie.tv.data.sources.ClientExtraction
 import fr.moovie.tv.data.sources.ExtractorRegistry
 import fr.moovie.tv.data.sources.Ua
 import kotlinx.serialization.json.Json
@@ -43,12 +44,12 @@ class TlsFingerprintProbeTest {
             return
         }
 
-        report("client d'extraction de l'app (ExtractorRegistry.http)", ExtractorRegistry.http)
+        report("client d'extraction de l'app (ClientExtraction.http)", ClientExtraction.http)
 
         // Variante : HTTP/1.1 forcé. Beaucoup de détections portent sur
         // l'empreinte HTTP/2 (ordre des SETTINGS) et non sur TLS ; si c'est le
         // cas, se replier en HTTP/1.1 coûte une ligne au lieu d'une lib de spoof.
-        val http1 = ExtractorRegistry.http.newBuilder()
+        val http1 = ClientExtraction.http.newBuilder()
             .protocols(listOf(Protocol.HTTP_1_1))
             .build()
         report("même client, HTTP/1.1 forcé", http1)

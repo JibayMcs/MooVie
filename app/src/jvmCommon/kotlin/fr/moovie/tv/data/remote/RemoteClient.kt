@@ -1,5 +1,6 @@
 package fr.moovie.tv.data.remote
 
+import fr.moovie.tv.data.sources.ClientExtraction
 import fr.moovie.tv.data.sources.ExtractorRegistry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -46,7 +47,7 @@ class RemoteClient(private val target: RemoteTarget) {
      * une adresse IP du réseau local. Le résolveur DoH n'a rien à y faire, et
      * l'interroger pour une IP littérale ne ferait qu'ajouter de la latence.
      */
-    private val http = ExtractorRegistry.http.newBuilder()
+    private val http = ClientExtraction.http.newBuilder()
         .connectTimeout(800, TimeUnit.MILLISECONDS)
         .readTimeout(1200, TimeUnit.MILLISECONDS)
         .callTimeout(1500, TimeUnit.MILLISECONDS)

@@ -147,6 +147,11 @@ kotlin {
                 implementation(compose.materialIconsExtended)
                 implementation(compose.components.resources)
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+                // Explicite depuis que la couche sources est en commun : elle
+                // référence `CoroutineDispatcher`. Les cibles JVM la tiraient
+                // jusque-là transitivement, à la même version — rien ne change
+                // pour elles.
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
             }
         }
 

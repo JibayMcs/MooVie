@@ -25,9 +25,11 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 @OptIn(ExperimentalEncodingApi::class)
 object VoePayload {
 
+    // `[\s\S]` plutôt que `.` sous RegexOption.DOT_MATCHES_ALL : cette option
+    // n'existe que sur la JVM. La classe de caractères dit la même chose à tous
+    // les moteurs, sans dépendre d'un drapeau.
     private val PAYLOAD = Regex(
-        """<script[^>]+type=["']application/json["'][^>]*>\s*\[\s*"(.*?)"\s*]\s*</script>""",
-        RegexOption.DOT_MATCHES_ALL,
+        """<script[^>]+type=["']application/json["'][^>]*>\s*\[\s*"([\s\S]*?)"\s*]\s*</script>""",
     )
 
     private val JUNK = listOf("@$", "^^", "~@", "%?", "*~", "!!", "#&")
@@ -51,14 +53,28 @@ object VoePayload {
         // Latin-1 et non UTF-8 : l'étape suivante décale des codes de caractères,
         // elle doit voir un octet = un caractère. Un décodage UTF-8 fusionnerait
         // des paires d'octets et fausserait le décalage.
-        val first = decodeBase64(step)?.toString(Charsets.ISO_8859_1) ?: return null
+        val first = decodeBase64(step)?.enLatin1() ?: return null
 
         val shifted = buildString(first.length) {
             for (c in first) append((c.code - 3).toChar())
         }.reversed()
 
-        return decodeBase64(shifted)?.toString(Charsets.UTF_8)
+        return decodeBase64(shifted)?.decodeToString()
     }
+
+    /**
+     * Décodage Latin-1 : un octet donne un caractère, de code égal à l'octet.
+     *
+     * `Charsets.ISO_8859_1` n'existe pas en commun — seul `decodeToString()`,
+     * qui est de l'UTF-8, y est disponible. Or c'est précisément ce qu'il ne
+     * faut pas ici : le décalage de codes qui suit exige la correspondance
+     * un octet = un caractère, qu'un décodage UTF-8 détruirait en fusionnant
+     * les paires d'octets au-delà de 0x7F.
+     */
+    private fun ByteArray.enLatin1(): String =
+        buildString(size) {
+            for (octet in this@enLatin1) append((octet.toInt() and 0xFF).toChar())
+        }
 
     private fun rot13(s: String): String = buildString(s.length) {
         for (c in s) append(

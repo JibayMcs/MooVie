@@ -1,20 +1,18 @@
 package fr.moovie.tv.data.sources
 
+import fr.moovie.tv.shared.dechiffrerAesCbc
 import fr.moovie.tv.core.sources.model.EmbedLink
 import fr.moovie.tv.core.sources.model.PlayableStream
 import fr.moovie.tv.core.sources.model.StreamFormat
 import fr.moovie.tv.core.sources.port.HttpGateway
 import fr.moovie.tv.core.sources.port.getBody
 import fr.moovie.tv.core.sources.port.SourceExtractor
-import kotlinx.coroutines.Dispatchers
+import fr.moovie.tv.shared.dispatcherEs
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
-import javax.crypto.Cipher
-import javax.crypto.spec.IvParameterSpec
-import javax.crypto.spec.SecretKeySpec
 
 /**
  * Extracteur SeekStreaming / embed4me — port de seekstreaming_extract_handler.
@@ -30,7 +28,7 @@ class SeekStreamingExtractor(private val http: HttpGateway) : SourceExtractor {
     override fun canHandle(url: String): Boolean =
         HOST.containsMatchIn(url)
 
-    override suspend fun extract(link: EmbedLink): PlayableStream? = withContext(Dispatchers.IO) {
+    override suspend fun extract(link: EmbedLink): PlayableStream? = withContext(dispatcherEs) {
         runCatching {
             val domain = DOMAIN.find(link.url)?.groupValues?.get(1) ?: "lpayer.embed4me.com"
             val videoId = extractVideoId(link.url) ?: return@runCatching null
@@ -68,21 +66,15 @@ class SeekStreamingExtractor(private val http: HttpGateway) : SourceExtractor {
 
     private fun decrypt(hex: String): String? = runCatching {
         val data = hex.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
-        val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
-        cipher.init(
-            Cipher.DECRYPT_MODE,
-            SecretKeySpec(KEY, "AES"),
-            IvParameterSpec(IV),
-        )
-        String(cipher.doFinal(data), Charsets.UTF_8)
+        dechiffrerAesCbc(data, KEY, IV)?.decodeToString()
     }.getOrNull()
 
     private fun JsonObject.str(key: String): String =
         (this[key] as? JsonPrimitive)?.content?.trim().orEmpty()
 
     companion object {
-        private val KEY = "kiemtienmua911ca".toByteArray(Charsets.UTF_8)
-        private val IV = "1234567890oiuytr".toByteArray(Charsets.UTF_8)
+        private val KEY = "kiemtienmua911ca".encodeToByteArray()
+        private val IV = "1234567890oiuytr".encodeToByteArray()
         /**
          * Les domaines de la famille SeekStreaming.
          *

@@ -30,7 +30,7 @@ class CinestreamEndToEndProbeTest {
             return@runBlocking
         }
 
-        val provider = CinestreamProvider(ExtractorRegistry.http)
+        val provider = CinestreamProvider(ClientExtraction.http)
 
         for ((tmdbId, title, year) in titles) {
             val links = provider.sourcesFor(MediaRef.Movie(tmdbId, title, year))

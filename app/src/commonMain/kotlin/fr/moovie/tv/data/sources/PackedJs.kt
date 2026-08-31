@@ -1,6 +1,5 @@
 package fr.moovie.tv.data.sources
 
-import java.net.URI
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
@@ -24,9 +23,12 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 @OptIn(ExperimentalEncodingApi::class)
 object PackedJs {
 
+    // `[\s\S]` plutôt que `.` sous RegexOption.DOT_MATCHES_ALL, qui n'existe
+    // que sur la JVM : la classe de caractères dit la même chose à tous les
+    // moteurs. Le script empaqueté tient sur plusieurs lignes, ces `.` doivent
+    // donc bien franchir les retours à la ligne.
     private val PACKED = Regex(
-        """eval\(function\(p,a,c,k,e,d\)\{.*?\}\('(.+?)',(\d+),(\d+),'(.+?)'\.""",
-        RegexOption.DOT_MATCHES_ALL,
+        """eval\(function\(p,a,c,k,e,d\)\{[\s\S]*?\}\('([\s\S]+?)',(\d+),(\d+),'([\s\S]+?)'\.""",
     )
 
     // Nouveau format : (function(s){var k=[12,34,...], b=atob(s), ... XOR ...})("payload")
@@ -91,7 +93,7 @@ object PackedJs {
 
             val decoded = ByteArray(bytes.size) { i ->
                 (bytes[i].toInt() xor key[i % key.size]).toByte()
-            }.toString(Charsets.UTF_8)
+            }.decodeToString()
 
             normalize(decoded, embedUrl)?.let { return it }
         }
@@ -165,7 +167,7 @@ object PackedJs {
 
         val plain = ByteArray(cipher.size) { i ->
             ((cipher[i].toInt() and 0xFF) xor ((seed + i * step) and mask)).toByte()
-        }.toString(Charsets.UTF_8)
+        }.decodeToString()
         // Les octets connus non consommés par la résolution valident le tout.
         return plain.takeIf { it.startsWith(known) }
     }
@@ -200,7 +202,7 @@ object PackedJs {
         if (!c.contains(".m3u8", ignoreCase = true) || isDecoy(c)) return null
         if (c.startsWith("http://") || c.startsWith("https://")) return c
         if (c.startsWith("/") || c.startsWith("./") || c.startsWith("../")) {
-            return runCatching { URI(embedUrl).resolve(c).toString() }.getOrNull()
+            return resoudreRelatif(embedUrl, c)
         }
         return null
     }

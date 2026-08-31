@@ -6,12 +6,14 @@ import fr.moovie.tv.core.sources.port.HttpGateway
 import fr.moovie.tv.core.sources.port.HttpRequest
 import fr.moovie.tv.core.sources.port.SourceProvider
 import fr.moovie.tv.core.sources.port.getBody
+import fr.moovie.tv.shared.maintenantMs
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlin.concurrent.Volatile
 
 /**
  * Provider frembed — **API JSON**, films et séries, indexés par ID TMDB.
@@ -110,7 +112,7 @@ class FrembedProvider(private val http: HttpGateway) : SourceProvider {
      */
     private suspend fun resolveBase(): String {
         val known = cachedBase
-        if (known != null && System.currentTimeMillis() - cachedAt < BASE_TTL_MS) return known
+        if (known != null && maintenantMs() - cachedAt < BASE_TTL_MS) return known
 
         val body = http.getBody("$DEFAULT_BASE/api/dns/domains", headers(DEFAULT_BASE))
         val domain = runCatching {
@@ -122,7 +124,7 @@ class FrembedProvider(private val http: HttpGateway) : SourceProvider {
 
         val resolved = domain?.let { "https://$it" } ?: known ?: DEFAULT_BASE
         cachedBase = resolved
-        cachedAt = System.currentTimeMillis()
+        cachedAt = maintenantMs()
         return resolved
     }
 

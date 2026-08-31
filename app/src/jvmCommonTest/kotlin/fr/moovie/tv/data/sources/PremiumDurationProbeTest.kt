@@ -23,7 +23,7 @@ class PremiumDurationProbeTest {
     fun probeDurations() = runBlocking {
         if (System.getProperty("moovie.probe") == null) return@runBlocking
 
-        val links = FstreamProvider(ExtractorRegistry.http).sourcesFor(media)
+        val links = FstreamProvider(ClientExtraction.http).sourcesFor(media)
         println("\nfstream : ${links.size} liens (attendu ≈ $expectedMin min)")
         println("%-14s %-8s %-9s %s".format("hôte", "langue", "durée", "url"))
         println("-".repeat(94))

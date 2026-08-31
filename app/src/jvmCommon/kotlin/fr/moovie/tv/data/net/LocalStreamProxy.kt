@@ -1,5 +1,6 @@
 package fr.moovie.tv.data.net
 
+import fr.moovie.tv.data.sources.ClientExtraction
 import fr.moovie.tv.data.sources.ExtractorRegistry
 import okhttp3.Request
 import java.io.BufferedOutputStream
@@ -243,7 +244,7 @@ internal class LocalStreamProxy(
         // Le client de l'application, et non un neuf : c'est lui qui porte la
         // résolution DoH, sans laquelle les domaines de sources sont bloqués
         // par le DNS du fournisseur d'accès.
-        val response = runCatching { ExtractorRegistry.http.newCall(request).execute() }.getOrNull()
+        val response = runCatching { ClientExtraction.http.newCall(request).execute() }.getOrNull()
         if (response == null) {
             respondStatus(output, 502, "Bad Gateway")
             return
@@ -356,7 +357,7 @@ internal class LocalStreamProxy(
                 .apply { headers.forEach { (nom, valeur) -> header(nom, valeur) } }
                 .header("Range", "bytes=$position-$borne")
                 .build()
-            val reponse = runCatching { ExtractorRegistry.http.newCall(requete).execute() }.getOrNull()
+            val reponse = runCatching { ClientExtraction.http.newCall(requete).execute() }.getOrNull()
 
             if (reponse == null || !reponse.isSuccessful) {
                 val code = reponse?.code
@@ -442,7 +443,7 @@ internal class LocalStreamProxy(
             .apply { headers.forEach { (nom, valeur) -> header(nom, valeur) } }
             .header("Range", "bytes=0-1")
             .build()
-        val reponse = runCatching { ExtractorRegistry.http.newCall(requete).execute() }.getOrNull()
+        val reponse = runCatching { ClientExtraction.http.newCall(requete).execute() }.getOrNull()
             ?: return null
         val taille = reponse.use {
             it.header("Content-Range")?.substringAfter('/')?.trim()?.toLongOrNull() ?: 0L

@@ -4,9 +4,10 @@ import fr.moovie.tv.core.sources.model.EmbedLink
 import fr.moovie.tv.core.sources.model.PlayableStream
 import fr.moovie.tv.core.sources.model.StreamFormat
 import fr.moovie.tv.core.sources.port.HttpGateway
-import fr.moovie.tv.core.sources.port.getBody
 import fr.moovie.tv.core.sources.port.SourceExtractor
-import kotlinx.coroutines.Dispatchers
+import fr.moovie.tv.core.sources.port.getBody
+import fr.moovie.tv.shared.dispatcherEs
+import fr.moovie.tv.shared.maintenantMs
 import kotlinx.coroutines.withContext
 
 /**
@@ -22,7 +23,7 @@ class DoodStreamExtractor(private val http: HttpGateway) : SourceExtractor {
     override fun canHandle(url: String): Boolean =
         DOOD_HOST.containsMatchIn(url)
 
-    override suspend fun extract(link: EmbedLink): PlayableStream? = withContext(Dispatchers.IO) {
+    override suspend fun extract(link: EmbedLink): PlayableStream? = withContext(dispatcherEs) {
         runCatching {
             val domain = DOMAIN.find(link.url)?.groupValues?.get(1) ?: return@runCatching null
 
@@ -35,7 +36,7 @@ class DoodStreamExtractor(private val http: HttpGateway) : SourceExtractor {
             if (base.isBlank()) return@runCatching null
 
             val rnd = (1..10).map { ALPHANUM.random() }.joinToString("")
-            val expiry = System.currentTimeMillis()
+            val expiry = maintenantMs()
             val videoUrl = "$base$rnd?token=$token&expiry=$expiry"
 
             PlayableStream(

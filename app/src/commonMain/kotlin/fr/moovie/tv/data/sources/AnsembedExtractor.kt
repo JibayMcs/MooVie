@@ -6,7 +6,7 @@ import fr.moovie.tv.core.sources.model.StreamFormat
 import fr.moovie.tv.core.sources.port.HttpGateway
 import fr.moovie.tv.core.sources.port.getBody
 import fr.moovie.tv.core.sources.port.SourceExtractor
-import kotlinx.coroutines.Dispatchers
+import fr.moovie.tv.shared.dispatcherEs
 import kotlinx.coroutines.withContext
 
 /**
@@ -19,7 +19,7 @@ class AnsembedExtractor(private val http: HttpGateway) : SourceExtractor {
 
     override fun canHandle(url: String): Boolean = url.contains("ansembed", ignoreCase = true)
 
-    override suspend fun extract(link: EmbedLink): PlayableStream? = withContext(Dispatchers.IO) {
+    override suspend fun extract(link: EmbedLink): PlayableStream? = withContext(dispatcherEs) {
         runCatching {
             val html = http.getBody(
                 link.url,
