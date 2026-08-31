@@ -1,13 +1,15 @@
 package fr.moovie.tv.data.update
 
-import kotlinx.coroutines.Dispatchers
+import fr.moovie.tv.shared.dispatcherEs
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import java.io.File
+import fr.moovie.tv.data.net.clientRest
+import io.ktor.client.request.get
+import io.ktor.client.request.header
+import io.ktor.client.statement.bodyAsText
+import io.ktor.http.isSuccess
 import fr.moovie.tv.data.net.Connectivity
 
 @Serializable
@@ -34,7 +36,7 @@ data class GithubRelease(
 class UpdateRepository {
 
     private val json = Json { ignoreUnknownKeys = true }
-    private val client = OkHttpClient()
+    private val client = clientRest
 
     /**
      * Dernière release à proposer, ou null (réseau HS, aucune release).
@@ -46,7 +48,7 @@ class UpdateRepository {
      *   complète, où il faut faire ce tri soi-même.
      */
     suspend fun latestRelease(prereleases: Boolean = false): GithubRelease? =
-        withContext(Dispatchers.IO) {
+        withContext(dispatcherEs) {
             // Hors ligne, la question ne se pose pas : ni la vérification
             // périodique, ni le bouton des réglages n'ont d'interlocuteur. Rendu
             // ici plutôt que chez les deux appelants, pour que personne n'ait à
@@ -71,15 +73,12 @@ class UpdateRepository {
     fun isEligible(release: GithubRelease, prereleases: Boolean): Boolean =
         !release.draft && (prereleases || !release.prerelease)
 
-    private fun latestStable(): GithubRelease? = runCatching {
-        val request = Request.Builder()
-            .url("https://api.github.com/repos/JibayMcs/MooVie/releases/latest")
-            .header("Accept", "application/vnd.github+json")
-            .build()
-        client.newCall(request).execute().use { resp ->
-            if (!resp.isSuccessful) return@use null
-            json.decodeFromString<GithubRelease>(resp.body!!.string())
+    private suspend fun latestStable(): GithubRelease? = runCatching {
+        val reponse = client.get("https://api.github.com/repos/JibayMcs/MooVie/releases/latest") {
+            header("Accept", "application/vnd.github+json")
         }
+        if (!reponse.status.isSuccess()) return@runCatching null
+        json.decodeFromString<GithubRelease>(reponse.bodyAsText())
     }.getOrNull()
 
     /**
@@ -95,14 +94,12 @@ class UpdateRepository {
      * paginer pour retrouver des versions que plus personne n'utilise coûterait
      * des requêtes à chaque vérification.
      */
-    private fun latestIncludingPrereleases(): GithubRelease? = runCatching {
-        val request = Request.Builder()
-            .url("https://api.github.com/repos/JibayMcs/MooVie/releases?per_page=30")
-            .header("Accept", "application/vnd.github+json")
-            .build()
-        client.newCall(request).execute().use { resp ->
-            if (!resp.isSuccessful) return@use null
-            json.decodeFromString<List<GithubRelease>>(resp.body!!.string())
+    private suspend fun latestIncludingPrereleases(): GithubRelease? = runCatching {
+        val reponse = client.get("https://api.github.com/repos/JibayMcs/MooVie/releases?per_page=30") {
+            header("Accept", "application/vnd.github+json")
+        }
+        if (!reponse.status.isSuccess()) return@runCatching null
+        json.decodeFromString<List<GithubRelease>>(reponse.bodyAsText())
                 .filter { !it.draft }
                 .maxWithOrNull { a, b ->
                     when {
@@ -111,7 +108,6 @@ class UpdateRepository {
                         else -> -1
                     }
                 }
-        }
     }.getOrNull()
 
     /**
@@ -185,33 +181,4 @@ class UpdateRepository {
         return 0
     }
 
-    /**
-     * Télécharge l'APK vers [dest] en publiant la progression (0..1).
-     * Renvoie true si le fichier est complet.
-     */
-    suspend fun downloadApk(url: String, dest: File, onProgress: (Float) -> Unit): Boolean =
-        withContext(Dispatchers.IO) {
-            runCatching {
-                val request = Request.Builder().url(url).build()
-                client.newCall(request).execute().use { resp ->
-                    if (!resp.isSuccessful) return@use false
-                    val body = resp.body ?: return@use false
-                    val total = body.contentLength()
-                    dest.outputStream().use { out ->
-                        body.byteStream().use { input ->
-                            val buffer = ByteArray(64 * 1024)
-                            var copied = 0L
-                            while (true) {
-                                val read = input.read(buffer)
-                                if (read == -1) break
-                                out.write(buffer, 0, read)
-                                copied += read
-                                if (total > 0) onProgress(copied.toFloat() / total)
-                            }
-                        }
-                    }
-                    true
-                }
-            }.getOrDefault(false)
-        }
 }

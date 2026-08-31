@@ -3,6 +3,7 @@ package fr.moovie.tv.shared
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import java.text.Normalizer
+import java.util.UUID
 import javax.crypto.Cipher
 import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.SecretKeySpec
@@ -19,3 +20,5 @@ actual fun dechiffrerAesCbc(donnees: ByteArray, cle: ByteArray, iv: ByteArray): 
     }.getOrNull()
 
 actual fun enNfd(s: String): String = Normalizer.normalize(s, Normalizer.Form.NFD)
+
+actual fun genererUuid(): String = UUID.randomUUID().toString()

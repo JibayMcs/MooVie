@@ -1,5 +1,6 @@
 package fr.moovie.tv.ui.update
 
+import fr.moovie.tv.data.update.downloadApk
 import fr.moovie.tv.resources.Res
 import fr.moovie.tv.resources.update_error
 import org.jetbrains.compose.resources.getString

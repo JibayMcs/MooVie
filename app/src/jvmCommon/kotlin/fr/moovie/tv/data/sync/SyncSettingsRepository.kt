@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import java.util.UUID
+import fr.moovie.tv.shared.genererUuid
 
 /**
  * Fournisseur choisi, identifiants, et ce que la dernière synchro a appris.
@@ -137,7 +137,7 @@ class SyncSettingsRepository {
      */
     suspend fun deviceId(): String {
         store.data.first()[DEVICE_ID]?.takeIf { it.isNotBlank() }?.let { return it }
-        val fresh = UUID.randomUUID().toString().take(12)
+        val fresh = genererUuid().take(12)
         store.edit { it[DEVICE_ID] = fresh }
         return fresh
     }

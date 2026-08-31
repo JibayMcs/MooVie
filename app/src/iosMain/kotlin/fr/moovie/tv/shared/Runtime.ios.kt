@@ -17,6 +17,7 @@ import platform.CoreCrypto.kCCOptionPKCS7Padding
 import platform.CoreCrypto.kCCSuccess
 import platform.Foundation.NSDate
 import platform.Foundation.NSString
+import platform.Foundation.NSUUID
 import platform.Foundation.decomposedStringWithCanonicalMapping
 import platform.Foundation.timeIntervalSince1970
 import platform.posix.size_tVar
@@ -74,3 +75,11 @@ actual fun dechiffrerAesCbc(donnees: ByteArray, cle: ByteArray, iv: ByteArray): 
  */
 @Suppress("CAST_NEVER_SUCCEEDS")
 actual fun enNfd(s: String): String = (s as NSString).decomposedStringWithCanonicalMapping
+
+/**
+ * `NSUUID` rend un UUID en **majuscules** là où `java.util.UUID` le rend en
+ * minuscules. La valeur sert d'identifiant opaque comparé à lui-même, mais on
+ * s'aligne quand même : un identifiant qui change de casse selon la plateforme
+ * finirait par se comparer à travers une synchronisation.
+ */
+actual fun genererUuid(): String = NSUUID().UUIDString.lowercase()

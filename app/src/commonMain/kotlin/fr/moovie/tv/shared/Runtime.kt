@@ -49,3 +49,11 @@ expect fun dechiffrerAesCbc(donnees: ByteArray, cle: ByteArray, iv: ByteArray): 
  * `java.text.Normalizer` n'existe pas en natif ; Foundation sait le faire.
  */
 expect fun enNfd(s: String): String
+
+/**
+ * Identifiant aléatoire au format UUID v4.
+ *
+ * Sert à nommer un appareil dans la synchronisation. Ni `java.util.UUID` ni
+ * `NSUUID` n'ont d'équivalent commun, mais les deux rendent la même forme.
+ */
+expect fun genererUuid(): String
