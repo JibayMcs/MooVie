@@ -1,26 +1,46 @@
 package fr.moovie.tv
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.window.ComposeUIViewController
-import androidx.lifecycle.viewmodel.compose.viewModel
+import fr.moovie.tv.data.download.Download
 import fr.moovie.tv.data.net.Connectivity
+import fr.moovie.tv.ios.IosCatalogScreen
+import fr.moovie.tv.ios.IosDetailsScreen
+import fr.moovie.tv.ios.IosDiscoveryScreen
+import fr.moovie.tv.ios.IosHistoryScreen
+import fr.moovie.tv.ios.IosHomeScreen
+import fr.moovie.tv.ios.IosPersonScreen
+import fr.moovie.tv.ios.IosPlayerScreen
+import fr.moovie.tv.ios.IosSearchScreen
 import fr.moovie.tv.ui.adaptive.AdaptiveRoot
+import fr.moovie.tv.ui.adaptive.MoovieBottomBar
 import fr.moovie.tv.ui.adaptive.UiFlavor
-import fr.moovie.tv.ui.home.HomeScreenContent
-import fr.moovie.tv.ui.home.HomeViewModel
+import fr.moovie.tv.ui.adaptive.hidesBottomBar
+import fr.moovie.tv.ui.download.DownloadsScreen
+import fr.moovie.tv.ui.download.downloadPlayerScreen
+import fr.moovie.tv.ui.navigation.NavStack
 import fr.moovie.tv.ui.navigation.Screen
-import fr.moovie.tv.ui.navigation.rememberNavStack
+import fr.moovie.tv.ui.offline.OfflineScreen
+import fr.moovie.tv.ui.offline.OfflineSearchScreen
+import fr.moovie.tv.ui.onboarding.OnboardingScreen
+import fr.moovie.tv.ui.onboarding.rememberStartScreen
+import fr.moovie.tv.ui.player.AvPlayerController
+import fr.moovie.tv.ui.player.SurfaceVideo
 import fr.moovie.tv.ui.settings.SettingsScreen
 import fr.moovie.tv.ui.theme.MooVieTheme
 import platform.UIKit.UIViewController
@@ -37,42 +57,28 @@ fun MoovieViewController(): UIViewController = ComposeUIViewController { RacineM
 /**
  * La racine de l'application sur iOS.
  *
- * ## Une pile, et non plus un seul écran
+ * ## Ce qu'elle est
  *
- * Jusqu'ici cette fonction affichait l'accueil et rien d'autre : les rappels
- * d'ouverture étaient des lambdas vides, si bien qu'« Ouvrir les réglages » ne
- * faisait rien — et comme l'accueil s'ouvre sur cet écran-là tant qu'aucune clé
- * TMDB n'est enregistrée, l'application était en pratique inutilisable.
+ * Une [NavStack] — la même classe qu'Android et le desktop — et un `when` sur
+ * `nav.current` qui distribue vers les écrans partagés. Les emballages qui
+ * branchent chaque ViewModel sont dans `ios/Screens.kt` ; l'interface qu'ils
+ * affichent vient de `commonMain`, c'est-à-dire du même Compose qu'Android.
+ * Rien de ce que voit l'utilisateur n'est écrit deux fois.
  *
- * Elle tient maintenant une [fr.moovie.tv.ui.navigation.NavStack], la même
- * classe que MainActivity et le desktop, et dispatche sur `nav.current` comme
- * eux. Les écrans qu'elle atteint sont **les écrans partagés** : c'est le même
- * Compose que sur Android, pas une réécriture — d'où la même interface et le
- * même style, sans effort pour les tenir alignés.
+ * ## L'écran de départ n'est pas toujours l'accueil
  *
- * ## Ce qui n'est pas encore branché, et pourquoi
+ * [rememberStartScreen] rend null tant que la réponse n'est pas lue, et on
+ * n'affiche rien pendant ce temps : composer un accueil pour le remplacer une
+ * lecture DataStore plus tard le ferait clignoter. Sans clé TMDB enregistrée, la
+ * racine est [Screen.Onboarding] — pas l'accueil, qui n'aurait rien à montrer.
  *
- * Recherche, fiche, historique, découverte, téléchargements et lecteur vivent
- * encore dans `jvmCommon`, où le portage ne les a pas encore fait passer. Leurs
- * rappels restent muets plutôt que faux — mieux vaut un bouton sans effet qu'un
- * bouton qui ouvre un écran à moitié branché. Ils arriveront par la même voie
- * que les réglages : le contenu partagé remonte en `commonMain`, un emballage
- * iOS le branche, une branche s'ajoute ici.
+ * ## Le retour, faute de geste relayé
  *
- * Le catalogue et la filmographie font exception : leur contenu **est** déjà
- * commun. Ils attendent quand même, et pour une raison de navigation, pas de
- * portage — ni l'un ni l'autre n'affiche de bouton retour, parce que sur Android
- * c'est la touche matérielle qui les ferme. Les ouvrir ici enfermerait
- * l'utilisateur dedans. Ils arriveront avec [fr.moovie.tv.ui.adaptive.MoovieBottomBar],
- * qui est la sortie qu'Android leur donne en mode tactile, et qui suppose que
- * tous ses onglets mènent quelque part.
- *
- * ## Le retour
- *
- * Il n'y a pas de bouton retour matériel sur iOS ; c'est le balayage depuis le
- * bord qui en tient lieu, et Compose Multiplatform ne le relaie pas jusqu'à la
- * pile. Chaque écran porte donc son propre `onBack`, qui dépile — la même
- * convention que le desktop, où la touche Échap ne couvre pas tout non plus.
+ * iOS n'a pas de bouton retour matériel, et Compose Multiplatform ne relaie pas
+ * encore le balayage depuis le bord jusqu'à la pile. Chaque écran affiche donc
+ * le sien — `showBackButton = true` dans les emballages — et la barre de
+ * navigation basse tient lieu de sortie pour les destinations de premier niveau.
+ * C'est la solution du desktop, où aucune touche ne fait ce travail non plus.
  *
  * ## `UiFlavor.TOUCH`, sans hésitation
  *
@@ -84,51 +90,74 @@ fun MoovieViewController(): UIViewController = ComposeUIViewController { RacineM
 private fun RacineMoovie() {
     // La sonde de connectivité doit tourner avant le premier chargement :
     // l'accueil bascule sur la bibliothèque hors ligne si elle dit non, et
-    // partir sur un état inconnu ferait clignoter l'écran au lancement.
+    // partir d'un état inconnu ferait clignoter l'écran au lancement.
     LaunchedEffect(Unit) { Connectivity.start() }
 
     MooVieTheme {
         AdaptiveRoot(flavor = UiFlavor.TOUCH) {
-            // Deux corrections tenues par un seul `Column`, dans cet ordre
-            // précis. Android et desktop ont le même, aux mêmes fins.
+            // **Le fond, puis le retrait des encoches, dans cet ordre.**
             //
-            // **Le fond.** `MooVieTheme` ne fait que déclarer une palette :
-            // `MaterialTheme` ne peint rien de lui-même, et sans `Surface`
-            // parent la vue reste de la couleur du système — blanche sur iOS.
-            // Les écrans peignaient chacun le leur, ce qui laissait tout le
-            // reste — encoche comprise — en blanc.
+            // `MooVieTheme` ne peint rien : `MaterialTheme` déclare une palette,
+            // il ne dessine pas de fond, et sans `Surface` parent la vue reste
+            // blanche. MainActivity et le desktop ouvrent tous deux sur le même
+            // fond peint.
             //
-            // **Les encoches.** `MoovieApp.swift` passe `ignoresSafeArea(.all)`
-            // pour que le lecteur puisse occuper la dalle entière, et disait que
-            // Compose se chargeait des encoches. Il ne s'en chargeait pas : rien
-            // dans le code partagé ne pose d'insets, parce qu'Android n'en a pas
-            // besoin — le système y réserve déjà la place sous la barre d'état.
-            // Le haut des pages passait donc sous la Dynamic Island.
+            // Le retrait vient après, parce que `MoovieApp.swift` passe
+            // `ignoresSafeArea(.all)` : Compose reçoit toute la dalle, y compris
+            // sous la Dynamic Island. Peindre d'abord rend l'encoche sombre ;
+            // retirer d'abord y laisserait une bande blanche.
             //
-            // L'ordre compte : le fond est peint **avant** le retrait, si bien
-            // qu'il couvre aussi la zone de l'encoche — sinon on aurait
-            // remplacé du texte illisible par une bande blanche.
-            //
-            // `safeDrawing` et non `statusBars` seuls : en paysage, l'encoche
-            // mange un bord latéral, et l'indicateur d'accueil borde le bas.
-            // `windowInsetsPadding` **consomme** ce qu'il applique, si bien que
-            // le `navigationBarsPadding()` de MoovieBottomBar n'ajoute rien
-            // par-dessus — pas de double marge.
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color(0xFF0A0A0A))
-                    .windowInsetsPadding(WindowInsets.safeDrawing),
-            ) {
-                val nav = rememberNavStack(Screen.Home)
+            // `safeDrawing` plutôt que la seule barre d'état : en paysage
+            // l'encoche mange un bord latéral, et l'indicateur d'accueil borde
+            // le bas. Le modificateur **consomme** ce qu'il applique, donc le
+            // `navigationBarsPadding()` de [MoovieBottomBar] n'ajoute rien
+            // par-dessus.
+            Box(modifier = Modifier.fillMaxSize().background(Color(0xFF0A0A0A))) {
+                val depart = rememberStartScreen()
+                // Null = la réponse n'est pas encore lue. Voir le KDoc.
+                if (depart != null) {
+                    val nav = remember(depart) { NavStack(depart) }
+                    val online by Connectivity.online.collectAsState()
 
-                when (nav.current) {
-                    Screen.Settings -> SettingsScreen(onBack = { nav.pop() })
+                    // Hors ligne, on ne reste pas sur un écran qui ne peut rien
+                    // afficher — sauf en lecture, qui joue un fichier local.
+                    LaunchedEffect(online) {
+                        if (!online && nav.current !is Screen.Player) nav.popToRoot()
+                    }
 
-                    // Tout le reste retombe sur l'accueil : c'est la seule
-                    // autre destination atteignable pour l'instant, et rien ne
-                    // pousse les autres. Voir le KDoc ci-dessus.
-                    else -> AccueilMoovie(onOpenSettings = { nav.push(Screen.Settings) })
+                    // **Le lecteur, et lui seul, garde toute la dalle.**
+                    //
+                    // Partout ailleurs on retire les encoches, sinon le haut des
+                    // pages passe sous la Dynamic Island. Une image de film, elle,
+                    // doit aller jusqu'aux bords : c'est ce pour quoi
+                    // `MoovieApp.swift` demande `ignoresSafeArea(.all)`, et la
+                    // rogner reviendrait à afficher un film en médaillon. Ses
+                    // propres commandes portent déjà leurs marges.
+                    val enLecture = nav.current is Screen.Player
+                    Column(
+                        modifier = if (enLecture) {
+                            Modifier.fillMaxSize()
+                        } else {
+                            Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)
+                        },
+                    ) {
+                        // Le contenu prend la place restante, la barre occupe le
+                        // bas. Empilé plutôt que superposé : la barre ne doit pas
+                        // recouvrir la dernière ligne d'une liste.
+                        Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                            EcranCourant(nav = nav, online = online)
+                        }
+
+                        // Aux mêmes conditions que sur Android : jamais sur le
+                        // lecteur ni sur l'installation initiale, que
+                        // `hidesBottomBar` désigne toutes deux.
+                        if (!hidesBottomBar(nav.current)) {
+                            MoovieBottomBar(
+                                current = nav.current,
+                                onSelect = { nav.switchTop(it) },
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -136,41 +165,205 @@ private fun RacineMoovie() {
 }
 
 /**
- * L'accueil partagé, branché sur son ViewModel.
+ * L'écran que désigne le sommet de la pile.
  *
- * Extrait de [RacineMoovie] parce que deux branches du `when` l'affichent, et
- * qu'un `HomeViewModel` construit dans chacune rechargerait les rangées à
- * chaque passage.
+ * Extrait de [RacineMoovie] pour que le `when` se lise d'un bloc, sans les
+ * quatre niveaux d'indentation de la mise en page.
  */
 @Composable
-private fun AccueilMoovie(onOpenSettings: () -> Unit) {
-    val modele: HomeViewModel = viewModel { HomeViewModel() }
-    val etat by modele.state.collectAsState()
-    val reprises by modele.resume.collectAsState()
-    val vus by modele.watched.collectAsState()
-    val aVoir by modele.watchlist.collectAsState()
+private fun EcranCourant(nav: NavStack, online: Boolean) {
+    /** Ouvrir une fiche : le même geste depuis six écrans. */
+    val ouvrirTitre: (Int, Boolean) -> Unit = { id, isTv -> nav.push(Screen.Details(id, isTv)) }
 
-    HomeScreenContent(
-        state = etat,
-        resume = reprises,
-        watched = vus,
-        watchlist = aVoir,
-        onOpenTitle = { _, _ -> },
-        onResume = {},
-        onOpenSettings = onOpenSettings,
-        onOpenSearch = {},
-        onOpenHistory = {},
-        onOpenCatalog = {},
-        onOpenCatalogGenre = {},
-        onRemoveResume = modele::removeResume,
-        onMarkResumeWatched = modele::markResumeWatched,
-        onRemoveFromWatchlist = modele::removeFromWatchlist,
-        onAddToWatchlist = modele::addToWatchlist,
-        // Nul et non vide : le contrat de ce paramètre est « null s'il n'y a pas
-        // de téléviseur à portée », et il n'y en aura jamais sur iOS — la
-        // diffusion Cast a été écartée du portage. Le bouton ne s'affiche donc
-        // pas, au lieu de s'afficher sans effet.
-        onSendResumeToTv = null,
-        onOpenRemote = null,
+    when (val ecran = nav.current) {
+        // Sans réseau, l'accueil et la recherche basculent sur ce qui est
+        // téléchargé : la même substitution que sur Android, et c'est
+        // `OfflineScreen` qui porte l'explication.
+        Screen.Home -> if (!online) {
+            OfflineScreen(
+                onPlay = { d -> lancerTelechargement(nav, d) },
+                onOpenSettings = { nav.push(Screen.Settings) },
+            )
+        } else {
+            IosHomeScreen(
+                onOpenTitle = ouvrirTitre,
+                onResume = { entree ->
+                    // Reprise : la fiche ouvre directement le panneau des
+                    // sources, sur l'épisode où l'on en était.
+                    nav.push(
+                        Screen.Details(
+                            tmdbId = entree.tmdbId,
+                            isTv = entree.isTv,
+                            autoSources = true,
+                            resumeSeason = entree.season,
+                            resumeEpisode = entree.episode,
+                        ),
+                    )
+                },
+                onOpenSettings = { nav.push(Screen.Settings) },
+                onOpenSearch = { nav.push(Screen.Search) },
+                onOpenDiscovery = { nav.push(Screen.Discovery) },
+                onOpenHistory = { nav.push(Screen.History) },
+                onOpenDownloads = { nav.push(Screen.Downloads) },
+                onOpenCatalog = { nav.push(Screen.Catalog()) },
+                onOpenCatalogGenre = { nav.push(Screen.Catalog(it)) },
+            )
+        }
+
+        Screen.Onboarding -> OnboardingScreen(
+            onOpenSettings = { nav.push(Screen.Settings) },
+            // Remplace au lieu d'empiler : une fois installé, revenir sur
+            // l'écran d'installation n'aurait plus rien à proposer.
+            onReady = { nav.replace(Screen.Home) },
+            // Nul : l'appairage porte un serveur HTTP local, réservé aux cibles
+            // JVM, et n'a de sens que face à un téléviseur. Le choix « depuis
+            // mon téléphone » disparaît.
+            pairingDialog = null,
+        )
+
+        Screen.Settings -> SettingsScreen(
+            onBack = { nav.pop() },
+            onPlayDownload = { d -> lancerTelechargement(nav, d) },
+        )
+
+        Screen.Search -> if (!online) {
+            OfflineSearchScreen(onPlay = { d -> lancerTelechargement(nav, d) })
+        } else {
+            IosSearchScreen(
+                onOpenTitle = ouvrirTitre,
+                onOpenDiscovery = { nav.push(Screen.Discovery) },
+                onBack = { nav.pop() },
+            )
+        }
+
+        Screen.Discovery -> if (!online) {
+            OfflineScreen(
+                onPlay = { d -> lancerTelechargement(nav, d) },
+                onOpenSettings = { nav.push(Screen.Settings) },
+            )
+        } else {
+            IosDiscoveryScreen(onOpenTitle = ouvrirTitre, onBack = { nav.pop() })
+        }
+
+        Screen.History -> IosHistoryScreen(onOpenTitle = ouvrirTitre, onBack = { nav.pop() })
+
+        Screen.Downloads -> DownloadsScreen(
+            onPlay = { d -> lancerTelechargement(nav, d) },
+            onBack = { nav.pop() },
+            showBackButton = true,
+        )
+
+        is Screen.Catalog -> IosCatalogScreen(
+            onOpenTitle = ouvrirTitre,
+            select = ecran.select,
+            onBack = { nav.pop() },
+        )
+
+        is Screen.Person -> IosPersonScreen(
+            params = ecran,
+            onOpenTitle = ouvrirTitre,
+            onBack = { nav.pop() },
+        )
+
+        is Screen.Details -> IosDetailsScreen(
+            params = ecran,
+            onPlay = { lecteur -> nav.push(lecteur) },
+            onOpenPerson = { id, nom -> nav.push(Screen.Person(id, nom)) },
+            onBack = { nav.pop() },
+        )
+
+        is Screen.Player -> LecteurIos(nav = nav, params = ecran)
+
+        // Les destinations de la pile Cast — télécommande, écran de diffusion et
+        // son lancement. Elles n'existent pas sur iOS, le portage a écarté ce
+        // rôle, et rien ne les empile. On revient à l'accueil plutôt que
+        // d'afficher un écran vide si l'une d'elles arrivait par une voie qu'on
+        // n'a pas prévue.
+        else -> LaunchedEffect(ecran) { nav.popToRoot() }
+    }
+}
+
+/**
+ * Le lecteur, avec le contrôleur AVPlayer qu'il faut lui construire.
+ *
+ * ## Pourquoi le contrôleur naît ici et pas dans l'écran
+ *
+ * [AvPlayerController] ouvre le flux dès sa construction et retient une session
+ * audio. Sa durée de vie doit donc être exactement celle de l'entrée de
+ * navigation : `remember(streamUrl)` le recrée quand la source change — c'est ce
+ * qui fait qu'un enchaînement d'épisodes rouvre bien un nouveau média — et
+ * `DisposableEffect` le libère en quittant. Le laisser vivre plus longtemps
+ * laisserait un AVPlayer jouer derrière l'écran suivant, son compris.
+ */
+@Composable
+private fun LecteurIos(nav: NavStack, params: Screen.Player) {
+    val controleur = remember(params.streamUrl) {
+        AvPlayerController(params.streamUrl, params.headers)
+    }
+    DisposableEffect(controleur) { onDispose { controleur.liberer() } }
+
+    IosPlayerScreen(
+        streamUrl = params.streamUrl,
+        headers = params.headers,
+        mediaKey = params.mediaKey,
+        title = params.title,
+        subtitle = params.subtitle,
+        nextSeason = params.nextSeason,
+        nextEpisode = params.nextEpisode,
+        posterUrl = params.posterUrl,
+        startAtMs = params.startAtMs,
+        expectedMinutes = params.expectedMinutes,
+        controller = controleur,
+        surface = { modifier -> SurfaceVideo(controleur, modifier) },
+        onBack = { retourDepuisLecteur(nav) },
+        // Enchaîner passe par la fiche, qui sait résoudre une source : le lecteur
+        // ne connaît qu'une URL, pas l'hébergeur d'où viendra la suivante.
+        // `replace` et non `push` — dix épisodes d'affilée laisseraient sinon dix
+        // entrées à remonter une par une.
+        onNextEpisode = { saison, episode ->
+            val fiche = nav.previous as? Screen.Details
+            if (fiche == null) {
+                retourDepuisLecteur(nav)
+            } else {
+                nav.replace(
+                    Screen.Details(
+                        tmdbId = fiche.tmdbId,
+                        isTv = true,
+                        autoSources = true,
+                        resumeSeason = saison,
+                        resumeEpisode = episode,
+                    ),
+                )
+            }
+        },
+        // Le flux a cassé : on rend la main à la fiche, qui reprend sa cascade
+        // sur l'hébergeur suivant.
+        onPlaybackFailed = { retourDepuisLecteur(nav) },
     )
+}
+
+/**
+ * Quitter le lecteur, c'est revenir à la fiche dont le flux est parti.
+ *
+ * `popUpTo` et non `pop` : un enchaînement d'épisodes a pu remplacer l'entrée
+ * courante plusieurs fois, et un simple dépilement rendrait la main à l'accueil
+ * en sautant la fiche de la série. Même raisonnement que sur Android, et c'est
+ * exactement ce pour quoi `NavStack.popUpTo` existe. Sans fiche dans la pile —
+ * lecture d'un téléchargement, ouverte depuis les réglages — on revient à la
+ * racine.
+ */
+private fun retourDepuisLecteur(nav: NavStack) {
+    if (!nav.popUpTo { it is Screen.Details }) nav.popToRoot()
+}
+
+/**
+ * Joue un fichier déjà téléchargé, sans passer par sa fiche ni par TMDB.
+ *
+ * La conversion est celle de `downloadPlayerScreen`, en commun : elle résout le
+ * flux local du téléchargement et rend null quand il n'y en a pas — une entrée
+ * en file d'attente, ou dont les fichiers ont été effacés. Rien ne s'ouvre alors,
+ * ce qui vaut mieux qu'un lecteur sur une URL vide.
+ */
+private fun lancerTelechargement(nav: NavStack, telechargement: Download) {
+    downloadPlayerScreen(telechargement)?.let(nav::push)
 }
