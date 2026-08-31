@@ -17,6 +17,7 @@ import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.viewmodel.CreationExtras
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import fr.moovie.tv.data.profile.ProfileRepository
+import fr.moovie.tv.shared.fabriqueParDefaut
 import kotlinx.coroutines.flow.first
 
 /**
@@ -114,8 +115,7 @@ private class ProfileViewModelStoreOwner(
     private val parentFactories = parent as? HasDefaultViewModelProviderFactory
 
     override val defaultViewModelProviderFactory: ViewModelProvider.Factory
-        get() = parentFactories?.defaultViewModelProviderFactory
-            ?: ViewModelProvider.NewInstanceFactory()
+        get() = parentFactories?.defaultViewModelProviderFactory ?: fabriqueParDefaut()
 
     override val defaultViewModelCreationExtras: CreationExtras
         get() = parentFactories?.defaultViewModelCreationExtras ?: CreationExtras.Empty

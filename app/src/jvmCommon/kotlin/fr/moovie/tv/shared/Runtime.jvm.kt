@@ -28,3 +28,9 @@ actual fun espaceLibre(chemin: okio.Path): Long =
 
 actual fun formaterDecimal(valeur: Double, decimales: Int): String =
     String.format(java.util.Locale.getDefault(), "%.${decimales}f", valeur)
+
+actual fun espaceTotal(chemin: okio.Path): Long =
+    runCatching { chemin.toFile().totalSpace }.getOrDefault(0L)
+
+actual fun fabriqueParDefaut(): androidx.lifecycle.ViewModelProvider.Factory =
+    androidx.lifecycle.ViewModelProvider.NewInstanceFactory()

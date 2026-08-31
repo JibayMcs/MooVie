@@ -78,3 +78,35 @@ expect fun espaceLibre(chemin: okio.Path): Long
  * chaque affiche.
  */
 expect fun formaterDecimal(valeur: Double, decimales: Int): String
+
+/**
+ * Octets que porte au total le volume qui contient ce chemin.
+ *
+ * Pendant de [espaceLibre], et pour un seul appelant : la barre de stockage des
+ * téléchargements, qui dessine trois parts — ce qui est à nous, ce qui est aux
+ * autres, ce qui reste. Les deux dernières se déduisent l'une de l'autre, mais
+ * il faut bien connaître le tout.
+ *
+ * Rend 0 si la mesure échoue, et non [Long.MAX_VALUE] comme [espaceLibre] : ces
+ * deux valeurs par défaut visent des choses opposées. Là-bas, échouer ne doit
+ * pas refuser un téléchargement possible ; ici, un total inconnu doit faire
+ * **disparaître** la barre plutôt que la dessiner sur un disque imaginaire.
+ */
+expect fun espaceTotal(chemin: okio.Path): Long
+
+/**
+ * Fabrique de ViewModels à utiliser quand le propriétaire parent n'en fournit
+ * aucune — le cas de `ProfileHost`, qui donne à chaque profil son propre magasin.
+ *
+ * `ViewModelProvider.NewInstanceFactory` tiendrait ce rôle, mais elle n'existe
+ * que sur les cibles JVM : elle construit le ViewModel **par réflexion**, à
+ * partir de sa classe, et Kotlin/Native n'en a pas. D'où un `expect` plutôt
+ * qu'un appel direct.
+ *
+ * L'`actual` iOS refuse explicitement au lieu de fabriquer quoi que ce soit, et
+ * c'est voulu : là-bas chaque `viewModel { … }` passe son propre constructeur —
+ * la seule forme qui marche sans réflexion — si bien que cette fabrique n'est
+ * jamais atteinte. Y échouer bruyamment vaut mieux que rendre un objet vide dont
+ * on chercherait la trace trois écrans plus loin.
+ */
+expect fun fabriqueParDefaut(): androidx.lifecycle.ViewModelProvider.Factory

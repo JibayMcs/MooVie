@@ -39,6 +39,7 @@ import fr.moovie.tv.R
 import fr.moovie.tv.data.settings.AppLanguage
 import fr.moovie.tv.data.settings.LocaleManager
 import fr.moovie.tv.ui.components.MoovieButton
+import fr.moovie.tv.ui.pairing.PairingDialog
 
 /**
  * Wrapper Android : branche le [SettingsViewModel] (repos DataStore androidMain)
@@ -113,6 +114,12 @@ fun SettingsScreen(
         onBack = onBack,
         onPlayDownload = onPlayDownload,
         languageSelector = { LanguageSelector() },
+        // Les deux sections qui parlent à un autre appareil. Passées en
+        // paramètre parce qu'elles s'adossent aux sockets de `data.cast` et
+        // `data.remote` : l'écran, lui, est commun aux quatre plateformes
+        // depuis le portage iOS. Voir RemoteSection.kt.
+        remoteSection = { onPair -> RemoteSection(onPair) },
+        pairingDialog = { onDismiss -> PairingDialog(onDismiss = onDismiss) },
     )
 }
 

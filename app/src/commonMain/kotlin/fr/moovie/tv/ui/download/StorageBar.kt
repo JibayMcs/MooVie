@@ -27,7 +27,8 @@ import fr.moovie.tv.resources.downloads_storage_free
 import fr.moovie.tv.resources.downloads_storage_other
 import fr.moovie.tv.ui.theme.MoovieGradient
 import org.jetbrains.compose.resources.stringResource
-import java.io.File
+import fr.moovie.tv.shared.espaceLibre
+import fr.moovie.tv.shared.espaceTotal
 
 /** Ce qu'occupe le volume qui porte les téléchargements. */
 data class StorageUsage(
@@ -53,11 +54,16 @@ data class StorageUsage(
  * dessiner un disque vide.
  */
 fun storageUsage(dir: okio.Path, mine: Long): StorageUsage = runCatching {
-    val volume = dir.toFile()
+    // `espaceLibre` / `espaceTotal` plutôt que `java.io.File` : la mesure d'un
+    // volume n'a pas d'API commune, et c'est le seul point de ce fichier qui
+    // touchait la JVM. Les deux rendent exactement ce que rendaient
+    // `usableSpace` et `totalSpace` sur Android et desktop — voir leurs
+    // `actual` respectifs.
+    val total = espaceTotal(dir)
     StorageUsage(
-        total = volume.totalSpace,
-        free = volume.usableSpace,
-        mine = mine.coerceIn(0L, volume.totalSpace),
+        total = total,
+        free = espaceLibre(dir).coerceAtMost(total),
+        mine = mine.coerceIn(0L, total),
     )
 }.getOrDefault(StorageUsage(0L, 0L, mine))
 

@@ -1,6 +1,9 @@
 package fr.moovie.tv.ui.backup
 
 import fr.moovie.tv.shared.dispatcherEs
+import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import fr.moovie.tv.shared.maintenantMs
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -146,10 +149,22 @@ class BackupViewModel : ViewModel() {
      */
     private fun fileName(now: Long) = "moovie-${stamp(now)}$BACKUP_EXTENSION"
 
-    /** `2026-08-02_1430` — trié à l'alphabétique comme à la chronologie. */
-    private fun stamp(now: Long): String = java.time.Instant.ofEpochMilli(now)
-        .atZone(java.time.ZoneId.systemDefault())
-        .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd_HHmm"))
+    /**
+     * `2026-08-02_1430` — trié à l'alphabétique comme à la chronologie.
+     *
+     * Composé à la main plutôt que par un motif : `java.time` n'existe pas en
+     * Kotlin/Native, et kotlinx-datetime — qui, lui, est commun — ne porte pas
+     * de formateur à motif. Quatre champs zéro-remplis donnent exactement la
+     * même chaîne que `yyyy-MM-dd_HHmm`, et le nom de fichier est un format
+     * qu'on lit soi-même, pas un affichage localisé : il ne doit surtout **pas**
+     * suivre la langue de l'appareil.
+     */
+    private fun stamp(now: Long): String {
+        val t = Instant.fromEpochMilliseconds(now).toLocalDateTime(TimeZone.currentSystemDefault())
+        fun deuxChiffres(v: Int) = v.toString().padStart(2, '0')
+        return "${t.year}-${deuxChiffres(t.monthNumber)}-${deuxChiffres(t.dayOfMonth)}" +
+            "_${deuxChiffres(t.hour)}${deuxChiffres(t.minute)}"
+    }
 
     /** Les supports se lisent et s'écrivent sur disque : jamais sur le fil UI. */
     private fun io(block: suspend () -> Unit) {

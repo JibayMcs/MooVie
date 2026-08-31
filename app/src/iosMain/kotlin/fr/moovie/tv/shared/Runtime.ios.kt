@@ -131,3 +131,35 @@ actual fun formaterDecimal(valeur: Double, decimales: Int): String {
     return formateur.stringFromNumber(platform.Foundation.NSNumber(double = valeur))
         ?: valeur.toString()
 }
+
+/**
+ * `NSURLVolumeTotalCapacityKey` : la capacité du volume, celle qu'annonce
+ * Réglages > Général > Stockage. Symétrique de [espaceLibre] juste au-dessus,
+ * qui prend la clé « importante » plutôt que la brute — les deux décrivent le
+ * même volume, chacune sous l'angle de sa question.
+ */
+@OptIn(ExperimentalForeignApi::class)
+actual fun espaceTotal(chemin: okio.Path): Long = runCatching {
+    val url = platform.Foundation.NSURL.fileURLWithPath(chemin.toString())
+    val valeurs = url.resourceValuesForKeys(
+        listOf(platform.Foundation.NSURLVolumeTotalCapacityKey),
+        null,
+    )
+    (valeurs?.values?.firstOrNull() as? platform.Foundation.NSNumber)?.longLongValue ?: 0L
+}.getOrDefault(0L)
+
+/**
+ * Voir le KDoc de l'`expect` : sans réflexion, aucune fabrique générique n'est
+ * possible, et aucune n'est nécessaire — les `viewModel { … }` d'iOS portent
+ * tous leur constructeur.
+ */
+actual fun fabriqueParDefaut(): androidx.lifecycle.ViewModelProvider.Factory =
+    object : androidx.lifecycle.ViewModelProvider.Factory {
+        override fun <T : androidx.lifecycle.ViewModel> create(
+            modelClass: kotlin.reflect.KClass<T>,
+            extras: androidx.lifecycle.viewmodel.CreationExtras,
+        ): T = error(
+            "Aucune fabrique par défaut sur iOS : passez le constructeur, " +
+                "comme dans `viewModel { HomeViewModel() }`.",
+        )
+    }
