@@ -152,6 +152,15 @@ kotlin {
                 // jusque-là transitivement, à la même version — rien ne change
                 // pour elles.
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
+                // Réglages persistants. L'artefact était déjà multiplateforme,
+                // il était simplement déclaré côté JVM faute d'utilisateur
+                // commun ; le chemin du fichier vient de l'expect/actual
+                // `moovieDataStoreChemin`.
+                implementation("androidx.datastore:datastore-preferences-core:1.1.1")
+                // `createWithPath` prend un `okio.Path` là où l'API JVM prenait
+                // un `File`. DataStore tire déjà okio, on le déclare pour ne pas
+                // dépendre d'une transitivité.
+                implementation("com.squareup.okio:okio:3.9.1")
             }
         }
 
@@ -176,9 +185,6 @@ kotlin {
                 // Images multiplateforme (Coil 3), fetcher réseau OkHttp
                 implementation("io.coil-kt.coil3:coil-compose:3.0.4")
                 implementation("io.coil-kt.coil3:coil-network-okhttp:3.0.4")
-                // Réglages persistants (artefact KMP ; le chemin du fichier est
-                // fourni par expect/actual moovieDataStoreFile)
-                implementation("androidx.datastore:datastore-preferences-core:1.1.1")
                 // ViewModels multiplateformes (androidx.lifecycle réel côté Android,
                 // port JetBrains côté desktop)
                 implementation("org.jetbrains.androidx.lifecycle:lifecycle-viewmodel:2.8.4")

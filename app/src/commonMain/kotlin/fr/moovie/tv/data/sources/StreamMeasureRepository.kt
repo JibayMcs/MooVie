@@ -1,5 +1,6 @@
 package fr.moovie.tv.data.sources
 
+import fr.moovie.tv.shared.maintenantMs
 import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -73,7 +74,7 @@ class StreamMeasureRepository {
      * dépenserait une part de ce qu'on vient d'économiser. L'appelant garde le
      * résultat pour la durée de son écran.
      */
-    suspend fun all(now: Long = System.currentTimeMillis()): Map<String, StreamMeasure> =
+    suspend fun all(now: Long = maintenantMs()): Map<String, StreamMeasure> =
         store.data.first().asMap()
             .mapNotNull { (key, value) ->
                 if (!key.name.startsWith(ENTRY_PREFIX)) return@mapNotNull null
@@ -91,7 +92,7 @@ class StreamMeasureRepository {
         url: String,
         heights: List<Int>,
         playable: Boolean,
-        now: Long = System.currentTimeMillis(),
+        now: Long = maintenantMs(),
     ) {
         if (url.isBlank()) return
         store.edit { prefs ->

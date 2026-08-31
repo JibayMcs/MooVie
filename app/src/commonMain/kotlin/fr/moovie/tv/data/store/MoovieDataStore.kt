@@ -4,10 +4,20 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.Preferences
-import java.io.File
+import fr.moovie.tv.shared.Verrou
+import fr.moovie.tv.shared.avec
+import okio.Path.Companion.toPath
+import kotlin.concurrent.Volatile
 
-/** Fichier de persistance d'un DataStore Preferences nommé (chemin par plateforme). */
-expect fun moovieDataStoreFile(name: String): File
+/**
+ * Chemin absolu du fichier de persistance d'un magasin nommé.
+ *
+ * Un chemin et non un `java.io.File` : ce type n'existe pas en Kotlin/Native.
+ * Les cibles JVM le dérivent de `moovieDataStoreFile`, qui reste en place et
+ * rend le **même** fichier qu'avant — les données existantes des utilisateurs
+ * sont donc servies à l'identique.
+ */
+expect fun moovieDataStoreChemin(name: String): String
 
 /**
  * Profil d'origine : celui de tout le monde avant que les profils existent.
@@ -104,6 +114,8 @@ object ActiveProfile {
 fun profileStoreName(base: String, profileId: String = ActiveProfile.id): String =
     if (profileId == DEFAULT_PROFILE_ID) base else "${base}__$profileId"
 
+private val verrou = Verrou()
+
 private val stores = mutableMapOf<String, DataStore<Preferences>>()
 
 /** Fabrique posée par les tests, voir [overrideStores]. Null en production. */
@@ -117,10 +129,15 @@ private val overridden = mutableMapOf<String, DataStore<Preferences>>()
  * Instance unique par fichier — DataStore interdit deux instances actives sur
  * le même fichier — créée à la demande.
  */
-fun preferencesStore(name: String): DataStore<Preferences> = synchronized(stores) {
-    override?.let { create -> return@synchronized overridden.getOrPut(name) { create(name) } }
+fun preferencesStore(name: String): DataStore<Preferences> = verrou.avec {
+    override?.let { create -> return@avec overridden.getOrPut(name) { create(name) } }
     stores.getOrPut(name) {
-        PreferenceDataStoreFactory.create(produceFile = { moovieDataStoreFile(name) })
+        // `createWithPath` et non `create` : cette dernière prend un
+        // `java.io.File` et n'existe que sur la JVM. Même fichier, même format,
+        // seule l'API d'entrée change.
+        PreferenceDataStoreFactory.createWithPath(
+            produceFile = { moovieDataStoreChemin(name).toPath() },
+        )
     }
 }
 
@@ -143,7 +160,7 @@ fun preferencesStore(name: String): DataStore<Preferences> = synchronized(stores
  *
  * Passer `null` rend la main aux fichiers.
  */
-internal fun overrideStores(create: ((String) -> DataStore<Preferences>)?) = synchronized(stores) {
+internal fun overrideStores(create: ((String) -> DataStore<Preferences>)?) = verrou.avec {
     override = create
     overridden.clear()
 }

@@ -1,5 +1,6 @@
 package fr.moovie.tv.data.profile
 
+import fr.moovie.tv.shared.maintenantMs
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import fr.moovie.tv.data.store.ActiveProfile
@@ -152,7 +153,7 @@ class ProfileRepository {
      * On bascule d'abord si c'était l'actif, pour qu'aucun flux ne lise les
      * données au moment où elles sont vidées.
      */
-    suspend fun delete(id: String, now: Long = System.currentTimeMillis()) {
+    suspend fun delete(id: String, now: Long = maintenantMs()) {
         if (id == DEFAULT_PROFILE_ID) return
         if (activeId.first() == id) setActive(DEFAULT_PROFILE_ID)
         write(profiles.first().filterNot { it.id == id })

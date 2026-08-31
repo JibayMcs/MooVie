@@ -6,21 +6,11 @@ import okhttp3.OkHttpClient
 import okhttp3.dnsoverhttps.DnsOverHttps
 import java.net.InetAddress
 
-/** Résolveurs DNS-over-HTTPS proposés dans les réglages. */
-enum class DohProvider(
-    val label: String,
-    private val url: String,
-    private val bootstrap: List<String>,
-) {
-    CLOUDFLARE("Cloudflare", "https://cloudflare-dns.com/dns-query", listOf("1.1.1.1", "1.0.0.1")),
-    QUAD9("Quad9", "https://dns.quad9.net/dns-query", listOf("9.9.9.9", "149.112.112.112"));
+/** Adresses d'amorçage (IP littérales → pas de DNS système nécessaire). */
+internal fun DohProvider.bootstrapAddresses(): List<InetAddress> =
+    bootstrap.map { InetAddress.getByName(it) }
 
-    /** Adresses d'amorçage (IP littérales → pas de DNS système nécessaire). */
-    internal fun bootstrapAddresses(): List<InetAddress> =
-        bootstrap.map { InetAddress.getByName(it) }
-
-    internal fun dohUrl() = url.toHttpUrl()
-}
+internal fun DohProvider.dohUrl() = url.toHttpUrl()
 
 /**
  * DNS de l'app pour l'extraction des sources. Par défaut en DoH (Cloudflare) :
@@ -28,6 +18,10 @@ enum class DohProvider(
  * Mutable et thread-safe — les réglages mettent à jour le résolveur à chaud.
  * Le TMDB reste sur le DNS système (non bloqué) ; seul le client d'extraction
  * utilise ce résolveur.
+ *
+ * Propre aux cibles JVM : le remplacement du résolveur est une capacité
+ * d'OkHttp, et NSURLSession n'a pas d'équivalent. L'énumération du réglage,
+ * elle, est commune — voir [DohProvider].
  */
 object AppDns : Dns {
 

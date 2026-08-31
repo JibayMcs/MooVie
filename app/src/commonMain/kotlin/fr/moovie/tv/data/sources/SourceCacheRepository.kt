@@ -1,5 +1,6 @@
 package fr.moovie.tv.data.sources
 
+import fr.moovie.tv.shared.maintenantMs
 import fr.moovie.tv.core.sources.model.EmbedLink
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -93,7 +94,7 @@ class SourceCacheRepository {
         if (key.isBlank()) return null
         val raw = store.data.first()[stringPreferencesKey(ENTRY_PREFIX + key)] ?: return null
         val entry = runCatching { json.decodeFromString<CachedSources>(raw) }.getOrNull() ?: return null
-        if (System.currentTimeMillis() - entry.savedAt > TTL_MS) return null
+        if (maintenantMs() - entry.savedAt > TTL_MS) return null
         // Écrite par une autre version : le code qui a produit ces liens n'est
         // plus celui qui tourne.
         if (!writtenByRunningVersion(entry.version)) return null
@@ -112,7 +113,7 @@ class SourceCacheRepository {
         if (key.isBlank() || links.isEmpty()) return
         store.edit { prefs ->
             prefs[stringPreferencesKey(ENTRY_PREFIX + key)] = json.encodeToString(
-                CachedSources(links, System.currentTimeMillis(), providers.sorted(), appVersionName),
+                CachedSources(links, maintenantMs(), providers.sorted(), appVersionName),
             )
             prune(prefs)
         }

@@ -1,5 +1,10 @@
 package fr.moovie.tv.data.sync
 
+import fr.moovie.tv.shared.Verrou
+import fr.moovie.tv.shared.avec
+import fr.moovie.tv.shared.maintenantMs
+import kotlin.concurrent.Volatile
+
 /**
  * L'horloge qui date les décisions synchronisables.
  *
@@ -44,7 +49,7 @@ object MoovieClock {
     @Volatile
     private var floor = 0L
 
-    private val lock = Any()
+    private val lock = Verrou()
 
     /** Applique l'écart mesuré face au dépôt. */
     fun correctBy(offset: Long) {
@@ -52,8 +57,8 @@ object MoovieClock {
     }
 
     /** Horodate une décision locale. Jamais deux fois la même valeur. */
-    fun now(): Long = synchronized(lock) {
-        val physical = System.currentTimeMillis() + offset
+    fun now(): Long = lock.avec {
+        val physical = maintenantMs() + offset
         val next = if (physical > floor) physical else floor + 1
         floor = next
         next
@@ -68,15 +73,15 @@ object MoovieClock {
      */
     fun observe(remote: Long) {
         if (remote <= 0) return
-        synchronized(lock) {
-            val physical = System.currentTimeMillis() + offset
+        lock.avec {
+            val physical = maintenantMs() + offset
             if (remote > physical + MAX_DRIFT_MS) return
             if (remote > floor) floor = remote
         }
     }
 
     /** Pour les tests : repart d'une horloge vierge. */
-    internal fun reset() = synchronized(lock) {
+    internal fun reset() = lock.avec {
         offset = 0
         floor = 0
     }
