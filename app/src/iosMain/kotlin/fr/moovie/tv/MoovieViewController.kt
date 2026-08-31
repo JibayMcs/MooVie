@@ -40,6 +40,7 @@ import fr.moovie.tv.ui.offline.OfflineSearchScreen
 import fr.moovie.tv.ui.onboarding.OnboardingScreen
 import fr.moovie.tv.ui.onboarding.rememberStartScreen
 import fr.moovie.tv.ui.player.AvPlayerController
+import fr.moovie.tv.ui.player.OrientationEcran
 import fr.moovie.tv.ui.player.SurfaceVideo
 import fr.moovie.tv.ui.settings.SettingsScreen
 import fr.moovie.tv.ui.theme.MooVieTheme
@@ -301,6 +302,16 @@ private fun LecteurIos(nav: NavStack, params: Screen.Player) {
         AvPlayerController(params.streamUrl, params.headers)
     }
     DisposableEffect(controleur) { onDispose { controleur.liberer() } }
+
+    // Paysage tant que le lecteur est là, portrait partout ailleurs — le même
+    // partage que sur le téléphone Android, et celui que l'Info.plist annonçait
+    // depuis le début sans que rien ne l'applique. Posé et retiré par le même
+    // effet : quelle que soit la façon de quitter le lecteur — retour,
+    // enchaînement d'épisode, flux qui casse — l'orientation revient.
+    DisposableEffect(Unit) {
+        OrientationEcran.forcerPaysage()
+        onDispose { OrientationEcran.rendreLibre() }
+    }
 
     IosPlayerScreen(
         streamUrl = params.streamUrl,

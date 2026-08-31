@@ -87,8 +87,18 @@
 	<array>
 		<string>arm64</string>
 	</array>
-	<!-- Portrait partout sauf le lecteur, qui bascule de lui-même : même
-	     comportement que le téléphone Android. -->
+	<!-- Les trois orientations que l'application peut prendre — la borne
+	     extérieure, pas le comportement.
+
+	     Le partage réel se décide à l'exécution : portrait partout, paysage
+	     dans le lecteur, comme sur le téléphone Android. C'est
+	     `MoovieAppDelegate` qui répond au système, sur signal d'`OrientationEcran`
+	     ; cette clé ne fait que l'autoriser. Elle était là depuis le début en
+	     annonçant ce partage, mais rien ne l'appliquait : le lecteur restait en
+	     portrait si le téléphone y était.
+
+	     `PortraitUpsideDown` reste absente : un iPhone tenu à l'envers ne se
+	     retourne pas de lui-même, et personne ne regarde un film ainsi. -->
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
