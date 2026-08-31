@@ -374,11 +374,35 @@ jobs:
         run: |
           set -e
           ipa=$(ls moovie-*.ipa | head -1)
-          version="${GITHUB_REF_NAME#v}"
           taille=$(wc -c < "$ipa" | tr -d ' ')
+          # **La version annoncée doit être celle que l'application déclare.**
+          # SideStore compare `version` au `CFBundleShortVersionString` de l'app
+          # installée, et `buildVersion` à son `CFBundleVersion` ; ce sont ces
+          # deux comparaisons qui décident s'il y a du neuf.
+          #
+          # D'où le même `%%-*` qu'à l'archivage : `CFBundleShortVersionString`
+          # n'accepte que du numérique pointé, si bien qu'un tag `v1.19.0-rc.1`
+          # produit une app en « 1.19.0 ». Annoncer « 1.19.0-rc.1 » dans la
+          # source ne correspondrait donc à aucune version installable, et
+          # SideStore aurait proposé la même mise à jour indéfiniment.
+          #
+          # `buildVersion` est ce qui distingue alors deux préversions du même
+          # numéro : c'est le compteur du workflow, qui croît strictement, et
+          # c'est exactement ce que l'archivage met dans `CFBundleVersion`.
+          version="${GITHUB_REF_NAME#v}"
+          version="${version%%-*}"
+          build="${GITHUB_RUN_NUMBER}"
+          # Empreinte du fichier : SideStore la vérifie après téléchargement et
+          # refuse un .ipa qui ne correspond pas. Elle ne coûte rien à produire
+          # et transforme un téléchargement corrompu en refus explicite plutôt
+          # qu'en installation qui échoue sans raison lisible.
+          sha=$(shasum -a 256 "$ipa" | cut -d" " -f1)
           base="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}"
           # `date -u` et non la date du tag : c'est la date de publication que
           # lit SideStore pour décider s'il a du neuf.
+          # `app/icons/moovie.png` et non la bannière : SideStore affiche cette
+          # image dans une tuile **carrée**. Une bannière pleine largeur y
+          # arriverait écrasée, et c'est déjà l'icône que porte l'application.
           python3 - <<PYEOF > sidestore.json
           import json, os, datetime
           notes = os.environ.get("NOTES", "").strip() or "Voir les notes de version sur GitHub."
@@ -389,19 +413,22 @@ jobs:
                   "name": "Moo-vie",
                   "bundleIdentifier": "fr.moovie.tv",
                   "developerName": "Moo-vie",
+                  "subtitle": "Streaming multiplateforme, sans compte ni publicite.",
                   "localizedDescription":
                       "Streaming sur Android TV, Android, desktop et iOS, "
                       "depuis une base de code Kotlin Multiplatform unique. "
                       "L'extraction des sources tourne sur l'appareil : pas de "
                       "serveur, pas de compte, pas de publicité.",
-                  "iconURL": "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/main/.github/banner.png",
+                  "iconURL": "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/main/app/icons/moovie.png",
                   "tintColor": "1B1B1F",
                   "versions": [{
                       "version": "$version",
+                      "buildVersion": "$build",
                       "date": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
                       "localizedDescription": notes,
                       "downloadURL": "$base/$ipa",
                       "size": $taille,
+                      "sha256": "$sha",
                       # Compose Multiplatform exige iOS 15 ; c'est aussi la
                       # cible de déploiement du projet Xcode.
                       "minOSVersion": "15.0",
@@ -409,7 +436,11 @@ jobs:
               }],
           }, indent=2, ensure_ascii=False))
           PYEOF
-          echo "source SideStore : $(wc -c < sidestore.json) octets pour $ipa ($taille octets)"
+          echo "source SideStore : version $version (build $build) pour $ipa ($taille octets)"
+          # Relu avant publication : une source mal formée n'échoue pas ici, elle
+          # échoue chez l'utilisateur, sous la forme d'une source qui refuse de
+          # s'ajouter sans dire pourquoi.
+          python3 -c "import json,sys; json.load(open('sidestore.json')); print('source SideStore : JSON valide')"
         env:
           NOTES: ${{ needs.changelog.outputs.notes }}
 

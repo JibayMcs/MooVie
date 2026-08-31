@@ -9,9 +9,42 @@ name: Vérification iOS
 #
 # Distinct de `release.yml`, qui ne se déclenche que sur un tag et publie sur la
 # release : on ne veut pas taguer une version pour savoir si le code compile.
+#
+# Il se déclenche sur `main`, sur les pull requests et sur les branches de
+# travail iOS — mais seulement quand quelque chose qui le concerne a bougé.
+#
+# `commonMain` fait partie de ces chemins, et c'est le point important : depuis
+# le portage, l'interface partagée y vit tout entière. Un changement fait pour
+# Android ou pour le desktop peut donc casser la compilation Kotlin/Native sans
+# que son auteur en voie rien, et ce workflow est le seul à pouvoir le dire.
+#
+# Le filtre par chemins est ce qui rend ce filet supportable : une PR qui ne
+# touche qu'aux sources Android ou qu'aux traductions ne paie pas ses vingt
+# minutes de runner macOS.
+#
+# La liste est écrite deux fois, et ce n'est pas un oubli : **GitHub Actions
+# n'interprète pas les ancres YAML**. Un `&ancre` / `*ancre` passerait la
+# validation d'un analyseur YAML ordinaire et ne filtrerait rien ici.
 on:
   push:
-    branches: ['feat/ios-port', 'ios/**']
+    branches: [main, 'ios/**', 'feat/ios-port']
+    paths:
+      - 'app/src/commonMain/**'
+      - 'app/src/iosMain/**'
+      - 'app/build.gradle.kts'
+      - 'build.gradle.kts'
+      - 'gradle/**'
+      - 'iosApp/**'
+      - '.github/workflows/ci-ios.yml'
+  pull_request:
+    paths:
+      - 'app/src/commonMain/**'
+      - 'app/src/iosMain/**'
+      - 'app/build.gradle.kts'
+      - 'build.gradle.kts'
+      - 'gradle/**'
+      - 'iosApp/**'
+      - '.github/workflows/ci-ios.yml'
   # Permet de le relancer à la main depuis l'onglet Actions, sans pousser.
   workflow_dispatch:
 

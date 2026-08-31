@@ -5,7 +5,7 @@
 # Moo-Vie
 
 Streaming app for **Android TV**, **Android phone**, **desktop** (Linux, Windows, macOS)
-and ~~iOS~~, built from a single Kotlin Multiplatform codebase. Source extraction runs
+and **iOS**, built from a single Kotlin Multiplatform codebase. Source extraction runs
 **on-device**: no backend, no account, no ads.
 
 🇫🇷 [Version française](README.fr.md)
@@ -152,22 +152,30 @@ and ~~iOS~~, built from a single Kotlin Multiplatform codebase. Source extractio
   DNS-over-HTTPS in the loop, where a Chromecast would use the router's resolver
   and hit the very blocking the app exists to route around. One question decides
   whether any of it stands, and it is untested, so there is no date on this.
-- **No iOS support planned.** The constraints are heavy - sideloading, App Store
-  policy, a separate player stack - and I have no Apple device to test on.
-  Shipping something I cannot run myself would be worse than not shipping it.
+- **iOS: shipped, and contributor-maintained.** The previous entry said there
+  would be none, for a reason that has not changed - I have no Apple device, and
+  shipping something I cannot run myself would be worse than not shipping it.
+  What changed is that somebody else runs it: the port was built and exercised on
+  a real iPhone, and the CI macOS runner compiles Kotlin/Native and the Xcode
+  project on every PR touching shared code. The caveat stands and you should know
+  it before installing - iOS-specific defects will take longer to be spotted than
+  Android ones. See [docs/ios.md](docs/ios.md).
+- **Cast and remote on iOS** - out of scope for the port, with no date. Both rest
+  on network discovery and a local HTTP server, which only exist on the JVM
+  targets. These are living-room roles, and the TV is an Android device.
 
 ## Stack
 
 | Layer | Tech |
 |---|---|
-| Language / build | Kotlin 2.0, Kotlin Multiplatform (`androidMain` / `desktopMain` / shared `jvmCommon`) |
-| UI | Compose Multiplatform, shared design system (`MoovieButton`, rails, dialogs) |
-| Playback | Media3 / ExoPlayer on Android · libmpv on desktop |
-| Network | Retrofit + OkHttp + kotlinx.serialization, DNS-over-HTTPS |
-| Extraction | OkHttp + Jsoup + Java crypto (packer deobfuscation, AES) |
-| Storage | DataStore Preferences, OkHttp disk cache |
+| Language / build | Kotlin 2.0, Kotlin Multiplatform (shared `commonMain` · `jvmCommon` · `androidMain` / `desktopMain` / `iosMain`) |
+| UI | Compose Multiplatform, shared design system (`MoovieButton`, rails, dialogs) - **the screens are common to all four platforms** |
+| Playback | Media3 / ExoPlayer on Android · libmpv on desktop · AVPlayer on iOS |
+| Network | Ktor (OkHttp engine on JVM, Darwin/NSURLSession on iOS) + kotlinx.serialization, DNS-over-HTTPS |
+| Extraction | ksoup + platform crypto (packer deobfuscation, AES) |
+| Storage | DataStore Preferences (okio), disk cache |
 | Images | Coil 3 |
-| CI | GitHub Actions: a `vX.Y.Z` tag builds the signed APK, AppImage, `.msi` and `.dmg` |
+| CI | GitHub Actions: a `vX.Y.Z` tag builds the signed APK, AppImage, `.msi`, `.dmg` and `.ipa` |
 
 ## Install
 
@@ -177,6 +185,10 @@ Grab the latest build from [Releases](https://github.com/JibayMcs/MooVie/release
 - **Linux** - `moovie-vX.Y.Z-x86_64.AppImage` (`chmod +x`, then run - no install, no root)
 - **Windows** - `moovie-vX.Y.Z.msi`
 - **macOS** - `moovie-vX.Y.Z.dmg`
+- **iOS** - `moovie-vX.Y.Z.ipa`, installed via [SideStore](https://sidestore.io).
+  The path differs from the others and takes a few minutes of setup: it is all in
+  **[docs/ios.md](docs/ios.md)** - installing, the TMDB key, and above all
+  updates, which cannot happen from inside the app.
 
 All three desktop packages bundle their own Java runtime **and their video player**
 (libmpv): nothing else to install, on any platform. The Linux AppImage runs on any
@@ -198,9 +210,13 @@ under **Settings → API & Keys**. Later updates are handled from inside the app
 ./gradlew :app:packageDistributionForCurrentOS
 ```
 
-Layout: `app/src/commonMain` (resources), `app/src/jvmCommon` (ViewModels, repositories,
-shared UI), `app/src/androidMain`, `app/src/desktopMain`. A preconfigured Android TV
+Layout: `app/src/commonMain` (resources, ViewModels, repositories and **all the
+shared UI**), `app/src/jvmCommon` (whatever depends on OkHttp, Jsoup and sockets:
+Cast, remote, pairing), then `app/src/androidMain`, `app/src/desktopMain` and
+`app/src/iosMain`. The Xcode shell lives in `iosApp/`; a preconfigured Android TV
 emulator and its test scripts live in `emulator/`.
+
+Building for iOS requires a Mac - see [docs/ios.md](docs/ios.md).
 
 **Subtitles work out of the box in the published builds** - the APK, AppImage, MSI and
 DMG from [Releases](https://github.com/JibayMcs/MooVie/releases) all ship with what they

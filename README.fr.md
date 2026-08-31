@@ -5,7 +5,7 @@
 # Moo-Vie
 
 Application de streaming pour **Android TV**, **Android mobile**, **desktop**
-(Linux, Windows, macOS) et ~~iOS~~, depuis une seule base de code Kotlin Multiplatform.
+(Linux, Windows, macOS) et **iOS**, depuis une seule base de code Kotlin Multiplatform.
 L'extraction des sources se fait **on-device** : pas de backend, pas de compte, pas de pub.
 
 🇬🇧 [English version](README.md)
@@ -166,23 +166,32 @@ L'extraction des sources se fait **on-device** : pas de backend, pas de compte, 
   passerait par le résolveur de la box et se heurterait au blocage même que
   l'app existe pour contourner. Une question décide si tout cela tient debout,
   et elle n'est pas tranchée : donc pas de date.
-- **Pas de support iOS prévu.** Les contraintes sont lourdes - installation hors
-  store, règles de l'App Store, pile de lecture à refaire - et je n'ai aucun
-  appareil Apple pour tester. Publier quelque chose que je ne peux pas faire
-  tourner moi-même serait pire que de ne pas le publier.
+- **iOS : livré, et maintenu par contribution.** L'entrée précédente disait
+  qu'il n'y en aurait pas, pour une raison qui n'a pas changé - je n'ai aucun
+  appareil Apple, et publier ce que je ne peux pas faire tourner moi-même serait
+  pire que de ne rien publier. Ce qui a changé, c'est que quelqu'un d'autre le
+  fait tourner : le portage a été construit et éprouvé sur un iPhone réel, et le
+  runner macOS de la CI compile Kotlin/Native et le projet Xcode à chaque PR qui
+  touche au code commun. La réserve subsiste et il faut la connaître avant
+  d'installer - les défauts propres à iOS mettront plus longtemps à être vus que
+  ceux d'Android. Voir [docs/ios.fr.md](docs/ios.fr.md).
+- **Cast et télécommande sur iOS** - hors du portage, et sans date. Les deux
+  reposent sur une découverte réseau et un serveur HTTP local, qui n'existent que
+  sur les cibles JVM. Ce sont des rôles de salon, et le téléviseur est un
+  appareil Android.
 
 ## Stack
 
 | Couche | Techno |
 |---|---|
-| Langage / build | Kotlin 2.0, Kotlin Multiplatform (`androidMain` / `desktopMain` / `jvmCommon` partagé) |
-| UI | Compose Multiplatform, design system partagé (`MoovieButton`, rails, dialogues) |
-| Lecture | Media3 / ExoPlayer sur Android · libmpv sur desktop |
-| Réseau | Retrofit + OkHttp + kotlinx.serialization, DNS-over-HTTPS |
-| Extraction | OkHttp + Jsoup + crypto Java (déobfuscation packer, AES) |
-| Persistance | DataStore Preferences, cache disque OkHttp |
+| Langage / build | Kotlin 2.0, Kotlin Multiplatform (`commonMain` partagé · `jvmCommon` · `androidMain` / `desktopMain` / `iosMain`) |
+| UI | Compose Multiplatform, design system partagé (`MoovieButton`, rails, dialogues) - **les écrans sont communs aux quatre plateformes** |
+| Lecture | Media3 / ExoPlayer sur Android · libmpv sur desktop · AVPlayer sur iOS |
+| Réseau | Ktor (moteur OkHttp côté JVM, Darwin/NSURLSession sur iOS) + kotlinx.serialization, DNS-over-HTTPS |
+| Extraction | ksoup + crypto de plateforme (déobfuscation packer, AES) |
+| Persistance | DataStore Preferences (okio), cache disque |
 | Images | Coil 3 |
-| CI | GitHub Actions : un tag `vX.Y.Z` produit l'APK signé, l'AppImage, le `.msi` et le `.dmg` |
+| CI | GitHub Actions : un tag `vX.Y.Z` produit l'APK signé, l'AppImage, le `.msi`, le `.dmg` et le `.ipa` |
 
 ## Installation
 
@@ -193,6 +202,10 @@ Récupérer le dernier build depuis les
 - **Linux** - `moovie-vX.Y.Z-x86_64.AppImage` (`chmod +x` puis lancer - ni installation ni root)
 - **Windows** - `moovie-vX.Y.Z.msi`
 - **macOS** - `moovie-vX.Y.Z.dmg`
+- **iOS** - `moovie-vX.Y.Z.ipa`, à installer par [SideStore](https://sidestore.io).
+  Le chemin est différent des autres et demande quelques minutes de préparation :
+  tout est dans **[docs/ios.fr.md](docs/ios.fr.md)** - installation, clé TMDB,
+  et surtout les mises à jour, qui ne peuvent pas se faire depuis l'app.
 
 Les trois paquets desktop embarquent leur runtime Java **et leur lecteur vidéo**
 (libmpv) : plus rien à installer à côté, sur aucune plateforme. L'AppImage Linux
@@ -214,9 +227,13 @@ gratuite dans **Réglages → API & Clés**. Les mises à jour suivantes se font
 ./gradlew :app:packageDistributionForCurrentOS
 ```
 
-Découpage : `app/src/commonMain` (ressources), `app/src/jvmCommon` (ViewModels, repositories,
-UI partagée), `app/src/androidMain`, `app/src/desktopMain`. Un émulateur Android TV
+Découpage : `app/src/commonMain` (ressources, ViewModels, repositories et **toute
+l'UI partagée**), `app/src/jvmCommon` (ce qui tient à OkHttp, Jsoup et aux sockets :
+Cast, télécommande, appairage), puis `app/src/androidMain`, `app/src/desktopMain` et
+`app/src/iosMain`. La coque Xcode est dans `iosApp/` ; un émulateur Android TV
 préconfiguré et ses scripts de test sont dans `emulator/`.
+
+Compiler pour iOS demande un Mac - voir [docs/ios.fr.md](docs/ios.fr.md).
 
 **Les sous-titres fonctionnent tels quels dans les versions publiées** - l'APK,
 l'AppImage, le MSI et le DMG des [Releases](https://github.com/JibayMcs/MooVie/releases)
