@@ -6,6 +6,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -22,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import fr.moovie.tv.data.intro.IntroDbRepository
 import fr.moovie.tv.data.intro.IntroMedia
@@ -30,6 +32,7 @@ import fr.moovie.tv.data.watch.WatchProgressRepository
 import fr.moovie.tv.data.watch.nextUpEntry
 import fr.moovie.tv.ui.player.ApplySubtitleStyle
 import fr.moovie.tv.ui.player.MooviePlayerController
+import fr.moovie.tv.ui.player.PLAYER_SEEK_STEP_MS
 import fr.moovie.tv.ui.player.PlayerControlBar
 import fr.moovie.tv.ui.player.PlayerDurationGuard
 import fr.moovie.tv.ui.player.PlayerSkipButton
@@ -136,6 +139,18 @@ internal fun IosPlayerScreen(
     fun signalActivity() {
         controlsVisible = true
         activityTick++
+    }
+
+    /**
+     * Interrompt le décompte d'enchaînement.
+     *
+     * `finished` à false suffit : c'est la clé du `LaunchedEffect` qui porte le
+     * décompte, le remettre l'annule. Même mécanique que sur le desktop.
+     */
+    fun annulerEnchainement() {
+        finished = false
+        autoNextSeconds = null
+        signalActivity()
     }
 
     ApplySubtitleStyle(controller)
@@ -304,7 +319,43 @@ internal fun IosPlayerScreen(
     // pour y laisser voir la vue native, et chaque aplat opaque posé par-dessus
     // est une occasion de le recouvrir. La vue native peint son propre noir —
     // y compris les bandes que laisse le respect des proportions.
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            // **Sans ces gestes, le lecteur était un cul-de-sac.** Les commandes
+            // se rangent seules après quelques secondes, et rien ne les
+            // rappelait : ni retour, ni pause, ni barre de progression — on
+            // restait devant l'image jusqu'à tuer l'application. C'est le
+            // premier essai sur iPhone qui l'a montré.
+            //
+            // Les deux gestes sont ceux d'Android, au comportement près :
+            // l'appui simple bascule les commandes, le double appui recule ou
+            // avance de quinze secondes selon la moitié touchée. Le lecteur du
+            // téléviseur n'en a pas besoin — une télécommande n'émet pas
+            // d'événement de pointeur — mais un téléphone n'a que ça.
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onTap = {
+                        when {
+                            // Un décompte en cours se lit comme « je ne veux pas
+                            // de la suite » quand on touche l'écran : c'est la
+                            // seule interprétation utile du geste à ce
+                            // moment-là.
+                            autoNextSeconds != null -> annulerEnchainement()
+                            controlsVisible -> controlsVisible = false
+                            else -> signalActivity()
+                        }
+                    },
+                    onDoubleTap = { position ->
+                        val versArriere = position.x < size.width / 2f
+                        controller.seekBy(
+                            if (versArriere) -PLAYER_SEEK_STEP_MS else PLAYER_SEEK_STEP_MS,
+                        )
+                        signalActivity()
+                    },
+                )
+            },
+    ) {
         surface(Modifier.fillMaxSize())
 
         // **Chaque couche porte son alignement, et la barre n'en a pas d'elle-même.**
@@ -349,11 +400,11 @@ internal fun IosPlayerScreen(
                     signalActivity()
                 },
                 onSeekBack = {
-                    controller.seekBy(-15_000L)
+                    controller.seekBy(-PLAYER_SEEK_STEP_MS)
                     signalActivity()
                 },
                 onSeekForward = {
-                    controller.seekBy(15_000L)
+                    controller.seekBy(PLAYER_SEEK_STEP_MS)
                     signalActivity()
                 },
                 onCommitScrub = {

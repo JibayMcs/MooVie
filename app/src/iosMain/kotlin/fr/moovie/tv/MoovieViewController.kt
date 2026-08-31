@@ -309,8 +309,8 @@ private fun LecteurIos(nav: NavStack, params: Screen.Player) {
     // effet : quelle que soit la façon de quitter le lecteur — retour,
     // enchaînement d'épisode, flux qui casse — l'orientation revient.
     DisposableEffect(Unit) {
-        OrientationEcran.forcerPaysage()
-        onDispose { OrientationEcran.rendreLibre() }
+        OrientationEcran.demanderPaysage()
+        onDispose { OrientationEcran.relacherPaysage() }
     }
 
     IosPlayerScreen(

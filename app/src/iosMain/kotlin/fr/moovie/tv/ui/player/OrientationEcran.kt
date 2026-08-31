@@ -35,7 +35,7 @@ object OrientationEcran {
     var surChangement: (() -> Unit)? = null
 
     /**
-     * Vrai tant qu'un lecteur est à l'écran.
+     * Vrai tant qu'au moins un écran réclame le paysage.
      *
      * Le reste de l'application reste en portrait, comme sur le téléphone
      * Android : ses écrans sont des listes et des grilles, qu'un paysage
@@ -45,17 +45,34 @@ object OrientationEcran {
     var paysageForce: Boolean = false
         private set
 
-    /** Entrée dans le lecteur. */
-    fun forcerPaysage() {
-        if (paysageForce) return
-        paysageForce = true
-        surChangement?.invoke()
+    /**
+     * **Un compteur, et non un drapeau.** Deux écrans réclament le paysage — le
+     * lecteur, et la fiche quand sa bande-annonce passe au premier plan — et
+     * l'un mène à l'autre : on lance un film depuis la fiche. Avec un simple
+     * booléen, la fiche relâcherait en se démontant juste après que le lecteur
+     * a demandé, et l'écran retomberait en portrait sur le film.
+     *
+     * Le compteur rend l'ordre indifférent : le portrait ne revient qu'au
+     * dernier relâchement.
+     */
+    private var demandes = 0
+
+    /** Entrée dans un écran qui veut le paysage. */
+    fun demanderPaysage() {
+        demandes++
+        appliquer()
     }
 
-    /** Sortie du lecteur : le portrait redevient la seule orientation. */
-    fun rendreLibre() {
-        if (!paysageForce) return
-        paysageForce = false
+    /** Sortie. Sans effet si un autre écran le réclame encore. */
+    fun relacherPaysage() {
+        if (demandes > 0) demandes--
+        appliquer()
+    }
+
+    private fun appliquer() {
+        val voulu = demandes > 0
+        if (voulu == paysageForce) return
+        paysageForce = voulu
         surChangement?.invoke()
     }
 }

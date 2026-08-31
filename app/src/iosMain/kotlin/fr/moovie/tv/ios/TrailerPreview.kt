@@ -9,6 +9,7 @@ import fr.moovie.tv.core.sources.model.PlayableStream
 import fr.moovie.tv.ui.player.AvPlayerController
 import fr.moovie.tv.ui.player.MooviePlayerController
 import fr.moovie.tv.ui.player.SurfaceVideo
+import platform.AVFoundation.AVLayerVideoGravityResizeAspect
 import platform.AVFoundation.AVLayerVideoGravityResizeAspectFill
 import platform.AVFoundation.volume
 
@@ -56,6 +57,14 @@ internal fun TrailerPreviewIos(
     volume: Float,
     onController: (MooviePlayerController?) -> Unit,
     modifier: Modifier = Modifier,
+    /**
+     * La bande-annonce est-elle au premier plan, c'est-à-dire occupant l'écran
+     * entier plutôt que le fond de la fiche ?
+     *
+     * Elle décide du cadrage, et les deux réponses sont opposées à dessein —
+     * voir le commentaire sur `gravite` plus bas.
+     */
+    plein: Boolean = false,
 ) {
     // Pistes séparées = manifeste DASH. Voir le KDoc : on laisse la place à
     // l'affiche plutôt que de tenter une lecture qu'AVPlayer ne sait pas faire.
@@ -92,9 +101,22 @@ internal fun TrailerPreviewIos(
     SurfaceVideo(
         controleur = controleur,
         modifier = modifier,
-        // Recadré comme l'affiche qu'il remplace : des bandes noires
-        // trahiraient une vidéo posée là au lieu d'un décor. Même choix que le
-        // `ContentScale.Crop` de l'aperçu desktop.
-        gravite = AVLayerVideoGravityResizeAspectFill,
+        // **Deux cadrages, parce que ce sont deux rôles.**
+        //
+        // En fond de fiche, l'aperçu tient la place de l'affiche : il est
+        // recadré, comme le `ContentScale.Crop` de l'aperçu desktop et le
+        // `RESIZE_MODE_ZOOM` d'Android. Des bandes noires y trahiraient une
+        // vidéo posée là au lieu d'un décor.
+        //
+        // Au premier plan, c'est l'inverse : on regarde la bande-annonce, et
+        // rogner un 16:9 dans un écran de téléphone en coupe une bonne moitié.
+        // C'est ce que montrait le premier essai — image portrait et amputée.
+        // L'écran bascule en paysage en même temps (voir `IosDetailsScreen`),
+        // si bien que les bandes restent minces.
+        gravite = if (plein) {
+            AVLayerVideoGravityResizeAspect
+        } else {
+            AVLayerVideoGravityResizeAspectFill
+        },
     )
 }
