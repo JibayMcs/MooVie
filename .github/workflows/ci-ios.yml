@@ -1,0 +1,72 @@
+name: Vérification iOS
+
+# Ne publie **rien**. Son seul rôle est de compiler ce qu'aucun poste de
+# développement sous Linux ou Windows ne peut compiler : le code Kotlin/Native
+# et le projet Xcode. La toolchain Apple n'existe que sur macOS, si bien que
+# `compileIosMainKotlinMetadata` est purement et simplement *skipped* ailleurs —
+# vérifié, ce n'est pas une supposition. Sans ce workflow, `app/src/iosMain`
+# n'est relu que par des yeux humains.
+#
+# Distinct de `release.yml`, qui ne se déclenche que sur un tag et publie sur la
+# release : on ne veut pas taguer une version pour savoir si le code compile.
+on:
+  push:
+    branches: ['feat/ios-port', 'ios/**']
+  # Permet de le relancer à la main depuis l'onglet Actions, sans pousser.
+  workflow_dispatch:
+
+jobs:
+  compiler:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # En premier, et séparément : cette tâche compile `commonMain` **et**
+      # `iosMain` en métadonnées. C'est le retour le plus rapide et le plus
+      # lisible sur les erreurs de code partagé, avant que xcodebuild ne noie
+      # tout dans sa propre sortie.
+      - name: Compiler le code partagé pour iOS
+        run: ./gradlew :app:compileIosMainKotlinMetadata --no-daemon
+
+      # Puis la vraie compilation native, cible appareil : c'est elle qui
+      # éprouve le cinterop — CoreCrypto, Core Image, NSDateFormatter — que la
+      # compilation de métadonnées ne touche pas.
+      - name: Compiler le framework Kotlin/Native (appareil)
+        run: ./gradlew :app:linkDebugFrameworkIosArm64 --no-daemon
+
+      - name: Compiler le framework Kotlin/Native (simulateur)
+        run: ./gradlew :app:linkDebugFrameworkIosSimulatorArm64 --no-daemon
+
+      - name: Installer XcodeGen
+        run: brew install xcodegen
+
+      - name: Générer le projet Xcode
+        working-directory: iosApp
+        run: xcodegen generate
+
+      # Compilation seule, sans archive ni empaquetage : on cherche à savoir si
+      # le Swift et le lien avec le framework tiennent, pas à produire un .ipa.
+      - name: Compiler l'application iOS
+        run: |
+          xcodebuild build \
+            -project iosApp/Moovie.xcodeproj \
+            -scheme Moovie \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+
+      # Le reste du projet ne doit pas régresser pendant le portage. Ces deux
+      # cibles se compilent aussi sur macOS, autant les couvrir ici plutôt que
+      # de compter sur le poste de développement.
+      - name: Non-régression Android et desktop
+        run: ./gradlew :app:compileKotlinDesktop :app:compileDebugKotlinAndroid :app:desktopTest --no-daemon
