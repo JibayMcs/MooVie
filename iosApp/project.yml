@@ -20,11 +20,14 @@ targets:
     platform: iOS
     sources:
       - path: Sources
+      - path: Resources/Assets.xcassets
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: fr.moovie.tv
         PRODUCT_NAME: Moo-vie
         INFOPLIST_FILE: Resources/Info.plist
+        # Désigne le jeu d'icônes que le compilateur d'assets doit produire.
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         SWIFT_VERSION: "5.0"
         # Le .ipa sort non signé : SideStore resigne à l'installation avec le
         # certificat de développement de l'utilisateur. Voir le job `ipa` de

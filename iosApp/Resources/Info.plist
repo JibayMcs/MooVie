@@ -39,11 +39,20 @@
 		<string>audio</string>
 	</array>
 
+	<!-- Nom du jeu d'icônes dans le catalogue d'assets. Sans cette clé, iOS
+	     n'affiche aucune icône : le catalogue seul ne suffit pas, il faut le
+	     désigner. -->
+	<key>CFBundleIconName</key>
+	<string>AppIcon</string>
 	<key>UILaunchScreen</key>
 	<dict/>
+	<!-- `arm64` et surtout **pas** `armv7` : celui-ci est la capacité ARM 32
+	     bits, qu'un iPhone moderne — arm64 uniquement — ne satisfait pas. iOS
+	     refuse alors de lancer l'application, sans message : elle se ferme à
+	     l'instant où on l'ouvre. C'est le défaut qu'avait le premier .ipa. -->
 	<key>UIRequiredDeviceCapabilities</key>
 	<array>
-		<string>armv7</string>
+		<string>arm64</string>
 	</array>
 	<!-- Portrait partout sauf le lecteur, qui bascule de lui-même : même
 	     comportement que le téléphone Android. -->
