@@ -11,7 +11,11 @@ import platform.AVFoundation.AVPlayer
 import platform.AVFoundation.AVPlayerItem
 import platform.AVFoundation.AVPlayerTimeControlStatusPlaying
 import platform.AVFoundation.AVURLAsset
+import platform.AVFoundation.asset
 import platform.AVFoundation.currentItem
+import platform.AVFoundation.currentMediaSelection
+import platform.AVFoundation.mediaSelectionGroupForMediaCharacteristic
+import platform.AVFoundation.selectMediaOption
 import platform.AVFoundation.currentTime
 import platform.AVFoundation.duration
 import platform.AVFoundation.pause
@@ -179,7 +183,10 @@ class AvPlayerController(
     /** Voir la documentation de la classe : `AVTextStyleRule`, non branché. */
     override fun applySubtitleStyle(style: SubtitleStyle) = Unit
 
-    private fun pistes(item: AVPlayerItem, caracteristique: String): List<PlayerTrack> {
+    // Les constantes `AVMediaCharacteristic*` sont nullables dans le binding
+    // Kotlin/Native : ce sont des `NSString *` sans annotation côté Apple.
+    private fun pistes(item: AVPlayerItem, caracteristique: String?): List<PlayerTrack> {
+        if (caracteristique == null) return emptyList()
         val groupe = item.asset.mediaSelectionGroupForMediaCharacteristic(caracteristique)
             ?: return emptyList()
         val choisie = item.currentMediaSelection.selectedMediaOptionInMediaSelectionGroup(groupe)
@@ -194,7 +201,8 @@ class AvPlayerController(
         }
     }
 
-    private fun selectionner(caracteristique: String, trackId: String?) {
+    private fun selectionner(caracteristique: String?, trackId: String?) {
+        if (caracteristique == null) return
         val item = player.currentItem ?: return
         val groupe = item.asset.mediaSelectionGroupForMediaCharacteristic(caracteristique) ?: return
         val option = trackId?.toIntOrNull()

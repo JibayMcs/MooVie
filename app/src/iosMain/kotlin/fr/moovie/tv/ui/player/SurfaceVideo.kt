@@ -5,11 +5,10 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.interop.UIKitView
-import androidx.compose.ui.viewinterop.UIKitInteropProperties
 import kotlinx.cinterop.ExperimentalForeignApi
 import platform.AVFoundation.AVLayerVideoGravityResizeAspect
 import platform.AVFoundation.AVPlayerLayer
-import platform.CoreGraphics.CGRectZero
+import platform.CoreGraphics.CGRectMake
 import platform.UIKit.UIView
 
 /**
@@ -57,7 +56,7 @@ fun SurfaceVideo(
 
     UIKitView(
         factory = {
-            UIView(frame = CGRectZero.readValue()).apply {
+            UIView(frame = CGRectMake(0.0, 0.0, 0.0, 0.0)).apply {
                 backgroundColor = platform.UIKit.UIColor.blackColor
                 layer.addSublayer(couche)
             }
@@ -68,13 +67,11 @@ fun SurfaceVideo(
             vue.layer.setFrame(rect)
             couche.setFrame(rect)
         },
-        properties = UIKitInteropProperties(
-            // La vue ne reçoit aucun geste : tous les appuis — lecture, pause,
-            // pincement, double-tape — sont gérés par la chrome Compose
-            // au-dessus. Laisser UIKit les intercepter les lui volerait.
-            isInteractive = false,
-            isNativeAccessibilityEnabled = false,
-        ),
+        // La vue ne reçoit aucun geste : tous les appuis — lecture, pause,
+        // pincement, double-tape — sont gérés par la chrome Compose au-dessus.
+        // Laisser UIKit les intercepter les lui volerait.
+        interactive = false,
+        accessibilityEnabled = false,
     )
 
     DisposableEffect(controleur) {
