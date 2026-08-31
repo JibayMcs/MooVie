@@ -108,3 +108,18 @@ internal expect fun formaterHeureCourte(epochMs: Long): String
 
 /** Jour de semaine, jour et mois abrégés : « sam. 1 août ». */
 internal expect fun formaterJourMoisAbrege(epochMs: Long): String
+
+/**
+ * Date rendue selon un motif **fourni par les traductions**.
+ *
+ * Un seul appelant : l'en-tête de jour de l'historique, dont le motif est la
+ * ressource `history_day_pattern`. Il est traduit parce que l'ordre des mots
+ * change d'une langue à l'autre — « 28 juillet » contre « July 28 » — et c'est
+ * précisément ce qui interdit de le remplacer par un des formateurs ci-dessus :
+ * ceux-là choisissent le motif, celui-ci le reçoit.
+ *
+ * Les motifs sont ceux d'Unicode TR-35, que `SimpleDateFormat` et
+ * `NSDateFormatter` interprètent tous deux : la même ressource donne le même
+ * rendu sur les quatre plateformes.
+ */
+internal expect fun formaterAuMotif(epochMs: Long, motif: String): String

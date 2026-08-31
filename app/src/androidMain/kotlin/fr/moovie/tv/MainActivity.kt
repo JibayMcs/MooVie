@@ -66,6 +66,8 @@ import fr.moovie.tv.data.remote.RemotePresence
 import fr.moovie.tv.data.remote.RemoteTarget
 import fr.moovie.tv.ui.remote.RemoteFab
 import fr.moovie.tv.ui.onboarding.OnboardingScreen
+import fr.moovie.tv.ui.pairing.PairingDialog
+import fr.moovie.tv.ui.pairing.pairingOffered
 import fr.moovie.tv.ui.onboarding.rememberStartScreen
 import fr.moovie.tv.data.download.DownloadQueue
 import fr.moovie.tv.ui.download.DownloadsScreen
@@ -634,6 +636,20 @@ class MainActivity : ComponentActivity() {
                                 // revenir en arrière sur l'écran d'installation
                                 // n'aurait plus rien à proposer.
                                 onReady = { nav.replace(Screen.Home) },
+                                // La modale d'appairage : passée en paramètre parce
+                                // qu'elle porte un serveur HTTP local, propre aux
+                                // cibles JVM. Voir le KDoc d'OnboardingScreen.
+                                pairingDialog = if (pairingOffered()) {
+                                    { onDismiss, notice, onSaved ->
+                                        PairingDialog(
+                                            onDismiss = onDismiss,
+                                            notice = notice,
+                                            onSaved = onSaved,
+                                        )
+                                    }
+                                } else {
+                                    null
+                                },
                             )
                             Screen.Downloads -> DownloadsScreen(
                                 onPlay = { d -> downloadPlayerScreen(d)?.let(nav::push) },

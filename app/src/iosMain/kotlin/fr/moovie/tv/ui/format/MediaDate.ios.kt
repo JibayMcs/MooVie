@@ -65,3 +65,11 @@ internal actual fun formaterHeureCourte(epochMs: Long): String =
 
 internal actual fun formaterJourMoisAbrege(epochMs: Long): String =
     jourMoisAbrege.stringFromDate(dateDepuisMs(epochMs))
+
+/**
+ * Le motif vient d'une traduction et change donc avec la langue : le formateur
+ * ne peut pas être conservé comme les trois autres. Il reste bon marché à
+ * l'échelle d'un en-tête de section par jour.
+ */
+internal actual fun formaterAuMotif(epochMs: Long, motif: String): String =
+    NSDateFormatter().apply { dateFormat = motif }.stringFromDate(dateDepuisMs(epochMs))

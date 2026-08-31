@@ -40,6 +40,7 @@ import fr.moovie.tv.data.tmdb.Episode
 import fr.moovie.tv.data.tmdb.TmdbRepository
 import fr.moovie.tv.data.tmdb.TvDetails
 import fr.moovie.tv.data.trailer.YoutubeTrailerExtractor
+import fr.moovie.tv.data.remote.RemoteCast
 import fr.moovie.tv.data.watch.ResumeEntry
 import fr.moovie.tv.data.watch.TitleMeta
 import fr.moovie.tv.data.watch.WatchProgressRepository
@@ -440,7 +441,7 @@ class DetailsViewModel : ViewModel() {
      */
     private suspend fun registerUnlessCast(meta: fr.moovie.tv.data.watch.ResumeEntry?) {
         val entry = meta ?: return
-        if (fr.moovie.tv.data.remote.RemoteCast.isEphemeral(entry.key)) return
+        if (RemoteCast.isEphemeral(entry.key)) return
         watchRepo.register(entry)
     }
 

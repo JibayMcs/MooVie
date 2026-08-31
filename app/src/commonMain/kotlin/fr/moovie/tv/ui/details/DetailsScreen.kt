@@ -1633,7 +1633,11 @@ private fun SourcesSlideOver(
 
                     itemsIndexed(sourcesInLang, key = { _, l -> l.url }) { linkIndex, link ->
                         val id = link.hoster to link.variant
-                        val rank = seen.merge(id, 1, Int::plus) ?: 1
+                        // `merge` est une méthode par défaut de Java 8, absente du
+                        // commun. Deux lignes disent la même chose : le rang est le
+                        // nombre de fois qu'on a vu ce couple, celle-ci comprise.
+                        val rank = (seen[id] ?: 0) + 1
+                        seen[id] = rank
                         // La mesure part quand la ligne entre à l'écran : dans une
                         // LazyColumn, seules les lignes visibles sont composées, donc
                         // on ne résout pas trente liens pour en montrer six.

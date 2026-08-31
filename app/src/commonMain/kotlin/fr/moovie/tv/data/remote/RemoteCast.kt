@@ -1,5 +1,10 @@
 package fr.moovie.tv.data.remote
 
+// `kotlin.concurrent.Volatile` et non celui de `kotlin.jvm` : le même effet,
+// mais déclaré pour toutes les cibles. C'est la seule chose qui retenait ce
+// fichier côté JVM — le reste n'est qu'un drapeau en mémoire.
+import kotlin.concurrent.Volatile
+
 /**
  * Les lectures que ce téléviseur **ne doit pas enregistrer**.
  *

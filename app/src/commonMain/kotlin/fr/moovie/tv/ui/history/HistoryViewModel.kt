@@ -5,7 +5,14 @@ import androidx.lifecycle.viewModelScope
 import fr.moovie.tv.data.settings.SettingsRepository
 import fr.moovie.tv.data.watch.HistoryEntry
 import fr.moovie.tv.data.watch.WatchProgressRepository
-import java.util.Calendar
+import fr.moovie.tv.shared.maintenantMs
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.Instant
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atStartOfDayIn
+import kotlinx.datetime.minus
+import kotlinx.datetime.toLocalDateTime
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -65,14 +72,22 @@ class HistoryViewModel : ViewModel() {
      * celui d'UTC.
      */
     private fun groupByDay(entries: List<HistoryEntry>): List<HistoryDay> {
-        val today = dayStart(System.currentTimeMillis())
-        val yesterday = Calendar.getInstance().apply {
-            timeInMillis = today
-            add(Calendar.DAY_OF_YEAR, -1)
-        }.timeInMillis
+        val today = dayStart(maintenantMs())
+        // Un jour civil en arrière, et non 24 h : le passage à l'heure d'été en
+        // compte 23. `Calendar.add(DAY_OF_YEAR, -1)` faisait déjà ce calcul-là ;
+        // kotlinx-datetime le refait en passant par la date, pas par la durée.
+        val yesterday = Instant.fromEpochMilliseconds(today)
+            .toLocalDateTime(TimeZone.currentSystemDefault()).date
+            .minus(1, DateTimeUnit.DAY)
+            .atStartOfDayIn(TimeZone.currentSystemDefault())
+            .toEpochMilliseconds()
         return entries
             .groupBy { dayStart(it.watchedAt) }
-            .toSortedMap(compareByDescending { it })
+            // `toSortedMap` est une extension de `java.util.SortedMap` : elle
+            // n'existe pas dans le commun. Trier les entrées donne la même
+            // chose — l'ordre décroissant des jours — sans passer par une carte
+            // triée dont on ne se sert que pour la parcourir une fois.
+            .entries.sortedByDescending { it.key }
             .map { (start, dayEntries) ->
                 HistoryDay(
                     dayStart = start,
@@ -87,15 +102,20 @@ class HistoryViewModel : ViewModel() {
     }
 
     private fun computeStats(entries: List<HistoryEntry>): HistoryStats {
-        val monthStart = dayStart(
-            Calendar.getInstance().apply { set(Calendar.DAY_OF_MONTH, 1) }.timeInMillis,
-        )
-        val yearStart = dayStart(
-            Calendar.getInstance().apply { set(Calendar.DAY_OF_YEAR, 1) }.timeInMillis,
-        )
-        val seriesSince = dayStart(
-            Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -TOP_SERIES_DAYS) }.timeInMillis,
-        )
+        // Premier jour du mois et de l'année en cours, à minuit. `Calendar`
+        // partait de maintenant et remettait le champ à 1 ; kotlinx-datetime
+        // reconstruit la date civile, ce qui dit la même chose plus directement.
+        val zone = TimeZone.currentSystemDefault()
+        val aujourdHui = Instant.fromEpochMilliseconds(maintenantMs()).toLocalDateTime(zone).date
+        val monthStart = LocalDate(aujourdHui.year, aujourdHui.month, 1)
+            .atStartOfDayIn(zone).toEpochMilliseconds()
+        val yearStart = LocalDate(aujourdHui.year, 1, 1)
+            .atStartOfDayIn(zone).toEpochMilliseconds()
+        // Trente jours civils en arrière, minuit. En jours et non en heures :
+        // c'est ce que faisait `Calendar.add(DAY_OF_YEAR, …)`, et les deux
+        // changements d'heure de l'année valent chacun une heure d'écart.
+        val seriesSince = aujourdHui.minus(TOP_SERIES_DAYS, DateTimeUnit.DAY)
+            .atStartOfDayIn(zone).toEpochMilliseconds()
 
         val ofMonth = entries.filter { it.watchedAt >= monthStart }
         val ofYear = entries.filter { it.watchedAt >= yearStart }
@@ -132,11 +152,11 @@ class HistoryViewModel : ViewModel() {
             ?.toPair()
 
     /** Minuit local du jour contenant [millis]. */
-    private fun dayStart(millis: Long): Long = Calendar.getInstance().apply {
-        timeInMillis = millis
-        set(Calendar.HOUR_OF_DAY, 0)
-        set(Calendar.MINUTE, 0)
-        set(Calendar.SECOND, 0)
-        set(Calendar.MILLISECOND, 0)
-    }.timeInMillis
+    private fun dayStart(millis: Long): Long {
+        val zone = TimeZone.currentSystemDefault()
+        return Instant.fromEpochMilliseconds(millis)
+            .toLocalDateTime(zone).date
+            .atStartOfDayIn(zone)
+            .toEpochMilliseconds()
+    }
 }

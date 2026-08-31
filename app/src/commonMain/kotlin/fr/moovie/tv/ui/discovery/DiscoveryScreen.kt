@@ -1,6 +1,7 @@
 package fr.moovie.tv.ui.discovery
 
 import fr.moovie.tv.shared.formaterDecimal
+import kotlin.math.PI
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
@@ -369,7 +370,7 @@ private fun Mains(
     val respiration = rememberInfiniteTransition(label = "flottement")
     val phase by respiration.animateFloat(
         initialValue = 0f,
-        targetValue = (2 * Math.PI).toFloat(),
+        targetValue = (2 * PI).toFloat(),
         animationSpec = infiniteRepeatable(
             animation = tween(PERIODE_MS),
             repeatMode = RepeatMode.Restart,

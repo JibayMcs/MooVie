@@ -34,6 +34,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import fr.moovie.tv.ui.format.formaterAuMotif
 import fr.moovie.tv.ui.theme.MoovieShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
@@ -72,11 +73,8 @@ import fr.moovie.tv.ui.components.MoovieAsyncImage
 import fr.moovie.tv.ui.components.MoovieCard
 import fr.moovie.tv.ui.components.MoovieIconButton
 import fr.moovie.tv.ui.components.MoovieMarqueeText
-import java.text.SimpleDateFormat
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import java.util.Date
-import java.util.Locale
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 
@@ -277,8 +275,7 @@ private fun dayLabel(day: HistoryDay): String = when (day.relative) {
     RelativeDay.OLDER -> {
         val pattern = stringResource(Res.string.history_day_pattern)
         remember(day.dayStart, pattern) {
-            SimpleDateFormat(pattern, Locale.getDefault())
-                .format(Date(day.dayStart))
+            formaterAuMotif(day.dayStart, pattern)
                 // Les jours et mois sont en minuscules en français : en tête de
                 // section, une majuscule se lit mieux.
                 .replaceFirstChar { it.uppercase() }

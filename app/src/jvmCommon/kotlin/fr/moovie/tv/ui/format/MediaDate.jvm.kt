@@ -44,3 +44,7 @@ internal actual fun formaterJourMoisAbrege(epochMs: Long): String {
     val moment = Instant.ofEpochMilli(epochMs).atZone(ZoneId.systemDefault())
     return DateTimeFormatter.ofPattern("EEE d MMM", Locale.getDefault()).format(moment)
 }
+
+internal actual fun formaterAuMotif(epochMs: Long, motif: String): String =
+    java.text.SimpleDateFormat(motif, Locale.getDefault())
+        .format(java.util.Date(epochMs))

@@ -34,8 +34,6 @@ import fr.moovie.tv.resources.onboarding_restore
 import fr.moovie.tv.resources.onboarding_restore_help
 import fr.moovie.tv.resources.onboarding_title
 import fr.moovie.tv.ui.backup.BackupSection
-import fr.moovie.tv.ui.pairing.PairingDialog
-import fr.moovie.tv.ui.pairing.pairingOffered
 import fr.moovie.tv.resources.pairing_action
 import fr.moovie.tv.resources.onboarding_phone_help
 import androidx.compose.runtime.rememberCoroutineScope
@@ -73,6 +71,23 @@ private val DIM = Color(0xFF9A9A9A)
 fun OnboardingScreen(
     onOpenSettings: () -> Unit,
     onReady: () -> Unit,
+    /**
+     * Boîte d'appairage d'un téléphone, ou null là où l'appairage n'est pas
+     * proposé — c'est-à-dire partout sauf sur un téléviseur.
+     *
+     * Un **emplacement** et non un appel direct : elle porte un serveur HTTP
+     * local, qui n'existe que sur les cibles JVM. Le choix « depuis mon
+     * téléphone » disparaît avec elle, au lieu de mener à une modale vide.
+     * C'est exactement ce que décidait `pairingOffered()`, désormais lu à la
+     * présence de ce paramètre.
+     *
+     * Les trois arguments sont ceux que la modale doit recevoir de cet écran :
+     * de quoi se fermer, le message de vérification à afficher, et le rappel
+     * déclenché quand le téléphone a envoyé quelque chose.
+     */
+    pairingDialog: (
+        @Composable (onDismiss: () -> Unit, notice: String?, onSaved: () -> Unit) -> Unit
+    )? = null,
 ) {
     val repo = remember { SettingsRepository() }
     val hasKey by produceState(initialValue = false) {
@@ -153,7 +168,7 @@ fun OnboardingScreen(
             // meilleur chemin : sur une TV, coller la clé au clavier tactile bat
             // toujours 32 caractères hexadécimaux à la télécommande. La saisie
             // manuelle reste dessous, comme repli.
-            if (pairingOffered()) {
+            if (pairingDialog != null) {
                 Choice(
                     label = stringResource(Res.string.pairing_action),
                     help = stringResource(Res.string.onboarding_phone_help),
@@ -168,14 +183,14 @@ fun OnboardingScreen(
         }
     }
 
-    if (pairing) {
-        PairingDialog(
-            onDismiss = { pairing = false },
-            notice = notice,
+    if (pairing && pairingDialog != null) {
+        pairingDialog(
+            { pairing = false },
+            notice,
             // Enchaîner ne se décide pas sur « la clé n'est pas vide » : une clé
             // fausse laisserait l'utilisateur sur un accueil sans catalogue, sans
             // rien pour comprendre. On la fait valider par TMDB avant de passer.
-            onSaved = {
+            {
                 scope.launch {
                     notice = checkingText
                     val key = repo.tmdbApiKey.first()
