@@ -1,6 +1,8 @@
 package fr.moovie.tv.data.store
 
+import fr.moovie.tv.shared.systemeFichiers
 import kotlinx.cinterop.ExperimentalForeignApi
+import okio.Path.Companion.toPath
 import platform.Foundation.NSCachesDirectory
 import platform.Foundation.NSFileManager
 import platform.Foundation.NSUserDomainMask
@@ -21,5 +23,9 @@ actual fun moovieCacheChemin(name: String): String {
         error = null,
     )
     val base = repertoire?.path ?: error("répertoire Caches introuvable")
-    return "$base/moovie/$name"
+    // Même raison que pour le magasin de réglages : le sous-dossier n'existe
+    // pas tant qu'on ne l'a pas créé, et okio lève à l'ouverture.
+    val dossier = "$base/moovie/$name"
+    runCatching { systemeFichiers.createDirectories(dossier.toPath()) }
+    return dossier
 }

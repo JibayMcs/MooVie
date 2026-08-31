@@ -1,6 +1,8 @@
 package fr.moovie.tv.data.store
 
+import fr.moovie.tv.shared.systemeFichiers
 import kotlinx.cinterop.ExperimentalForeignApi
+import okio.Path.Companion.toPath
 import platform.Foundation.NSApplicationSupportDirectory
 import platform.Foundation.NSFileManager
 import platform.Foundation.NSUserDomainMask
@@ -26,5 +28,13 @@ actual fun moovieDataStoreChemin(name: String): String {
     )
     val base = repertoire?.path
         ?: error("répertoire Application Support introuvable")
-    return "$base/moovie/$name.preferences_pb"
+    // **Créer le répertoire, pas seulement le nommer.** `URLForDirectory` fait
+    // naître Application Support, mais pas le sous-dossier `moovie/`. Or
+    // `createWithPath` de DataStore ouvre le fichier sans créer ses parents —
+    // contrairement à l'API `File` des cibles JVM, qui s'en charge. Le premier
+    // accès levait donc, et une exception Kotlin non rattrapée termine le
+    // processus sur Kotlin/Native : l'app se ferme sans un mot.
+    val dossier = "$base/moovie"
+    runCatching { systemeFichiers.createDirectories(dossier.toPath()) }
+    return "$dossier/$name.preferences_pb"
 }
