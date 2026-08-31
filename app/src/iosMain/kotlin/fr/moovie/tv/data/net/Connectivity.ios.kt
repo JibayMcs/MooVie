@@ -4,7 +4,6 @@ import fr.moovie.tv.shared.Verrou
 import fr.moovie.tv.shared.avec
 import fr.moovie.tv.shared.dispatcherEs
 import io.ktor.client.request.head
-import io.ktor.client.request.timeout
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.darwin.Darwin
@@ -97,7 +96,9 @@ actual object Connectivity {
      * exception — DNS muet, route absente, délai dépassé — signifie hors ligne.
      */
     private suspend fun joignable(): Boolean = runCatching {
-        sonde.head("https://$HOTE/") { timeout { requestTimeoutMillis = DELAI_MS } }
+        // Le plafond est celui du client : `HttpTimeout` y est installé avec
+        // `requestTimeoutMillis`, inutile de le répéter par requête.
+        sonde.head("https://$HOTE/")
         true
     }.getOrDefault(false)
 

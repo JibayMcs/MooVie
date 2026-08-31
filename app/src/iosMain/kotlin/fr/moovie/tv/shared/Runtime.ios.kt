@@ -8,7 +8,8 @@ import kotlinx.cinterop.ptr
 import kotlinx.cinterop.refTo
 import kotlinx.cinterop.value
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.newFixedThreadPoolContext
 import platform.CoreCrypto.CCCrypt
 import platform.CoreCrypto.kCCAlgorithmAES
 import platform.CoreCrypto.kCCBlockSizeAES128
@@ -23,10 +24,22 @@ import platform.Foundation.timeIntervalSince1970
 import platform.posix.size_tVar
 
 /**
- * `Dispatchers.IO` existe bien en Kotlin/Native depuis kotlinx-coroutines 1.7 —
- * il n'est simplement pas visible depuis le source set commun.
+ * **`Dispatchers.IO` n'est pas utilisable ici** : kotlinx-coroutines le déclare
+ * `internal` sur les cibles Apple. Je l'avais cru simplement invisible depuis le
+ * commun ; la première compilation iOS a dit le contraire.
+ *
+ * `Dispatchers.Default` ne convient pas non plus : son pool est dimensionné sur
+ * le nombre de cœurs, et l'écriture d'un film de plusieurs gigaoctets par okio
+ * est un appel **bloquant**. Quelques téléchargements suffiraient à l'épuiser,
+ * et tout ce qui l'utilise gèlerait derrière — exactement la panne que le
+ * commentaire de `ExtractorRegistry` décrit côté JVM.
+ *
+ * D'où un pool dédié, ce que `Dispatchers.IO` est sur la JVM. Quatre threads :
+ * le réseau passe par NSURLSession, qui est asynchrone et n'en consomme aucun ;
+ * seuls les accès fichiers bloquent réellement.
  */
-actual val dispatcherEs: CoroutineDispatcher = Dispatchers.IO
+@OptIn(DelicateCoroutinesApi::class)
+actual val dispatcherEs: CoroutineDispatcher = newFixedThreadPoolContext(4, "moovie-es")
 
 actual fun maintenantMs(): Long = (NSDate().timeIntervalSince1970 * 1000).toLong()
 
@@ -91,6 +104,7 @@ actual fun genererUuid(): String = NSUUID().UUIDString.lowercase()
  * C'est la clé qu'Apple recommande précisément pour décider si un
  * téléchargement volumineux tient.
  */
+@OptIn(ExperimentalForeignApi::class)
 actual fun espaceLibre(chemin: okio.Path): Long = runCatching {
     val url = platform.Foundation.NSURL.fileURLWithPath(chemin.toString())
     val valeurs = url.resourceValuesForKeys(

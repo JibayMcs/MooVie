@@ -13,6 +13,11 @@ import platform.CoreGraphics.CGRectMake
 import platform.CoreImage.CIContext
 import platform.CoreImage.CIFilter
 import platform.CoreImage.CIImage
+// Import explicite : `+[CIFilter filterWithName:]` arrive par une catégorie
+// Objective-C, que Kotlin/Native expose en fonction d'extension sur le
+// compagnon plutôt qu'en membre — elle n'est donc pas visible par le seul
+// import de la classe.
+import platform.CoreImage.filterWithName
 import platform.CoreImage.createCGImage
 import platform.Foundation.NSData
 import platform.Foundation.NSString
