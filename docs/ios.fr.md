@@ -8,11 +8,11 @@ version parallèle. Ce qui change tient à ce qu'Apple impose, et cette page ne
 parle que de ça — installer, régler, mettre à jour.
 
 > [!IMPORTANT]
-> **Moo-vie n'est pas sur l'App Store et n'y sera pas.** L'application extrait
-> ses sources depuis des sites tiers, ce que les règles de l'App Store
-> n'autorisent pas. L'installation passe donc par le *sideload*, décrit ci-dessous.
-> C'est légal — Apple prévoit ce chemin pour les développeurs — mais il a ses
-> contraintes, et la principale est un **certificat qui expire tous les 7 jours**.
+> L'installation passe par **SideStore**, et non par l'App Store. Retenez-en une
+> chose avant de commencer : la signature d'un identifiant Apple gratuit
+> **expire au bout de 7 jours**, et il faut la renouveler pour que l'application
+> continue de s'ouvrir. SideStore le fait tout seul — voir
+> [Le renouvellement des 7 jours](#le-renouvellement-des-7-jours).
 
 **Il vous faut :** un iPhone ou un iPad sous **iOS 15 ou plus récent**, un
 identifiant Apple (le vôtre suffit, aucun compte développeur payant n'est
@@ -29,10 +29,24 @@ d'un identifiant Apple gratuit ne vaut que sept jours. SideStore renouvelle
 cette signature tout seul tant qu'il tourne sur le même réseau que votre
 ordinateur — c'est pour cela qu'on l'utilise plutôt qu'une installation manuelle.
 
-Suivez le [guide officiel d'installation](https://docs.sidestore.io/docs/installation/).
-Il demande de préparer un fichier de paire (*pairing file*) depuis un ordinateur,
-puis d'installer SideStore lui-même. Comptez une vingtaine de minutes la
-première fois ; ensuite vous n'y revenez plus.
+Suivez le [guide officiel](https://docs.sidestore.io/docs/installation/prerequisites),
+qui liste les prérequis puis déroule l'installation. Comptez une vingtaine de
+minutes la première fois ; ensuite vous n'y revenez plus.
+
+Deux étapes de ce guide arrêtent tout le monde si on les saute :
+
+- **Le fichier de paire** (*pairing file*), à produire depuis un ordinateur. Il
+  autorise SideStore à parler à votre appareil.
+- **L'application de VPN local**, à installer depuis l'App Store — celle que le
+  guide nomme à l'étape des prérequis. Sans elle, SideStore n'installe rien et
+  la raison n'est pas évidente : il a besoin de joindre un service **de votre
+  propre appareil**, et iOS ne le permet qu'à travers une boucle réseau locale.
+  Ce VPN ne fait passer aucun trafic vers l'extérieur, il ne sert qu'à ça.
+
+> [!NOTE]
+> Le nom de cette application a changé au fil des versions de SideStore. Fiez-vous
+> à celui que donnent les prérequis liés ci-dessus plutôt qu'à un nom écrit ici,
+> qui vieillirait mal.
 
 > [!TIP]
 > AltStore fonctionne aussi : SideStore en est un fork et lit le même format de
@@ -187,6 +201,11 @@ dans **Réglages → API & Clés** ; c'est la clé *v3 auth*, pas le jeton de le
 **Aucune source ne se lit.** Essayez d'activer DNS-over-HTTPS dans
 **Réglages → DNS**. Plusieurs opérateurs bloquent les domaines des hébergeurs au
 niveau du résolveur.
+
+**Appuyer sur Installer ne fait rien.** C'est presque toujours l'application de
+VPN local qui manque, ou qui n'est pas activée — voir l'étape 1. SideStore a
+besoin d'elle pour joindre un service de votre propre appareil ; sans elle, il
+n'échoue pas franchement, il n'aboutit simplement jamais.
 
 **SideStore refuse d'installer : « maximum number of apps ».** Un identifiant
 Apple gratuit ne permet que **3 applications** signées à la fois. Retirez-en une

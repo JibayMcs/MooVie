@@ -8,11 +8,10 @@ is what Apple imposes, and this page is only about that — installing,
 configuring, updating.
 
 > [!IMPORTANT]
-> **Moo-vie is not on the App Store, and won't be.** The app extracts its sources
-> from third-party sites, which App Store rules do not allow. Installation
-> therefore goes through *sideloading*, described below. It is legitimate — Apple
-> provides this path for developers — but it has constraints, and the main one is
-> a **certificate that expires every 7 days**.
+> Installation goes through **SideStore**, not the App Store. Take one thing away
+> before you start: a free Apple ID's signature **expires after 7 days**, and it
+> has to be renewed for the app to keep opening. SideStore does that on its own —
+> see [The 7-day renewal](#the-7-day-renewal).
 
 **You need:** an iPhone or iPad on **iOS 15 or later**, an Apple ID (your own is
 enough — no paid developer account required), and Wi-Fi.
@@ -28,9 +27,24 @@ signature is only good for seven days. SideStore renews it on its own as long as
 it runs on the same network as your computer — which is why we use it rather
 than a one-off manual install.
 
-Follow the [official installation guide](https://docs.sidestore.io/docs/installation/).
-It asks you to produce a pairing file from a computer, then to install SideStore
-itself. Budget twenty minutes the first time; you won't come back to it.
+Follow the [official guide](https://docs.sidestore.io/docs/installation/prerequisites),
+which lists the prerequisites and then walks through the install. Budget twenty
+minutes the first time; you won't come back to it.
+
+Two steps in that guide stop everyone who skips them:
+
+- **The pairing file**, produced from a computer. It is what lets SideStore talk
+  to your device.
+- **The local VPN app**, installed from the App Store — the one the guide names
+  under prerequisites. Without it SideStore installs nothing, and the reason is
+  not obvious: it needs to reach a service **on your own device**, and iOS only
+  allows that through a local network loopback. This VPN carries no traffic
+  outside, it exists only for that.
+
+> [!NOTE]
+> The name of that companion app has changed across SideStore versions. Trust the
+> one given in the prerequisites linked above rather than a name written here,
+> which would age badly.
 
 > [!TIP]
 > AltStore works too: SideStore is a fork of it and reads the same source format.
@@ -178,6 +192,10 @@ token.
 
 **No source plays.** Try enabling DNS-over-HTTPS under **Settings → DNS**.
 Several ISPs block host domains at the resolver.
+
+**Tapping Install does nothing.** Almost always the local VPN app is missing or
+not enabled — see step 1. SideStore needs it to reach a service on your own
+device; without it, it does not fail outright, it simply never gets there.
 
 **SideStore refuses to install: "maximum number of apps".** A free Apple ID only
 allows **3** signed apps at a time. Remove one from **My Apps**.
