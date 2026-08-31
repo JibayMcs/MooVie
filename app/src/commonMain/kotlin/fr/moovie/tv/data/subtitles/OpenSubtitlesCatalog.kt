@@ -1,5 +1,6 @@
 package fr.moovie.tv.data.subtitles
 
+import kotlin.concurrent.Volatile
 import fr.moovie.tv.core.sources.model.MediaRef
 import fr.moovie.tv.core.subtitles.model.DownloadedSubtitle
 import fr.moovie.tv.core.subtitles.model.SubtitleCandidate

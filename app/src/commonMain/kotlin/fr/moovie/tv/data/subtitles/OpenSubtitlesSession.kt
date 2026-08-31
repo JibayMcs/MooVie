@@ -1,5 +1,6 @@
 package fr.moovie.tv.data.subtitles
 
+import fr.moovie.tv.shared.maintenantMs
 import fr.moovie.tv.core.subtitles.model.SubtitleQuota
 import fr.moovie.tv.data.settings.SettingsRepository
 import kotlinx.coroutines.flow.first
@@ -109,7 +110,7 @@ class OpenSubtitlesSession(
     }
 
     private fun expired(issuedAtMs: Long): Boolean =
-        issuedAtMs <= 0 || System.currentTimeMillis() - issuedAtMs >= TOKEN_LIFETIME_MS
+        issuedAtMs <= 0 || maintenantMs() - issuedAtMs >= TOKEN_LIFETIME_MS
 
     class LoginFailure(val reason: OsLoginError) : Exception(reason.name)
 

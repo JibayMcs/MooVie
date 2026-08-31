@@ -3,7 +3,7 @@ package fr.moovie.tv.data.download
 import fr.moovie.tv.core.sources.model.PlayableStream
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
+import fr.moovie.tv.shared.dispatcherEs
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
@@ -28,7 +28,7 @@ import fr.moovie.tv.shared.avec
  */
 object DownloadQueue {
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val scope = CoroutineScope(SupervisorJob() + dispatcherEs)
     private val serial = Mutex()
     // `ConcurrentHashMap` n'existe pas en commun. Une carte ordinaire gardée
     // par un verrou donne la même garantie ici : toutes les manipulations de
