@@ -20,6 +20,7 @@ import androidx.compose.ui.window.ComposeUIViewController
 import fr.moovie.tv.data.download.Download
 import fr.moovie.tv.data.net.Connectivity
 import fr.moovie.tv.ios.IosCatalogScreen
+import fr.moovie.tv.ios.Vm
 import fr.moovie.tv.ios.IosDetailsScreen
 import fr.moovie.tv.ios.IosDiscoveryScreen
 import fr.moovie.tv.ios.IosHistoryScreen
@@ -120,23 +121,49 @@ private fun RacineMoovie() {
                     val nav = remember(depart) { NavStack(depart) }
                     val online by Connectivity.online.collectAsState()
 
+                    // **Une vidéo occupe-t-elle tout l'écran ?**
+                    //
+                    // Deux cas, et un seul endroit pour les reconnaître : le
+                    // lecteur, et la fiche dont la bande-annonce est passée au
+                    // premier plan. Trois décisions en découlent — l'orientation,
+                    // la barre de navigation, le retrait des encoches — et les
+                    // faire dépendre d'une même expression est ce qui garantit
+                    // qu'elles ne se contrediront pas.
+                    //
+                    // L'état de la bande-annonce se lit sur le ViewModel de la
+                    // fiche, qui vit à l'échelle de l'application : c'est la
+                    // seule façon pour la racine de savoir ce qui se passe dans
+                    // un écran qu'elle ne fait qu'afficher.
+                    val bandeAnnonce by Vm.details.trailerExpanded.collectAsState()
+                    val videoPleinEcran = nav.current is Screen.Player ||
+                        (nav.current is Screen.Details && bandeAnnonce)
+
+                    // Posé plutôt que compté. La version d'avant appairait une
+                    // demande à l'entrée et un relâchement à la sortie, et
+                    // l'application restait en paysage après la bande-annonce :
+                    // un relâchement manquait. Recalculer la réponse entière à
+                    // chaque changement supprime la classe entière de ce défaut
+                    // — il n'y a plus de sortie à ne pas oublier.
+                    LaunchedEffect(videoPleinEcran) {
+                        OrientationEcran.definir(videoPleinEcran)
+                    }
+
                     // Hors ligne, on ne reste pas sur un écran qui ne peut rien
                     // afficher — sauf en lecture, qui joue un fichier local.
                     LaunchedEffect(online) {
                         if (!online && nav.current !is Screen.Player) nav.popToRoot()
                     }
 
-                    // **Le lecteur, et lui seul, garde toute la dalle.**
+                    // **Une vidéo plein écran garde toute la dalle.**
                     //
                     // Partout ailleurs on retire les encoches, sinon le haut des
                     // pages passe sous la Dynamic Island. Une image de film, elle,
                     // doit aller jusqu'aux bords : c'est ce pour quoi
                     // `MoovieApp.swift` demande `ignoresSafeArea(.all)`, et la
-                    // rogner reviendrait à afficher un film en médaillon. Ses
-                    // propres commandes portent déjà leurs marges.
-                    val enLecture = nav.current is Screen.Player
+                    // rogner reviendrait à afficher un film en médaillon. Les
+                    // commandes du lecteur portent déjà leurs propres marges.
                     Column(
-                        modifier = if (enLecture) {
+                        modifier = if (videoPleinEcran) {
                             Modifier.fillMaxSize()
                         } else {
                             Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)
@@ -149,10 +176,16 @@ private fun RacineMoovie() {
                             EcranCourant(nav = nav, online = online)
                         }
 
-                        // Aux mêmes conditions que sur Android : jamais sur le
+                        // Aux mêmes conditions que sur Android — jamais sur le
                         // lecteur ni sur l'installation initiale, que
-                        // `hidesBottomBar` désigne toutes deux.
-                        if (!hidesBottomBar(nav.current)) {
+                        // `hidesBottomBar` désigne toutes deux — plus une qui
+                        // n'existe que sur iOS : la bande-annonce au premier
+                        // plan. Elle recouvre l'écran sans changer de
+                        // destination, si bien que la pile est toujours sur la
+                        // fiche et que `hidesBottomBar` ne peut pas la
+                        // reconnaître ; la barre restait donc posée en travers
+                        // de la vidéo.
+                        if (!hidesBottomBar(nav.current) && !videoPleinEcran) {
                             MoovieBottomBar(
                                 current = nav.current,
                                 onSelect = { nav.switchTop(it) },
@@ -303,15 +336,10 @@ private fun LecteurIos(nav: NavStack, params: Screen.Player) {
     }
     DisposableEffect(controleur) { onDispose { controleur.liberer() } }
 
-    // Paysage tant que le lecteur est là, portrait partout ailleurs — le même
-    // partage que sur le téléphone Android, et celui que l'Info.plist annonçait
-    // depuis le début sans que rien ne l'applique. Posé et retiré par le même
-    // effet : quelle que soit la façon de quitter le lecteur — retour,
-    // enchaînement d'épisode, flux qui casse — l'orientation revient.
-    DisposableEffect(Unit) {
-        OrientationEcran.demanderPaysage()
-        onDispose { OrientationEcran.relacherPaysage() }
-    }
+    // L'orientation n'est pas décidée ici : `RacineMoovie` la calcule pour les
+    // deux écrans qui la réclament — celui-ci et la bande-annonce au premier
+    // plan — depuis une seule expression. Un effet de plus à cet endroit
+    // ajouterait un second avis sur la même question.
 
     IosPlayerScreen(
         streamUrl = params.streamUrl,

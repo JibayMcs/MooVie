@@ -84,8 +84,15 @@ struct MoovieApp: App {
                 // `attemptRotationToDeviceOrientation`, plus bas — les deux
                 // disent la même chose au système, « relis le masque
                 // maintenant », mais aucune n'existe des deux côtés.
-                scene.windows.first?.rootViewController?
-                    .setNeedsUpdateOfSupportedInterfaceOrientations()
+                // Toutes les fenêtres de la scène, et non la première : sous
+                // SwiftUI il peut y en avoir plus d'une — une modale, une
+                // alerte — et c'est celle qui présente qui décide de
+                // l'orientation. En interroger une seule laissait la demande
+                // sans effet dès qu'une autre était devant.
+                for fenetre in scene.windows {
+                    fenetre.rootViewController?
+                        .setNeedsUpdateOfSupportedInterfaceOrientations()
+                }
                 scene.requestGeometryUpdate(
                     .iOS(interfaceOrientations: masque)
                 ) { _ in

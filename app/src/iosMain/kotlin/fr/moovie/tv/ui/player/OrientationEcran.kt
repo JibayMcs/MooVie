@@ -17,13 +17,19 @@ package fr.moovie.tv.ui.player
  * veut, Swift le traduit en la danse UIKit qui va avec — laquelle diffère entre
  * iOS 15 et iOS 16, une raison de plus pour la laisser là-bas.
  *
- * ## Le rappel plutôt qu'un sondage
+ * ## Un état posé, et non des demandes appairées
  *
- * `MoovieApp.swift` pose [surChangement] au démarrage. Sans lui, cet objet ne
- * fait rien de visible : c'est voulu, il ne suppose pas qu'on l'ait branché.
- * Le rappel ne porte aucun argument — Swift relit [paysageForce] — parce qu'un
- * `Boolean` de Kotlin traverse la frontière emballé dans un `KotlinBoolean`,
- * et qu'une propriété se lit sans cet emballage.
+ * La version d'avant comptait les demandes : chaque écran voulant le paysage
+ * appelait `demanderPaysage()` en entrant et `relacherPaysage()` en sortant. Sur
+ * l'appareil, l'application restait en paysage après avoir refermé la
+ * bande-annonce — un relâchement manquait à l'appel, et c'est le genre de
+ * déséquilibre qu'une comptabilité par paires rend possible par construction :
+ * il suffit d'un chemin de sortie qu'on n'a pas prévu.
+ *
+ * [definir] remplace ce compte par une valeur qu'un seul endroit calcule — la
+ * racine, qui sait quel écran est affiché et si la bande-annonce est au premier
+ * plan. Il n'y a plus de sortie à ne pas oublier : à chaque composition, la
+ * réponse est recalculée entièrement.
  */
 object OrientationEcran {
 
@@ -35,44 +41,23 @@ object OrientationEcran {
     var surChangement: (() -> Unit)? = null
 
     /**
-     * Vrai tant qu'au moins un écran réclame le paysage.
+     * Vrai quand l'écran affiché est une vidéo qui prend toute la place — le
+     * lecteur, ou la bande-annonce passée au premier plan.
      *
      * Le reste de l'application reste en portrait, comme sur le téléphone
      * Android : ses écrans sont des listes et des grilles, qu'un paysage
-     * étirerait sans rien montrer de plus. Une vidéo, elle, n'a qu'une
-     * orientation qui lui convienne.
+     * étirerait sans rien montrer de plus.
      */
     var paysageForce: Boolean = false
         private set
 
     /**
-     * **Un compteur, et non un drapeau.** Deux écrans réclament le paysage — le
-     * lecteur, et la fiche quand sa bande-annonce passe au premier plan — et
-     * l'un mène à l'autre : on lance un film depuis la fiche. Avec un simple
-     * booléen, la fiche relâcherait en se démontant juste après que le lecteur
-     * a demandé, et l'écran retomberait en portrait sur le film.
-     *
-     * Le compteur rend l'ordre indifférent : le portrait ne revient qu'au
-     * dernier relâchement.
+     * Déclare l'orientation voulue. Sans effet si elle ne change pas — inutile
+     * de faire tourner l'appareil pour lui redire ce qu'il fait déjà.
      */
-    private var demandes = 0
-
-    /** Entrée dans un écran qui veut le paysage. */
-    fun demanderPaysage() {
-        demandes++
-        appliquer()
-    }
-
-    /** Sortie. Sans effet si un autre écran le réclame encore. */
-    fun relacherPaysage() {
-        if (demandes > 0) demandes--
-        appliquer()
-    }
-
-    private fun appliquer() {
-        val voulu = demandes > 0
-        if (voulu == paysageForce) return
-        paysageForce = voulu
+    fun definir(paysage: Boolean) {
+        if (paysage == paysageForce) return
+        paysageForce = paysage
         surChangement?.invoke()
     }
 }

@@ -1,7 +1,6 @@
 package fr.moovie.tv.ios
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -26,7 +25,6 @@ import fr.moovie.tv.ui.history.HistoryViewModel
 import fr.moovie.tv.ui.home.HomeScreenContent
 import fr.moovie.tv.ui.home.HomeViewModel
 import fr.moovie.tv.ui.navigation.Screen
-import fr.moovie.tv.ui.player.OrientationEcran
 import fr.moovie.tv.ui.person.PersonScreenContent
 import fr.moovie.tv.ui.person.PersonViewModel
 import fr.moovie.tv.ui.search.SearchScreenContent
@@ -323,14 +321,6 @@ internal fun IosDetailsScreen(
 
     // Reprise depuis l'accueil : lance la lecture directe une seule fois.
     val autoConsumed = remember { mutableStateOf(false) }
-
-    // Bande-annonce au premier plan : paysage, comme le lecteur et pour la même
-    // raison — c'est une vidéo qui prend l'écran entier. En fond de fiche elle
-    // reste un décor derrière une page qui se lit debout, et ne demande rien.
-    DisposableEffect(trailerExpanded) {
-        if (trailerExpanded) OrientationEcran.demanderPaysage()
-        onDispose { if (trailerExpanded) OrientationEcran.relacherPaysage() }
-    }
 
     LaunchedEffect(params.tmdbId, params.isTv) {
         vm.start(params.tmdbId, params.isTv, params.resumeSeason, params.resumeEpisode)
