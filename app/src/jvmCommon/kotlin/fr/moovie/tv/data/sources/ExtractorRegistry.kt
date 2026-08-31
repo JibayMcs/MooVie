@@ -122,5 +122,14 @@ object ProviderRegistry {
         // Seul catalogue en version originale : c'est lui qui rend le réglage VO
         // utilisable, et l'app regardable pour un public non francophone.
         VidapiProvider(ExtractorRegistry.gateway),
+        // Premier catalogue hispanophone (LAT/CAST/VOSE) : sans lui, aucun des
+        // trois réglages de langue espagnole n'a jamais rien à afficher.
+        //
+        // embed69.org — la première cible envisagée pour ce rôle — a été
+        // **retiré** : mesuré, il rend 444 (blocage WAF sans réponse) depuis
+        // plusieurs réseaux différents, y compris hors datacenter. Même
+        // philosophie que le retrait de coflix : un catalogue qui ne répond
+        // jamais ne vaut pas la requête et le délai qu'il coûte à chaque fiche.
+        UnlimplayProvider(ExtractorRegistry.gateway),
     )
 }

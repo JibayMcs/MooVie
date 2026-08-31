@@ -15,5 +15,11 @@ package fr.moovie.tv.data.settings
  *
  * Le nom de l'entrée **est** l'étiquette attendue des providers : `VO` ici doit
  * correspondre au `language = "VO"` qu'ils émettent.
+ *
+ * `LAT` (doublage latino-américain), `CAST` (doublage castillan) et `VOSE`
+ * (version originale sous-titrée en espagnol, symétrique de VOSTFR) viennent
+ * d'[UnlimplayProvider] : ce sont exactement les étiquettes que rend
+ * `UnlimplayProvider.languageOf`, à partir des clés `latino` / `castellano` /
+ * `subtitulado` que le catalogue déclare lui-même.
  */
-enum class StreamLanguage { VF, VOSTFR, VO }
+enum class StreamLanguage { VF, VOSTFR, VO, LAT, CAST, VOSE }
