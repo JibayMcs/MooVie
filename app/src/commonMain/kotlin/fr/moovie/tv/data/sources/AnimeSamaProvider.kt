@@ -2,12 +2,13 @@ package fr.moovie.tv.data.sources
 
 import fr.moovie.tv.core.sources.model.EmbedLink
 import fr.moovie.tv.core.sources.model.MediaRef
+import fr.moovie.tv.core.sources.port.HttpGateway
+import fr.moovie.tv.core.sources.port.HttpMethod
+import fr.moovie.tv.core.sources.port.HttpRequest
 import fr.moovie.tv.core.sources.port.SourceProvider
-import kotlinx.coroutines.Dispatchers
+import fr.moovie.tv.core.sources.port.getBody
+import fr.moovie.tv.shared.dispatcherEs
 import kotlinx.coroutines.withContext
-import okhttp3.FormBody
-import okhttp3.OkHttpClient
-import okhttp3.Request
 
 /**
  * Provider anime-sama (anime-sama.to) — port de API/Mainapi/routes animeSama.
@@ -15,13 +16,13 @@ import okhttp3.Request
  * → episodes.js par langue (`var epsN = ['https://…embed…']`, index = épisode).
  * Renvoie des liens d'embed (ansembed, vidmoly, sibnet…) à résoudre ensuite.
  */
-class AnimeSamaProvider(private val http: OkHttpClient) : SourceProvider {
+class AnimeSamaProvider(private val http: HttpGateway) : SourceProvider {
 
     override val name = "animesama"
 
     // anime-sama s'indexe par slug de catalogue, pas par TMDB : l'ID TMDB de
     // MediaRef ne lui sert à rien.
-    override suspend fun sourcesFor(media: MediaRef): List<EmbedLink> = withContext(Dispatchers.IO) {
+    override suspend fun sourcesFor(media: MediaRef): List<EmbedLink> = withContext(dispatcherEs) {
         when (media) {
             is MediaRef.Movie -> linksFor(media.title, seasonPrefix = "film", episode = 1)
             is MediaRef.Episode ->
@@ -29,7 +30,7 @@ class AnimeSamaProvider(private val http: OkHttpClient) : SourceProvider {
         }
     }
 
-    private fun linksFor(title: String, seasonPrefix: String, episode: Int): List<EmbedLink> {
+    private suspend fun linksFor(title: String, seasonPrefix: String, episode: Int): List<EmbedLink> {
         val catalogueUrl = search(title) ?: return emptyList()
         val page = get(catalogueUrl) ?: return emptyList()
 
@@ -59,16 +60,15 @@ class AnimeSamaProvider(private val http: OkHttpClient) : SourceProvider {
         return links.distinctBy { it.url }
     }
 
-    private fun search(title: String): String? {
-        val body = FormBody.Builder().add("query", title).build()
-        val req = Request.Builder()
-            .url("$BASE/template-php/defaut/fetch.php")
-            .post(body)
-            .header("User-Agent", Ua.BROWSER)
-            .build()
-        val html = runCatching {
-            http.newCall(req).execute().use { if (it.isSuccessful) it.body?.string() else null }
-        }.getOrNull() ?: return null
+    private suspend fun search(title: String): String? {
+        val html = http.fetch(
+            HttpRequest(
+                url = "$BASE/template-php/defaut/fetch.php",
+                method = HttpMethod.POST,
+                form = mapOf("query" to title),
+                headers = mapOf("User-Agent" to Ua.BROWSER),
+            ),
+        )?.takeIf { it.isSuccessful }?.body ?: return null
         val href = cataloguePath(html) ?: return null
         return "$BASE$href".let { if (it.endsWith("/")) it else "$it/" }
     }
@@ -78,12 +78,8 @@ class AnimeSamaProvider(private val http: OkHttpClient) : SourceProvider {
             URL.findAll(m.groupValues[1]).map { it.groupValues[1] }.toList()
         }.toList()
 
-    private fun get(url: String): String? {
-        val req = Request.Builder().url(url).header("User-Agent", Ua.BROWSER).build()
-        return runCatching {
-            http.newCall(req).execute().use { if (it.isSuccessful) it.body?.string() else null }
-        }.getOrNull()
-    }
+    private suspend fun get(url: String): String? =
+        http.getBody(url, mapOf("User-Agent" to Ua.BROWSER))
 
     companion object {
         const val BASE = "https://anime-sama.to"

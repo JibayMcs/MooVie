@@ -14,9 +14,10 @@ import java.util.concurrent.TimeUnit
  * Kotlin/Native compile aussi. Le déplacement ne change ni sa configuration ni
  * son cycle de vie — c'est le même client, au même réglage, sous un autre nom.
  *
- * Reste exposé parce que trois providers, le relais local et le client de
- * télécommande s'en servent directement ; ils passeront au port à leur tour, et
- * c'est ce passage qui les rendra portables.
+ * Reste exposé pour le relais local et le client de télécommande, qui
+ * transfèrent de vrais médias en flux et ne se ramènent pas au port — celui-ci
+ * matérialise la réponse en mémoire. Les providers, eux, sont tous passés au
+ * port et vivent désormais en commun.
  */
 object ClientExtraction {
     val http: OkHttpClient = OkHttpClient.Builder()
@@ -53,9 +54,8 @@ actual val passerelleSources: HttpGateway = OkHttpGateway(
  * timeout, fusion) est faite par l'appelant (DetailsViewModel) pour un
  * affichage en streaming.
  *
- * Reste côté JVM : trois de ces providers prennent un `OkHttpClient` en direct
- * plutôt que le port, ce qui les cloue à cette plateforme jusqu'à leur propre
- * portage.
+ * Reste côté JVM parce que sa construction touche `ClientExtraction`, mais tous
+ * les providers qu'il liste sont désormais communs et passent par le port.
  */
 object ProviderRegistry {
     val all: List<SourceProvider> = listOf(
@@ -63,8 +63,8 @@ object ProviderRegistry {
         // qu'un embed à désobfusquer. Rien à casser au prochain changement de
         // format, donc le candidat le plus sûr à essayer en premier.
         SwiftFlowProvider(ExtractorRegistry.gateway),
-        FstreamProvider(ClientExtraction.http),
-        AnimeSamaProvider(ClientExtraction.http),
+        FstreamProvider(ExtractorRegistry.gateway),
+        AnimeSamaProvider(ExtractorRegistry.gateway),
         // coflix a été **retiré** le 24/08/2026, et pas parce qu'il était mal
         // écrit : coflix.trade s'est reconstruit sur coflix.esq, en WordPress,
         // derrière un compte et un Turnstile Cloudflare. Mesuré — `suggest.php`
@@ -77,7 +77,7 @@ object ProviderRegistry {
         // chaque appareil, en coûtant une requête et son délai d'attente à
         // chaque ouverture de fiche — la panne muette que ce projet documente
         // déjà pour wiflix, mais livrée volontairement.
-        CinestreamProvider(ClientExtraction.http),
+        CinestreamProvider(ExtractorRegistry.gateway),
         FrembedProvider(ExtractorRegistry.gateway),
         // Après les catalogues déjà éprouvés : wiflix couvre moins de titres
         // (il refuse ceux dont la date de sortie ne correspond pas à TMDB) mais

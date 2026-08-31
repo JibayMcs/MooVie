@@ -40,3 +40,12 @@ expect fun maintenantMs(): Long
  * secret n'en est pas un ; ce qu'il faut ici, c'est l'algorithme.
  */
 expect fun dechiffrerAesCbc(donnees: ByteArray, cle: ByteArray, iv: ByteArray): ByteArray?
+
+/**
+ * Décomposition canonique Unicode (NFD) : « é » devient « e » suivi d'un accent
+ * combinant, ce qui permet ensuite de retirer les diacritiques par simple
+ * filtrage.
+ *
+ * `java.text.Normalizer` n'existe pas en natif ; Foundation sait le faire.
+ */
+expect fun enNfd(s: String): String

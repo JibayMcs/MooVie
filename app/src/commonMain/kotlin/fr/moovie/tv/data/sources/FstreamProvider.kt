@@ -2,17 +2,18 @@ package fr.moovie.tv.data.sources
 
 import fr.moovie.tv.core.sources.model.EmbedLink
 import fr.moovie.tv.core.sources.model.MediaRef
+import fr.moovie.tv.core.sources.port.HttpGateway
+import fr.moovie.tv.core.sources.port.HttpMethod
+import fr.moovie.tv.core.sources.port.HttpRequest
 import fr.moovie.tv.core.sources.port.SourceProvider
-import kotlinx.coroutines.Dispatchers
+import fr.moovie.tv.shared.dispatcherEs
+import fr.moovie.tv.shared.enNfd
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
-import okhttp3.FormBody
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import org.jsoup.Jsoup
+import com.fleeksoft.ksoup.Ksoup
 
 /**
  * Provider French-Stream — portage de API/Mainapi/routes/fstream.js.
@@ -25,7 +26,7 @@ import org.jsoup.Jsoup
  * le cookie statique ci-dessous ; si Cloudflare bloque, la recherche renverra du
  * HTML de vérification et donc zéro résultat. À traiter côté appelant.
  */
-class FstreamProvider(private val http: OkHttpClient) : SourceProvider {
+class FstreamProvider(private val http: HttpGateway) : SourceProvider {
 
     override val name = "fstream"
 
@@ -33,7 +34,7 @@ class FstreamProvider(private val http: OkHttpClient) : SourceProvider {
 
     // fstream ne connaît que son moteur de recherche interne : l'ID TMDB de
     // MediaRef ne lui sert à rien, il travaille sur le titre.
-    override suspend fun sourcesFor(media: MediaRef): List<EmbedLink> = withContext(Dispatchers.IO) {
+    override suspend fun sourcesFor(media: MediaRef): List<EmbedLink> = withContext(dispatcherEs) {
         val season = (media as? MediaRef.Episode)?.season
         val page = searchBestMatch(media.title, media.year, season) ?: return@withContext emptyList()
         val pageId = extractPageId(page.link) ?: return@withContext emptyList()
@@ -53,7 +54,7 @@ class FstreamProvider(private val http: OkHttpClient) : SourceProvider {
      * uniquement par année 2021 renvoyait « Dune Dreams (2021) » — un autre film.
      * On départage ensuite par saison (séries) puis par année.
      */
-    private fun searchBestMatch(title: String, year: String?, season: Int?): SearchResult? {
+    private suspend fun searchBestMatch(title: String, year: String?, season: Int?): SearchResult? {
         val results = search(title)
         if (results.isEmpty()) return null
         val target = normalizeTitle(title)
@@ -76,25 +77,32 @@ class FstreamProvider(private val http: OkHttpClient) : SourceProvider {
 
     /** Normalise pour comparaison : sans accents, minuscules, alphanumérique seulement. */
     private fun normalizeTitle(s: String): String =
-        java.text.Normalizer.normalize(s, java.text.Normalizer.Form.NFD)
-            .replace(Regex("""\p{Mn}+"""), "")
+        enNfd(s)
+            // Plages explicites plutôt que `\p{Mn}` : les catégories Unicode ne
+            // sont pas garanties par le moteur d'expressions régulières de
+            // Kotlin/Native, et une classe muette y aurait laissé passer les
+            // accents sans rien signaler. Ces cinq blocs couvrent les marques
+            // combinantes que produit la décomposition d'un titre latin.
+            .filterNot { c ->
+                c.code in 0x0300..0x036F || c.code in 0x1AB0..0x1AFF ||
+                    c.code in 0x1DC0..0x1DFF || c.code in 0x20D0..0x20FF ||
+                    c.code in 0xFE20..0xFE2F
+            }
             .lowercase()
             .replace(Regex("""[^a-z0-9]+"""), " ")
             .trim()
 
-    private fun search(query: String): List<SearchResult> {
-        val body = FormBody.Builder().add("query", query).add("page", "1").build()
-        val req = Request.Builder()
-            .url("$BASE/engine/ajax/search.php")
-            .post(body)
-            .headers(baseHeaders())
-            .header("X-Requested-With", "XMLHttpRequest")
-            .build()
-        val html = runCatching {
-            http.newCall(req).execute().use { if (it.isSuccessful) it.body?.string() else null }
-        }.getOrNull() ?: return emptyList()
+    private suspend fun search(query: String): List<SearchResult> {
+        val html = http.fetch(
+            HttpRequest(
+                url = "$BASE/engine/ajax/search.php",
+                method = HttpMethod.POST,
+                form = mapOf("query" to query, "page" to "1"),
+                headers = baseHeaders() + ("X-Requested-With" to "XMLHttpRequest"),
+            ),
+        )?.takeIf { it.isSuccessful }?.body ?: return emptyList()
 
-        val doc = Jsoup.parse(html)
+        val doc = Ksoup.parse(html)
         return doc.select("div.search-item").mapNotNull { el ->
             val t = el.selectFirst(".search-title")?.text()?.trim() ?: return@mapNotNull null
             val onclick = el.selectFirst("[onclick]")?.attr("onclick").orEmpty()
@@ -110,16 +118,16 @@ class FstreamProvider(private val http: OkHttpClient) : SourceProvider {
 
     // --- Lecteurs film --------------------------------------------------------
 
-    private fun filmPlayers(pageId: String, pageUrl: String): List<EmbedLink> {
-        val req = Request.Builder()
-            .url("$BASE/engine/ajax/film_api.php?id=$pageId")
-            .headers(baseHeaders())
-            .header("Referer", pageUrl)
-            .header("Accept", "application/json, text/plain, */*")
-            .build()
-        val payload = runCatching {
-            http.newCall(req).execute().use { if (it.isSuccessful) it.body?.string() else null }
-        }.getOrNull() ?: return emptyList()
+    private suspend fun filmPlayers(pageId: String, pageUrl: String): List<EmbedLink> {
+        val payload = http.fetch(
+            HttpRequest(
+                url = "$BASE/engine/ajax/film_api.php?id=$pageId",
+                headers = baseHeaders() + mapOf(
+                    "Referer" to pageUrl,
+                    "Accept" to "application/json, text/plain, */*",
+                ),
+            ),
+        )?.takeIf { it.isSuccessful }?.body ?: return emptyList()
 
         val root = runCatching { json.parseToJsonElement(payload).jsonObject }.getOrNull() ?: return emptyList()
         val players = root["players"]?.let { it as? JsonObject } ?: return emptyList()
@@ -147,16 +155,16 @@ class FstreamProvider(private val http: OkHttpClient) : SourceProvider {
 
     // --- Lecteurs épisode -----------------------------------------------------
 
-    private fun episodePlayers(pageId: String, pageUrl: String, episode: Int): List<EmbedLink> {
-        val req = Request.Builder()
-            .url("$BASE/engine/ajax/episodes_p.php?id=$pageId")
-            .headers(baseHeaders())
-            .header("Referer", pageUrl)
-            .header("Accept", "application/json, text/plain, */*")
-            .build()
-        val payload = runCatching {
-            http.newCall(req).execute().use { if (it.isSuccessful) it.body?.string() else null }
-        }.getOrNull() ?: return emptyList()
+    private suspend fun episodePlayers(pageId: String, pageUrl: String, episode: Int): List<EmbedLink> {
+        val payload = http.fetch(
+            HttpRequest(
+                url = "$BASE/engine/ajax/episodes_p.php?id=$pageId",
+                headers = baseHeaders() + mapOf(
+                    "Referer" to pageUrl,
+                    "Accept" to "application/json, text/plain, */*",
+                ),
+            ),
+        )?.takeIf { it.isSuccessful }?.body ?: return emptyList()
 
         val root = runCatching { json.parseToJsonElement(payload).jsonObject }.getOrNull() ?: return emptyList()
         val links = mutableListOf<EmbedLink>()
@@ -177,10 +185,7 @@ class FstreamProvider(private val http: OkHttpClient) : SourceProvider {
 
     // --- Helpers --------------------------------------------------------------
 
-    private fun baseHeaders() = okhttp3.Headers.Builder()
-        .add("User-Agent", UA)
-        .add("Cookie", COOKIE)
-        .build()
+    private fun baseHeaders() = mapOf("User-Agent" to UA, "Cookie" to COOKIE)
 
     private fun extractPageId(url: String): String? = PAGE_ID.find(url)?.groupValues?.get(1)
 

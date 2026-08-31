@@ -16,6 +16,8 @@ import platform.CoreCrypto.kCCDecrypt
 import platform.CoreCrypto.kCCOptionPKCS7Padding
 import platform.CoreCrypto.kCCSuccess
 import platform.Foundation.NSDate
+import platform.Foundation.NSString
+import platform.Foundation.decomposedStringWithCanonicalMapping
 import platform.Foundation.timeIntervalSince1970
 import platform.posix.size_tVar
 
@@ -65,3 +67,10 @@ actual fun dechiffrerAesCbc(donnees: ByteArray, cle: ByteArray, iv: ByteArray): 
         if (statut.toInt() != kCCSuccess) null else sortie.copyOf(ecrits.value.toInt())
     }
 }
+
+/**
+ * `decomposedStringWithCanonicalMapping` **est** la NFD d'Unicode, celle que
+ * `Normalizer.Form.NFD` applique côté JVM — pas une approximation.
+ */
+@Suppress("CAST_NEVER_SUCCEEDS")
+actual fun enNfd(s: String): String = (s as NSString).decomposedStringWithCanonicalMapping

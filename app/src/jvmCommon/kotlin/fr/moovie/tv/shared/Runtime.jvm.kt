@@ -2,6 +2,7 @@ package fr.moovie.tv.shared
 
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import java.text.Normalizer
 import javax.crypto.Cipher
 import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.SecretKeySpec
@@ -16,3 +17,5 @@ actual fun dechiffrerAesCbc(donnees: ByteArray, cle: ByteArray, iv: ByteArray): 
             init(Cipher.DECRYPT_MODE, SecretKeySpec(cle, "AES"), IvParameterSpec(iv))
         }.doFinal(donnees)
     }.getOrNull()
+
+actual fun enNfd(s: String): String = Normalizer.normalize(s, Normalizer.Form.NFD)
