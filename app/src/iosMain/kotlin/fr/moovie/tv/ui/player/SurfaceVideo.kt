@@ -83,11 +83,24 @@ private class VueVideo(
 fun SurfaceVideo(
     controleur: AvPlayerController,
     modifier: Modifier = Modifier,
+    /**
+     * Comment l'image occupe la surface.
+     *
+     * Le lecteur garde le défaut, `ResizeAspect` : des bandes plutôt qu'une
+     * image rognée — sur un film en 2.39:1 vu sur un iPhone, le remplissage
+     * couperait la moitié du cadre.
+     *
+     * L'aperçu de bande-annonce demande l'inverse, `ResizeAspectFill` : il tient
+     * la place de l'affiche de fond, et des bandes noires y trahiraient une
+     * vidéo posée là au lieu d'un décor. C'est le même choix que fait le
+     * `ContentScale.Crop` de l'aperçu desktop.
+     */
+    gravite: String = AVLayerVideoGravityResizeAspect,
 ) {
-    val couche = remember(controleur) {
+    val couche = remember(controleur, gravite) {
         AVPlayerLayer().apply {
             player = controleur.player
-            videoGravity = AVLayerVideoGravityResizeAspect
+            videoGravity = gravite
         }
     }
 

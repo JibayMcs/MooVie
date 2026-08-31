@@ -411,12 +411,12 @@ internal fun IosDetailsScreen(
         onCloseTrailer = vm::closeTrailer,
         onDownloadBest = vm::downloadBest,
         downloadSearching = downloadSearching,
-        // Null, et l'écran s'y adapte : il teste ce paramètre et affiche
-        // l'affiche fixe plutôt qu'un aperçu animé. Jouer la bande-annonce dans
-        // la fiche demanderait une seconde surface vidéo — donc un second
-        // AVPlayer vivant sur le même écran que celui du lecteur. C'est un
-        // travail à part, pas un oubli.
-        trailerPreview = null,
+        // L'aperçu joue vraiment. Il était nul, et le bouton « Bande-annonce »
+        // ne faisait alors rien du tout : `TrailerButton` ne dépend que de
+        // `TrailerState.Ready`, jamais de ce paramètre. Voir TrailerPreview.kt.
+        trailerPreview = { flux, volume, surControleur, mod ->
+            TrailerPreviewIos(flux, volume, surControleur, mod)
+        },
         trailerAutoplay = trailerAutoplay,
         trailerSound = trailerSound,
         country = tmdbCountry(),
