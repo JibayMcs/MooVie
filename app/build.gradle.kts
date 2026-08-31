@@ -59,6 +59,46 @@ val openSubtitlesApiKey: String =
         ?: System.getenv("OPENSUBTITLES_API_KEY")
         ?: ""
 
+/**
+ * Équivalent iOS de `BuildConfig`.
+ *
+ * La version affichée et la clé OpenSubtitles atteignent l'APK par un champ
+ * `BuildConfig` et le desktop par une propriété système passée à la JVM.
+ * Kotlin/Native n'a ni l'un ni l'autre : pas de `System.getProperty`, et rien
+ * n'injecte de constante dans un binaire natif après coup. On génère donc une
+ * source, ce qui garde l'unique `appVersion` de ce fichier comme seule origine
+ * du numéro de version sur les quatre plateformes.
+ *
+ * Passer par `Info.plist` aurait été possible pour la version, mais pas pour la
+ * clé : le plist est en clair dans le bundle, là où une constante compilée est
+ * au moins noyée dans le binaire — même protection, faible, que côté Android.
+ */
+val genererBuildConfigIos by tasks.registering {
+    val sortie = layout.buildDirectory.dir("generated/moovie/ios")
+    // Sans ces deux `inputs`, Gradle considérerait la tâche à jour après un
+    // changement de version ou de clé, et le binaire iOS embarquerait
+    // silencieusement les anciennes valeurs.
+    inputs.property("version", appVersion)
+    inputs.property("cleOpenSubtitles", openSubtitlesApiKey)
+    outputs.dir(sortie)
+    doLast {
+        // Échappement : la clé vient d'un secret CI, rien ne garantit qu'elle
+        // ne porte pas de guillemet ou d'antislash.
+        fun litteral(v: String) = v.replace("\\", "\\\\").replace("\"", "\\\"")
+        val f = sortie.get().file("MoovieBuildConfig.kt").asFile
+        f.parentFile.mkdirs()
+        f.writeText(
+            """
+            // Généré par la tâche Gradle `genererBuildConfigIos`. Ne pas éditer.
+            package fr.moovie.tv.shared
+
+            internal const val VERSION_GENEREE: String = "${litteral(appVersion)}"
+            internal const val CLE_OPENSUBTITLES_GENEREE: String = "${litteral(openSubtitlesApiKey)}"
+            """.trimIndent() + "\n",
+        )
+    }
+}
+
 kotlin {
     androidTarget {
         compilerOptions {
@@ -69,6 +109,31 @@ kotlin {
     jvm("desktop") {
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_17)
+        }
+    }
+
+    // Cibles iOS.
+    //
+    // Kotlin/Native ne sait compiler une cible Apple que **depuis macOS** : la
+    // toolchain est celle de Xcode. Sur Linux et Windows, Gradle configure ces
+    // cibles sans broncher mais leurs tâches de compilation sont inexécutables.
+    // C'est sans conséquence pour les autres plateformes — `assembleRelease` et
+    // `packageDistributionForCurrentOS` ne dépendent d'aucune d'elles — et cela
+    // veut dire que la vérification de compilation iOS appartient au runner
+    // macOS de la CI, pas au poste de développement.
+    //
+    // iosX64 est le simulateur sur Mac Intel, iosSimulatorArm64 celui des Mac
+    // Apple Silicon, iosArm64 l'appareil réel — seule cette dernière entre dans
+    // le .ipa.
+    listOf(iosX64(), iosArm64(), iosSimulatorArm64()).forEach { cible ->
+        cible.binaries.framework {
+            baseName = "MoovieShared"
+            // Statique, et non dynamique : Compose Multiplatform embarque son
+            // propre moteur de rendu Skia, et un .ipa distribué hors App Store
+            // n'a aucun mécanisme de partage de frameworks entre applications.
+            // Le lien statique évite en prime l'étape d'embarquement de
+            // framework dans le bundle, que la signature AltStore n'aime pas.
+            isStatic = true
         }
     }
 
@@ -119,6 +184,29 @@ kotlin {
                 implementation("org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-compose:2.8.4")
             }
         }
+
+        // Pendant iOS de `jvmCommon` : ce que les deux cibles JVM tirent de
+        // Retrofit/OkHttp/jsoup, Kotlin/Native doit le tirer d'ailleurs. Le
+        // source set est déclaré à la main parce que le Default Hierarchy
+        // Template est désactivé sur ce projet — les `dependsOn` explicites de
+        // `jvmCommon` le désactivent pour tout le module, `iosMain` ne serait
+        // donc pas créé tout seul.
+        val iosMain by creating {
+            dependsOn(commonMain)
+            // Dépendance de tâche portée par le srcDir : Gradle génère le
+            // fichier avant de compiler, sans qu'on ait à câbler un `dependsOn`
+            // sur chacune des trois tâches de compilation iOS.
+            kotlin.srcDir(genererBuildConfigIos)
+            dependencies {
+                // Ktor remplace OkHttp. Le moteur Darwin s'appuie sur
+                // NSURLSession, seule pile HTTP disponible sans JVM.
+                implementation("io.ktor:ktor-client-core:3.0.3")
+                implementation("io.ktor:ktor-client-darwin:3.0.3")
+            }
+        }
+        val iosX64Main by getting { dependsOn(iosMain) }
+        val iosArm64Main by getting { dependsOn(iosMain) }
+        val iosSimulatorArm64Main by getting { dependsOn(iosMain) }
 
         val commonTest by getting {
             dependencies {

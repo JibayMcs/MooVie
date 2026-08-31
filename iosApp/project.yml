@@ -1,0 +1,54 @@
+# Spec XcodeGen — `xcodegen generate` produit Moovie.xcodeproj à partir d'ici.
+#
+# Pourquoi générer plutôt que versionner un .pbxproj : ce format est un graphe
+# d'objets à identifiants opaques, illisible en revue et qui produit un conflit
+# de fusion à chaque ajout de fichier. La spec ci-dessous dit la même chose en
+# quarante lignes qu'on peut relire.
+#
+# Le projet généré est ignoré par git (voir .gitignore) : il se régénère.
+name: Moovie
+
+options:
+  bundleIdPrefix: fr.moovie
+  deploymentTarget:
+    iOS: "15.0"
+  createIntermediateGroups: true
+
+targets:
+  Moovie:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: fr.moovie.tv
+        PRODUCT_NAME: Moo-vie
+        INFOPLIST_FILE: Resources/Info.plist
+        SWIFT_VERSION: "5.0"
+        # Le .ipa sort non signé : AltStore resigne à l'installation avec le
+        # certificat de développement de l'utilisateur. Voir le job `ipa` de
+        # .github/workflows/release.yml.
+        CODE_SIGNING_REQUIRED: "NO"
+        CODE_SIGNING_ALLOWED: "NO"
+        CODE_SIGN_IDENTITY: ""
+        # Chemin où `embedAndSignAppleFrameworkForXcode` dépose le framework
+        # Kotlin, indexé par configuration et SDK — c'est ce qui permet au même
+        # projet de bâtir pour le simulateur et pour l'appareil.
+        FRAMEWORK_SEARCH_PATHS:
+          - "$(inherited)"
+          - "$(SRCROOT)/../app/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)"
+        OTHER_LDFLAGS:
+          - "$(inherited)"
+          - "-framework"
+          - "MoovieShared"
+    preBuildScripts:
+      # Compile le code Kotlin partagé et dépose MoovieShared.framework à
+      # l'emplacement ci-dessus. La tâche lit CONFIGURATION, SDK_NAME et ARCHS
+      # dans l'environnement que Xcode lui passe : elle choisit donc seule la
+      # bonne cible Kotlin/Native.
+      - name: Compiler le framework Kotlin
+        basedOnDependencyAnalysis: false
+        script: |
+          cd "$SRCROOT/.."
+          ./gradlew :app:embedAndSignAppleFrameworkForXcode

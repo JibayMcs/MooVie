@@ -1,8 +1,10 @@
 name: Release
 
 # Publie à chaque tag vX.Y.Z : APK Android signé + paquets desktop natifs
-# (deb Linux, msi Windows, dmg macOS) sur la même GitHub Release.
-# L'auto-updater in-app (Android et desktop) lit releases/latest.
+# (AppImage Linux, msi Windows, dmg macOS) + .ipa iOS non signé, sur la même
+# GitHub Release.
+# L'auto-updater in-app (Android et desktop) lit releases/latest. iOS n'en a
+# pas : un .ipa sideloadé se met à jour par AltStore, pas depuis l'app.
 #
 # Un tag qui porte un suffixe semver de préversion — `v1.15.0-rc.1` — sort en
 # **pré-release**. C'est ce qui met une version à l'épreuve sans l'imposer :
@@ -277,6 +279,90 @@ jobs:
           # Une préversion ne peut pas être « latest ». On le dit explicitement
           # au lieu de compter sur le refus de l'API : c'est ce drapeau, et lui
           # seul, qui protège les utilisateurs installés d'une bannière.
+          make_latest: ${{ !contains(github.ref_name, '-') }}
+
+  # iOS : .ipa **non signé**, destiné au sideload par AltStore.
+  #
+  # Non signé parce qu'une app d'extraction de sources ne passe pas la revue de
+  # l'App Store : il n'y a pas de canal officiel à viser, et signer ici
+  # supposerait un compte Apple Developer dont la clé privée vivrait dans les
+  # secrets du dépôt. AltStore resigne à l'installation avec le certificat de
+  # l'utilisateur, ce qui est de toute façon la seule signature qui vaille sur
+  # son appareil.
+  #
+  # C'est le **seul endroit où le code Kotlin/Native est compilé** : la toolchain
+  # Apple n'existe que sur macOS, un poste Linux ou Windows configure les cibles
+  # iOS sans pouvoir les bâtir. Ce job est donc aussi la vérification de
+  # compilation du portage.
+  ipa:
+    needs: changelog
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # Le projet Xcode n'est pas versionné : il se génère depuis
+      # iosApp/project.yml. Voir le commentaire en tête de ce fichier-là.
+      - name: Installer XcodeGen
+        run: brew install xcodegen
+
+      - name: Générer le projet Xcode
+        working-directory: iosApp
+        run: xcodegen generate
+
+      # CFBundleShortVersionString n'accepte que du numérique pointé : le
+      # suffixe de préversion — « -rc.1 » — y est refusé, exactement comme
+      # jpackage le refuse pour le MSI et le DMG. Même traitement, donc, que le
+      # `jpackageVersion` de app/build.gradle.kts. Le numéro de build prend le
+      # compteur du workflow, qui croît strictement.
+      - name: Archiver (non signé)
+        env:
+          OPENSUBTITLES_API_KEY: ${{ secrets.MOOVIE_OPENSUBTITLES_KEY }}
+        run: |
+          set -e
+          version="${GITHUB_REF_NAME#v}"
+          xcodebuild archive \
+            -project iosApp/Moovie.xcodeproj \
+            -scheme Moovie \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$PWD/build/Moovie.xcarchive" \
+            MARKETING_VERSION="${version%%-*}" \
+            CURRENT_PROJECT_VERSION="${GITHUB_RUN_NUMBER}" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+
+      # Un .ipa est un zip dont le seul contenu obligatoire est Payload/<app>.
+      # Aucun outil n'est nécessaire pour le fabriquer, et `xcodebuild
+      # -exportArchive` en exigerait un profil de provisioning — ce que
+      # précisément on n'a pas.
+      - name: Empaqueter le .ipa
+        run: |
+          set -e
+          app=$(find build/Moovie.xcarchive/Products/Applications -maxdepth 1 -name '*.app' | head -1)
+          [ -n "$app" ] || { echo "aucun .app dans l'archive"; exit 1; }
+          mkdir -p Payload
+          cp -R "$app" Payload/
+          zip -qry "moovie-${GITHUB_REF_NAME}.ipa" Payload
+          ls -lh moovie-*.ipa
+
+      - name: Publier sur la release GitHub
+        uses: softprops/action-gh-release@v2
+        with:
+          files: moovie-*.ipa
+          body: ${{ needs.changelog.outputs.notes }}
+          generate_release_notes: true
+          # Les publications visent la *même* release : elles doivent s'accorder
+          # sur ce marquage, sinon la dernière arrivée déclasse les précédentes.
+          prerelease: ${{ contains(github.ref_name, '-') }}
           make_latest: ${{ !contains(github.ref_name, '-') }}
 
   # Linux passe par un AppImage : il embarque ses bibliothèques, tourne sur

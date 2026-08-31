@@ -39,3 +39,10 @@ tools/reports/
 
 # Bibliothèques mpv portables, déposées par tools/fetch-mpv-linux.sh
 app/mpv-linux/
+
+# Projet Xcode : généré par `xcodegen generate` depuis iosApp/project.yml, qui
+# est la source de vérité. Un .pbxproj versionné entre en conflit à chaque
+# ajout de fichier et ne se relit pas en revue.
+/iosApp/Moovie.xcodeproj/
+/iosApp/*.xcworkspace/
+/iosApp/build/
