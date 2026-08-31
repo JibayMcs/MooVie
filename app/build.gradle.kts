@@ -161,6 +161,16 @@ kotlin {
                 // un `File`. DataStore tire déjà okio, on le déclare pour ne pas
                 // dépendre d'une transitivité.
                 implementation("com.squareup.okio:okio:3.9.1")
+                // ViewModels multiplateformes. Le port JetBrains vise aussi iOS :
+                // ces artefacts étaient déclarés côté JVM faute d'utilisateur
+                // commun, pas par contrainte. Les remonter ici est ce qui permet
+                // aux ViewModels de l'application de devenir partagés.
+                implementation("org.jetbrains.androidx.lifecycle:lifecycle-viewmodel:2.8.4")
+                // LocalViewModelStoreOwner, que ProfileHost redéfinit pour donner
+                // à chaque profil son propre magasin de ViewModels — sans quoi
+                // `viewModel()` rend l'instance construite sous le profil
+                // précédent.
+                implementation("org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-compose:2.8.4")
                 // Ktor : client HTTP commun de la couche TMDB. Le *moteur* reste
                 // par plateforme — OkHttp côté JVM, ce qui permet de réutiliser
                 // le client existant et son cache disque sans rien changer au
@@ -201,14 +211,6 @@ kotlin {
                 // Images multiplateforme (Coil 3), fetcher réseau OkHttp
                 implementation("io.coil-kt.coil3:coil-compose:3.0.4")
                 implementation("io.coil-kt.coil3:coil-network-okhttp:3.0.4")
-                // ViewModels multiplateformes (androidx.lifecycle réel côté Android,
-                // port JetBrains côté desktop)
-                implementation("org.jetbrains.androidx.lifecycle:lifecycle-viewmodel:2.8.4")
-                // LocalViewModelStoreOwner, que ProfileHost redéfinit pour donner
-                // à chaque profil son propre magasin de ViewModels — sans quoi
-                // `viewModel()` rend l'instance construite sous le profil
-                // précédent. Le port JetBrains, pour rester en jvmCommon.
-                implementation("org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-compose:2.8.4")
             }
         }
 
