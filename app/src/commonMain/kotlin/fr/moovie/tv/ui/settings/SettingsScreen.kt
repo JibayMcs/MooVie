@@ -385,8 +385,19 @@ fun SettingsScreenContent(
     // droit qui s'efface (une étape de sauvegarde qui passe à la suivante)
     // ramenait le focus ici et faisait sauter la section affichée.
     var navKeyDriven by remember { mutableStateOf(true) }
-    // Focus initial sur la 1re section, pas sur un contrôle : le champ clé TMDB
+    // Focus initial sur une section et non sur un contrôle : le champ clé TMDB
     // s'auto-focaliserait et ouvrirait le clavier à l'entrée dans l'écran.
+    //
+    // **Sur la section affichée, et non sur la première du volet.** Il allait
+    // à l'index 0, ce qui déclenchait le `onFocusChanged` ci-dessous et
+    // remplaçait aussitôt la section de départ par celle-là : l'écran ouvrait
+    // donc sur « Profils », en contradiction avec le `SettingsSection.API`
+    // déclaré juste au-dessus. Deux lignes du même fichier disaient le
+    // contraire l'une de l'autre, et c'est le focus qui gagnait.
+    //
+    // Mémorisée : `section` bouge avec le focus, et sans cela le point d'entrée
+    // se déplacerait avec elle.
+    val sectionInitiale = remember { section }
     val firstSectionFocus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { firstSectionFocus.requestFocus() } }
 
@@ -460,7 +471,7 @@ fun SettingsScreenContent(
                     (!remote && it == SettingsSection.REMOTE) ||
                     (onCheckUpdates == null && it == SettingsSection.UPDATE)
             }
-            sections.forEachIndexed { index, entry ->
+            sections.forEach { entry ->
                 MoovieButton(
                     onClick = {
                         section = entry
@@ -477,7 +488,13 @@ fun SettingsScreenContent(
                         // pour changer de section obligeait à un aller-retour par
                         // catégorie juste pour savoir ce qu'elle contient.
                         .onFocusChanged { if (it.isFocused && navKeyDriven) section = entry }
-                        .then(if (index == 0) Modifier.focusRequester(firstSectionFocus) else Modifier),
+                        .then(
+                            if (entry == sectionInitiale) {
+                                Modifier.focusRequester(firstSectionFocus)
+                            } else {
+                                Modifier
+                            },
+                        ),
                 ) {
                     Icon(
                         imageVector = sectionIcon(entry),
