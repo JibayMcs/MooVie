@@ -22,7 +22,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.File
+import okio.Path
 
 /** Ce qui a empêché d'aboutir, en termes affichables. */
 enum class SubtitleTrouble { QUOTA, NETWORK, NOTHING_FOUND }
@@ -76,7 +76,7 @@ class PlayerSubtitlesViewModel : ViewModel() {
     val file: StateFlow<String?> = _file.asStateFlow()
 
     private var mediaKey: String = ""
-    private var original: File? = null
+    private var original: Path? = null
     private var streamFps: Double? = null
 
     /**
@@ -187,7 +187,10 @@ class PlayerSubtitlesViewModel : ViewModel() {
 
     private fun publish(timing: SubtitleTiming) {
         val source = original ?: return
-        _file.value = files.retimed(source, timing).absolutePath
+        // `okio.Path.toString()` rend le chemin natif de la plateforme, ce
+        // que `File.absolutePath` rendait déjà : le lecteur reçoit la même
+        // chaîne qu'avant.
+        _file.value = files.retimed(source, timing).toString()
     }
 
     private fun io(block: suspend () -> Unit) {

@@ -10,3 +10,5 @@ import java.io.File
  * réglages et à la progression de lecture, qui doivent survivre.
  */
 expect fun moovieCacheDir(name: String): File
+
+actual fun moovieCacheChemin(name: String): String = moovieCacheDir(name).absolutePath

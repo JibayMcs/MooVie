@@ -3,8 +3,11 @@ package fr.moovie.tv.data.subtitles
 import fr.moovie.tv.core.subtitles.model.SubtitleCandidate
 import fr.moovie.tv.core.subtitles.usecase.SubtitleTiming
 import fr.moovie.tv.core.subtitles.usecase.retimeSrt
-import fr.moovie.tv.data.store.moovieCacheDir
-import java.io.File
+import fr.moovie.tv.data.store.moovieCacheChemin
+import fr.moovie.tv.shared.systemeFichiers
+import okio.FileSystem
+import okio.Path
+import okio.Path.Companion.toPath
 
 /**
  * Garde sur disque les sous-titres téléchargés, et en produit des versions
@@ -20,32 +23,38 @@ import java.io.File
  * cosmétique : Media3 met en cache par URI, et réécrire le même chemin
  * laisserait le lecteur afficher l'ancienne version. Le compteur garantit qu'un
  * nouveau réglage est un nouveau fichier, donc réellement rechargé.
+ *
+ * Les chemins sont des `okio.Path` depuis le portage : `java.io.File` n'existe
+ * pas en Kotlin/Native. Côté JVM, `Path.toFile()` rend le `File` que les
+ * lecteurs attendent — la conversion se fait au point d'usage.
  */
 class SubtitleFileStore(
-    private val dir: File = moovieCacheDir("subtitles"),
+    private val dir: Path = moovieCacheChemin("subtitles").toPath(),
+    private val fs: FileSystem = systemeFichiers,
 ) {
 
     private var version = 0
 
     /** Écrit le sous-titre brut tel que téléchargé, et rend son fichier. */
-    fun storeOriginal(mediaKey: String, candidate: SubtitleCandidate, content: String): File {
-        dir.mkdirs()
-        val file = File(dir, "${safe(mediaKey)}_${candidate.fileId}.srt")
-        file.writeText(content)
-        return file
+    fun storeOriginal(mediaKey: String, candidate: SubtitleCandidate, content: String): Path {
+        fs.createDirectories(dir)
+        val fichier = dir / "${safe(mediaKey)}_${candidate.fileId}.srt"
+        fs.write(fichier) { writeUtf8(content) }
+        return fichier
     }
 
     /**
      * Produit la version à donner au lecteur. Sans réglage, c'est l'original
      * lui-même — inutile de recopier 46 Ko pour ne rien changer.
      */
-    fun retimed(original: File, timing: SubtitleTiming): File {
+    fun retimed(original: Path, timing: SubtitleTiming): Path {
         if (timing.isIdentity) return original
-        dir.mkdirs()
+        fs.createDirectories(dir)
         version++
-        val out = File(dir, "${original.nameWithoutExtension}_v$version.srt")
-        out.writeText(retimeSrt(original.readText(), timing))
-        return out
+        val sortie = dir / "${original.name.substringBeforeLast('.')}_v$version.srt"
+        val source = fs.read(original) { readUtf8() }
+        fs.write(sortie) { writeUtf8(retimeSrt(source, timing)) }
+        return sortie
     }
 
     /**
@@ -57,9 +66,9 @@ class SubtitleFileStore(
      */
     fun clearDerived(mediaKey: String) {
         val prefix = safe(mediaKey)
-        dir.listFiles()
-            ?.filter { it.name.startsWith(prefix) && it.name.contains("_v") }
-            ?.forEach { it.delete() }
+        contenu()
+            .filter { it.name.startsWith(prefix) && it.name.contains("_v") }
+            .forEach { fs.delete(it) }
     }
 
     /**
@@ -71,21 +80,21 @@ class SubtitleFileStore(
      */
     fun storedIds(mediaKey: String): Set<String> {
         val prefix = safe(mediaKey) + "_"
-        return dir.listFiles()
-            ?.asSequence()
-            ?.map { it.name }
-            ?.filter { it.startsWith(prefix) && it.endsWith(".srt") }
+        return contenu()
+            .asSequence()
+            .map { it.name }
+            .filter { it.startsWith(prefix) && it.endsWith(".srt") }
             // Les versions recalées portent un suffixe `_v<n>` : ce sont des
             // dérivés du même téléchargement, pas des téléchargements de plus.
-            ?.map { it.removePrefix(prefix).removeSuffix(".srt") }
-            ?.filterNot { it.contains("_v") }
-            ?.toSet()
-            .orEmpty()
+            .map { it.removePrefix(prefix).removeSuffix(".srt") }
+            .filterNot { it.contains("_v") }
+            .toSet()
     }
 
     /** Sous-titre déjà téléchargé pour ce média et ce candidat, s'il existe. */
-    fun existing(mediaKey: String, candidate: SubtitleCandidate): File? =
-        File(dir, "${safe(mediaKey)}_${candidate.fileId}.srt").takeIf { it.isFile }
+    fun existing(mediaKey: String, candidate: SubtitleCandidate): Path? =
+        (dir / "${safe(mediaKey)}_${candidate.fileId}.srt")
+            .takeIf { fs.metadataOrNull(it)?.isRegularFile == true }
 
     /**
      * Le dernier sous-titre utilisé pour ce média, s'il y en a un.
@@ -101,12 +110,21 @@ class SubtitleFileStore(
      * recalée** (`_v<n>`) avant l'originale : entre les deux, celle qu'on veut
      * envoyer est celle qu'il a ajustée.
      */
-    fun dernierUtilise(mediaKey: String): File? {
+    fun dernierUtilise(mediaKey: String): Path? {
         val prefix = safe(mediaKey) + "_"
-        return dir.listFiles()
-            ?.filter { it.isFile && it.name.startsWith(prefix) && it.name.endsWith(".srt") }
-            ?.maxByOrNull { it.lastModified() }
+        return contenu()
+            .filter { it.name.startsWith(prefix) && it.name.endsWith(".srt") }
+            .filter { fs.metadataOrNull(it)?.isRegularFile == true }
+            .maxByOrNull { fs.metadataOrNull(it)?.lastModifiedAtMillis ?: 0L }
     }
+
+    /**
+     * `listOrNull` et non `list` : okio **lève** sur un répertoire absent là où
+     * `File.listFiles()` rendait null. Au premier lancement, avant tout
+     * téléchargement, ce répertoire n'existe pas — et lever ici casserait
+     * l'affichage de la liste des sous-titres.
+     */
+    private fun contenu(): List<Path> = fs.listOrNull(dir).orEmpty()
 
     /** `tv:1396:s1e1` porte des deux-points, que Windows refuse dans un nom. */
     private fun safe(mediaKey: String): String =

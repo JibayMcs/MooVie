@@ -208,7 +208,10 @@ fun DetailsScreen(
                         // conversion et la mise à disposition sont l'affaire de
                         // CastSession. Rien de téléchargé, rien d'envoyé — le
                         // Chromecast ne sait pas chercher de sous-titres.
-                        sousTitres = SubtitleFileStore().dernierUtilise(viewModel.playbackKey),
+                        // `toFile()` : CastSession lit le fichier avec l'API Java, que
+                        // okio expose sur la JVM.
+                        sousTitres = SubtitleFileStore()
+                            .dernierUtilise(viewModel.playbackKey)?.toFile(),
                     )
                 }.getOrDefault(false)
                 castEnCours = false

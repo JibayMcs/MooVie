@@ -1,7 +1,11 @@
 package fr.moovie.tv.data.trailer
 
-import fr.moovie.tv.data.store.moovieCacheDir
-import java.io.File
+import fr.moovie.tv.data.store.moovieCacheChemin
+import fr.moovie.tv.shared.maintenantMs
+import fr.moovie.tv.shared.systemeFichiers
+import okio.FileSystem
+import okio.Path
+import okio.Path.Companion.toPath
 
 /**
  * Dépose le manifeste DASH d'une bande-annonce sur disque et rend son URI.
@@ -20,7 +24,10 @@ import java.io.File
  * googlevideo qui expirent en six heures, ils sont donc jetables par nature.
  * Que l'OS les purge est exactement le comportement voulu.
  */
-class DashManifestStore(private val dir: File = moovieCacheDir("trailers")) {
+class DashManifestStore(
+    private val dir: Path = moovieCacheChemin("trailers").toPath(),
+    private val fs: FileSystem = systemeFichiers,
+) {
 
     /**
      * @return l'URI du manifeste, ou null si l'écriture échoue (disque plein,
@@ -28,19 +35,23 @@ class DashManifestStore(private val dir: File = moovieCacheDir("trailers")) {
      *         bande-annonce comme absente, ce qu'elle est devenue.
      */
     fun write(manifest: String): String? = runCatching {
+        fs.createDirectories(dir)
         prune()
         // Nom stable par contenu : rouvrir la même fiche réécrit le même fichier
         // au lieu d'en semer un par ouverture.
-        val file = File(dir, "trailer-${manifest.hashCode().toUInt().toString(16)}.mpd")
-        file.writeText(manifest)
-        // `File.toURI()` rend `file:/home/…` — **une seule** barre oblique, sans
-        // autorité. C'est une URI valide, et libVLC ne la reconnaît pas : il la
-        // prend pour un chemin relatif et la colle derrière le répertoire
+        val fichier = dir / "trailer-${manifest.hashCode().toUInt().toString(16)}.mpd"
+        fs.write(fichier) { writeUtf8(manifest) }
+        // Trois barres obliques, et non les deux de `File.toURI()` : celle-ci
+        // rend `file:/home/…`, une URI valide que libVLC ne reconnaît pas — il
+        // la prend pour un chemin relatif et la colle derrière le répertoire
         // courant, d'où un « cannot open file …/app/file:/home/… ». La forme à
-        // trois barres est celle que les deux lecteurs attendent. `rawPath`
-        // plutôt que `path` : il garde l'encodage, seul à survivre à un nom
-        // d'utilisateur accentué.
-        "file://" + file.toURI().rawPath
+        // trois barres est celle que les deux lecteurs attendent.
+        //
+        // `enCheminUri` remplace `URI.rawPath` — et reproduit sa règle exacte,
+        // qui n'est pas celle d'un encodeur d'URL ordinaire : les caractères
+        // non-ASCII restent intacts, seuls les ASCII interdits sont cités. Voir
+        // la documentation de cette fonction, et `UriFichierTest`.
+        "file://" + enCheminUri(fichier.toString())
     }.getOrNull()
 
     /**
@@ -51,9 +62,10 @@ class DashManifestStore(private val dir: File = moovieCacheDir("trailers")) {
      * suit l'expiration annoncée par YouTube (`expiresInSeconds`, ~6 h).
      */
     private fun prune() {
-        val limite = System.currentTimeMillis() - EXPIRATION_MS
-        dir.listFiles()?.forEach { f ->
-            if (f.isFile && f.lastModified() < limite) f.delete()
+        val limite = maintenantMs() - EXPIRATION_MS
+        fs.listOrNull(dir)?.forEach { f ->
+            val meta = fs.metadataOrNull(f) ?: return@forEach
+            if (meta.isRegularFile && (meta.lastModifiedAtMillis ?: 0L) < limite) fs.delete(f)
         }
     }
 
