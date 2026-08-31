@@ -161,6 +161,13 @@ kotlin {
                 // un `File`. DataStore tire déjà okio, on le déclare pour ne pas
                 // dépendre d'une transitivité.
                 implementation("com.squareup.okio:okio:3.9.1")
+                // Ktor : client HTTP commun de la couche TMDB. Le *moteur* reste
+                // par plateforme — OkHttp côté JVM, ce qui permet de réutiliser
+                // le client existant et son cache disque sans rien changer au
+                // comportement d'Android et du desktop.
+                implementation("io.ktor:ktor-client-core:3.0.3")
+                implementation("io.ktor:ktor-client-content-negotiation:3.0.3")
+                implementation("io.ktor:ktor-serialization-kotlinx-json:3.0.3")
             }
         }
 
@@ -170,12 +177,13 @@ kotlin {
         val jvmCommon by creating {
             dependsOn(commonMain)
             dependencies {
-                implementation("com.squareup.retrofit2:retrofit:2.11.0")
-                implementation("com.squareup.retrofit2:converter-kotlinx-serialization:2.11.0")
                 implementation("com.squareup.okhttp3:okhttp:4.12.0")
                 implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
                 // DNS-over-HTTPS : contourne le blocage DNS des FAI sur les domaines sources
                 implementation("com.squareup.okhttp3:okhttp-dnsoverhttps:4.12.0")
+                // Moteur Ktor adossé à OkHttp : `preconfigured` lui passe le
+                // client existant, cache et interceptors compris.
+                implementation("io.ktor:ktor-client-okhttp:3.0.3")
                 implementation("org.jsoup:jsoup:1.18.1")
                 // Encodage QR seulement (Java pur, sans dépendance Android) :
                 // l'appairage du téléphone en affiche un. Le codage QR est du
