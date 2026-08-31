@@ -95,7 +95,11 @@ fun SurfaceVideo(
      * vidéo posée là au lieu d'un décor. C'est le même choix que fait le
      * `ContentScale.Crop` de l'aperçu desktop.
      */
-    gravite: String = AVLayerVideoGravityResizeAspect,
+    // `String?` et non `String` : Kotlin/Native expose les constantes
+    // `AVLayerVideoGravity*` en nullable, le typedef Objective-C étant un
+    // `NSString *` sans annotation de nullité. C'est aussi le type que prend
+    // `videoGravity`, si bien que la valeur traverse sans déballage.
+    gravite: String? = AVLayerVideoGravityResizeAspect,
 ) {
     val couche = remember(controleur, gravite) {
         AVPlayerLayer().apply {
