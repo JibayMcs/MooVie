@@ -25,3 +25,6 @@ actual fun genererUuid(): String = UUID.randomUUID().toString()
 
 actual fun espaceLibre(chemin: okio.Path): Long =
     runCatching { chemin.toFile().usableSpace }.getOrDefault(Long.MAX_VALUE)
+
+actual fun formaterDecimal(valeur: Double, decimales: Int): String =
+    String.format(java.util.Locale.getDefault(), "%.${decimales}f", valeur)

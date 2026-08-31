@@ -114,3 +114,20 @@ actual fun espaceLibre(chemin: okio.Path): Long = runCatching {
     (valeurs?.values?.firstOrNull() as? platform.Foundation.NSNumber)?.longLongValue
         ?: Long.MAX_VALUE
 }.getOrDefault(Long.MAX_VALUE)
+
+/**
+ * `NSNumberFormatter` porte le séparateur décimal de la locale, comme
+ * `String.format` le fait via `Locale.getDefault()` sur la JVM.
+ */
+actual fun formaterDecimal(valeur: Double, decimales: Int): String {
+    val formateur = platform.Foundation.NSNumberFormatter().apply {
+        numberStyle = platform.Foundation.NSNumberFormatterDecimalStyle
+        minimumFractionDigits = decimales.toULong()
+        maximumFractionDigits = decimales.toULong()
+        // Pas de séparateur de milliers : ces valeurs sont des notes et des
+        // tailles déjà réduites, « 1 234,5 » y serait du bruit.
+        usesGroupingSeparator = false
+    }
+    return formateur.stringFromNumber(platform.Foundation.NSNumber(double = valeur))
+        ?: valeur.toString()
+}

@@ -1,5 +1,6 @@
 package fr.moovie.tv.ui.profile
 
+import fr.moovie.tv.shared.maintenantMs
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -148,7 +149,7 @@ fun ProfileGate(onPicked: (String) -> Unit) {
                     val edit = editing!!
                     scope.launch {
                         if (edit.profileId == null) {
-                            repo.create(name, System.currentTimeMillis())
+                            repo.create(name, maintenantMs())
                         } else {
                             repo.rename(edit.profileId, name)
                         }

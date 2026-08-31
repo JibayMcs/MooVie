@@ -67,3 +67,14 @@ expect fun genererUuid(): String
  * parfaitement possible.
  */
 expect fun espaceLibre(chemin: okio.Path): Long
+
+/**
+ * Un nombre décimal, au séparateur de la locale.
+ *
+ * Remplace `"%.1f".format(x)`, qui n'existe pas en commun — mais surtout qui
+ * **suit la locale** sur la JVM : une note de 7,5 s'écrit avec une virgule en
+ * français et un point en anglais. Une concaténation maison aurait imposé le
+ * point partout et changé l'affichage d'Android, pour des notes visibles sur
+ * chaque affiche.
+ */
+expect fun formaterDecimal(valeur: Double, decimales: Int): String

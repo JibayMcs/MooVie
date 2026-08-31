@@ -1,5 +1,6 @@
 package fr.moovie.tv.ui.home
 
+import fr.moovie.tv.shared.formaterDecimal
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -586,7 +587,7 @@ private fun CatalogHero(item: TmdbItem) {
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             item.year?.let { Text(it, style = MaterialTheme.typography.titleMedium, color = Color(0xFFCCCCCC)) }
             if (item.voteAverage > 0) {
-                Text("★ %.1f".format(item.voteAverage), style = MaterialTheme.typography.titleMedium, color = Color(0xFFE6B800))
+                Text("★ " + formaterDecimal(item.voteAverage, 1), style = MaterialTheme.typography.titleMedium, color = Color(0xFFE6B800))
             }
         }
         Spacer(Modifier.height(10.dp))

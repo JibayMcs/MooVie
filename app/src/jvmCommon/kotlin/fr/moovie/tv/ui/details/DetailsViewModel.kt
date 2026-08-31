@@ -1,5 +1,7 @@
 package fr.moovie.tv.ui.details
 
+import fr.moovie.tv.shared.dispatcherEs
+import fr.moovie.tv.shared.maintenantMs
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import fr.moovie.tv.data.settings.SettingsRepository
@@ -410,7 +412,7 @@ class DetailsViewModel : ViewModel() {
     private suspend fun catalogTitle(displayed: String): String {
         if (currentTmdbLanguage() == CATALOG_LANGUAGE) return displayed
         val pending = catalogTitleLock.withLock {
-            catalogTitleAsync ?: viewModelScope.async(Dispatchers.IO) {
+            catalogTitleAsync ?: viewModelScope.async(dispatcherEs) {
                 // Tout est capturé : une exception qui s'échapperait d'un `async`
                 // emporterait le scope du ViewModel avec elle, et donc la fiche.
                 runCatching {
@@ -952,7 +954,7 @@ class DetailsViewModel : ViewModel() {
             // répondu, pour ne mettre en cache qu'une liste complète.
             coroutineScope {
                 providers.forEach { provider ->
-                    launch(Dispatchers.IO) {
+                    launch(dispatcherEs) {
                         val result = runCatching {
                             withTimeoutOrNull(PROVIDER_TIMEOUT_MS) { query(provider) }
                         }
@@ -1053,7 +1055,7 @@ class DetailsViewModel : ViewModel() {
             val answered = mutableSetOf<String>()
             val links = coroutineScope {
                 providers.map { provider ->
-                    async(Dispatchers.IO) {
+                    async(dispatcherEs) {
                         val result = runCatching {
                             withTimeoutOrNull(PROVIDER_TIMEOUT_MS) { provider.sourcesFor(media) }
                         }.getOrNull()
@@ -1390,7 +1392,7 @@ class DetailsViewModel : ViewModel() {
                     imageUrl = meta.imageUrl,
                     tmdbId = meta.tmdbId,
                     isTv = meta.isTv,
-                    createdAt = System.currentTimeMillis(),
+                    createdAt = maintenantMs(),
                     sourceUrl = link.url,
                     hoster = link.hoster,
                     language = link.language.orEmpty(),
@@ -1473,7 +1475,7 @@ class DetailsViewModel : ViewModel() {
                     imageUrl = meta.imageUrl,
                     tmdbId = meta.tmdbId,
                     isTv = meta.isTv,
-                    createdAt = System.currentTimeMillis(),
+                    createdAt = maintenantMs(),
                     sourceUrl = lien.url,
                     hoster = lien.hoster,
                     language = lien.language.orEmpty(),
@@ -1599,7 +1601,7 @@ class DetailsViewModel : ViewModel() {
                             imageUrl = ep.stillUrl() ?: tv.details.posterUrl(),
                             tmdbId = tmdbId,
                             isTv = true,
-                            createdAt = System.currentTimeMillis(),
+                            createdAt = maintenantMs(),
                             sourceUrl = lien.url,
                             hoster = lien.hoster,
                             language = lien.language.orEmpty(),
@@ -1647,7 +1649,7 @@ class DetailsViewModel : ViewModel() {
         val answered = mutableSetOf<String>()
         val links = coroutineScope {
             providers.map { provider ->
-                async(Dispatchers.IO) {
+                async(dispatcherEs) {
                     val result = runCatching {
                         withTimeoutOrNull(PROVIDER_TIMEOUT_MS) { provider.sourcesFor(media) }
                     }.getOrNull()

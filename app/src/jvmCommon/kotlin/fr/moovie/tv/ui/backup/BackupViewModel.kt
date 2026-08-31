@@ -1,5 +1,7 @@
 package fr.moovie.tv.ui.backup
 
+import fr.moovie.tv.shared.dispatcherEs
+import fr.moovie.tv.shared.maintenantMs
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import fr.moovie.tv.data.backup.BACKUP_EXTENSION
@@ -84,7 +86,7 @@ class BackupViewModel : ViewModel() {
     fun chooseTarget(target: BackupTarget) = io {
         // Assemblé dès maintenant pour montrer ce qui partira ; l'écriture
         // n'aura lieu qu'à la confirmation.
-        val backup = repo.export(includeApiKey = true, now = System.currentTimeMillis())
+        val backup = repo.export(includeApiKey = true, now = maintenantMs())
         pending = backup
         val contents = backup.summary()
         _step.value = BackupStep.ConfirmExport(
@@ -151,6 +153,6 @@ class BackupViewModel : ViewModel() {
 
     /** Les supports se lisent et s'écrivent sur disque : jamais sur le fil UI. */
     private fun io(block: suspend () -> Unit) {
-        viewModelScope.launch { withContext(Dispatchers.IO) { block() } }
+        viewModelScope.launch { withContext(dispatcherEs) { block() } }
     }
 }

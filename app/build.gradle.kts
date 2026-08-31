@@ -186,6 +186,9 @@ kotlin {
                 // bibliothèque multiplateforme ne connaît les motifs de date
                 // propres à chaque langue, seuls les OS les portent.
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.1")
+                // Coil 3 est multiplateforme ; seul son moteur réseau ne l'est
+                // pas, et celui-ci reste déclaré par cible.
+                implementation("io.coil-kt.coil3:coil-compose:3.0.4")
             }
         }
 
@@ -208,8 +211,7 @@ kotlin {
                 // Reed-Solomon et du masquage — pas quelque chose qu'on écrit
                 // à la main pour économiser un jar.
                 implementation("com.google.zxing:core:3.5.3")
-                // Images multiplateforme (Coil 3), fetcher réseau OkHttp
-                implementation("io.coil-kt.coil3:coil-compose:3.0.4")
+                // Fetcher réseau OkHttp de Coil : lui seul est propre à la JVM.
                 implementation("io.coil-kt.coil3:coil-network-okhttp:3.0.4")
             }
         }
@@ -231,6 +233,9 @@ kotlin {
                 // NSURLSession, seule pile HTTP disponible sans JVM.
                 implementation("io.ktor:ktor-client-core:3.0.3")
                 implementation("io.ktor:ktor-client-darwin:3.0.3")
+                // Pendant iOS du fetcher OkHttp : Coil passe par Ktor, donc par
+                // NSURLSession.
+                implementation("io.coil-kt.coil3:coil-network-ktor3:3.0.4")
                 // Chiffrement. Uniquement côté iOS : la JVM garde `javax.crypto`
                 // tel quel, il n'y a aucune raison de remplacer une pile qui
                 // marche chez les utilisateurs Android et desktop. Le provider

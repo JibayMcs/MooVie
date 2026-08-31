@@ -1,5 +1,6 @@
 package fr.moovie.tv.ui.intro
 
+import fr.moovie.tv.shared.dispatcherEs
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import fr.moovie.tv.core.intro.SegmentKind
@@ -173,6 +174,6 @@ class ReportSegmentViewModel : ViewModel() {
     }
 
     private fun io(block: suspend () -> Unit) {
-        viewModelScope.launch { withContext(Dispatchers.IO) { block() } }
+        viewModelScope.launch { withContext(dispatcherEs) { block() } }
     }
 }

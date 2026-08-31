@@ -1,5 +1,7 @@
 package fr.moovie.tv.ui.download
 
+import fr.moovie.tv.shared.formaterDecimal
+import fr.moovie.tv.shared.dispatcherEs
 import androidx.compose.foundation.background
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.basicMarquee
@@ -118,14 +120,14 @@ fun DownloadsSection(
     // n'a comptés, et c'est quand le disque se remplit que le chiffre doit être
     // juste.
     val used by produceState(0L, downloads.size) {
-        value = withContext(Dispatchers.IO) { repo.bytesOnDisk() }
+        value = withContext(dispatcherEs) { repo.bytesOnDisk() }
     }
 
     // Ce que le volume porte en tout. Relevé avec la taille occupée et sur le
     // même fil : `usableSpace` interroge le système de fichiers, ce qui n'a rien
     // à faire sur le fil d'interface.
     val storage by produceState(StorageUsage(0L, 0L, 0L), used) {
-        value = withContext(Dispatchers.IO) { storageUsage(moovieDownloadsDir(), used) }
+        value = withContext(dispatcherEs) { storageUsage(moovieDownloadsDir(), used) }
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -344,7 +346,7 @@ private fun Affiche(download: Download, modifier: Modifier = Modifier) {
     // la rattrape — une fois, sans bloquer le rendu. Voir fetchDownloadPoster.
     val fichier by produceState<Path?>(null, download.key) {
         value = downloadPoster(download.key)
-            ?: withContext(Dispatchers.IO) {
+            ?: withContext(dispatcherEs) {
                 fetchDownloadPoster(
                     key = download.key,
                     tmdbId = download.tmdbId,
@@ -436,8 +438,8 @@ private fun statusOf(download: Download): String = when (download.state) {
  * chiffre plutôt que de celui du système.
  */
 internal fun formatSize(bytes: Long): String = when {
-    bytes >= 1_000_000_000 -> "%.1f Go".format(bytes / 1_000_000_000.0)
-    bytes >= 1_000_000 -> "%.0f Mo".format(bytes / 1_000_000.0)
-    bytes >= 1_000 -> "%.0f Ko".format(bytes / 1_000.0)
+    bytes >= 1_000_000_000 -> formaterDecimal(bytes / 1_000_000_000.0, 1) + " Go"
+    bytes >= 1_000_000 -> formaterDecimal(bytes / 1_000_000.0, 0) + " Mo"
+    bytes >= 1_000 -> formaterDecimal(bytes / 1_000.0, 0) + " Ko"
     else -> "$bytes o"
 }

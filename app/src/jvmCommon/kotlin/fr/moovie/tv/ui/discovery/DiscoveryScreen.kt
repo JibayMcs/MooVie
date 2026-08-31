@@ -1,5 +1,6 @@
 package fr.moovie.tv.ui.discovery
 
+import fr.moovie.tv.shared.formaterDecimal
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
@@ -957,7 +958,7 @@ private fun Contexte(
                 is DiscoveryCard.Title -> {
                     carte.year?.let { Puce(it) }
                     if (carte.rating > 0) Puce(
-                        String.format("%.1f", carte.rating),
+                        formaterDecimal(carte.rating, 1),
                         MOOVIE_ORANGE,
                     )
                 }

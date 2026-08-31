@@ -1,5 +1,6 @@
 package fr.moovie.tv.ui.sync
 
+import fr.moovie.tv.shared.maintenantMs
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -115,7 +116,7 @@ fun SyncSection(viewModel: SyncViewModel = remember { SyncViewModel() }) {
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 MoovieButton(
-                    onClick = { viewModel.syncNow(System.currentTimeMillis()) },
+                    onClick = { viewModel.syncNow(maintenantMs()) },
                     enabled = state != SyncState.Running,
                 ) {
                     Text(

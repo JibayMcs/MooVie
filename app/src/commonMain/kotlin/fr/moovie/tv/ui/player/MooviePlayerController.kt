@@ -172,8 +172,9 @@ fun formatPlayerTime(ms: Long): String {
     val m = (totalSec % 3600) / 60
     val s = totalSec % 60
     return if (h > 0) {
-        "%d:%02d:%02d".format(h, m, s)
+        // Chiffres et deux-points : rien de localisé ici, `padStart` suffit.
+        "$h:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}"
     } else {
-        "%d:%02d".format(m, s)
+        "$m:${s.toString().padStart(2, '0')}"
     }
 }

@@ -1,5 +1,6 @@
 package fr.moovie.tv.ui.details
 
+import fr.moovie.tv.shared.formaterDecimal
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -2169,7 +2170,7 @@ private fun MovieMeta(
                 }
                 if (details.voteAverage > 0) {
                     Text(
-                        "★ %.1f".format(details.voteAverage),
+                        "★ " + formaterDecimal(details.voteAverage, 1),
                         style = MaterialTheme.typography.titleSmall,
                         color = Color(0xFFE6B800),
                     )
@@ -2278,7 +2279,7 @@ private fun EpisodeDetail(
                 }
                 if (ep.voteAverage > 0) {
                     Text(
-                        "★ %.1f".format(ep.voteAverage),
+                        "★ " + formaterDecimal(ep.voteAverage, 1),
                         style = MaterialTheme.typography.titleSmall,
                         color = Color(0xFFE6B800),
                     )

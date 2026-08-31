@@ -1,5 +1,6 @@
 package fr.moovie.tv.ui.backup
 
+import fr.moovie.tv.shared.maintenantMs
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -188,7 +189,7 @@ fun BackupSection(
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     MoovieButton(
-                        onClick = { viewModel.confirmExport(System.currentTimeMillis()) },
+                        onClick = { viewModel.confirmExport(maintenantMs()) },
                         modifier = focusFirst,
                     ) { Text(stringResource(Res.string.backup_export)) }
                     MoovieButton(onClick = leave) {

@@ -1,5 +1,7 @@
 package fr.moovie.tv.ui.subtitles
 
+import fr.moovie.tv.shared.dispatcherEs
+import fr.moovie.tv.shared.maintenantMs
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import fr.moovie.tv.core.sources.model.MediaRef
@@ -97,7 +99,7 @@ class PlayerSubtitlesViewModel : ViewModel() {
 
         _state.value = _state.value.copy(loading = true, trouble = null)
         session.restore()
-        session.renewIfNeeded(System.currentTimeMillis())
+        session.renewIfNeeded(maintenantMs())
 
         val languages = settings.subtitleLanguages.first()
         val found = catalog.search(media, languages)
@@ -194,6 +196,6 @@ class PlayerSubtitlesViewModel : ViewModel() {
     }
 
     private fun io(block: suspend () -> Unit) {
-        viewModelScope.launch { withContext(Dispatchers.IO) { block() } }
+        viewModelScope.launch { withContext(dispatcherEs) { block() } }
     }
 }

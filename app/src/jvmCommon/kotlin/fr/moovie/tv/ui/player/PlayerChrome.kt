@@ -1,5 +1,6 @@
 package fr.moovie.tv.ui.player
 
+import fr.moovie.tv.shared.formaterDecimal
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -784,7 +785,7 @@ fun speedSection(current: Float, onSelect: (Float) -> Unit): PlayerOptionSection
     PlayerOptionSection(
         stringResource(Res.string.player_speed),
         PLAYER_SPEEDS.map { value ->
-            val label = "×%.2f".format(value).trimEnd('0').trimEnd('.', ',')
+            val label = "×" + formaterDecimal(value.toDouble(), 2).trimEnd('0').trimEnd('.', ',')
             PlayerOption(label, value == current) { onSelect(value) }
         },
     )

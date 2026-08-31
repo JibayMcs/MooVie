@@ -1,5 +1,7 @@
 package fr.moovie.tv.ui.subtitles
 
+import fr.moovie.tv.shared.dispatcherEs
+import fr.moovie.tv.shared.maintenantMs
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import fr.moovie.tv.core.subtitles.model.SubtitleBackdrop
@@ -84,7 +86,7 @@ class SubtitlesSettingsViewModel : ViewModel() {
         if (username.isBlank() || password.isBlank()) return@io
         _state.value = _state.value.copy(busy = true, error = null)
 
-        session.login(username, password, remember, System.currentTimeMillis())
+        session.login(username, password, remember, maintenantMs())
             .onSuccess { account ->
                 _state.value = _state.value.copy(
                     account = account,
@@ -162,6 +164,6 @@ class SubtitlesSettingsViewModel : ViewModel() {
     }
 
     private fun io(block: suspend () -> Unit) {
-        viewModelScope.launch { withContext(Dispatchers.IO) { block() } }
+        viewModelScope.launch { withContext(dispatcherEs) { block() } }
     }
 }

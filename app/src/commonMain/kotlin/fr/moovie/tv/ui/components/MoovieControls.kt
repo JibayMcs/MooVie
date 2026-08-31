@@ -1,5 +1,6 @@
 package fr.moovie.tv.ui.components
 
+import fr.moovie.tv.shared.maintenantMs
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -322,7 +323,7 @@ private class ConfirmKeyPress {
     var watchdog: Job? = null
 
     fun press() {
-        if (downs == 0) startedAt = System.currentTimeMillis()
+        if (downs == 0) startedAt = maintenantMs()
         downs++
     }
 
@@ -339,7 +340,7 @@ private class ConfirmKeyPress {
      */
     fun isLong(): Boolean =
         downs >= LONG_PRESS_DOWNS ||
-            (startedAt > 0L && System.currentTimeMillis() - startedAt >= LONG_PRESS_MS)
+            (startedAt > 0L && maintenantMs() - startedAt >= LONG_PRESS_MS)
 
     fun reset() {
         watchdog?.cancel()
