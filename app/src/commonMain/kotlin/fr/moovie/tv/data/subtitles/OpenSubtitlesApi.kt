@@ -1,7 +1,19 @@
 package fr.moovie.tv.data.subtitles
 
+import fr.moovie.tv.data.net.clientRest
 import fr.moovie.tv.shared.appVersionName
-import kotlinx.coroutines.Dispatchers
+import fr.moovie.tv.shared.dispatcherEs
+import fr.moovie.tv.shared.maintenantMs
+import io.ktor.client.request.HttpRequestBuilder
+import io.ktor.client.request.delete
+import io.ktor.client.request.get
+import io.ktor.client.request.header
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.client.statement.bodyAsText
+import io.ktor.http.ContentType
+import io.ktor.http.contentType
+import io.ktor.http.isSuccess
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -9,10 +21,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
+import kotlin.concurrent.Volatile
 
 private const val BASE_URL = "https://api.opensubtitles.com/api/v1"
 
@@ -113,14 +122,14 @@ class OpenSubtitlesApi(
         ignoreUnknownKeys = true
         coerceInputValues = true
     }
-    private val client = OkHttpClient()
-
     /**
-     * Le lien de téléchargement est servi par une autre couche, avec son propre
-     * plafond : on n'y envoie ni clé ni jeton, il n'en a pas besoin et le jeton
-     * n'a rien à faire hors de l'API.
+     * Un seul client, deux usages. Le lien de téléchargement est servi par une
+     * autre couche, avec son propre plafond : on n'y envoie **ni clé ni jeton**
+     * — il n'en a pas besoin, et le jeton n'a rien à faire hors de l'API. Cette
+     * séparation tient donc aux en-têtes posés, pas à la configuration du
+     * client, qui était déjà identique des deux côtés.
      */
-    private val fileClient = OkHttpClient()
+    private val client = clientRest
 
     /** Jeton de l'utilisateur connecté. Null tant qu'il ne l'est pas. */
     @Volatile
@@ -168,21 +177,15 @@ class OpenSubtitlesApi(
      * Demande un lien de téléchargement. **Consomme le quota**, y compris si le
      * fichier n'est jamais récupéré ensuite.
      */
-    suspend fun requestDownload(fileId: Long): Result<OsDownloadResponse> {
-        val body = """{"file_id":$fileId}""".toRequestBody(JSON_MEDIA)
-        return call(
-            Request.Builder().url("$BASE_URL/download").post(body).headers(),
-        )
-    }
+    suspend fun requestDownload(fileId: Long): Result<OsDownloadResponse> =
+        appel { client.post("$BASE_URL/download") { entetes(); corpsJson("""{"file_id":$fileId}""") } }
 
     /** Récupère le fichier lui-même. Ne consomme rien : le quota est déjà payé. */
-    suspend fun fetchFile(link: String): Result<String> = withContext(Dispatchers.IO) {
+    suspend fun fetchFile(link: String): Result<String> = withContext(dispatcherEs) {
         runCatching {
-            val request = Request.Builder().url(link).header("User-Agent", userAgent).build()
-            fileClient.newCall(request).execute().use { resp ->
-                if (!resp.isSuccessful) error("HTTP ${resp.code}")
-                resp.body!!.string()
-            }
+            val reponse = client.get(link) { header("User-Agent", userAgent) }
+            if (!reponse.status.isSuccess()) error("HTTP ${reponse.status.value}")
+            reponse.bodyAsText()
         }
     }
 
@@ -195,17 +198,17 @@ class OpenSubtitlesApi(
      * avec les identifiants.
      */
     suspend fun login(username: String, password: String): Result<OsLoginResponse> {
-        val body = json.encodeToString(
+        val corps = json.encodeToString(
             OsLoginRequest.serializer(),
             OsLoginRequest(username, password),
-        ).toRequestBody(JSON_MEDIA)
-        return call(Request.Builder().url("$BASE_URL/login").post(body).headers())
+        )
+        return appel { client.post("$BASE_URL/login") { entetes(); corpsJson(corps) } }
     }
 
-    suspend fun logout(): Result<Unit> = withContext(Dispatchers.IO) {
+    suspend fun logout(): Result<Unit> = withContext(dispatcherEs) {
         runCatching {
-            val request = Request.Builder().url("$BASE_URL/logout").delete().headers().build()
-            client.newCall(request).execute().close()
+            space()
+            client.delete("$BASE_URL/logout") { entetes() }
             token = null
         }
     }
@@ -214,42 +217,57 @@ class OpenSubtitlesApi(
     private data class OsLoginRequest(val username: String, val password: String)
 
     private suspend inline fun <reified T> get(url: String): Result<T> =
-        call(Request.Builder().url(url).get().headers())
+        appel { client.get(url) { entetes() } }
 
-    private suspend inline fun <reified T> call(builder: Request.Builder): Result<T> =
-        withContext(Dispatchers.IO) {
-            runCatching {
-                space()
-                client.newCall(builder.build()).execute().use { resp ->
-                    val raw = resp.body?.string().orEmpty()
-                    if (!resp.isSuccessful) throw OsHttpException(resp.code, raw)
-                    json.decodeFromString<T>(raw)
-                }
-            }
+    /**
+     * Exécute l'appel, respecte l'espacement, puis décode — ou lève une
+     * [OsHttpException] **porteuse du corps**.
+     *
+     * Le corps est lu dans tous les cas, succès comme échec : c'est là
+     * qu'OpenSubtitles loge la différence entre un identifiant invalide et un
+     * quota épuisé, que le seul code 406 ne permet pas de trancher.
+     */
+    private suspend inline fun <reified T> appel(
+        crossinline requete: suspend () -> io.ktor.client.statement.HttpResponse,
+    ): Result<T> = withContext(dispatcherEs) {
+        runCatching {
+            space()
+            val reponse = requete()
+            val brut = reponse.bodyAsText()
+            if (!reponse.status.isSuccess()) throw OsHttpException(reponse.status.value, brut)
+            json.decodeFromString<T>(brut)
         }
+    }
 
     /** Ajoute les en-têtes exigés : sans `User-Agent` valide, l'API rend 403. */
-    private fun Request.Builder.headers(): Request.Builder = apply {
+    private fun HttpRequestBuilder.entetes() {
         header("Api-Key", apiKey)
         header("User-Agent", userAgent)
         header("Accept", "application/json")
-        header("Content-Type", "application/json")
         token?.let { header("Authorization", "Bearer $it") }
+    }
+
+    /**
+     * `Content-Type` est posé par le corps et non par [entetes] : Ktor le
+     * dérive de ce qu'on envoie, et le forcer en en-tête sur un GET sans corps
+     * produirait une requête que l'API refuse.
+     */
+    private fun HttpRequestBuilder.corpsJson(corps: String) {
+        contentType(ContentType.Application.Json)
+        setBody(corps)
     }
 
     /** Laisse au moins [MIN_INTERVAL_MS] entre deux appels. */
     private suspend fun space() {
         throttle.withLock {
-            val now = System.currentTimeMillis()
+            val now = maintenantMs()
             val wait = MIN_INTERVAL_MS - (now - lastCallAtMs)
             if (wait > 0) delay(wait)
-            lastCallAtMs = System.currentTimeMillis()
+            lastCallAtMs = maintenantMs()
         }
     }
 
     private companion object {
-        val JSON_MEDIA = "application/json".toMediaType()
-
         /** 5 requêtes/seconde autorisées : on vise 4 pour garder de la marge. */
         const val MIN_INTERVAL_MS = 250L
     }

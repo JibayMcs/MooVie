@@ -3,16 +3,22 @@ package fr.moovie.tv.data.intro
 import fr.moovie.tv.core.intro.SegmentKind
 import fr.moovie.tv.core.intro.SegmentSubmission
 import fr.moovie.tv.data.settings.SettingsRepository
-import kotlinx.coroutines.Dispatchers
+import fr.moovie.tv.shared.dispatcherEs
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
+import fr.moovie.tv.data.net.clientRest
+import io.ktor.client.request.HttpRequestBuilder
+import io.ktor.client.request.get
+import io.ktor.client.request.header
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.client.statement.bodyAsText
+import io.ktor.http.ContentType
+import io.ktor.http.contentType
+import io.ktor.http.isSuccess
 
 /** Un segment (intro/générique) : bornes en ms, chacune éventuellement absente. */
 @Serializable
@@ -66,7 +72,7 @@ class IntroDbRepository(
         // qu'on veut dire pour une intro sans début ou un générique sans fin.
         explicitNulls = false
     }
-    private val client = OkHttpClient()
+    private val client = clientRest
 
     /**
      * Récupère les segments. [durationMs] aide l'API à choisir la bonne version
@@ -83,7 +89,7 @@ class IntroDbRepository(
         season: Int,
         episode: Int,
         durationMs: Long,
-    ): IntroMedia? = withContext(Dispatchers.IO) {
+    ): IntroMedia? = withContext(dispatcherEs) {
         val key = apiKey()
         runCatching {
             val url = buildString {
@@ -91,14 +97,14 @@ class IntroDbRepository(
                 if (isTv) append("&season=").append(season).append("&episode=").append(episode)
                 if (durationMs > 0) append("&duration_ms=").append(durationMs)
             }
-            val request = Request.Builder()
-                .url(url)
-                .header("Accept", "application/json")
-                .authorize(key)
-                .build()
-            client.newCall(request).execute().use { resp ->
-                if (!resp.isSuccessful) return@use null
-                json.decodeFromString<IntroMedia>(resp.body!!.string())
+            val reponse = client.get(url) {
+                header("Accept", "application/json")
+                authorize(key)
+            }
+            if (!reponse.status.isSuccess()) {
+                null
+            } else {
+                json.decodeFromString<IntroMedia>(reponse.bodyAsText())
             }
         }.getOrNull()
     }
@@ -113,7 +119,7 @@ class IntroDbRepository(
      * [fr.moovie.tv.core.intro.validateSubmission], pure et testée. Ce qui est
      * attrapé à ce niveau, ce sont les refus du serveur.
      */
-    suspend fun submit(submission: SegmentSubmission): SubmitError? = withContext(Dispatchers.IO) {
+    suspend fun submit(submission: SegmentSubmission): SubmitError? = withContext(dispatcherEs) {
         val key = apiKey()
         if (key.isBlank()) return@withContext SubmitError.NO_KEY
 
@@ -132,36 +138,35 @@ class IntroDbRepository(
         )
 
         runCatching {
-            val request = Request.Builder()
-                .url("$BASE_URL/submit")
-                .post(json.encodeToString(SubmitBody.serializer(), body).toRequestBody(JSON_MEDIA))
-                .header("Accept", "application/json")
-                .authorize(key)
-                .build()
-            client.newCall(request).execute().use { resp ->
-                val raw = resp.body?.string().orEmpty()
-                when {
-                    resp.isSuccessful -> null
-                    resp.code == 401 || resp.code == 403 -> SubmitError.UNAUTHORIZED
-                    resp.code == 429 -> SubmitError.RATE_LIMITED
-                    // Un signalement par type de segment et par épisode : le
-                    // second est refusé, et ce n'est pas une panne — l'interface
-                    // doit le dire autrement qu'avec une erreur.
-                    resp.code == 409 ||
-                        raw.contains("already", ignoreCase = true) -> SubmitError.ALREADY_SUBMITTED
-                    else -> SubmitError.REJECTED
-                }
+            val reponse = client.post("$BASE_URL/submit") {
+                contentType(ContentType.Application.Json)
+                setBody(json.encodeToString(SubmitBody.serializer(), body))
+                header("Accept", "application/json")
+                authorize(key)
+            }
+            val brut = reponse.bodyAsText()
+            val code = reponse.status.value
+            when {
+                reponse.status.isSuccess() -> null
+                code == 401 || code == 403 -> SubmitError.UNAUTHORIZED
+                code == 429 -> SubmitError.RATE_LIMITED
+                // Un signalement par type de segment et par épisode : le
+                // second est refusé, et ce n'est pas une panne — l'interface
+                // doit le dire autrement qu'avec une erreur.
+                code == 409 ||
+                    brut.contains("already", ignoreCase = true) -> SubmitError.ALREADY_SUBMITTED
+                else -> SubmitError.REJECTED
             }
         }.getOrElse { SubmitError.NETWORK }
     }
 
     private suspend fun apiKey(): String = settings.introDbApiKey.first().trim()
 
-    private fun Request.Builder.authorize(key: String): Request.Builder =
-        if (key.isBlank()) this else header("Authorization", "Bearer $key")
+    private fun HttpRequestBuilder.authorize(key: String) {
+        if (key.isNotBlank()) header("Authorization", "Bearer $key")
+    }
 
     private companion object {
         const val BASE_URL = "https://api.theintrodb.org/v3"
-        val JSON_MEDIA = "application/json".toMediaType()
     }
 }
