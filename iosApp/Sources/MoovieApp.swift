@@ -78,10 +78,14 @@ struct MoovieApp: App {
                 .compactMap({ $0 as? UIWindowScene })
                 .first else { return }
 
-            scene.windows.first?.rootViewController?
-                .setNeedsUpdateOfSupportedInterfaceOrientations()
-
             if #available(iOS 16.0, *) {
+                // Dans la branche, et non avant : cette méthode est elle-même
+                // iOS 16. Son équivalent d'avant est
+                // `attemptRotationToDeviceOrientation`, plus bas — les deux
+                // disent la même chose au système, « relis le masque
+                // maintenant », mais aucune n'existe des deux côtés.
+                scene.windows.first?.rootViewController?
+                    .setNeedsUpdateOfSupportedInterfaceOrientations()
                 scene.requestGeometryUpdate(
                     .iOS(interfaceOrientations: masque)
                 ) { _ in
