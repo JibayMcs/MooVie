@@ -20,6 +20,9 @@ import platform.CoreImage.CIImage
 import platform.CoreImage.filterWithName
 import platform.CoreImage.createCGImage
 import platform.Foundation.NSData
+// Même raison que `filterWithName` : `setValue:forKey:` est du KVC, déclaré
+// dans une catégorie de NSObject, donc exposé en extension.
+import platform.Foundation.setValue
 import platform.Foundation.NSString
 import platform.Foundation.create
 import platform.Foundation.dataUsingEncoding
