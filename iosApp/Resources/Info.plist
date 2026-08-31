@@ -44,8 +44,25 @@
 	     désigner. -->
 	<key>CFBundleIconName</key>
 	<string>AppIcon</string>
+	<!-- L'écran de lancement, que le système affiche avant la première image
+	     de Compose. Un dictionnaire vide donnait du blanc : l'ouverture
+	     éclatait donc en blanc avant de basculer sur le fond sombre. La couleur
+	     vient du catalogue d'assets, seule façon d'en désigner une ici. -->
 	<key>UILaunchScreen</key>
-	<dict/>
+	<dict>
+		<key>UIColorName</key>
+		<string>LaunchBackground</string>
+	</dict>
+
+	<!-- L'application est sombre, et seulement sombre — la palette de
+	     `MooVieTheme` est un `darkColorScheme` fixe, sans variante claire. Le
+	     déclarer au système fait deux choses qu'on aurait dû demander
+	     séparément : l'heure et les indicateurs de la barre d'état passent en
+	     clair (ils étaient noirs sur fond noir, donc invisibles), et les
+	     claviers et menus du système s'affichent sombres au lieu de trancher
+	     en blanc au milieu d'un écran de réglages. -->
+	<key>UIUserInterfaceStyle</key>
+	<string>Dark</string>
 	<!-- **La clé qui manquait, et qui fermait l'application au lancement.**
 
 	     Compose Multiplatform vérifie sa présence au démarrage

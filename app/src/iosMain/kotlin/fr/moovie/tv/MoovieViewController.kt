@@ -1,9 +1,17 @@
 package fr.moovie.tv
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.window.ComposeUIViewController
 import androidx.lifecycle.viewmodel.compose.viewModel
 import fr.moovie.tv.data.net.Connectivity
@@ -81,15 +89,47 @@ private fun RacineMoovie() {
 
     MooVieTheme {
         AdaptiveRoot(flavor = UiFlavor.TOUCH) {
-            val nav = rememberNavStack(Screen.Home)
+            // Deux corrections tenues par un seul `Column`, dans cet ordre
+            // précis. Android et desktop ont le même, aux mêmes fins.
+            //
+            // **Le fond.** `MooVieTheme` ne fait que déclarer une palette :
+            // `MaterialTheme` ne peint rien de lui-même, et sans `Surface`
+            // parent la vue reste de la couleur du système — blanche sur iOS.
+            // Les écrans peignaient chacun le leur, ce qui laissait tout le
+            // reste — encoche comprise — en blanc.
+            //
+            // **Les encoches.** `MoovieApp.swift` passe `ignoresSafeArea(.all)`
+            // pour que le lecteur puisse occuper la dalle entière, et disait que
+            // Compose se chargeait des encoches. Il ne s'en chargeait pas : rien
+            // dans le code partagé ne pose d'insets, parce qu'Android n'en a pas
+            // besoin — le système y réserve déjà la place sous la barre d'état.
+            // Le haut des pages passait donc sous la Dynamic Island.
+            //
+            // L'ordre compte : le fond est peint **avant** le retrait, si bien
+            // qu'il couvre aussi la zone de l'encoche — sinon on aurait
+            // remplacé du texte illisible par une bande blanche.
+            //
+            // `safeDrawing` et non `statusBars` seuls : en paysage, l'encoche
+            // mange un bord latéral, et l'indicateur d'accueil borde le bas.
+            // `windowInsetsPadding` **consomme** ce qu'il applique, si bien que
+            // le `navigationBarsPadding()` de MoovieBottomBar n'ajoute rien
+            // par-dessus — pas de double marge.
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color(0xFF0A0A0A))
+                    .windowInsetsPadding(WindowInsets.safeDrawing),
+            ) {
+                val nav = rememberNavStack(Screen.Home)
 
-            when (nav.current) {
-                Screen.Settings -> SettingsScreen(onBack = { nav.pop() })
+                when (nav.current) {
+                    Screen.Settings -> SettingsScreen(onBack = { nav.pop() })
 
-                // Tout le reste retombe sur l'accueil : c'est la seule autre
-                // destination atteignable pour l'instant, et rien ne pousse les
-                // autres. Voir le KDoc ci-dessus.
-                else -> AccueilMoovie(onOpenSettings = { nav.push(Screen.Settings) })
+                    // Tout le reste retombe sur l'accueil : c'est la seule
+                    // autre destination atteignable pour l'instant, et rien ne
+                    // pousse les autres. Voir le KDoc ci-dessus.
+                    else -> AccueilMoovie(onOpenSettings = { nav.push(Screen.Settings) })
+                }
             }
         }
     }
