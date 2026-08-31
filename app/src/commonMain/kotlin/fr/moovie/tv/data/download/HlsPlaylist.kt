@@ -1,6 +1,6 @@
 package fr.moovie.tv.data.download
 
-import java.net.URI
+import fr.moovie.tv.data.sources.resoudreRelatif
 
 /**
  * Une ressource distante et le nom qu'elle portera sur le disque.
@@ -99,7 +99,10 @@ object HlsPlaylist {
                 line.startsWith("#") -> raw
 
                 else -> {
-                    val name = "seg%05d%s".format(segments++, extensionOf(line))
+                    // `String.format` est propre à la JVM. `padStart` donne le
+                    // même « seg00042.ts » : le compteur est toujours positif,
+                    // seul cas où les deux diffèrent.
+                    val name = "seg${(segments++).toString().padStart(5, '0')}${extensionOf(line)}"
                     resources += HlsResource(resolve(baseUrl, line), name)
                     name
                 }
@@ -134,5 +137,5 @@ object HlsPlaylist {
      * faire tomber tout le téléchargement pour un segment mal formé.
      */
     private fun resolve(baseUrl: String, reference: String): String =
-        runCatching { URI(baseUrl).resolve(reference).toString() }.getOrElse { reference }
+        resoudreRelatif(baseUrl, reference) ?: reference
 }

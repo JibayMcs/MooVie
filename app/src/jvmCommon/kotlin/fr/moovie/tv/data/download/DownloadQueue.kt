@@ -10,7 +10,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import java.util.concurrent.ConcurrentHashMap
+import fr.moovie.tv.shared.Verrou
+import fr.moovie.tv.shared.avec
 
 /**
  * La file des téléchargements.
@@ -29,7 +30,11 @@ object DownloadQueue {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val serial = Mutex()
-    private val jobs = ConcurrentHashMap<String, Job>()
+    // `ConcurrentHashMap` n'existe pas en commun. Une carte ordinaire gardée
+    // par un verrou donne la même garantie ici : toutes les manipulations de
+    // `jobs` passent par les quelques lignes ci-dessous.
+    private val verrou = Verrou()
+    private val jobs = mutableMapOf<String, Job>()
 
     private val repo = DownloadRepository()
     private val engine by lazy {
@@ -41,28 +46,35 @@ object DownloadQueue {
     }
 
     /** Les titres en cours ou en attente, pour griser un bouton. */
-    val active: Set<String> get() = jobs.keys
+    val active: Set<String> get() = verrou.avec { jobs.keys.toSet() }
 
     /**
      * Met un titre en file. Sans effet s'il y est déjà — appuyer deux fois sur
      * « Télécharger » ne doit pas lancer deux fois la même chose.
      */
     fun enqueue(download: Download, stream: PlayableStream) {
-        if (jobs.containsKey(download.key)) return
+        if (verrou.avec { jobs.containsKey(download.key) }) return
         // Avant de lancer quoi que ce soit : sans premier plan, Android tue ce
         // processus au premier passage en arrière-plan et le téléchargement
         // meurt en silence.
         DownloadForeground.start()
         val queued = download.copy(state = DownloadState.QUEUED, error = null)
-        jobs[download.key] = scope.launch {
-            repo.put(queued)
-            try {
-                serial.withLock { run(queued, stream) }
-            } finally {
-                jobs.remove(download.key)
-                // Dernier travail terminé : on rend la main, ce qui retire
-                // aussi la notification. Rien ne doit rester dans le volet.
-                if (jobs.isEmpty()) DownloadForeground.stop()
+        // L'enregistrement se fait **sous le verrou et autour du lancement**,
+        // comme l'affectation d'origine le faisait implicitement : la coroutine
+        // démarre aussitôt, et si elle se terminait avant qu'on ait noté sa
+        // référence, le retrait ne trouverait rien à retirer et l'entrée
+        // resterait pour toujours — un titre impossible à relancer.
+        verrou.avec {
+            jobs[download.key] = scope.launch {
+                repo.put(queued)
+                try {
+                    serial.withLock { run(queued, stream) }
+                } finally {
+                    verrou.avec { jobs.remove(download.key) }
+                    // Dernier travail terminé : on rend la main, ce qui retire
+                    // aussi la notification. Rien ne doit rester dans le volet.
+                    if (verrou.avec { jobs.isEmpty() }) DownloadForeground.stop()
+                }
             }
         }
     }
@@ -84,7 +96,7 @@ object DownloadQueue {
 
     /** Interrompt sans effacer : ce qui est téléchargé reste, la reprise s'en sert. */
     fun pause(key: String) {
-        jobs.remove(key)?.cancel()
+        verrou.avec { jobs.remove(key) }?.cancel()
     }
 
     /** Interrompt **et** efface. Le seul chemin qui perd des octets. */
