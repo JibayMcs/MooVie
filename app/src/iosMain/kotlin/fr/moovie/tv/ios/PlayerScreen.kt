@@ -1,5 +1,10 @@
 package fr.moovie.tv.ios
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -295,16 +300,40 @@ internal fun IosPlayerScreen(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+    // Pas de fond peint ici : `UIKitView` découpe un trou dans la composition
+    // pour y laisser voir la vue native, et chaque aplat opaque posé par-dessus
+    // est une occasion de le recouvrir. La vue native peint son propre noir —
+    // y compris les bandes que laisse le respect des proportions.
+    Box(modifier = Modifier.fillMaxSize()) {
         surface(Modifier.fillMaxSize())
 
-        if (controlsVisible) {
-            PlayerTitleOverlay(
-                title = title,
-                subtitle = subtitle,
-                modifier = Modifier.align(Alignment.TopStart).padding(16.dp),
-            )
+        // **Chaque couche porte son alignement, et la barre n'en a pas d'elle-même.**
+        //
+        // `PlayerControlBar` est un `Column(fillMaxWidth)` dont le dégradé va du
+        // transparent au noir vers le bas : elle est faite pour être posée en
+        // bas de l'écran, mais n'expose aucun `modifier` pour le dire. Sans
+        // enveloppe alignée, un `Box` la place en haut à gauche — elle recouvrait
+        // alors le titre et assombrissait le haut de l'image, ce qui donnait un
+        // lecteur dont tout se tassait sous l'encoche.
+        //
+        // Android et le desktop l'enveloppent tous deux dans une
+        // `AnimatedVisibility` alignée ; on fait pareil, ce qui rend au passage
+        // le glissement d'apparition qu'ils ont et que ce lecteur n'avait pas.
+        AnimatedVisibility(
+            visible = controlsVisible,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.align(Alignment.TopCenter),
+        ) {
+            PlayerTitleOverlay(title = title, subtitle = subtitle)
+        }
 
+        AnimatedVisibility(
+            visible = controlsVisible,
+            enter = fadeIn() + slideInVertically(initialOffsetY = { it }),
+            exit = fadeOut() + slideOutVertically(targetOffsetY = { it }),
+            modifier = Modifier.align(Alignment.BottomCenter),
+        ) {
             PlayerControlBar(
                 isPlaying = isPlaying,
                 positionMs = scrubTargetMs ?: timeMs,
