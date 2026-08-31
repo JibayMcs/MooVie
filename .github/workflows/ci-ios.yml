@@ -51,19 +51,43 @@ jobs:
         working-directory: iosApp
         run: xcodegen generate
 
-      # Compilation seule, sans archive ni empaquetage : on cherche à savoir si
-      # le Swift et le lien avec le framework tiennent, pas à produire un .ipa.
-      - name: Compiler l'application iOS
+      # Build **appareil**, pas simulateur : c'est celui qui donne un binaire
+      # installable sur un iPhone. Le simulateur a déjà été couvert par le lien
+      # du framework juste au-dessus.
+      - name: Construire l'application iOS
         run: |
           xcodebuild build \
             -project iosApp/Moovie.xcodeproj \
             -scheme Moovie \
             -configuration Debug \
-            -sdk iphonesimulator \
-            -destination 'generic/platform=iOS Simulator' \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build/dd \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY=""
+
+      # Un .ipa est un zip dont le seul contenu obligatoire est `Payload/<app>`.
+      # Non signé : SideStore resigne à l'installation avec le certificat de
+      # l'utilisateur.
+      - name: Empaqueter le .ipa
+        run: |
+          set -e
+          app=$(find build/dd/Build/Products -maxdepth 2 -name '*.app' | head -1)
+          [ -n "$app" ] || { echo "aucun .app produit"; exit 1; }
+          mkdir -p Payload
+          cp -R "$app" Payload/
+          zip -qry "moovie-${GITHUB_SHA:0:7}.ipa" Payload
+          ls -lh moovie-*.ipa
+
+      # Artefact de branche, pas de release : il sert à essayer sur un vrai
+      # appareil sans taguer une version. Sept jours suffisent largement.
+      - name: Publier le .ipa en artefact
+        uses: actions/upload-artifact@v4
+        with:
+          name: moovie-ipa
+          path: moovie-*.ipa
+          retention-days: 7
 
       # Le reste du projet ne doit pas régresser pendant le portage. Ces deux
       # cibles se compilent aussi sur macOS, autant les couvrir ici plutôt que
