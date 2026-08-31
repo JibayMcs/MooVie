@@ -1,4 +1,4 @@
-package fr.moovie.tv.data.trailer
+package fr.moovie.tv.shared
 
 /**
  * Encode un chemin absolu pour la partie chemin d'une URI `file://`, comme le
@@ -20,7 +20,7 @@ package fr.moovie.tv.data.trailer
  * `UriFichierTest` compare cette fonction à `File.toURI().rawPath` sur les
  * chemins qui posent problème.
  */
-internal fun enCheminUri(chemin: String): String = buildString(chemin.length) {
+fun enCheminUri(chemin: String): String = buildString(chemin.length) {
     // Parcours par **caractère** et non par octet : parcourir les octets UTF-8
     // et les rendre un à un comme des Char reconstruit chaque séquence
     // multi-octets en autant de caractères Latin-1, et « é » ressort en « Ã© ».

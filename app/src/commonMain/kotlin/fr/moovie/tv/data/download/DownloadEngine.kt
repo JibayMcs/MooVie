@@ -2,8 +2,11 @@ package fr.moovie.tv.data.download
 
 import fr.moovie.tv.core.sources.model.PlayableStream
 import fr.moovie.tv.core.sources.model.StreamFormat
-import java.io.File
-import java.net.URI
+import fr.moovie.tv.shared.enCheminUri
+import fr.moovie.tv.shared.maintenantMs
+import fr.moovie.tv.shared.espaceLibre
+import fr.moovie.tv.shared.systemeFichiers
+import okio.Path
 
 /**
  * Port de récupération d'octets.
@@ -31,7 +34,7 @@ interface ByteFetcher {
     suspend fun fetch(
         url: String,
         headers: Map<String, String>,
-        target: File,
+        target: Path,
         onProgress: suspend (recus: Long, total: Long) -> Unit = { _, _ -> },
     ): Long
 }
@@ -85,16 +88,16 @@ class DownloadEngine(
      * Où poser les fichiers. Injecté pour que les tests n'écrivent pas dans le
      * dossier de données de la personne qui lance la suite.
      */
-    private val dirFor: (String) -> File = ::downloadDir,
+    private val dirFor: (String) -> Path = ::downloadDir,
     /**
      * Espace libre du volume qui reçoit les fichiers. Injecté pour la même
      * raison que [dirFor] : un test ne peut pas remplir un vrai disque.
      */
-    private val freeSpace: (File) -> Long = { it.usableSpace },
+    private val freeSpace: (Path) -> Long = ::espaceLibre,
 ) {
 
     suspend fun run(download: Download, stream: PlayableStream): DownloadOutcome {
-        val dir = dirFor(download.key).also { it.mkdirs() }
+        val dir = dirFor(download.key).also(systemeFichiers::createDirectories)
         // Avant d'ouvrir quoi que ce soit : commencer pour s'arrêter à mi-course
         // laisse des octets qui ne serviront jamais, sur un disque qui manque
         // déjà de place.
@@ -133,9 +136,9 @@ class DownloadEngine(
     private suspend fun direct(
         download: Download,
         stream: PlayableStream,
-        dir: File,
+        dir: Path,
     ): DownloadOutcome {
-        val target = File(dir, "video.mp4")
+        val target = dir / "video.mp4"
         publish(download.copy(state = DownloadState.RUNNING, totalSegments = 1, doneSegments = 0))
 
         // Rendu compte pendant le transfert, et **espacé dans le temps** : la
@@ -145,7 +148,7 @@ class DownloadEngine(
         // laisse le magasin tranquille.
         var dernierePublication = 0L
         val bytes = fetchResilient(download, stream, stream.url, target) { recus, total ->
-            val maintenant = System.currentTimeMillis()
+            val maintenant = maintenantMs()
             if (maintenant - dernierePublication >= PROGRESS_INTERVAL_MS) {
                 dernierePublication = maintenant
                 publish(
@@ -174,7 +177,7 @@ class DownloadEngine(
     private suspend fun hls(
         download: Download,
         stream: PlayableStream,
-        dir: File,
+        dir: Path,
     ): DownloadOutcome {
         var source = stream
         var playlistText = fetchText(source, source.url)
@@ -191,7 +194,7 @@ class DownloadEngine(
         val local = HlsPlaylist.localize(playlistText, playlistUrl)
         if (local.resources.isEmpty()) return DownloadOutcome.Failed("Playlist sans segment")
 
-        File(dir, PLAYLIST_NAME).writeText(local.text)
+        systemeFichiers.write(dir / PLAYLIST_NAME) { writeUtf8(local.text) }
 
         var done = 0
         var bytes = 0L
@@ -204,10 +207,11 @@ class DownloadEngine(
         )
 
         for (resource in local.resources) {
-            val target = File(dir, resource.localName)
+            val target = dir / resource.localName
             // Le disque est l'état : ce qui est déjà là ne se retélécharge pas.
-            bytes += if (target.length() > 0) {
-                target.length()
+            val dejaLa = systemeFichiers.metadataOrNull(target)?.size ?: 0L
+            bytes += if (dejaLa > 0) {
+                dejaLa
             } else {
                 fetchResilient(download, source, resource.url, target)
             }
@@ -265,7 +269,7 @@ class DownloadEngine(
         download: Download,
         stream: PlayableStream,
         url: String,
-        target: File,
+        target: Path,
         onProgress: suspend (recus: Long, total: Long) -> Unit = { _, _ -> },
     ): Long = try {
         fetcher.fetch(url, stream.headers, target, onProgress)
@@ -278,13 +282,21 @@ class DownloadEngine(
         fetcher.fetch(url, fresh.headers, target, onProgress)
     }
 
+    /**
+     * Le fichier temporaire vit dans le répertoire des téléchargements et non
+     * dans celui du système : `File.createTempFile` n'a pas d'équivalent commun,
+     * et surtout le temporaire doit être sur **le même volume** que sa
+     * destination éventuelle — c'est ce qui rend un déplacement atomique
+     * possible plutôt qu'une recopie.
+     */
     private suspend fun fetchText(stream: PlayableStream, url: String): String {
-        val temp = File.createTempFile("moovie-playlist", ".m3u8")
+        val racine = moovieDownloadsDir().also(systemeFichiers::createDirectories)
+        val temp = racine / "playlist-${url.hashCode().toUInt().toString(16)}.m3u8"
         return try {
             fetcher.fetch(url, stream.headers, temp)
-            temp.readText()
+            systemeFichiers.read(temp) { readUtf8() }
         } finally {
-            temp.delete()
+            runCatching { systemeFichiers.delete(temp) }
         }
     }
 
@@ -304,7 +316,7 @@ class DownloadEngine(
      * Une erreur de lecture ne bloque pas : mieux vaut tenter et échouer sur
      * l'écriture que refuser un téléchargement parfaitement possible.
      */
-    private fun diskFull(dir: File): Boolean {
+    private fun diskFull(dir: Path): Boolean {
         val free = runCatching { freeSpace(dir) }.getOrDefault(Long.MAX_VALUE)
         return free < MIN_FREE_BYTES
     }
@@ -336,12 +348,12 @@ class DownloadEngine(
 const val PLAYLIST_NAME = "stream.m3u8"
 
 /** Le fichier à lire pour un titre téléchargé, ou null s'il n'est pas complet. */
-fun playableFile(key: String): File? {
+fun playableFile(key: String): Path? {
     val dir = downloadDir(key)
-    val playlist = File(dir, PLAYLIST_NAME)
-    if (playlist.exists()) return playlist
-    val mp4 = File(dir, "video.mp4")
-    return mp4.takeIf { it.length() > 0 }
+    val playlist = dir / PLAYLIST_NAME
+    if (systemeFichiers.exists(playlist)) return playlist
+    val mp4 = dir / "video.mp4"
+    return mp4.takeIf { (systemeFichiers.metadataOrNull(it)?.size ?: 0L) > 0L }
 }
 
 /**
@@ -375,11 +387,9 @@ fun localStream(key: String): PlayableStream? {
  *
  *     .../Moo-vie/app/file:/home/…/downloads/tv_108978_s2e3/stream.m3u8
  *
- * On reconstruit donc l'URI avec une autorité vide, ce qui donne
- * `file:///home/…`. Passer par `uri.path` plutôt que par `absolutePath` garde
- * l'échappement et le cas Windows, où le chemin devient `/C:/…`.
+ * On préfixe donc explicitement `file://`, ce qui donne `file:///home/…`.
+ * `enCheminUri` reproduit l'échappement de `URI.rawPath` — non-ASCII laissés
+ * intacts, ASCII interdits cités — et il est comparé à lui dans
+ * `UriFichierTest`.
  */
-internal fun fileUrl(file: File): String {
-    val uri = file.toURI()
-    return URI(uri.scheme, "", uri.path, null).toString()
-}
+internal fun fileUrl(file: Path): String = "file://" + enCheminUri(file.toString())

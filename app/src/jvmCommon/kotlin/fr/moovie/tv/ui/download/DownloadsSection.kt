@@ -13,8 +13,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.TextStyle
 import fr.moovie.tv.data.download.downloadPoster
 import fr.moovie.tv.data.download.fetchDownloadPoster
-import java.io.File
-import okio.Path.Companion.toOkioPath
+import okio.Path
 import fr.moovie.tv.ui.components.MoovieAsyncImage
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -343,7 +342,7 @@ private fun Affiche(download: Download, modifier: Modifier = Modifier) {
     // `produceState` plutôt qu'un simple `remember` : les titres téléchargés
     // avant cette version n'ont pas d'affiche sur le disque, et c'est ici qu'on
     // la rattrape — une fois, sans bloquer le rendu. Voir fetchDownloadPoster.
-    val fichier by produceState<File?>(null, download.key) {
+    val fichier by produceState<Path?>(null, download.key) {
         value = downloadPoster(download.key)
             ?: withContext(Dispatchers.IO) {
                 fetchDownloadPoster(
@@ -358,8 +357,9 @@ private fun Affiche(download: Download, modifier: Modifier = Modifier) {
     // **propre à Android** chez Coil. Sur desktop le modèle n'était résolu par
     // personne, et la carte restait sans image sans que rien ne le signale —
     // une bibliothèque hors ligne illustrée d'un seul côté. `Path` est le
-    // chemin que les deux plateformes comprennent.
-    val image = fichier?.toOkioPath() ?: return
+    // chemin que les deux plateformes comprennent — et c'est désormais le type
+    // que le stockage rend directement, la conversion a disparu.
+    val image = fichier ?: return
     // Une bande pleine hauteur, et non une vignette posée en haut.
     //
     // Le cadre carré précédent laissait du vide sous l'image dès que la carte

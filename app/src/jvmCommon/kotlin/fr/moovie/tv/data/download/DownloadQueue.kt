@@ -39,7 +39,7 @@ object DownloadQueue {
     private val repo = DownloadRepository()
     private val engine by lazy {
         DownloadEngine(
-            fetcher = OkHttpByteFetcher(),
+            fetcher = ByteFetcherKtor(),
             progress = { repo.put(it) },
             resolver = ExtractorStreamResolver(repo),
         )

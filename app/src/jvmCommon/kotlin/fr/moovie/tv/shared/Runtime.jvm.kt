@@ -22,3 +22,6 @@ actual fun dechiffrerAesCbc(donnees: ByteArray, cle: ByteArray, iv: ByteArray): 
 actual fun enNfd(s: String): String = Normalizer.normalize(s, Normalizer.Form.NFD)
 
 actual fun genererUuid(): String = UUID.randomUUID().toString()
+
+actual fun espaceLibre(chemin: okio.Path): Long =
+    runCatching { chemin.toFile().usableSpace }.getOrDefault(Long.MAX_VALUE)

@@ -83,3 +83,20 @@ actual fun enNfd(s: String): String = (s as NSString).decomposedStringWithCanoni
  * finirait par se comparer à travers une synchronisation.
  */
 actual fun genererUuid(): String = NSUUID().UUIDString.lowercase()
+
+/**
+ * `NSURLVolumeAvailableCapacityForImportantUsageKey` et non
+ * `systemFreeSize` : sur iOS, le second annonce l'espace brut alors que le
+ * système peut en libérer davantage en purgeant ce qui est reconstructible.
+ * C'est la clé qu'Apple recommande précisément pour décider si un
+ * téléchargement volumineux tient.
+ */
+actual fun espaceLibre(chemin: okio.Path): Long = runCatching {
+    val url = platform.Foundation.NSURL.fileURLWithPath(chemin.toString())
+    val valeurs = url.resourceValuesForKeys(
+        listOf(platform.Foundation.NSURLVolumeAvailableCapacityForImportantUsageKey),
+        null,
+    )
+    (valeurs?.values?.firstOrNull() as? platform.Foundation.NSNumber)?.longLongValue
+        ?: Long.MAX_VALUE
+}.getOrDefault(Long.MAX_VALUE)

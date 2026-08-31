@@ -57,3 +57,13 @@ expect fun enNfd(s: String): String
  * `NSUUID` n'ont d'équivalent commun, mais les deux rendent la même forme.
  */
 expect fun genererUuid(): String
+
+/**
+ * Octets libres sur le volume qui contient ce chemin.
+ *
+ * Sert à refuser un téléchargement avant de le commencer plutôt qu'à le voir
+ * s'arrêter sans un mot au milieu. Rend [Long.MAX_VALUE] si la mesure échoue :
+ * mieux vaut tenter et échouer sur l'écriture que refuser un téléchargement
+ * parfaitement possible.
+ */
+expect fun espaceLibre(chemin: okio.Path): Long

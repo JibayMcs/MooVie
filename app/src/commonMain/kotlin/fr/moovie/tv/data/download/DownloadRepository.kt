@@ -1,5 +1,6 @@
 package fr.moovie.tv.data.download
 
+import fr.moovie.tv.shared.systemeFichiers
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import fr.moovie.tv.data.store.preferencesStore
@@ -45,7 +46,7 @@ class DownloadRepository {
      */
     suspend fun remove(key: String) {
         store.edit { it.remove(keyOf(key)) }
-        runCatching { downloadDir(key).deleteRecursively() }
+        runCatching { systemeFichiers.deleteRecursively(downloadDir(key)) }
     }
 
     /**
@@ -57,9 +58,15 @@ class DownloadRepository {
      * le chiffre doit être juste.
      */
     fun bytesOnDisk(): Long = moovieDownloadsDir()
-        .walkBottomUp()
-        .filter { it.isFile }
-        .sumOf { it.length() }
+        // `listRecursively` remplace `walkBottomUp` : l'ordre n'importe pas
+        // pour une somme, seule la couverture compte.
+        .let { racine ->
+            if (systemeFichiers.metadataOrNull(racine)?.isDirectory != true) return 0L
+            systemeFichiers.listRecursively(racine)
+                .mapNotNull { systemeFichiers.metadataOrNull(it) }
+                .filter { it.isRegularFile }
+                .sumOf { it.size ?: 0L }
+        }
 
     private fun keyOf(mediaKey: String) = stringPreferencesKey(PREFIX + mediaKey)
 

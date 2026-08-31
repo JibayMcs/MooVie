@@ -52,11 +52,12 @@ data class StorageUsage(
  * Un volume qui ne répond pas rend 0, et la barre disparaît plutôt que de
  * dessiner un disque vide.
  */
-fun storageUsage(dir: File, mine: Long): StorageUsage = runCatching {
+fun storageUsage(dir: okio.Path, mine: Long): StorageUsage = runCatching {
+    val volume = dir.toFile()
     StorageUsage(
-        total = dir.totalSpace,
-        free = dir.usableSpace,
-        mine = mine.coerceIn(0L, dir.totalSpace),
+        total = volume.totalSpace,
+        free = volume.usableSpace,
+        mine = mine.coerceIn(0L, volume.totalSpace),
     )
 }.getOrDefault(StorageUsage(0L, 0L, mine))
 

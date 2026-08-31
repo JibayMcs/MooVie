@@ -3,7 +3,10 @@ package fr.moovie.tv.data.download
 import fr.moovie.tv.data.settings.SettingsRepository
 import fr.moovie.tv.data.tmdb.TmdbRepository
 import kotlinx.coroutines.flow.first
-import java.io.File
+import fr.moovie.tv.shared.systemeFichiers
+import okio.FileSystem
+import okio.Path
+import okio.Path.Companion.toPath
 
 /**
  * Racine des téléchargements.
@@ -20,10 +23,15 @@ import java.io.File
  * la mémoire interne d'une box est souvent de huit gigaoctets, on y tiendrait
  * deux films.
  */
-expect fun moovieDownloadsDir(): File
+expect fun moovieDownloadsChemin(): String
+
+/** Racine des téléchargements, en chemin okio. */
+fun moovieDownloadsDir(): Path = moovieDownloadsChemin().toPath()
+
+private val fs: FileSystem get() = systemeFichiers
 
 /** Dossier d'un téléchargement : ses segments, sa playlist et sa fiche. */
-fun downloadDir(key: String): File = File(moovieDownloadsDir(), safeName(key))
+fun downloadDir(key: String): Path = moovieDownloadsDir() / safeName(key)
 
 /**
  * Nom de l'affiche, rangée dans le dossier du titre.
@@ -55,8 +63,10 @@ private const val POSTER_NAME = "poster-2x3.jpg"
  * titres téléchargés avant cette version n'en ont pas — ils restent lisibles,
  * sans vignette.
  */
-fun downloadPoster(key: String): File? =
-    File(downloadDir(key), POSTER_NAME).takeIf { it.isFile && it.length() > 0 }
+fun downloadPoster(key: String): Path? = (downloadDir(key) / POSTER_NAME).takeIf { chemin ->
+    val meta = fs.metadataOrNull(chemin)
+    meta?.isRegularFile == true && (meta.size ?: 0L) > 0L
+}
 
 /**
  * Récupère l'affiche manquante d'un titre déjà téléchargé, et la rend.
@@ -77,21 +87,21 @@ suspend fun fetchDownloadPoster(
     tmdbId: Int,
     isTv: Boolean,
     imageUrl: String? = null,
-): File? {
+): Path? {
     downloadPoster(key)?.let { return it }
     val dir = downloadDir(key)
-    if (!dir.isDirectory) return null
+    if (fs.metadataOrNull(dir)?.isDirectory != true) return null
     val url = posterUrlOf(tmdbId, isTv) ?: imageUrl?.takeIf { it.isNotBlank() } ?: return null
-    val cible = File(dir, POSTER_NAME)
+    val cible = dir / POSTER_NAME
     return runCatching {
-        OkHttpByteFetcher().fetch(url, emptyMap(), cible)
-        cible.takeIf { it.isFile && it.length() > 0 }
+        ByteFetcherKtor().fetch(url, emptyMap(), cible)
+        downloadPoster(key)
             // L'image de la première version, devenue inutile : quelques dizaines
             // de kilo-octets, mais sur une bibliothèque de cent titres c'est un
             // ménage qui vaut la ligne.
-            ?.also { runCatching { File(dir, "poster.jpg").delete() } }
+            ?.also { runCatching { fs.delete(dir / "poster.jpg") } }
     }.getOrElse {
-        runCatching { cible.delete() }
+        runCatching { fs.delete(cible) }
         null
     }
 }

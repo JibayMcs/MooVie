@@ -1,4 +1,4 @@
-package fr.moovie.tv.data.trailer
+package fr.moovie.tv.shared
 
 import java.io.File
 import kotlin.test.Test
