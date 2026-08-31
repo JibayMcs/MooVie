@@ -1,11 +1,11 @@
 package fr.moovie.tv.ui.format
 
-import java.time.LocalDate
-import java.time.chrono.IsoChronology
-import java.time.format.DateTimeFormatter
-import java.time.format.DateTimeFormatterBuilder
-import java.time.format.FormatStyle
-import java.util.Locale
+import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
+import kotlinx.datetime.todayIn
 
 /**
  * Date TMDB (`2013-04-07`) rendue dans la langue de l'app : `07/04/2013` en
@@ -14,10 +14,11 @@ import java.util.Locale
  * TMDB rend toujours de l'ISO ; l'afficher tel quel donnait une date qu'aucun
  * francophone ne lit dans ce sens.
  *
- * La locale n'a pas à être passée : sur Android, `LocaleManager` appelle
- * `Locale.setDefault()` avec la langue choisie dans les réglages avant que la
- * moindre UI soit construite ; sur desktop c'est la locale système. Les deux
- * plateformes convergent donc sur `Locale.getDefault()`.
+ * La locale n'a pas à être passée : chaque plateforme sait la sienne. Sur
+ * Android, `LocaleManager` appelle `Locale.setDefault()` avec la langue choisie
+ * dans les réglages avant que la moindre UI soit construite ; sur desktop c'est
+ * la locale système ; sur iOS, `NSDateFormatter` suit les réglages de
+ * l'appareil. Voir les `actual` de [formaterDateCourte].
  *
  * Le motif vient de la locale (ordre jour/mois propre à chaque langue) mais
  * l'année est forcée sur quatre chiffres : le format court américain donne
@@ -32,7 +33,7 @@ fun formatMediaDate(raw: String?): String? {
     if (YEAR_ONLY.matches(value)) return value
 
     val date = runCatching { LocalDate.parse(value) }.getOrNull() ?: return value
-    return date.format(formatterFor(Locale.getDefault()))
+    return formaterDateCourte(date.year, date.monthNumber, date.dayOfMonth)
 }
 
 /** Année seule d'une date TMDB, ou la valeur telle quelle si illisible. */
@@ -45,20 +46,6 @@ fun mediaYear(raw: String?): String? {
 private val YEAR_ONLY = Regex("""\d{4}""")
 
 /**
- * Un formateur par locale — leur construction passe par une recherche de motif
- * localisé, inutile de la refaire à chaque date d'une liste d'épisodes.
- */
-private val formatters = mutableMapOf<Locale, DateTimeFormatter>()
-
-@Synchronized
-private fun formatterFor(locale: Locale): DateTimeFormatter = formatters.getOrPut(locale) {
-    val pattern = DateTimeFormatterBuilder
-        .getLocalizedDateTimePattern(FormatStyle.SHORT, null, IsoChronology.INSTANCE, locale)
-        .replace(Regex("y+"), "yyyy")
-    DateTimeFormatter.ofPattern(pattern, locale)
-}
-
-/**
  * Instant daté dans la langue de l'app : « 02/08/2026 · 14:30 ».
  *
  * Sert à l'aperçu d'une sauvegarde, où la date répond à la seule question qui
@@ -67,10 +54,10 @@ private fun formatterFor(locale: Locale): DateTimeFormatter = formatters.getOrPu
  */
 fun formatBackupDate(ms: Long): String {
     if (ms <= 0) return "—"
-    val locale = Locale.getDefault()
-    val moment = java.time.Instant.ofEpochMilli(ms).atZone(java.time.ZoneId.systemDefault())
-    val time = DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT).withLocale(locale).format(moment)
-    return "${formatterFor(locale).format(moment)} · $time"
+    val moment = Instant.fromEpochMilliseconds(ms)
+        .toLocalDateTime(TimeZone.currentSystemDefault())
+    val date = formaterDateCourte(moment.year, moment.monthNumber, moment.dayOfMonth)
+    return "$date · ${formaterHeureCourte(ms)}"
 }
 
 /**
@@ -81,16 +68,8 @@ fun formatBackupDate(ms: Long): String {
  * l'heure de mesure. La minute suffit — afficher les secondes obligerait à
  * recomposer le lecteur une fois par seconde pendant tout un film.
  */
-fun formatNowDateTime(nowMs: Long): String {
-    val locale = Locale.getDefault()
-    val moment = java.time.Instant.ofEpochMilli(nowMs)
-        .atZone(java.time.ZoneId.systemDefault())
-    val date = DateTimeFormatter.ofPattern("EEE d MMM", locale).format(moment)
-    val time = DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT)
-        .withLocale(locale)
-        .format(moment)
-    return "$date · $time"
-}
+fun formatNowDateTime(nowMs: Long): String =
+    "${formaterJourMoisAbrege(nowMs)} · ${formaterHeureCourte(nowMs)}"
 
 /**
  * La date d'un épisode **à venir**, formatée, ou null s'il est déjà sorti.
@@ -101,14 +80,31 @@ fun formatNowDateTime(nowMs: Long): String {
  * information utile à ce stade.
  *
  * Le jour même compte comme sorti : un épisode diffusé ce soir n'est pas
- * « prévu », il arrive. La comparaison se fait donc sur `isAfter`.
+ * « prévu », il arrive. La comparaison est donc stricte.
  *
- * `LocalDate.now()` sans fuseau explicite, volontairement : c'est la date du
- * calendrier de l'utilisateur qui décide de ce qui est « à venir » pour lui, pas
- * celle du diffuseur.
+ * Le fuseau est celui du système, volontairement : c'est la date du calendrier
+ * de l'utilisateur qui décide de ce qui est « à venir » pour lui, pas celle du
+ * diffuseur.
  */
 fun upcomingDate(raw: String?): String? {
     val value = raw?.trim()?.takeIf { it.isNotEmpty() } ?: return null
     val date = runCatching { LocalDate.parse(value) }.getOrNull() ?: return null
-    return if (date.isAfter(LocalDate.now())) formatMediaDate(value) else null
+    val aujourdHui = Clock.System.todayIn(TimeZone.currentSystemDefault())
+    return if (date > aujourdHui) formatMediaDate(value) else null
 }
+
+/**
+ * Date courte au motif de la locale, année sur quatre chiffres.
+ *
+ * `expect` parce que le motif lui-même — l'ordre jour/mois, les séparateurs —
+ * est une donnée de localisation que porte le système et qu'aucune
+ * bibliothèque multiplateforme n'embarque. kotlinx-datetime sait analyser et
+ * calculer des dates, il ne sait pas les présenter à un francophone.
+ */
+internal expect fun formaterDateCourte(annee: Int, mois: Int, jour: Int): String
+
+/** Heure au format court de la locale : « 14:30 », « 2:30 PM ». */
+internal expect fun formaterHeureCourte(epochMs: Long): String
+
+/** Jour de semaine, jour et mois abrégés : « sam. 1 août ». */
+internal expect fun formaterJourMoisAbrege(epochMs: Long): String

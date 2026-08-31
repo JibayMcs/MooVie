@@ -171,6 +171,11 @@ kotlin {
                 // ksoup : portage Kotlin/Multiplatform de jsoup, même API de
                 // sélection CSS. Remplace `org.jsoup`, qui est du Java pur.
                 implementation("com.fleeksoft.ksoup:ksoup:0.2.0")
+                // Dates : analyse ISO, calendrier local, arithmétique. Le
+                // *formatage localisé*, lui, reste en expect/actual — aucune
+                // bibliothèque multiplateforme ne connaît les motifs de date
+                // propres à chaque langue, seuls les OS les portent.
+                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.1")
             }
         }
 

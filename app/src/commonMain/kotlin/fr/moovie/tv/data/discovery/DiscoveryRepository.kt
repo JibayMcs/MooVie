@@ -17,7 +17,9 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-import java.time.LocalDate
+import kotlinx.datetime.Clock
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.todayIn
 import kotlin.random.Random
 
 /**
@@ -203,7 +205,10 @@ class DiscoveryRepository(
             liste.distinctBy { it.id to it.isTv }.forEach { item ->
                 val id = item.id to item.isTv
                 score[id] = (score[id] ?: 0) + 1
-                parId.putIfAbsent(id, item)
+                // `putIfAbsent` est une API Java 8 absente du commun ;
+                // `getOrPut` a la même sémantique — la première occurrence
+                // gagne, les suivantes ne remplacent pas.
+                parId.getOrPut(id) { item }
             }
         }
 
@@ -219,11 +224,14 @@ class DiscoveryRepository(
          * titre désigné une fois devant un titre désigné trois fois.
          */
         val des = Random(tirage)
+        // `toSortedMap` n'existe que sur la JVM (il rend une `TreeMap`). Trier
+        // les entrées du groupement par clé décroissante donne le même ordre de
+        // parcours, sans passer par une carte triée.
         val classes = score.entries
             .groupBy { it.value }
-            .toSortedMap(compareByDescending { it })
-            .values
-            .flatMap { paquet -> paquet.shuffled(des) }
+            .entries
+            .sortedByDescending { it.key }
+            .flatMap { (_, paquet) -> paquet.shuffled(des) }
             .mapNotNull { parId[it.key] }
 
         return groupe(
@@ -297,7 +305,10 @@ class DiscoveryRepository(
 
         if (ids.isEmpty()) return null
 
-        val aujourdhui = LocalDate.now().toString()
+        // `todayIn(fuseau système)` est le pendant exact de `LocalDate.now()` :
+        // la date du calendrier de l'utilisateur, et son `toString()` est de
+        // l'ISO comme celui de java.time.
+        val aujourdhui = Clock.System.todayIn(TimeZone.currentSystemDefault()).toString()
         val cartes = coroutineScope {
             ids.map { id ->
                 async { runCatching { tmdb.collection(apiKey, id) }.getOrNull() }
