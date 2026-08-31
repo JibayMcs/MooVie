@@ -46,6 +46,22 @@
 	<string>AppIcon</string>
 	<key>UILaunchScreen</key>
 	<dict/>
+	<!-- **La clé qui manquait, et qui fermait l'application au lancement.**
+
+	     Compose Multiplatform vérifie sa présence au démarrage
+	     (`PlistSanityCheck.performIfNeeded`) et lève une `IllegalStateException`
+	     si elle est absente. Sur Kotlin/Native une exception non rattrapée
+	     termine le processus : `abort()`, SIGABRT, l'app se ferme à l'instant
+	     où on l'ouvre — c'est exactement ce que montrait le journal de crash
+	     d'un iPhone 17.
+
+	     Ce qu'elle fait par ailleurs : sans elle, iOS plafonne à 60 Hz une
+	     application qui ne s'est pas déclarée, même sur un écran ProMotion à
+	     120 Hz. Compose rend dans sa propre couche Metal et veut la cadence
+	     complète ; d'où une vérification qui refuse de démarrer plutôt que de
+	     laisser passer une animation deux fois moins fluide sans un mot. -->
+	<key>CADisableMinimumFrameDurationOnPhone</key>
+	<true/>
 	<!-- `arm64` et surtout **pas** `armv7` : celui-ci est la capacité ARM 32
 	     bits, qu'un iPhone moderne — arm64 uniquement — ne satisfait pas. iOS
 	     refuse alors de lancer l'application, sans message : elle se ferme à
