@@ -26,7 +26,7 @@ targets:
         PRODUCT_NAME: Moo-vie
         INFOPLIST_FILE: Resources/Info.plist
         SWIFT_VERSION: "5.0"
-        # Le .ipa sort non signé : AltStore resigne à l'installation avec le
+        # Le .ipa sort non signé : SideStore resigne à l'installation avec le
         # certificat de développement de l'utilisateur. Voir le job `ipa` de
         # .github/workflows/release.yml.
         CODE_SIGNING_REQUIRED: "NO"

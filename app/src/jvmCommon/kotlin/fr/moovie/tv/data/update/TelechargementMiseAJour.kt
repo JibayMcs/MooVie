@@ -21,7 +21,7 @@ private val clientTelechargement = OkHttpClient()
  * (0..1). Renvoie true si le fichier est complet.
  *
  * **Côté JVM uniquement, et c'est structurel.** iOS n'a pas de mise à jour
- * intégrée : un `.ipa` sideloadé se réinstalle par AltStore, qui gère lui-même
+ * intégrée : un `.ipa` sideloadé se réinstalle par SideStore, qui gère lui-même
  * la vérification de version et le remplacement. Une app ne peut de toute façon
  * pas s'installer elle-même sur iOS. La *détection* de version, elle, reste
  * commune dans [UpdateRepository] — c'est du HTTP et de la comparaison semver,

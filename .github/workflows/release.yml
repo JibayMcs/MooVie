@@ -4,7 +4,8 @@ name: Release
 # (AppImage Linux, msi Windows, dmg macOS) + .ipa iOS non signé, sur la même
 # GitHub Release.
 # L'auto-updater in-app (Android et desktop) lit releases/latest. iOS n'en a
-# pas : un .ipa sideloadé se met à jour par AltStore, pas depuis l'app.
+# pas : une app iOS ne peut pas s'installer elle-même. La mise à jour y passe
+# par SideStore, qui lit la source JSON publiée à côté du .ipa.
 #
 # Un tag qui porte un suffixe semver de préversion — `v1.15.0-rc.1` — sort en
 # **pré-release**. C'est ce qui met une version à l'épreuve sans l'imposer :
@@ -281,14 +282,15 @@ jobs:
           # seul, qui protège les utilisateurs installés d'une bannière.
           make_latest: ${{ !contains(github.ref_name, '-') }}
 
-  # iOS : .ipa **non signé**, destiné au sideload par AltStore.
+  # iOS : .ipa **non signé**, destiné au sideload par SideStore.
   #
   # Non signé parce qu'une app d'extraction de sources ne passe pas la revue de
   # l'App Store : il n'y a pas de canal officiel à viser, et signer ici
   # supposerait un compte Apple Developer dont la clé privée vivrait dans les
-  # secrets du dépôt. AltStore resigne à l'installation avec le certificat de
+  # secrets du dépôt. SideStore resigne à l'installation avec le certificat de
   # l'utilisateur, ce qui est de toute façon la seule signature qui vaille sur
-  # son appareil.
+  # son appareil — et il sait la renouveler **depuis l'appareil**, là où
+  # AltStore exige un ordinateur sur le même réseau tous les sept jours.
   #
   # C'est le **seul endroit où le code Kotlin/Native est compilé** : la toolchain
   # Apple n'existe que sur macOS, un poste Linux ou Windows configure les cibles
@@ -354,10 +356,69 @@ jobs:
           zip -qry "moovie-${GITHUB_REF_NAME}.ipa" Payload
           ls -lh moovie-*.ipa
 
+      # Source SideStore : le seul mécanisme de mise à jour possible sur iOS.
+      #
+      # Une app iOS ne peut pas s'installer elle-même — c'est verrouillé par le
+      # système, pas une API manquante. L'updater intégré des autres
+      # plateformes n'a donc pas d'équivalent ici. Ce que sait faire SideStore,
+      # c'est interroger périodiquement une « source » : un JSON listant les
+      # versions et leurs URLs. L'utilisateur l'ajoute une fois, SideStore
+      # s'occupe du reste. Le format est celui d'AltStore, dont SideStore est un
+      # fork : la même source sert donc aux deux.
+      #
+      # L'URL de la source est **stable** parce que GitHub résout toujours
+      # `releases/latest/download/<asset>` vers la dernière release non
+      # préversion. Pas besoin d'une branche gh-pages ni d'un hébergement à
+      # côté : le fichier voyage avec le .ipa qu'il décrit.
+      - name: Construire la source SideStore
+        run: |
+          set -e
+          ipa=$(ls moovie-*.ipa | head -1)
+          version="${GITHUB_REF_NAME#v}"
+          taille=$(wc -c < "$ipa" | tr -d ' ')
+          base="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}"
+          # `date -u` et non la date du tag : c'est la date de publication que
+          # lit SideStore pour décider s'il a du neuf.
+          python3 - <<PYEOF > sidestore.json
+          import json, os, datetime
+          notes = os.environ.get("NOTES", "").strip() or "Voir les notes de version sur GitHub."
+          print(json.dumps({
+              "name": "Moo-vie",
+              "identifier": "fr.moovie.sidestore",
+              "apps": [{
+                  "name": "Moo-vie",
+                  "bundleIdentifier": "fr.moovie.tv",
+                  "developerName": "Moo-vie",
+                  "localizedDescription":
+                      "Streaming sur Android TV, Android, desktop et iOS, "
+                      "depuis une base de code Kotlin Multiplatform unique. "
+                      "L'extraction des sources tourne sur l'appareil : pas de "
+                      "serveur, pas de compte, pas de publicité.",
+                  "iconURL": "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/main/.github/banner.png",
+                  "tintColor": "1B1B1F",
+                  "versions": [{
+                      "version": "$version",
+                      "date": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                      "localizedDescription": notes,
+                      "downloadURL": "$base/$ipa",
+                      "size": $taille,
+                      # Compose Multiplatform exige iOS 15 ; c'est aussi la
+                      # cible de déploiement du projet Xcode.
+                      "minOSVersion": "15.0",
+                  }],
+              }],
+          }, indent=2, ensure_ascii=False))
+          PYEOF
+          echo "source SideStore : $(wc -c < sidestore.json) octets pour $ipa ($taille octets)"
+        env:
+          NOTES: ${{ needs.changelog.outputs.notes }}
+
       - name: Publier sur la release GitHub
         uses: softprops/action-gh-release@v2
         with:
-          files: moovie-*.ipa
+          files: |
+            moovie-*.ipa
+            sidestore.json
           body: ${{ needs.changelog.outputs.notes }}
           generate_release_notes: true
           # Les publications visent la *même* release : elles doivent s'accorder
