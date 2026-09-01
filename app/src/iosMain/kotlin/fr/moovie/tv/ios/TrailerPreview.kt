@@ -48,8 +48,9 @@ import platform.AVFoundation.volume
  * lit tout média distant. Le relais n'aurait rien à corriger, et il n'existe de
  * toute façon que sur les cibles JVM.
  *
- * @param volume 0 (muet) à 1, piloté par le mode cinéma de la fiche. Le son ne
- *   monte qu'une fois l'interface effacée — voir `DetailsScreenContent`.
+ * @param volume 0 (muet) à 1, piloté par la fiche : le réglage donne l'état de
+ *   départ, le bouton de coupure du cadre garde la main ensuite — voir
+ *   `DetailsScreenContent`.
  */
 @Composable
 internal fun TrailerPreviewIos(
@@ -83,7 +84,8 @@ internal fun TrailerPreviewIos(
         AvPlayerController(stream.url, stream.headers)
     }
 
-    // Le volume suit le mode cinéma. Réglé sur le lecteur natif : le contrat
+    // Le volume suit celui que la fiche demande. Réglé sur le lecteur natif :
+    // le contrat
     // commun `MooviePlayerController` n'expose pas le volume, parce que sur TV
     // et sur téléphone c'est le système qui le tient.
     LaunchedEffect(controleur, volume) {

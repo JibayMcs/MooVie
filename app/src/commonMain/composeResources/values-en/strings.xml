@@ -599,6 +599,10 @@
     <!-- "More info" tab -->
     <string name="details_tab_overview">Overview</string>
     <string name="details_tab_info">More info</string>
+    <!-- Details page tab bar -->
+    <string name="details_tab_episodes">Episodes</string>
+    <string name="details_tab_similar">You may also like</string>
+    <string name="details_tab_trailers">Trailers</string>
     <string name="info_original_title">Original title</string>
     <string name="info_director">Director</string>
     <string name="info_creator">Created by</string>
@@ -630,9 +634,9 @@
     <string name="status_released">Released</string>
     <string name="status_post_production">Post-production</string>
     <string name="settings_trailer_autoplay">Autoplay trailer</string>
-    <string name="settings_trailer_autoplay_help">Plays the trailer muted behind the title page after a few seconds. The "Trailer" button stays available even when this is off.</string>
+    <string name="settings_trailer_autoplay_help">Plays the trailer inside the artwork at the top of the page after a few seconds. It stays reachable from the page even when this is off.</string>
     <string name="settings_trailer_sound">Trailer sound</string>
-    <string name="settings_trailer_sound_help">Fades the sound in when the trailer takes over the title page, and cuts it as soon as the mouse moves. No effect on TV or phone, where the preview stays muted.</string>
+    <string name="settings_trailer_sound_help">Starts the trailer with sound rather than muted. The mute button on the artwork still has the last word.</string>
     <string name="common_close">Close</string>
     <string name="trailer_mute">Mute</string>
     <string name="trailer_unmute">Unmute</string>

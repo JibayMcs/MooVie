@@ -739,6 +739,7 @@ class MainActivity : ComponentActivity() {
                                 tmdbId = s.tmdbId,
                                 isTv = s.isTv,
                                 onOpenPerson = { id, name -> nav.push(Screen.Person(id, name)) },
+                                onOpenTitle = { id, isTv -> nav.push(Screen.Details(id, isTv)) },
                                 // Après un titre envoyé au salon : on suit sur
                                 // l'écran qui montre ce que la TV fait.
                                 onOpenRemote = { nav.push(Screen.Remote) },

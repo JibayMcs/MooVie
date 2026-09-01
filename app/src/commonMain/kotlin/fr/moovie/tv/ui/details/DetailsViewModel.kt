@@ -37,6 +37,7 @@ import fr.moovie.tv.data.sources.StreamMeasureRepository
 import fr.moovie.tv.ui.format.upcomingDate
 import fr.moovie.tv.ui.navigation.AltSource
 import fr.moovie.tv.data.tmdb.Episode
+import fr.moovie.tv.data.tmdb.TmdbItem
 import fr.moovie.tv.data.tmdb.TmdbRepository
 import fr.moovie.tv.data.tmdb.TvDetails
 import fr.moovie.tv.data.trailer.YoutubeTrailerExtractor
@@ -248,6 +249,46 @@ class DetailsViewModel : ViewModel() {
     /** Message transitoire si un lecteur choisi n'a pas pu être résolu. */
     private val _resolveError = MutableStateFlow<String?>(null)
     val resolveError: StateFlow<String?> = _resolveError
+
+    // ── À voir aussi ─────────────────────────────────────────────────────────
+
+    /**
+     * Les titres proches, pour l'onglet « À voir aussi ».
+     *
+     * Ce sont les recommandations de TMDB, et non un « même réalisateur » ou un
+     * « même acteur » qu'on aurait bricolé à partir des crédits déjà en main :
+     * TMDB croise le genre, l'équipe et ce que le public a réellement regardé
+     * ensuite, là où un critère unique donne surtout des voisins de catalogue.
+     * Le prix est un appel de plus à l'ouverture de la fiche ; il part en tâche
+     * de fond et personne ne l'attend.
+     *
+     * Liste vide tant qu'elle n'est pas chargée **et** si TMDB n'a rien : les
+     * deux se valent pour l'appelant, qui n'affiche l'onglet que s'il a de quoi
+     * le remplir. Un onglet qu'on ouvre sur du vide est pire que pas d'onglet.
+     */
+    private val _recommendations = MutableStateFlow<List<TmdbItem>>(emptyList())
+    val recommendations: StateFlow<List<TmdbItem>> = _recommendations
+
+    private var recommendationsJob: Job? = null
+
+    private fun loadRecommendations(repo: TmdbRepository, apiKey: String, state: DetailsState) {
+        val (id, isTv) = when (state) {
+            is DetailsState.Movie -> state.details.id to false
+            is DetailsState.Tv -> state.details.id to true
+            else -> return
+        }
+        // Même garde-fou que la bande-annonce : le titre peut changer pendant la
+        // requête, et la rangée du film précédent s'afficherait sur la fiche
+        // suivante.
+        val gen = resolveGen
+        recommendationsJob?.cancel()
+        recommendationsJob = viewModelScope.launch {
+            val proches = runCatching { repo.recommendations(apiKey, isTv, id) }.getOrNull()
+                ?: return@launch
+            if (gen != resolveGen) return@launch
+            _recommendations.value = proches
+        }
+    }
 
     // ── Bande-annonce ────────────────────────────────────────────────────────
 
@@ -489,6 +530,11 @@ class DetailsViewModel : ViewModel() {
         trailerJob?.cancel()
         _trailer.value = TrailerState.None
         _trailerExpanded.value = false
+        // Idem pour « À voir aussi » : les voisins du titre précédent sont un
+        // contresens sur celui-ci, et la rangée resterait garnie le temps que
+        // la nouvelle requête revienne.
+        recommendationsJob?.cancel()
+        _recommendations.value = emptyList()
         resolveGen++ // invalide toute résolution en vol de la fiche précédente
         _quickPlay.value = QuickPlayState.Idle
         _panelVisible.value = false
@@ -598,6 +644,7 @@ class DetailsViewModel : ViewModel() {
                 // pour que le bouton « Lire » soit prêt sans ouvrir le panneau.
                 if (it is DetailsState.Movie) loadMovieSources()
                 loadTrailer(repo, apiKey, it)
+                loadRecommendations(repo, apiKey, it)
             }.onFailure { _state.value = DetailsState.Error(getString(Res.string.details_tmdb_error, it.message ?: "")) }
         }
     }
