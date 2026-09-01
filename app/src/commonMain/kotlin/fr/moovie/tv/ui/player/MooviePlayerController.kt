@@ -42,6 +42,22 @@ interface MooviePlayerController {
     /** Lecture en cours (pas « playWhenReady » : l'état réel). */
     val isPlaying: Boolean
 
+    /**
+     * Le lecteur veut jouer et n'a pas de quoi : ouverture du flux, mise en
+     * mémoire tampon, rechargement après un saut.
+     *
+     * Distinct d'une pause, qui est une décision du spectateur. C'est cette
+     * distinction qui permet à un écran de n'afficher un indicateur d'attente
+     * que quand l'attente n'est pas voulue — un rond qui tourne sur une pause
+     * demandée serait un mensonge.
+     *
+     * Faux par défaut, et c'est la bonne réponse pour deux des trois
+     * plateformes : Android rend sa vidéo dans une `PlayerView` et le desktop
+     * dans mpv, qui affichent l'un et l'autre leur propre indicateur. iOS
+     * dessine dans un `AVPlayerLayer` nu, qui ne montre rien de lui-même.
+     */
+    val isBuffering: Boolean get() = false
+
     /** Position courante en millisecondes, 0 si inconnue. */
     fun positionMs(): Long
 

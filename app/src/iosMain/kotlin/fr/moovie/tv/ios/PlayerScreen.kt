@@ -7,9 +7,18 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Replay
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -21,6 +30,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
@@ -30,6 +41,9 @@ import fr.moovie.tv.data.intro.IntroMedia
 import fr.moovie.tv.data.settings.SettingsRepository
 import fr.moovie.tv.data.watch.WatchProgressRepository
 import fr.moovie.tv.data.watch.nextUpEntry
+import fr.moovie.tv.resources.Res
+import fr.moovie.tv.resources.player_seek_back
+import fr.moovie.tv.resources.player_seek_forward
 import fr.moovie.tv.ui.player.ApplySubtitleStyle
 import fr.moovie.tv.ui.player.MooviePlayerController
 import fr.moovie.tv.ui.player.PLAYER_SEEK_STEP_MS
@@ -45,6 +59,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * Combien de temps les contrôles restent après le dernier geste.
@@ -59,6 +74,25 @@ private const val AUTO_NEXT_SECONDS = 8
 
 /** Fraction du média à partir de laquelle on demande la source suivante. */
 private const val PREFETCH_AT = 0.80
+
+/**
+ * Combien de temps le retour visuel du double appui reste affiché.
+ *
+ * Assez pour être lu, assez peu pour ne pas traîner sur l'image — et surtout
+ * plus long que l'intervalle entre deux double-appuis d'une même série, sans
+ * quoi le cumul repartirait de zéro entre deux gestes qui s'enchaînent.
+ */
+private const val SEEK_FEEDBACK_MS = 800L
+
+/**
+ * Le saut que le double appui vient de faire, tel qu'on l'annonce.
+ *
+ * Le cumul plutôt que le pas : trois appuis du même côté avancent de 45 s, et
+ * afficher « 15 s » trois fois de suite laisserait croire que seul le dernier a
+ * compté. Le côté est retenu parce qu'il décide de quel bord l'indicateur
+ * s'affiche — et parce que changer de côté doit remettre le compte à zéro.
+ */
+private data class RetourSaut(val versArriere: Boolean, val cumulMs: Long)
 
 /**
  * Le lecteur, côté iOS.
@@ -136,6 +170,13 @@ internal fun IosPlayerScreen(
     var autoNextSeconds by remember { mutableStateOf<Int?>(null) }
     var scrubTargetMs by remember { mutableStateOf<Long?>(null) }
 
+    // Vrai d'emblée : le lecteur ouvre son flux, et la boucle d'état ne dira le
+    // contraire qu'un demi-tour plus tard. Partir de « ça joue » ferait
+    // clignoter l'écran noir sans indicateur, précisément à l'instant où
+    // l'attente est la plus longue.
+    var chargement by remember { mutableStateOf(true) }
+    var retourSaut by remember { mutableStateOf<RetourSaut?>(null) }
+
     fun signalActivity() {
         controlsVisible = true
         activityTick++
@@ -188,6 +229,11 @@ internal fun IosPlayerScreen(
         while (true) {
             delay(500)
             isPlaying = controller.isPlaying
+            // Relevé dans la boucle qui existe déjà plutôt que dans une seconde,
+            // au prix d'un demi-tour de retard sur l'apparition du rond. Le
+            // premier chargement, celui qui se remarque, est couvert par la
+            // valeur initiale.
+            chargement = controller.isBuffering
             val time = controller.positionMs()
             if (time > 1_000) everPlayed = true
             timeMs = time
@@ -284,6 +330,15 @@ internal fun IosPlayerScreen(
         onNextEpisode(nextSeason, nextEpisode)
     }
 
+    // Effacement du retour de saut, relancé à chaque nouvel appui : la clé de
+    // l'effet est la valeur elle-même, si bien qu'un second double appui repousse
+    // la disparition au lieu de la laisser tomber au terme du premier.
+    LaunchedEffect(retourSaut) {
+        if (retourSaut == null) return@LaunchedEffect
+        delay(SEEK_FEEDBACK_MS)
+        retourSaut = null
+    }
+
     // Auto-masquage : relancé à chaque geste. En pause, les contrôles restent.
     LaunchedEffect(activityTick, isPlaying) {
         if (!isPlaying) {
@@ -350,6 +405,20 @@ internal fun IosPlayerScreen(
                         val versArriere = position.x < size.width / 2f
                         controller.seekBy(
                             if (versArriere) -PLAYER_SEEK_STEP_MS else PLAYER_SEEK_STEP_MS,
+                        )
+                        // Le geste marchait déjà, mais rien ne le disait : la
+                        // vidéo sautait sans qu'on sache si c'était la source qui
+                        // avait toussé ou l'appui qui avait porté. On cumule tant
+                        // que les appuis restent du même côté ; changer de bord
+                        // annonce une nouvelle série.
+                        val precedent = retourSaut
+                        retourSaut = RetourSaut(
+                            versArriere = versArriere,
+                            cumulMs = if (precedent?.versArriere == versArriere) {
+                                precedent.cumulMs + PLAYER_SEEK_STEP_MS
+                            } else {
+                                PLAYER_SEEK_STEP_MS
+                            },
                         )
                         signalActivity()
                     },
@@ -455,6 +524,59 @@ internal fun IosPlayerScreen(
                 color = Color.White,
                 modifier = Modifier.align(Alignment.Center),
             )
+        }
+
+        // **Le rond d'attente, que la vue native ne fournit pas.**
+        //
+        // Android rend sa vidéo dans une `PlayerView` et le desktop dans mpv :
+        // tous deux affichent leur propre indicateur pendant la mise en mémoire
+        // tampon. Un `AVPlayerLayer` ne montre rien — on ouvrait donc le lecteur
+        // sur un écran noir, immobile et muet, sans moyen de distinguer un flux
+        // qui charge d'un flux qui ne viendra jamais.
+        //
+        // Pas pendant le décompte d'enchaînement : le média est fini, ce qui
+        // tourne alors n'est pas une attente de données.
+        if (chargement && autoNextSeconds == null) {
+            CircularProgressIndicator(
+                color = Color.White,
+                modifier = Modifier.align(Alignment.Center).size(48.dp),
+            )
+        }
+
+        // Le retour visuel du double appui, du côté touché — voir [RetourSaut].
+        retourSaut?.let { saut ->
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier
+                    .align(
+                        if (saut.versArriere) Alignment.CenterStart else Alignment.CenterEnd,
+                    )
+                    .padding(horizontal = 40.dp)
+                    .clip(CircleShape)
+                    .background(Color(0x66000000))
+                    .padding(horizontal = 20.dp, vertical = 16.dp),
+            ) {
+                // La flèche circulaire de la barre de contrôles, miroitée pour
+                // l'avance comme elle l'est là-bas : deux façons de faire le même
+                // saut ne doivent pas porter deux dessins différents.
+                Icon(
+                    imageVector = Icons.Default.Replay,
+                    contentDescription = stringResource(
+                        if (saut.versArriere) Res.string.player_seek_back
+                        else Res.string.player_seek_forward,
+                    ),
+                    tint = Color.White,
+                    modifier = Modifier.size(32.dp).then(
+                        if (saut.versArriere) Modifier else Modifier.scale(scaleX = -1f, scaleY = 1f),
+                    ),
+                )
+                Text(
+                    text = "${saut.cumulMs / 1000} s",
+                    color = Color.White,
+                    style = MaterialTheme.typography.labelLarge,
+                )
+            }
         }
     }
 }

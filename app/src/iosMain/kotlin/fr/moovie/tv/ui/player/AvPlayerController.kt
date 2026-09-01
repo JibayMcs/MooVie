@@ -10,6 +10,7 @@ import platform.AVFoundation.AVMediaCharacteristicLegible
 import platform.AVFoundation.AVPlayer
 import platform.AVFoundation.AVPlayerItem
 import platform.AVFoundation.AVPlayerTimeControlStatusPlaying
+import platform.AVFoundation.AVPlayerTimeControlStatusWaitingToPlayAtSpecifiedRate
 import platform.AVFoundation.AVURLAsset
 import platform.AVFoundation.asset
 import platform.AVFoundation.currentItem
@@ -97,6 +98,17 @@ class AvPlayerController(
 
     override val isPlaying: Boolean
         get() = player.timeControlStatus == AVPlayerTimeControlStatusPlaying
+
+    /**
+     * `WaitingToPlayAtSpecifiedRate` : une cadence non nulle est demandée et
+     * AVPlayer ne peut pas la tenir. C'est l'état exact de l'attente de données,
+     * et il se lit sans observateur — `timeControlStatus` est une propriété,
+     * là où `playbackLikelyToKeepUp` demanderait un KVO à enregistrer et à
+     * libérer à la main, pour la même réponse.
+     */
+    override val isBuffering: Boolean
+        get() = player.timeControlStatus ==
+            AVPlayerTimeControlStatusWaitingToPlayAtSpecifiedRate
 
     override fun positionMs(): Long = secondesEnMs(CMTimeGetSeconds(player.currentTime()))
 
