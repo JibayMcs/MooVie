@@ -36,6 +36,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -268,39 +270,87 @@ private const val QUICKPLAY_BANNER_WITH_REASON_MS = 8_000L
 private val CAST_CARD_WIDTH = 96.dp
 
 /**
- * Dispose les deux volets d'une série : description à gauche, épisodes à droite
- * sur grand écran — l'un au-dessus de l'autre sur téléphone.
+ * Dispose une fiche de série : description à gauche, épisodes à droite sur grand
+ * écran — tout dans un même défilement sur téléphone.
  *
- * Le conteneur fournit à l'appelant les modificateurs de chaque volet plutôt que
- * de les laisser au point d'appel : `weight` n'existe que dans le scope de la
- * `Row` ou de la `Column`, il doit donc être construit ici, une fois le sens de
- * l'empilement décidé.
+ * ## Pourquoi l'en-tête et les épisodes arrivent séparément
+ *
+ * Les deux dispositions ne diffèrent pas seulement par le sens de l'empilement,
+ * mais par **ce qui défile**. Sur grand écran, l'en-tête est posé et seuls les
+ * épisodes bougent : il décrit ce qu'on parcourt, et le perdre au premier appui
+ * vers le bas revenait à naviguer à l'aveugle dans une liste de vingt épisodes.
+ * Une télécommande n'a de toute façon pas de défilement libre — il n'y a que du
+ * focus qui se déplace, et l'en-tête n'a aucune raison de suivre.
+ *
+ * Au doigt, c'est l'inverse. La page ne défilait pas, seule la liste le faisait,
+ * si bien que le titre, le résumé, la rangée des saisons et les actions
+ * occupaient à demeure la moitié haute d'un écran de téléphone — il restait une
+ * fenêtre de deux épisodes pour parcourir la saison, et un geste sur l'en-tête
+ * ne faisait rien du tout. Ce n'est pas ainsi qu'une page se lit sur un
+ * téléphone : elle défile en entier.
+ *
+ * D'où ces deux paramètres plutôt qu'un `content` unique. Pour que l'en-tête
+ * défile *avec* les épisodes, il doit être un élément de leur liste — et un
+ * élément de liste paresseuse ne peut être posé que depuis un `LazyListScope`,
+ * que le point d'appel n'a pas. C'est aussi ce qui garde la paresse : on aurait
+ * pu rendre la page défilante et poser les épisodes dans une `Column`
+ * ordinaire, au prix de composer les vingt-cinq d'un coup, images comprises.
  */
 @Composable
 private fun SeriesPanes(
     compact: Boolean,
+    episodesState: LazyListState,
     modifier: Modifier = Modifier,
-    content: @Composable (headerModifier: Modifier, listModifier: Modifier) -> Unit,
+    /** Titre, résumé de saison, rangée des saisons et actions. */
+    header: @Composable (Modifier) -> Unit,
+    /** « En savoir plus », qui prend la place des épisodes, ou null s'il est fermé. */
+    infoPanel: (@Composable (Modifier) -> Unit)?,
+    /** Les épisodes, posés en éléments de liste paresseuse. */
+    episodes: LazyListScope.() -> Unit,
 ) {
     if (compact) {
-        Column(
+        LazyColumn(
+            state = episodesState,
             modifier = modifier,
+            // Les marges de la page passent par le `contentPadding` de la liste,
+            // qui les porte maintenant pour tout le monde — en-tête compris.
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            content(
-                Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                Modifier.weight(1f).fillMaxWidth(),
-            )
+            item { header(Modifier.fillMaxWidth()) }
+            if (infoPanel != null) {
+                item { infoPanel(Modifier.fillMaxWidth()) }
+            } else {
+                episodes()
+            }
         }
     } else {
         Row(
             modifier = modifier,
             horizontalArrangement = Arrangement.spacedBy(24.dp),
         ) {
-            content(
-                Modifier.width(SERIES_PANE_WIDTH).padding(start = 48.dp),
-                Modifier.weight(1f).fillMaxHeight(),
-            )
+            header(Modifier.width(SERIES_PANE_WIDTH).padding(start = 48.dp))
+            // `weight` n'existe que dans le scope de la `Row` : le volet droit se
+            // construit donc ici, pas au point d'appel.
+            val volet = Modifier.weight(1f).fillMaxHeight()
+            if (infoPanel != null) {
+                infoPanel(volet.padding(end = 48.dp, bottom = 24.dp))
+            } else {
+                // LazyColumn et non Column défilante : c'est ce qui donne
+                // `animateScrollToItem`, seul moyen de caler l'épisode focalisé en
+                // haut — sans quoi il se colle en bas du cadre et le suivant reste
+                // invisible, exactement le défaut corrigé sur les rangées de
+                // l'accueil.
+                LazyColumn(
+                    state = episodesState,
+                    modifier = volet,
+                    // Marges dans le contentPadding : l'agrandissement au focus
+                    // déborde dedans au lieu d'être rogné.
+                    contentPadding = PaddingValues(end = 48.dp, bottom = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    content = episodes,
+                )
+            }
         }
     }
 }
@@ -428,6 +478,16 @@ fun DetailsScreenContent(
     // son FocusRequester n'existe pas. Il faut défiler jusqu'à lui d'abord.
     val episodesState = rememberLazyListState()
 
+    /**
+     * Écart entre le rang d'un épisode dans la saison et son index dans la liste
+     * paresseuse.
+     *
+     * Le titre « Épisodes (saison N) » occupe toujours le premier élément. Au
+     * doigt, l'en-tête de la série en occupe un de plus : il défile avec les
+     * épisodes au lieu de rester posé au-dessus — voir [SeriesPanes].
+     */
+    val episodeItemOffset = if (compact) 2 else 1
+
     // Série reprise en cours : le focus descend sur l'épisode à suivre plutôt
     // que de rester sur la rangée des saisons — sinon on arrive avec « S1 »
     // sélectionné alors que la liste affiche une tout autre saison, et il faut
@@ -475,9 +535,10 @@ fun DetailsScreenContent(
         val tv = state as? DetailsState.Tv
         val wantsEpisode = tv != null && tv.resumeEpisode > 0 && selectedEpisode == null && !autoFocusDone
         if (wantsEpisode) {
-            // +1 : le titre « Épisodes (saison N) » occupe le premier élément.
+            // Le décalage compte les éléments posés avant les épisodes : voir
+            // [episodeItemOffset].
             val index = tv.episodes.indexOfFirst { it.episodeNumber == tv.resumeEpisode }
-            if (index >= 0) runCatching { episodesState.scrollToItem(index + 1) }
+            if (index >= 0) runCatching { episodesState.scrollToItem(index + episodeItemOffset) }
             // La liste d'épisodes n'est pas encore posée au moment où l'état
             // change : on retente le temps qu'elle le soit.
             repeat(10) {
@@ -943,8 +1004,9 @@ fun DetailsScreenContent(
                         // sa place et la liste récupère toute la colonne.
                         SeriesPanes(
                             compact = compact,
+                            episodesState = episodesState,
                             modifier = Modifier.weight(1f).fillMaxWidth(),
-                        ) { headerModifier, listModifier ->
+                            header = { headerModifier ->
                         Column(
                             modifier = headerModifier,
                             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -1138,45 +1200,29 @@ fun DetailsScreenContent(
                         }
                         }
                         }
-                        // Volet droit : « En savoir plus » y prend la place de la
-                        // liste des épisodes. C'est le cas qui a dicté la
-                        // conception — on consulte la date du prochain épisode,
-                        // puis on veut ses épisodes, sans avoir à défiler.
-                        if (infoVisible) {
-                            TvInfoPanel(
-                                details = s.details,
-                                country = country,
-                                // Il remplace la liste des épisodes, seul
-                                // élément défilant de la fiche de série.
-                                scrollable = true,
-                                modifier = listModifier.padding(
-                                    if (compact) {
-                                        PaddingValues(horizontal = 16.dp, vertical = 8.dp)
-                                    } else {
-                                        PaddingValues(end = 48.dp, bottom = 24.dp)
-                                    },
-                                ),
-                            )
-                        } else {
-                        // Volet droit : la liste occupe toute la hauteur.
-                        //
-                        // LazyColumn et non Column défilante : c'est ce qui donne
-                        // `animateScrollToItem`, seul moyen de caler l'épisode
-                        // focalisé en haut — sans quoi il se colle en bas du
-                        // cadre et le suivant reste invisible, exactement le
-                        // défaut corrigé sur les rangées de l'accueil.
-                        LazyColumn(
-                            state = episodesState,
-                            modifier = listModifier,
-                            // Marges dans le contentPadding : l'agrandissement au
-                            // focus déborde dedans au lieu d'être rogné.
-                            contentPadding = if (compact) {
-                                PaddingValues(horizontal = 16.dp, vertical = 8.dp)
-                            } else {
-                                PaddingValues(end = 48.dp, bottom = 24.dp)
                             },
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
-                        ) {
+                        // « En savoir plus » prend la place de la liste des
+                        // épisodes. C'est le cas qui a dicté la conception — on
+                        // consulte la date du prochain épisode, puis on veut ses
+                        // épisodes, sans avoir à défiler.
+                            infoPanel = if (infoVisible) {
+                                { modifierPanneau ->
+                                    TvInfoPanel(
+                                        details = s.details,
+                                        country = country,
+                                        // Au doigt il est un élément d'une liste
+                                        // qui porte déjà le défilement de la page :
+                                        // lui en donner un second l'imbriquerait.
+                                        // Sur grand écran il remplace la liste, et
+                                        // reste donc le seul élément défilant.
+                                        scrollable = !compact,
+                                        modifier = modifierPanneau,
+                                    )
+                                }
+                            } else {
+                                null
+                            },
+                            episodes = {
                         item {
                             Text(stringResource(Res.string.details_episodes_season, s.season), style = MaterialTheme.typography.titleMedium)
                         }
@@ -1213,7 +1259,7 @@ fun DetailsScreenContent(
                                     // écraserait l'alignement.
                                     if (it.isFocused) pageScope.launch {
                                         delay(80)
-                                        episodesState.animateScrollToItem(index + 1)
+                                        episodesState.animateScrollToItem(index + episodeItemOffset)
                                     }
                                 },
                             ) {
@@ -1254,9 +1300,8 @@ fun DetailsScreenContent(
                                 CastRow(s.details.credits?.cast.orEmpty(), 0.dp, onOpenPerson)
                             }
                         }
-                        }
-                        } // fin du `else` : liste des épisodes ou « En savoir plus »
-                        }
+                            },
+                        )
                         // Le casting d'une série est en queue de la liste des
                         // épisodes (voir plus haut), pas ici : sous les volets il
                         // aurait été un bloc fixe pris à la liste.
