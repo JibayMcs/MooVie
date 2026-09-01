@@ -57,6 +57,7 @@ import fr.moovie.tv.resources.pairing_key_checking
 import fr.moovie.tv.resources.pairing_key_missing
 import fr.moovie.tv.resources.pairing_key_rejected
 import fr.moovie.tv.resources.pairing_key_unreachable
+import fr.moovie.tv.ui.adaptive.isTouchUi
 import fr.moovie.tv.ui.backup.BackupSection
 import fr.moovie.tv.ui.components.MoovieButton
 import fr.moovie.tv.ui.navigation.Screen
@@ -283,19 +284,40 @@ fun OnboardingScreen(
         }
     }
 
-    // Le focus se pose sur la première commande de chaque étape. À la
-    // télécommande, arriver sur un écran sans focus veut dire que la première
-    // flèche ne fait rien : elle sert à entrer dans la page au lieu d'agir.
+    // **Le focus se pose d'office à la télécommande, et jamais au doigt.**
+    //
+    // Au D-pad, arriver sur un écran sans focus veut dire que la première flèche
+    // ne fait rien : elle sert à entrer dans la page au lieu d'agir.
+    //
+    // Au doigt, la même ligne était un défaut. `MoovieButton` peint son état
+    // « actif » sur le focus autant que sur `selected` — les deux passent par
+    // `moovieSurface` — si bien que la première commande de chaque étape
+    // s'affichait comme une réponse déjà donnée. Pire, un écran tactile ne
+    // déplace pas le focus : répondre « Non » allumait le second bouton sans
+    // éteindre le premier, et l'on voyait deux réponses cochées. Exactement ce
+    // que ce parcours prétend éviter en ne présélectionnant rien.
+    val auDoigt = isTouchUi
     val premiereCommande = remember { FocusRequester() }
-    LaunchedEffect(mode, etape) {
-        if (mode == Mode.QUESTIONS) runCatching { premiereCommande.requestFocus() }
+    LaunchedEffect(mode, etape, auDoigt) {
+        if (mode == Mode.QUESTIONS && !auDoigt) runCatching { premiereCommande.requestFocus() }
     }
 
+    // **Les marges d'un salon ne sont pas celles d'une main.**
+    //
+    // 56 dp de côté, c'est le recul d'un téléviseur : la zone sûre d'une dalle
+    // dont les bords sont rognés par le sur-balayage, sur 960 dp de large. Sur un
+    // téléphone de 400 dp, les mêmes 56 dp mangent plus du quart de la largeur —
+    // le questionnaire s'affichait en médaillon, encadré de noir, alors que
+    // c'est le seul écran de l'application qui n'a rien d'autre à montrer que
+    // lui-même. Le reste de l'app fait déjà cette distinction : 16 dp au doigt,
+    // 48 dp ailleurs, sur la fiche comme sur l'accueil.
+    val margeH = if (auDoigt) 20.dp else 56.dp
+    val margeV = if (auDoigt) 24.dp else 48.dp
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 56.dp, vertical = 48.dp),
+            .padding(horizontal = margeH, vertical = margeV),
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
         when (mode) {
@@ -416,8 +438,11 @@ private fun Bienvenue(
     onRestaurer: () -> Unit,
     onAppairer: () -> Unit,
 ) {
+    // Même réserve que dans les questions : au doigt, un focus posé d'office
+    // allume la première carte comme si elle était déjà choisie.
+    val auDoigt = isTouchUi
     val premier = remember { FocusRequester() }
-    LaunchedEffect(Unit) { runCatching { premier.requestFocus() } }
+    LaunchedEffect(auDoigt) { if (!auDoigt) runCatching { premier.requestFocus() } }
 
     Text(
         stringResource(Res.string.onboarding_title),
