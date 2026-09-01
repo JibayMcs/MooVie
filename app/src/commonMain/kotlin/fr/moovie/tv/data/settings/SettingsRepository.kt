@@ -25,6 +25,30 @@ class SettingsRepository {
     val tmdbApiKey: Flow<String> =
         store.data.map { it[TMDB_API_KEY].orEmpty() }
 
+    /**
+     * L'installation a-t-elle été menée à son terme ?
+     *
+     * **Pourquoi une réponse à part, alors que la clé TMDB semblait suffire.**
+     * Elle a suffi tant que l'installation ne demandait que cette clé : l'écran
+     * se refermait sur la première saisie, et « avoir une clé » valait « avoir
+     * fini ». Le parcours pose maintenant d'autres questions après elle — la
+     * langue des flux, la lecture, le profil — et une clé saisie ne dit plus
+     * rien de celles-là. Sans ce drapeau, l'application se serait rouverte sur
+     * l'accueil au premier redémarrage, en sautant tout ce qui suit la clé.
+     *
+     * **Absent vaut « oui » quand une clé existe déjà.** C'est la migration, et
+     * elle tient en une ligne parce qu'elle décrit exactement ce qu'on sait
+     * d'une installation d'avant : personne n'a jamais répondu à ce parcours,
+     * mais quelqu'un a bien configuré cette application. La renvoyer dans un
+     * questionnaire au premier lancement de la mise à jour aurait été une
+     * punition pour être resté.
+     */
+    val onboardingDone: Flow<Boolean> =
+        store.data.map { it[ONBOARDING_DONE] ?: it[TMDB_API_KEY].orEmpty().isNotBlank() }
+
+    suspend fun setOnboardingDone(value: Boolean) =
+        store.edit { it[ONBOARDING_DONE] = value }
+
     val streamLanguage: Flow<StreamLanguage> =
         store.data.map {
             runCatching { StreamLanguage.valueOf(it[STREAM_LANGUAGE] ?: "VF") }
@@ -357,6 +381,7 @@ class SettingsRepository {
 
     private companion object {
         val TMDB_API_KEY = stringPreferencesKey("tmdb_api_key")
+        val ONBOARDING_DONE = booleanPreferencesKey("onboarding_done")
         val STREAM_LANGUAGE = stringPreferencesKey("stream_language")
         val DISABLED_PROVIDERS = stringPreferencesKey("disabled_providers")
         val PROVIDER_ORDER = stringPreferencesKey("provider_order")
