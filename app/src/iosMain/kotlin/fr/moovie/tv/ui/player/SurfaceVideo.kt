@@ -2,6 +2,7 @@ package fr.moovie.tv.ui.player
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.interop.UIKitView
@@ -101,11 +102,28 @@ fun SurfaceVideo(
     // `videoGravity`, si bien que la valeur traverse sans déballage.
     gravite: String? = AVLayerVideoGravityResizeAspect,
 ) {
-    val couche = remember(controleur, gravite) {
-        AVPlayerLayer().apply {
-            player = controleur.player
-            videoGravity = gravite
-        }
+    // **Un seul layer pour toute la vie de la surface.**
+    //
+    // La version d'avant le mémorisait sous `remember(controleur, gravite)`,
+    // donc en construisait un neuf au moindre changement de cadrage — c'est
+    // exactement ce que fait la bande-annonce en passant au premier plan, où
+    // `ResizeAspectFill` devient `ResizeAspect`. Or `factory` de [UIKitView]
+    // n'est appelée qu'une fois : la [VueVideo] déjà posée continuait de porter
+    // l'ancien layer, que le `onDispose` plus bas venait de retirer de sa
+    // hiérarchie. Il ne restait qu'une vue sans contenu, dont le fond est noir —
+    // avec le son et la position qui avançaient derrière, l'AVPlayer n'ayant
+    // rien perdu. Le même symptôme que le layer de taille nulle, pour une autre
+    // raison, et c'est ce que le KDoc de [VueVideo] appelle une image noire sur
+    // une lecture qui va bien.
+    //
+    // Le layer est donc posé une fois pour toutes, et ce qui varie est réglé
+    // dessus : `player` et `videoGravity` sont des propriétés de `CALayer`, les
+    // écrire suffit, et aucune des deux ne demande de reconstruire quoi que ce
+    // soit. Plus rien ne peut désigner un layer que la vue n'a pas.
+    val couche = remember { AVPlayerLayer() }
+    SideEffect {
+        couche.player = controleur.player
+        couche.videoGravity = gravite
     }
 
     UIKitView(

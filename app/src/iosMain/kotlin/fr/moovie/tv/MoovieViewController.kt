@@ -301,7 +301,16 @@ private fun EcranCourant(nav: NavStack, online: Boolean) {
 
         is Screen.Details -> IosDetailsScreen(
             params = ecran,
-            onPlay = { lecteur -> nav.push(lecteur) },
+            onPlay = { lecteur ->
+                // Neutralise l'auto-lecture sur l'entrée de la fiche avant
+                // d'empiler le lecteur : sinon en revenir relancerait la
+                // lecture, qui repousserait le lecteur — boucle sans issue.
+                // Le garde-fou `autoConsumed` de l'écran ne suffit pas : la
+                // fiche quitte la composition pendant que le lecteur est au
+                // sommet, et son `remember` repart à faux au retour.
+                if (ecran.autoSources) nav.replace(ecran.copy(autoSources = false))
+                nav.push(lecteur)
+            },
             onOpenPerson = { id, nom -> nav.push(Screen.Person(id, nom)) },
             onBack = { nav.pop() },
         )
@@ -357,16 +366,27 @@ private fun LecteurIos(nav: NavStack, params: Screen.Player) {
         onBack = { retourDepuisLecteur(nav) },
         // Enchaîner passe par la fiche, qui sait résoudre une source : le lecteur
         // ne connaît qu'une URL, pas l'hébergeur d'où viendra la suivante.
-        // `replace` et non `push` — dix épisodes d'affilée laisseraient sinon dix
-        // entrées à remonter une par une.
+        //
+        // **On dépile le lecteur, puis on réécrit la fiche du dessous.**
+        //
+        // Le seul `replace` d'avant écrasait l'entrée du lecteur, pas celle de la
+        // fiche : chaque épisode laissait donc une fiche de plus dans la pile, et
+        // quatre épisodes d'affilée demandaient quatre retours sur des pages
+        // identiques. L'intention était déjà d'éviter cela — elle n'était tenue
+        // qu'à moitié, `replace` économisant la seconde entrée par épisode, pas la
+        // première. Dépiler d'abord tient la pile à `[…, fiche, lecteur]` quel que
+        // soit le nombre d'épisodes enchaînés, et un seul retour ramène à la série.
+        //
+        // Le dépilement est sûr ici : `fiche` non nul prouve qu'il y a une entrée
+        // sous le lecteur, donc que la pile en compte au moins deux.
         onNextEpisode = { saison, episode ->
             val fiche = nav.previous as? Screen.Details
             if (fiche == null) {
                 retourDepuisLecteur(nav)
             } else {
+                nav.pop()
                 nav.replace(
-                    Screen.Details(
-                        tmdbId = fiche.tmdbId,
+                    fiche.copy(
                         isTv = true,
                         autoSources = true,
                         resumeSeason = saison,
@@ -384,12 +404,12 @@ private fun LecteurIos(nav: NavStack, params: Screen.Player) {
 /**
  * Quitter le lecteur, c'est revenir à la fiche dont le flux est parti.
  *
- * `popUpTo` et non `pop` : un enchaînement d'épisodes a pu remplacer l'entrée
- * courante plusieurs fois, et un simple dépilement rendrait la main à l'accueil
- * en sautant la fiche de la série. Même raisonnement que sur Android, et c'est
- * exactement ce pour quoi `NavStack.popUpTo` existe. Sans fiche dans la pile —
- * lecture d'un téléchargement, ouverte depuis les réglages — on revient à la
- * racine.
+ * `popUpTo` et non `pop` : il désigne la fiche par ce qu'elle est, sans supposer
+ * qu'elle occupe l'entrée immédiatement sous le lecteur. C'est ce qui distingue
+ * les deux cas de figure sans avoir à les compter — le retour depuis un
+ * enchaînement d'épisodes tombe sur la fiche, tandis qu'une lecture ouverte sans
+ * fiche du tout, celle d'un téléchargement lancé depuis les réglages, n'en
+ * trouve aucune et revient à la racine. Même raisonnement que sur Android.
  */
 private fun retourDepuisLecteur(nav: NavStack) {
     if (!nav.popUpTo { it is Screen.Details }) nav.popToRoot()
