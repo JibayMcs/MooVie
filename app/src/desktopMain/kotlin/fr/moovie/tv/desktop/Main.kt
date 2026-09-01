@@ -108,15 +108,23 @@ fun main() {
         // média, le lecteur n'a aucun titre à interroger.
         val testStream = remember { System.getenv("MOOVIE_TEST_STREAM") }
         val testKey = remember { System.getenv("MOOVIE_TEST_KEY").orEmpty() }
+        // Même crochet, pour les fiches : MOOVIE_TEST_DETAILS=movie:550 ou
+        // tv:1396 ouvre directement la fiche demandée. Travailler sa mise en
+        // page passait sinon par l'accueil, une recherche et deux clics à
+        // chaque relance — et par un titre différent selon ce que TMDB met en
+        // avant ce jour-là, ce qui est le contraire d'une comparaison.
+        val testDetails = remember { System.getenv("MOOVIE_TEST_DETAILS").orEmpty() }
         // Racine résolue avant de bâtir la pile : sans clé TMDB on démarre sur
         // l'écran d'installation, et l'accueil vide n'apparaît pas même le temps
         // d'une image. La pile se reconstruit une fois la réponse connue — rien
         // n'a encore pu s'y empiler.
         val start = rememberStartScreen(
-            override = if (testStream.isNullOrBlank()) {
-                null
-            } else {
-                Screen.Player(testStream, mediaKey = testKey)
+            override = when {
+                !testStream.isNullOrBlank() -> Screen.Player(testStream, mediaKey = testKey)
+                testDetails.isNotBlank() -> testDetails.split(':').let { (genre, id) ->
+                    Screen.Details(id.toInt(), isTv = genre == "tv")
+                }
+                else -> null
             },
         )
         val nav = remember(start) { NavStack(start ?: Screen.Home) }
@@ -491,6 +499,7 @@ private fun DesktopApp(
                     params = s,
                     onOpenRemote = { nav.push(Screen.Remote) },
                     onOpenPerson = { id, name -> nav.push(Screen.Person(id, name)) },
+                    onOpenTitle = { id, isTv -> nav.push(Screen.Details(id, isTv)) },
                     onPlay = { player ->
                         // Neutralise l'auto-lecture sur l'entrée de la fiche avant
                         // d'empiler le lecteur : sinon en revenir relancerait la

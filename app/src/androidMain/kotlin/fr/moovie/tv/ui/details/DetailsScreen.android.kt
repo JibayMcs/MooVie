@@ -60,6 +60,8 @@ fun DetailsScreen(
     onPlay: (Screen.Player) -> Unit,
     onBack: () -> Unit,
     onOpenPerson: (personId: Int, name: String) -> Unit = { _, _ -> },
+    /** Ouvre une autre fiche depuis l'onglet « À voir aussi ». */
+    onOpenTitle: (tmdbId: Int, isTv: Boolean) -> Unit = { _, _ -> },
     autoSources: Boolean = false,
     resumeSeason: Int = 0,
     resumeEpisode: Int = 0,
@@ -72,6 +74,7 @@ fun DetailsScreen(
     viewModel: DetailsViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val recommendations by viewModel.recommendations.collectAsStateWithLifecycle()
     val sources by viewModel.sources.collectAsStateWithLifecycle()
     val resolved by viewModel.resolved.collectAsStateWithLifecycle()
     val inWatchlist by viewModel.inWatchlist.collectAsStateWithLifecycle()
@@ -314,6 +317,9 @@ fun DetailsScreen(
         resolveError = resolveError,
         resolvingUrl = resolvingUrl,
         onOpenPerson = { onOpenPerson(it.id, it.name) },
+        recommendations = recommendations,
+        onOpenTitle = onOpenTitle,
+        onCloseEpisode = viewModel::closeEpisode,
         streamLang = streamLang,
         watched = watched,
         resume = resume,

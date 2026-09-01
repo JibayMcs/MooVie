@@ -17,6 +17,7 @@ import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import fr.moovie.tv.data.download.Download
 import fr.moovie.tv.data.download.readyInSeason
 import fr.moovie.tv.data.download.DownloadState
@@ -25,6 +26,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -54,12 +56,18 @@ import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material.icons.filled.Fullscreen
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Theaters
+import androidx.compose.material.icons.filled.VolumeOff
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -87,6 +95,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -98,6 +107,7 @@ import fr.moovie.tv.core.sources.model.PlayableStream
 import fr.moovie.tv.data.tmdb.CastMember
 import fr.moovie.tv.data.tmdb.Episode
 import fr.moovie.tv.data.tmdb.MovieDetails
+import fr.moovie.tv.data.tmdb.TmdbItem
 import fr.moovie.tv.data.watch.ResumeEntry
 import fr.moovie.tv.resources.Res
 import fr.moovie.tv.resources.common_back
@@ -133,6 +143,11 @@ import fr.moovie.tv.resources.details_source_dl_running
 import fr.moovie.tv.resources.details_source_dl_paused
 import fr.moovie.tv.resources.details_source_dl_failed
 import fr.moovie.tv.resources.player_download_done
+import fr.moovie.tv.resources.player_fullscreen
+import fr.moovie.tv.resources.player_pause
+import fr.moovie.tv.resources.player_play
+import fr.moovie.tv.resources.trailer_mute
+import fr.moovie.tv.resources.trailer_unmute
 import fr.moovie.tv.resources.details_download_season_partial
 import fr.moovie.tv.resources.details_download_season_queued
 import fr.moovie.tv.resources.details_download_season
@@ -170,25 +185,14 @@ import fr.moovie.tv.ui.components.SkeletonDetails
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
-import fr.moovie.tv.ui.adaptive.isPointerUi
 import fr.moovie.tv.ui.player.MooviePlayerController
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
-
-/**
- * Largeur du volet gauche d'une fiche série (titre, résumé, saisons, actions).
- *
- * Contenue à dessein : en 1080p l'écran ne fait que 960 dp de large, et chaque
- * point pris ici est un point de moins pour la liste des épisodes — qui est ce
- * qu'on vient consulter.
- */
-private val SERIES_PANE_WIDTH = 380.dp
 
 /**
  * Délai laissé au `bringIntoView` déclenché par la prise de focus avant de
@@ -205,22 +209,41 @@ private const val SCROLL_SETTLE_MS = 120L
  * Trois secondes : assez pour que traverser des fiches n'en lance aucune, assez
  * court pour que s'arrêter sur un titre donne l'impression que l'app répond.
  */
+/**
+ * L'espacement entre les blocs de la page.
+ *
+ * Nommé plutôt que répété : le défilement vers un onglet s'en sert pour savoir
+ * où la barre commence, et deux valeurs indépendantes finiraient par diverger —
+ * la page se calerait alors seize points à côté, ce qui se voit.
+ */
+private val ESPACEMENT_PAGE = 16.dp
+
 private const val HERO_PREVIEW_DELAY_MS = 3_000L
+
+/**
+ * Rythme auquel on demande au lecteur où il en est, pour savoir s'il a fini.
+ *
+ * Une demi-seconde : deux lectures par seconde suffisent à rendre l'image du
+ * hero sans qu'on voie l'attente, et c'est déjà moins que le sondage des
+ * contrôles du plein écran, qui affichent une position au dixième près.
+ */
+private const val FIN_APERCU_POLL_MS = 500L
+
+/**
+ * De combien on peut manquer la fin sans la manquer.
+ *
+ * Un lecteur ne s'arrête presque jamais pile sur la dernière milliseconde
+ * annoncée : il reste un reliquat de quelques dixièmes, et exiger l'égalité
+ * ferait attendre le butoir de la durée annoncée alors que la vidéo est
+ * visiblement terminée.
+ */
+private const val FIN_APERCU_MARGE_MS = 800L
 
 /** Fondu d'apparition de l'aperçu : il remplace une affiche, il ne surgit pas. */
 private const val HERO_PREVIEW_FADE_MS = 800
 
-/**
- * Temps sans mouvement de souris avant que l'interface ne s'efface.
- *
- * Trois secondes, comme le délai de l'aperçu lui-même : assez pour ne pas
- * clignoter quand on traverse la fenêtre, assez court pour que rester immobile
- * soit visiblement récompensé.
- */
-private const val CINEMA_IDLE_MS = 3_000L
-
 /** L'interface s'efface doucement — c'est un fondu, pas une disparition. */
-private const val CINEMA_UI_FADE_MS = 600
+private const val UI_FADE_MS = 600
 
 /**
  * Inactivité au bout de laquelle la chrome de la bande-annonce se replie.
@@ -237,7 +260,7 @@ private const val TRAILER_CHROME_IDLE_MS = 4_000L
  * Un son qui apparaît d'un coup s'entend comme un défaut ; un fondu s'entend
  * comme une intention.
  */
-private const val CINEMA_SOUND_FADE_MS = 1_200
+private const val TRAILER_SOUND_FADE_MS = 1_200
 
 /**
  * Temps laissé au bandeau « langue indisponible » avant de s'effacer.
@@ -270,24 +293,16 @@ private const val QUICKPLAY_BANNER_WITH_REASON_MS = 8_000L
 private val CAST_CARD_WIDTH = 96.dp
 
 /**
- * Dispose une fiche de série : description à gauche, épisodes à droite sur grand
- * écran — tout dans un même défilement sur téléphone.
+ * Dispose la fiche d'une série **au doigt** : en-tête et épisodes dans un seul
+ * défilement.
  *
  * ## Pourquoi l'en-tête et les épisodes arrivent séparément
  *
- * Les deux dispositions ne diffèrent pas seulement par le sens de l'empilement,
- * mais par **ce qui défile**. Sur grand écran, l'en-tête est posé et seuls les
- * épisodes bougent : il décrit ce qu'on parcourt, et le perdre au premier appui
- * vers le bas revenait à naviguer à l'aveugle dans une liste de vingt épisodes.
- * Une télécommande n'a de toute façon pas de défilement libre — il n'y a que du
- * focus qui se déplace, et l'en-tête n'a aucune raison de suivre.
- *
- * Au doigt, c'est l'inverse. La page ne défilait pas, seule la liste le faisait,
- * si bien que le titre, le résumé, la rangée des saisons et les actions
- * occupaient à demeure la moitié haute d'un écran de téléphone — il restait une
- * fenêtre de deux épisodes pour parcourir la saison, et un geste sur l'en-tête
- * ne faisait rien du tout. Ce n'est pas ainsi qu'une page se lit sur un
- * téléphone : elle défile en entier.
+ * La page ne défilait pas, seule la liste le faisait, si bien que le titre, le
+ * résumé, la rangée des saisons et les actions occupaient à demeure la moitié
+ * haute d'un écran de téléphone — il restait une fenêtre de deux épisodes pour
+ * parcourir la saison, et un geste sur l'en-tête ne faisait rien du tout. Ce
+ * n'est pas ainsi qu'une page se lit sur un téléphone : elle défile en entier.
  *
  * D'où ces deux paramètres plutôt qu'un `content` unique. Pour que l'en-tête
  * défile *avec* les épisodes, il doit être un élément de leur liste — et un
@@ -295,10 +310,18 @@ private val CAST_CARD_WIDTH = 96.dp
  * que le point d'appel n'a pas. C'est aussi ce qui garde la paresse : on aurait
  * pu rendre la page défilante et poser les épisodes dans une `Column`
  * ordinaire, au prix de composer les vingt-cinq d'un coup, images comprises.
+ *
+ * ## Ce qui a disparu
+ *
+ * Il y avait ici un second cas, deux volets côte à côte pour le grand écran,
+ * avec un en-tête posé hors du défilement. La refonte du hero l'a remplacé : la
+ * fiche série défile désormais en entier comme celle d'un film, et la liste
+ * d'épisodes vit sous un onglet. Le paramètre `compact` avec lui — cette
+ * fonction n'est plus appelée que pour le tactile, et un booléen dont une seule
+ * valeur est atteignable ne décrit plus rien.
  */
 @Composable
 private fun SeriesPanes(
-    compact: Boolean,
     episodesState: LazyListState,
     modifier: Modifier = Modifier,
     /** Titre, résumé de saison, rangée des saisons et actions. */
@@ -308,49 +331,19 @@ private fun SeriesPanes(
     /** Les épisodes, posés en éléments de liste paresseuse. */
     episodes: LazyListScope.() -> Unit,
 ) {
-    if (compact) {
-        LazyColumn(
-            state = episodesState,
-            modifier = modifier,
-            // Les marges de la page passent par le `contentPadding` de la liste,
-            // qui les porte maintenant pour tout le monde — en-tête compris.
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            item { header(Modifier.fillMaxWidth()) }
-            if (infoPanel != null) {
-                item { infoPanel(Modifier.fillMaxWidth()) }
-            } else {
-                episodes()
-            }
-        }
-    } else {
-        Row(
-            modifier = modifier,
-            horizontalArrangement = Arrangement.spacedBy(24.dp),
-        ) {
-            header(Modifier.width(SERIES_PANE_WIDTH).padding(start = 48.dp))
-            // `weight` n'existe que dans le scope de la `Row` : le volet droit se
-            // construit donc ici, pas au point d'appel.
-            val volet = Modifier.weight(1f).fillMaxHeight()
-            if (infoPanel != null) {
-                infoPanel(volet.padding(end = 48.dp, bottom = 24.dp))
-            } else {
-                // LazyColumn et non Column défilante : c'est ce qui donne
-                // `animateScrollToItem`, seul moyen de caler l'épisode focalisé en
-                // haut — sans quoi il se colle en bas du cadre et le suivant reste
-                // invisible, exactement le défaut corrigé sur les rangées de
-                // l'accueil.
-                LazyColumn(
-                    state = episodesState,
-                    modifier = volet,
-                    // Marges dans le contentPadding : l'agrandissement au focus
-                    // déborde dedans au lieu d'être rogné.
-                    contentPadding = PaddingValues(end = 48.dp, bottom = 24.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    content = episodes,
-                )
-            }
+    LazyColumn(
+        state = episodesState,
+        modifier = modifier,
+        // Les marges de la page passent par le `contentPadding` de la liste,
+        // qui les porte maintenant pour tout le monde — en-tête compris.
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item { header(Modifier.fillMaxWidth()) }
+        if (infoPanel != null) {
+            item { infoPanel(Modifier.fillMaxWidth()) }
+        } else {
+            episodes()
         }
     }
 }
@@ -368,6 +361,13 @@ fun DetailsScreenContent(
     resolvingUrl: String?,
     /** Ouvre la filmographie d'une personne du casting. */
     onOpenPerson: (CastMember) -> Unit = {},
+    /**
+     * Les titres proches, pour l'onglet « À voir aussi ». Vide = pas d'onglet :
+     * voir [DetailsTabs].
+     */
+    recommendations: List<TmdbItem> = emptyList(),
+    /** Ouvre une autre fiche depuis « À voir aussi ». */
+    onOpenTitle: (tmdbId: Int, isTv: Boolean) -> Unit = { _, _ -> },
     streamLang: StreamLanguage,
     watched: Set<String>,
     resume: Map<String, ResumeEntry>,
@@ -454,7 +454,7 @@ fun DetailsScreenContent(
     downloadSearching: Boolean = false,
     /** Réglage utilisateur : l'aperçu se lance-t-il tout seul. */
     trailerAutoplay: Boolean = true,
-    /** Réglage utilisateur : le son de l'aperçu monte-t-il en mode cinéma. */
+    /** Réglage utilisateur : l'aperçu du hero démarre-t-il avec le son. */
     trailerSound: Boolean = false,
     /**
      * Pays de l'utilisateur (`FR`), pour choisir la bonne classification d'âge
@@ -463,6 +463,14 @@ fun DetailsScreenContent(
     country: String = "FR",
     onDismissQuickPlay: () -> Unit,
     onBack: () -> Unit,
+    /**
+     * Referme la fiche d'un épisode et revient à la liste de la série.
+     *
+     * Séparé de [onBack], qui quitte la fiche entière : ce sont deux retours
+     * différents, et les confondre faisait sortir de la série pour aller à
+     * l'accueil. Voir le bouton retour plus bas.
+     */
+    onCloseEpisode: () -> Unit = {},
     // Desktop uniquement : bouton retour à l'écran (sur TV, la télécommande a
     // sa propre touche Retour, pas besoin d'un bouton).
     showBackButton: Boolean = false,
@@ -531,9 +539,21 @@ fun DetailsScreenContent(
 
     // Le focus est aussi replacé quand on entre/sort d'une fiche d'épisode :
     // le bouton porteur de `primaryFocus` change de nœud à ce moment-là.
-    LaunchedEffect(state, selectedEpisode) {
+    //
+    // **Sur le titre, pas sur l'état.** `state` change aussi quand on choisit
+    // une autre saison — et reprendre le focus à ce moment-là ramenait la page
+    // tout en haut (`primaryModifier` remonte à la prise de focus), c'est-à-dire
+    // qu'on quittait la liste qu'on venait d'ouvrir. Le geste dit exactement le
+    // contraire : je reste ici, je change de saison. La clé du titre, elle, ne
+    // bouge pas d'une saison à l'autre.
+    LaunchedEffect(state.titleKey(), selectedEpisode) {
         val tv = state as? DetailsState.Tv
-        val wantsEpisode = tv != null && tv.resumeEpisode > 0 && selectedEpisode == null && !autoFocusDone
+        // Sur grand écran, le hero porte maintenant un bouton « Reprendre ·
+        // S2E4 » : viser l'épisode dans la liste ferait passer le focus
+        // par-dessus le hero à l'ouverture, pour arriver au même geste un cran
+        // plus loin. Au doigt, où il n'y a pas de hero, la visée reste utile.
+        val wantsEpisode = compact && tv != null && tv.resumeEpisode > 0 &&
+            selectedEpisode == null && !autoFocusDone
         if (wantsEpisode) {
             // Le décalage compte les éléments posés avant les épisodes : voir
             // [episodeItemOffset].
@@ -588,19 +608,6 @@ fun DetailsScreenContent(
     val ready = trailer as? TrailerState.Ready
     var previewPlaying by remember(ready?.video?.key) { mutableStateOf(false) }
 
-    // ── Mode cinéma ─────────────────────────────────────────────────────────
-    //
-    // L'interface s'efface, le son monte, et la bande-annonce a l'écran pour
-    // elle. Le moindre mouvement de souris la rend : on est revenu, on veut
-    // ses boutons.
-    //
-    // **Au pointeur seulement.** Le signal d'activité est le mouvement de
-    // souris, qui n'existe ni sur un téléviseur ni sur un téléphone ; sans lui
-    // l'interface disparaîtrait sans aucun moyen de la rappeler. L'aperçu y
-    // reste donc muet, sous une interface visible, ce qu'il était déjà.
-    val cinemaCapable = isPointerUi && trailerPreview != null
-    var cinema by remember(ready?.video?.key) { mutableStateOf(false) }
-
     // Le lecteur du fond, prêté par la plateforme. C'est *lui* que les contrôles
     // pilotent : il n'y a pas de second lecteur pour la bande-annonce.
     var trailerController by remember(ready?.video?.key) {
@@ -609,30 +616,20 @@ fun DetailsScreenContent(
     // Le réglage donne l'état de départ, l'utilisateur garde la main ensuite.
     var trailerMuted by remember(trailerExpanded) { mutableStateOf(!trailerSound) }
 
-    // L'activité passe par un flux et **non par un état Compose** : une souris
-    // émet des dizaines d'événements par seconde, et un `mutableStateOf`
+    // Le son de l'aperçu **dans le hero**. Le réglage donne l'état de départ ;
+    // le bouton du cadre garde la main ensuite.
+    //
+    // Muet par défaut, et c'est le bon défaut : la page vient de s'ouvrir,
+    // personne n'a rien demandé, et une vidéo qui parle toute seule dans un
+    // salon est une nuisance.
+    var apercuMuet by remember(ready?.video?.key) { mutableStateOf(!trailerSound) }
+
+    // L'activité du pointeur passe par un flux et **non par un état Compose** :
+    // une souris en émet des dizaines par seconde, et un `mutableStateOf`
     // incrémenté à chacun recomposerait toute la fiche pendant qu'on la
-    // traverse. Ici rien ne recompose tant que `cinema` ne change pas.
+    // traverse. Ici rien ne recompose tant que la chrome ne change pas.
     val pointerActivity = remember {
         MutableSharedFlow<Unit>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
-    }
-
-    // Suspendue tant que la bande-annonce est au premier plan : là, un mouvement
-    // de souris sert à viser un bouton, pas à réclamer l'interface de la fiche.
-    LaunchedEffect(previewPlaying, cinemaCapable, trailerExpanded) {
-        if (!previewPlaying || !cinemaCapable || trailerExpanded) {
-            cinema = false
-            return@LaunchedEffect
-        }
-        while (true) {
-            // Le mode s'arme après un temps sans mouvement…
-            while (withTimeoutOrNull(CINEMA_IDLE_MS) { pointerActivity.first() } != null) Unit
-            cinema = true
-            // …et se désarme au premier mouvement suivant, puis se réarme :
-            // c'est la boucle qui fait le va-et-vient, sans horloge à lire.
-            pointerActivity.first()
-            cinema = false
-        }
     }
 
     // Chrome de la bande-annonce : visible à l'ouverture, repliée sans activité,
@@ -661,10 +658,9 @@ fun DetailsScreenContent(
         }
     }
 
-    // La souris réveille aussi la chrome, pas seulement le mode cinéma : sur
-    // desktop c'est le seul geste disponible sans cliquer, et cliquer pour
-    // faire réapparaître une barre qu'on veut simplement consulter serait une
-    // pause non demandée.
+    // La souris réveille la chrome : sur desktop c'est le seul geste disponible
+    // sans cliquer, et cliquer pour faire réapparaître une barre qu'on veut
+    // simplement consulter serait une pause non demandée.
     LaunchedEffect(trailerExpanded) {
         if (!trailerExpanded) return@LaunchedEffect
         while (true) {
@@ -673,24 +669,33 @@ fun DetailsScreenContent(
         }
     }
 
-    // Les deux états qui découvrent la bande-annonce, et la seule différence
-    // entre eux est la présence des contrôles.
-    val trailerInFront = trailerExpanded || cinema
+    // **Le mode cinéma n'existe plus.**
+    //
+    // La bande-annonce passait toute seule au premier plan après quelques
+    // secondes sans souris : l'interface s'effaçait, le son montait, et la vidéo
+    // prenait l'écran. C'était une réponse au fait qu'elle jouait *derrière* la
+    // page, où on la voyait mal. Elle joue maintenant dans le cadre du hero,
+    // avec ses commandes — dont « agrandir ». Il ne reste à un déclenchement
+    // automatique que ses inconvénients : une page qui se dérobe pendant qu'on
+    // la lit, et qu'il faut réveiller pour s'en servir.
+    //
+    // Ne reste donc que la demande explicite.
+    val trailerInFront = trailerExpanded
     val soundWanted = when {
         trailerExpanded -> !trailerMuted
-        // Le mode cinéma s'arme tout seul : il obéit au réglage, sans discuter.
-        cinema -> trailerSound
-        else -> false
+        // L'aperçu du hero. Hors du hero encadré — téléphone, fiche d'épisode —
+        // aucun bouton ne touche à `apercuMuet`, et le réglage y décide seul.
+        else -> !apercuMuet
     }
 
     val volume by animateFloatAsState(
         targetValue = if (soundWanted) 1f else 0f,
-        animationSpec = tween(CINEMA_SOUND_FADE_MS),
+        animationSpec = tween(TRAILER_SOUND_FADE_MS),
         label = "trailerVolume",
     )
     val uiAlpha by animateFloatAsState(
         targetValue = if (trailerInFront) 0f else 1f,
-        animationSpec = tween(CINEMA_UI_FADE_MS),
+        animationSpec = tween(UI_FADE_MS),
         label = "detailsUiAlpha",
     )
 
@@ -713,33 +718,84 @@ fun DetailsScreenContent(
             previewPlaying = false
             return@LaunchedEffect
         }
-        // **Déjà en cours : on n'y touche pas.** Cet effet se relance à chaque
-        // ouverture *et fermeture* des contrôles ; remettre l'aperçu à zéro en
-        // sortant le faisait recharger le même manifeste dans un second
-        // lecteur, ce que googlevideo sanctionne d'un 403 — le défaut qui avait
-        // déjà valu un plantage. Fermer les contrôles doit rendre l'interface,
-        // rien d'autre.
-        if (previewPlaying) return@LaunchedEffect
-        delay(HERO_PREVIEW_DELAY_MS)
-        previewPlaying = true
-        // On rend la main à l'affiche à la fin plutôt que de laisser une image
-        // figée : `durationSeconds` vient de YouTube, et le lecteur d'aperçu n'a
-        // pas de rappel de fin à nous donner. Zéro (durée inconnue) laisse
-        // simplement l'aperçu courir.
-        val duree = ready.durationSeconds
-        if (duree > 0) {
-            delay(duree * 1000L)
-            previewPlaying = false
+        // **Déjà en cours : on ne relance pas, mais on surveille quand même.**
+        //
+        // Cet effet se rejoue à chaque ouverture *et* fermeture des contrôles.
+        // Remettre l'aperçu à zéro en sortant le faisait recharger le même
+        // manifeste dans un second lecteur, ce que googlevideo sanctionne d'un
+        // 403 — le défaut qui avait déjà valu un plantage. On saute donc le
+        // démarrage, mais pas la veille de fin qui suit : revenir du plein écran
+        // laissait sinon l'aperçu tourner jusqu'à la dernière trame, sans jamais
+        // rendre son image au hero.
+        if (!previewPlaying) {
+            delay(HERO_PREVIEW_DELAY_MS)
+            previewPlaying = true
+        }
+
+        // ── Ce qui se passe à la fin de la bande-annonce ─────────────────────
+        //
+        // **On rend le cadre à l'image**, plutôt que de laisser la dernière
+        // trame figée — ou, sur mpv, un cadre vidé donc noir, ce qui est pire :
+        // le hero paraît cassé alors qu'il ne fait qu'avoir fini.
+        //
+        // Et quand il n'y a pas d'image à rendre, on **reboucle** : un cadre
+        // noir vaut moins que la même bande-annonce une seconde fois. Le
+        // rembobinage passe par le lecteur déjà ouvert (`seekTo`) et non par un
+        // second, qui rouvrirait le même manifeste googlevideo — 403 garanti,
+        // c'est le défaut qui avait valu un plantage.
+        //
+        // La fin se **constate** au lieu de se calculer. `durationSeconds` vient
+        // de YouTube et décrit la vidéo, pas ce que le flux nous laisse lire :
+        // googlevideo bride certains manifestes, et la lecture s'arrête bien
+        // avant l'échéance annoncée. On surveille donc la position du lecteur,
+        // en gardant la durée annoncée comme butoir — sans elle, un flux bridé
+        // ne finirait jamais.
+        val butoirMs = ready.durationSeconds.takeIf { it > 0 }?.times(1000L)
+        while (true) {
+            var joueDepuisMs = 0L
+            while (true) {
+                delay(FIN_APERCU_POLL_MS)
+                val lecteur = trailerController
+                val position = lecteur?.positionMs() ?: 0L
+                val duree = lecteur?.durationMs() ?: 0L
+                if (duree > 0 && position >= duree - FIN_APERCU_MARGE_MS) break
+                // **Le butoir ne compte que le temps joué.** En pause,
+                // l'utilisateur a demandé que rien ne bouge — l'échéance
+                // comprise. Sans cette garde, une bande-annonce mise en pause
+                // au bouton du cadre rendait sa place à l'image toute seule,
+                // au bout de sa durée annoncée.
+                if (lecteur?.isPlaying != false) joueDepuisMs += FIN_APERCU_POLL_MS
+                if (butoirMs != null && joueDepuisMs >= butoirMs) break
+            }
+            if (backdrop != null) {
+                previewPlaying = false
+                return@LaunchedEffect
+            }
+            trailerController?.seekTo(0)
         }
     }
 
-    Box(
+    // `BoxWithConstraints` et non `Box` : le hero se dimensionne en fraction
+    // de la hauteur visible, et cette hauteur n'existe plus une fois entré dans
+    // le défilement vertical, où l'espace disponible est infini par nature.
+    // Vrai quand la page s'ouvre sur une image à fond perdu : elle décide du
+    // fond, de la marge haute et de la hauteur du hero.
+    //
+    // La fiche d'un **épisode** en est exclue : elle a son propre en-tête
+    // (`EpisodeHero`), qui montre l'image de l'épisode et non celle de la
+    // série, et qui n'a jamais été le sujet de cette refonte.
+    val heroPleinCadre = !compact && when (state) {
+        is DetailsState.Movie -> true
+        is DetailsState.Tv -> selectedEpisode == null
+        else -> false
+    }
+    BoxWithConstraints(
         modifier = Modifier.fillMaxSize().then(
-            // Observé aussi quand la bande-annonce est au premier plan, et pas
-            // seulement en mode cinéma : c'est ce même flux qui réveille sa
-            // chrome, y compris au doigt — un écran tactile n'a pas de
-            // survol, mais toucher est bien une activité.
-            if (!cinemaCapable && !trailerExpanded) {
+            // Observé seulement quand la bande-annonce est au premier plan :
+            // c'est ce flux qui réveille sa chrome, y compris au doigt — un
+            // écran tactile n'a pas de survol, mais toucher est bien une
+            // activité.
+            if (!trailerExpanded) {
                 Modifier
             } else {
                 // Passe **Initial** : on observe le pointeur sans lui prendre
@@ -756,41 +812,20 @@ fun DetailsScreenContent(
             },
         ),
     ) {
-        backdrop?.let { url ->
-            MoovieAsyncImage(
-                model = url,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize().blur(40.dp),
-            )
-        }
-        // Au-dessus de l'affiche, et non à sa place : elle reste dessous pendant
-        // le fondu, et pendant la seconde ou deux que le flux met à afficher sa
-        // première image. Sans elle on verrait du noir.
-        if (previewPlaying && ready != null && trailerPreview != null) {
-            AnimatedVisibility(
-                visible = true,
-                enter = fadeIn(animationSpec = tween(HERO_PREVIEW_FADE_MS)),
-                modifier = Modifier.fillMaxSize(),
-            ) {
-                trailerPreview(
-                    ready.stream,
-                    volume,
-                    { trailerController = it },
-                    Modifier.fillMaxSize(),
+        // Le fond flouté habille la page **quand rien d'autre ne le fait**. Sous
+        // un hero net qui porte déjà l'image en grand, il la répétait en flou
+        // derrière le reste de la page : deux fois la même chose, dont une
+        // illisible. La maquette s'arrête au noir sous le hero, et elle a raison.
+        if (!heroPleinCadre) {
+            backdrop?.let { url ->
+                MoovieAsyncImage(
+                    model = url,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize().blur(40.dp),
                 )
             }
         }
-        // Le voile s'efface avec l'interface qu'il sert à rendre lisible : le
-        // garder en mode cinéma assombrirait la bande-annonce pour rien.
-        Box(
-            modifier = Modifier.fillMaxSize()
-                .graphicsLayer { alpha = uiAlpha }
-                .background(
-                    Brush.verticalGradient(listOf(Color(0xAA0A0A0A), Color(0xE00A0A0A))),
-                ),
-        )
-
         // Scroll pleine largeur + marges portées par les enfants : les éléments
         // agrandis au focus débordent dans la marge au lieu d'être rognés.
         // 48 dp de marge, c'est le recul d'un salon. Sur 448 dp de large elles
@@ -801,15 +836,172 @@ fun DetailsScreenContent(
         // diverger, et c'est exactement ce qui avait décalé le casting.
         val hPadDp = if (compact) 16.dp else 48.dp
         val hPad = Modifier.padding(horizontal = hPadDp)
-        // Marge haute agrandie sur desktop pour que le titre passe sous le
-        // bouton retour en overlay (sinon ils se chevauchent).
-        val topPad = if (showBackButton) 96.dp else 48.dp
+        // **Le hero commence au pixel zéro, tout le reste non.**
+        //
+        // Une marge haute existe pour que le titre ne passe pas sous le bouton
+        // retour en overlay. Le hero, lui, doit toucher le bord : c'est une
+        // image à fond perdu, et la repousser de 96 dp laissait une bande noire
+        // au-dessus qui la transformait en bannière posée dans la page. Le
+        // bouton retour passe par-dessus, ce qu'il sait déjà faire, et le
+        // dégradé du hero le porte sans qu'il devienne illisible.
+        // **Toute la hauteur visible, moins la barre d'onglets.**
+        //
+        // C'est la mesure de la maquette, et elle vaut mieux qu'un pourcentage :
+        // l'image va jusqu'en bas de l'écran, et la barre d'onglets se pose
+        // dessous, juste assez visible pour dire que la page continue. Un
+        // pourcentage laissait soit une bande morte sous le hero, soit rien du
+        // tout selon la fenêtre ; ici le raccord est exact quelle que soit la
+        // taille.
+        //
+        // Le plancher tient le cas d'une fenêtre écrasée en hauteur, où le titre
+        // et les boutons ne tiendraient plus — on préfère alors déborder et
+        // laisser défiler.
+        val hauteurHero = (maxHeight - HAUTEUR_ONGLETS - AMORCE_SOUS_ONGLETS)
+            .coerceAtLeast(300.dp)
+        // **La marge du hero n'est pas celle de la page.**
+        //
+        // 48 dp collaient le titre et le synopsis contre le bord gauche, tout
+        // le contenu tassé sur le premier tiers d'une image qui en fait trois.
+        // La maquette respire : elle rentre son bloc d'environ un dixième de la
+        // largeur de chaque côté, ce qui fait de la place au texte au lieu de
+        // l'empiler. Le plancher garde la marge de page sur une fenêtre
+        // étroite, où un dixième ne serait plus rien.
+        val margeHero = (maxWidth * 0.09f).coerceAtLeast(hPadDp)
+        // Ce qui suit le hero s'aligne sur lui : la barre d'onglets, les
+        // rangées, les panneaux. Un contenu rentré de 48 dp sous un titre rentré
+        // de 170 en aurait fait deux pages posées l'une sur l'autre.
+        val hPadHero = Modifier.padding(horizontal = margeHero)
+        val topPad = when {
+            heroPleinCadre -> 0.dp
+            showBackButton -> 96.dp
+            else -> 48.dp
+        }
         val pageScope = rememberCoroutineScope()
-        // Sur la liste des épisodes d'une série, la page ne défile pas en bloc :
-        // l'en-tête et les saisons restent posés, seuls les épisodes défilent
-        // (voir plus bas). Partout ailleurs — film, fiche d'épisode — le
-        // défilement global reste le bon comportement.
-        val seriesList = state is DetailsState.Tv && selectedEpisode == null
+        // **La page ne porte pas son propre défilement quand un enfant le
+        // porte déjà.** C'est le cas de la fiche série au doigt, dont
+        // `SeriesPanes` est une `LazyColumn`.
+        //
+        // Sur grand écran, ce n'était pas une question de conteneur mais de
+        // parti pris : l'en-tête restait posé et seuls les épisodes défilaient,
+        // pour ne pas perdre de vue ce qu'on parcourait. Le hero plein cadre le
+        // rend intenable — il ne resterait rien à la liste — et la maquette
+        // tranche dans l'autre sens : la page défile en entier, hero compris.
+        val seriesList = compact && state is DetailsState.Tv && selectedEpisode == null
+
+        // **Un seul lecteur, et il ne bouge pas de l'arbre.**
+        //
+        // La bande-annonce doit tenir dans le cadre du hero tant qu'on parcourt
+        // la fiche, et prendre l'écran entier dès qu'elle passe devant. Ce sont
+        // deux places à l'écran, mais surtout deux places dans l'arbre si l'on
+        // écrit l'appel là où il paraît : la seconde ferait naître un second
+        // lecteur, qui rouvrirait le même manifeste googlevideo — et
+        // googlevideo répond 403 à la seconde demande. Un `movableContentOf`
+        // aurait dû résoudre exactement cela ; essayé, il n'apparie pas les
+        // deux sites (l'un est un paramètre différé de `DetailsHero`) et
+        // Compose plante sur un nœud qui a déjà un parent.
+        //
+        // Le lecteur reste donc **ici**, seul, et c'est son cadre qu'on
+        // déplace. Le hero occupe exactement le haut de la page, sur toute la
+        // largeur : sa boîte est connue sans avoir à la mesurer.
+        //
+        // Vrai quand la bande-annonce joue dans le cadre du hero : elle y prend
+        // la place de l'image, et c'est le hero qui porte ses commandes.
+        val apercuDansHero = heroPleinCadre && !trailerInFront &&
+            previewPlaying && ready != null && trailerPreview != null
+        if (previewPlaying && ready != null && trailerPreview != null) {
+            AnimatedVisibility(
+                visible = true,
+                enter = fadeIn(animationSpec = tween(HERO_PREVIEW_FADE_MS)),
+                modifier = if (apercuDansHero) {
+                    Modifier
+                        .align(Alignment.TopStart)
+                        .fillMaxWidth()
+                        .height(hauteurHero)
+                        // La page défile, le hero monte, la vidéo le suit.
+                        // Lue dans la couche graphique et non dans la mesure :
+                        // le défilement ne redéclenche alors qu'un dessin.
+                        .graphicsLayer { translationY = -pageScroll.value.toFloat() }
+                } else {
+                    Modifier.fillMaxSize()
+                },
+            ) {
+                trailerPreview(
+                    ready.stream,
+                    volume,
+                    { trailerController = it },
+                    Modifier.fillMaxSize(),
+                )
+            }
+        }
+
+        // Le voile s'efface avec l'interface qu'il sert à rendre lisible : le
+        // garder derrière la bande-annonce agrandie l'assombrirait pour rien.
+        //
+        // Il ne sert plus rien du tout sous un hero plein cadre : il existait
+        // pour tempérer le fond flouté, qui n'y est plus, et sa couleur est au
+        // demeurant celle du fond du thème — il n'assombrirait que du noir.
+        // Le garder aurait en revanche voilé la bande-annonce, qui se joue
+        // désormais dessous.
+        if (!heroPleinCadre) {
+            Box(
+                modifier = Modifier.fillMaxSize()
+                    .graphicsLayer { alpha = uiAlpha }
+                    .background(
+                        Brush.verticalGradient(listOf(Color(0xAA0A0A0A), Color(0xE00A0A0A))),
+                    ),
+            )
+        }
+
+        // ── Onglets ─────────────────────────────────────────────────────────
+        //
+        // La barre ne s'affiche que sous un hero plein cadre : c'est la même
+        // refonte, et elle ne descend ni au doigt ni sur la fiche d'un épisode.
+        //
+        // Retenu par valeur et non par index, remis à zéro au changement de
+        // titre : d'une fiche à l'autre la barre n'a pas les mêmes onglets, et
+        // « le troisième » n'y désigne pas la même chose.
+        var ongletChoisi by remember(state.titleKey()) { mutableStateOf<DetailsTab?>(null) }
+        val onglets = buildList {
+            if (state is DetailsState.Tv && selectedEpisode == null) add(DetailsTab.EPISODES)
+            if (recommendations.isNotEmpty()) add(DetailsTab.SIMILAIRES)
+            if (ready != null) add(DetailsTab.BANDES_ANNONCES)
+            add(DetailsTab.INFOS)
+        }
+        // L'onglet retenu peut avoir disparu — « À voir aussi » n'arrive
+        // qu'après sa requête, « Bandes-annonces » après la résolution du flux.
+        // On retombe alors sur le premier, jamais sur du vide.
+        val ongletActif = ongletChoisi?.takeIf { it in onglets } ?: onglets.first()
+
+        // **Choisir un onglet amène à son contenu.**
+        //
+        // La barre est posée au bas de l'image : au repos, ce qu'elle ouvre est
+        // hors de l'écran. Changer d'onglet ne montrait donc rien du tout — il
+        // fallait défiler ensuite, en devinant qu'il y avait quelque chose à
+        // voir. La page vient se caler juste sous la barre, qui reste visible en
+        // haut : on garde le moyen de changer d'avis.
+        //
+        // La cible se calcule, elle ne se mesure pas : le hero est le premier
+        // élément de la colonne et la barre le suit, séparés du seul espacement
+        // de la colonne. Un `onGloballyPositioned` aurait donné le même nombre
+        // au prix d'un état de plus et d'une image de retard.
+        val densite = LocalDensity.current
+        val hautDesOnglets = with(densite) { (hauteurHero + ESPACEMENT_PAGE).roundToPx() }
+        // Défini une fois pour les deux fiches : c'est la même barre, au même
+        // endroit, et la dupliquer aurait fini par la faire diverger.
+        val barreOnglets: @Composable () -> Unit = {
+            BandeauOnglets {
+                DetailsTabs(
+                    onglets = onglets,
+                    actif = ongletActif,
+                    onSelect = {
+                        ongletChoisi = it
+                        pageScope.launch { pageScroll.animateScrollTo(hautDesOnglets) }
+                    },
+                    modifier = hPadHero,
+                )
+            }
+        }
+
         Column(
             modifier = Modifier.fillMaxSize()
                 // Effacée, pas démontée : la page garde sa position de
@@ -818,7 +1010,7 @@ fun DetailsScreenContent(
                 .graphicsLayer { alpha = uiAlpha }
                 .then(if (seriesList) Modifier else Modifier.verticalScroll(pageScroll))
                 .padding(top = topPad, bottom = 48.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(ESPACEMENT_PAGE),
         ) {
             when (val s = state) {
                 DetailsState.Loading -> SkeletonDetails(modifier = hPad)
@@ -828,15 +1020,6 @@ fun DetailsScreenContent(
                 }
                 is DetailsState.Movie -> {
                     val movieWatched = movieKey in watched
-                    // Même mise en page que la fiche d'épisode — visuel à gauche,
-                    // métadonnées et synopsis à droite — pour que les deux fiches
-                    // du catalogue se ressemblent au lieu de diverger.
-                    MovieHeader(
-                        details = s.details,
-                        isWatched = movieWatched,
-                        showOverview = !compact,
-                    )
-
                     // Bouton Lire direct : loader pendant le chargement des sources,
                     // cliquable dès qu'un lien dans la langue préférée existe,
                     // « VF indisponible » sinon. Le panneau reste en choix manuel.
@@ -844,91 +1027,232 @@ fun DetailsScreenContent(
                     val prefReady = active?.links?.any { it.language == streamLang.name } == true
                     val loadingSources = active == null || active.anyLoading
                     val searching = quickPlay is QuickPlayState.Searching
-                    Row(
-                        modifier = hPad,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        MoovieButton(
-                            // Jamais inerte, et c'est le point. Pendant le
-                            // chargement, la lecture démarre dès qu'une source
-                            // arrive. Et **quand il n'y en a aucune**, l'appui
-                            // reste le seul moyen d'obtenir le motif : la lecture
-                            // rapide conclut aussitôt et le publie dans son
-                            // bandeau. La garde d'avant en faisait un cul-de-sac
-                            // silencieux — on appuyait sur l'action principale de
-                            // la fiche, focalisée à l'arrivée sur TV, et il ne se
-                            // passait rien du tout.
-                            //
-                            // Le bouton de l'épisode (EpisodeHero) n'a jamais eu
-                            // cette garde : c'est pour ça que le bandeau se voyait
-                            // sur un épisode et jamais sur un film. Deux boutons
-                            // pour le même geste, un seul savait échouer.
-                            //
-                            // Appuyer deux fois ne relance rien : `startQuickPlay`
-                            // sort si son job tourne encore.
-                            onClick = onQuickPlayMovie,
-                            modifier = primaryModifier,
-                        ) {
-                            when {
-                                searching -> {
-                                    CircularProgressIndicator(
-                                        color = Color.White,
-                                        strokeWidth = 2.dp,
-                                        modifier = Modifier.size(14.dp),
-                                    )
-                                    Spacer(Modifier.width(8.dp))
-                                    Text(stringResource(Res.string.details_playing))
+                    // Les actions deviennent un **emplacement** : sur grand écran elles se
+                    // posent dans le hero, sous le titre, et non plus dans le flux de la
+                    // page. Les hisser ici plutôt que de les dupliquer garde une seule
+                    // définition des boutons pour les deux mises en page — leur état de
+                    // sources est déjà bien assez subtil pour n'exister qu'à un endroit.
+                    val boutonLire: @Composable () -> Unit = {
+                            MoovieButton(
+                                // Jamais inerte, et c'est le point. Pendant le
+                                // chargement, la lecture démarre dès qu'une source
+                                // arrive. Et **quand il n'y en a aucune**, l'appui
+                                // reste le seul moyen d'obtenir le motif : la lecture
+                                // rapide conclut aussitôt et le publie dans son
+                                // bandeau. La garde d'avant en faisait un cul-de-sac
+                                // silencieux — on appuyait sur l'action principale de
+                                // la fiche, focalisée à l'arrivée sur TV, et il ne se
+                                // passait rien du tout.
+                                //
+                                // Le bouton de l'épisode (EpisodeHero) n'a jamais eu
+                                // cette garde : c'est pour ça que le bandeau se voyait
+                                // sur un épisode et jamais sur un film. Deux boutons
+                                // pour le même geste, un seul savait échouer.
+                                //
+                                // Appuyer deux fois ne relance rien : `startQuickPlay`
+                                // sort si son job tourne encore.
+                                onClick = onQuickPlayMovie,
+                                // Le fond plein vient du modificateur, posé
+                                // avant que `MoovieButton` ne dessine sa propre
+                                // surface : `selected` seul ne donne qu'un
+                                // liseré, ce qui distingue mal l'action
+                                // principale de ses voisines. C'est le rose de
+                                // l'identité, pas une couleur inventée ici.
+                                modifier = primaryModifier.then(
+                                    if (compact) {
+                                        Modifier
+                                    } else {
+                                        // Toute la colonne de gauche, comme le
+                                        // « S'ABONNER » de la maquette : c'est
+                                        // cette largeur — pas seulement sa
+                                        // couleur — qui le désigne comme
+                                        // l'action de la page. Un bouton qui se
+                                        // contente d'entourer « Lire » reste un
+                                        // bouton parmi d'autres.
+                                        //
+                                        // Borné quand même : sur une fenêtre
+                                        // très large, la colonne dépasse le
+                                        // demi-millier de points et un bouton
+                                        // de cette longueur ne se lit plus
+                                        // comme un bouton.
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .widthIn(max = LARGEUR_MAX_BOUTON_PRINCIPAL)
+                                            .clip(MoovieShape)
+                                            .background(MOOVIE_ACCENT)
+                                    },
+                                ),
+                                // **L'action principale doit se voir comme
+                                // telle.** Au repos, un MoovieButton n'est que
+                                // son libellé : posé au milieu de quatre autres,
+                                // « Lire » ne se distinguait de « Sources » que
+                                // par le mot. `selected` lui donne la surface
+                                // pleine du thème, et la marge le fait peser —
+                                // c'est le gros bouton de la maquette, obtenu
+                                // avec le bouton du projet plutôt qu'avec un
+                                // second modèle à entretenir.
+                                selected = !compact,
+                                contentPadding = if (compact) {
+                                    PaddingValues(horizontal = 16.dp, vertical = 10.dp)
+                                } else {
+                                    PaddingValues(horizontal = 24.dp, vertical = 20.dp)
+                                },
+                            ) {
+                                val libelle: @Composable RowScope.() -> Unit = {
+                                    when {
+                                        searching -> {
+                                            CircularProgressIndicator(
+                                                color = Color.White,
+                                                strokeWidth = 2.dp,
+                                                modifier = Modifier.size(14.dp),
+                                            )
+                                            Spacer(Modifier.width(8.dp))
+                                            Text(stringResource(Res.string.details_playing))
+                                        }
+                                        prefReady -> Text(
+                                            (
+                                                if (resume.containsKey(movieKey)) {
+                                                    stringResource(Res.string.details_resume)
+                                                } else {
+                                                    stringResource(Res.string.details_play)
+                                                }
+                                                ).let { if (compact) it else it.uppercase() },
+                                        )
+                                        loadingSources -> {
+                                            CircularProgressIndicator(
+                                                color = MOOVIE_ACCENT,
+                                                strokeWidth = 2.dp,
+                                                modifier = Modifier.size(14.dp),
+                                            )
+                                            Spacer(Modifier.width(8.dp))
+                                            Text(stringResource(Res.string.details_searching, streamLang.name))
+                                        }
+                                        else -> Text(stringResource(Res.string.details_lang_unavailable, streamLang.name), color = Color(0xFF8A8A8A))
+                                    }
                                 }
-                                prefReady -> Text(
-                                    if (resume.containsKey(movieKey)) stringResource(Res.string.details_resume) else stringResource(Res.string.details_play),
+                                if (compact) libelle() else LibellePrincipal(libelle)
+                            }
+                    }
+
+                    // Tout ce qui n'est pas « Lire » : les gestes qu'on fait sur
+                    // un titre une fois qu'on a décidé de ne pas le lancer tout
+                    // de suite.
+                    val actionsSecondaires: @Composable () -> Unit = {
+                            MoovieButton(onClick = onOpenPanel) { Text(stringResource(Res.string.details_sources)) }
+                            // Icône seule : la rangée est déjà pleine, et un
+                            // téléviseur se reconnaît sans légende. N'apparaît que
+                            // si une TV a répondu — voir onSendToTv.
+                            onSendToTv?.let { send ->
+                                MoovieIconButton(
+                                    onClick = send,
+                                    icon = Icons.Default.Cast,
+                                    contentDescription = stringResource(Res.string.details_send_to_tv),
                                 )
-                                loadingSources -> {
-                                    CircularProgressIndicator(
-                                        color = MOOVIE_ACCENT,
-                                        strokeWidth = 2.dp,
-                                        modifier = Modifier.size(14.dp),
-                                    )
-                                    Spacer(Modifier.width(8.dp))
-                                    Text(stringResource(Res.string.details_searching, streamLang.name))
+                            }
+                            // Bande-annonce et « En savoir plus » ne sont plus ici :
+                            // ils vivent en haut à droite de la fiche. La rangée
+                            // d'actions retrouve de l'air, et ces deux-là ne sont
+                            // pas des actions sur le titre — l'un ouvre une vidéo,
+                            // l'autre change de vue.
+                            DownloadBestButton(downloadSearching, onDownloadBest)
+                            // Œil = marquer vu / non vu (outline verte quand vu).
+                            MoovieIconButton(
+                                onClick = { onToggleWatched(movieKey) },
+                                icon = if (movieWatched) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                contentDescription = if (movieWatched) stringResource(Res.string.mark_unwatched) else stringResource(Res.string.mark_watched),
+                                selected = movieWatched,
+                            )
+                            // Signet = « À regarder plus tard ». Plein + outline verte
+                            // quand le titre y est déjà, comme l'œil juste avant :
+                            // l'état se lit sans avoir à ouvrir quoi que ce soit.
+                            MoovieIconButton(
+                                onClick = onToggleWatchlist,
+                                icon = if (inWatchlist) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                                contentDescription = stringResource(
+                                    if (inWatchlist) Res.string.watchlist_remove else Res.string.watchlist_add,
+                                ),
+                                selected = inWatchlist,
+                            )
+                    }
+
+                    // **Deux lignes sur grand écran, une seule au doigt.**
+                    //
+                    // Aligné avec ses voisines, « Lire » n'était que le premier
+                    // bouton d'une rangée de six : la couleur le distinguait, la
+                    // position non. Seul sur sa ligne, il devient ce qu'il est —
+                    // l'action de la page — et les gestes secondaires forment un
+                    // groupe en dessous, qu'on lit comme tel. C'est le « S'ABONNER »
+                    // de la maquette, et c'est aussi une meilleure descente au
+                    // D-pad : du bouton principal on tombe sur les autres, au lieu
+                    // de les traverser latéralement pour sortir de la fiche.
+                    //
+                    // Au doigt la largeur ne le permet pas : deux lignes de boutons
+                    // sur 448 dp repousseraient le synopsis hors de l'écran, et la
+                    // rangée unique y tient déjà.
+                    val actionsFilm: @Composable () -> Unit = {
+                        if (compact) {
+                            Row(
+                                modifier = hPad,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                boutonLire()
+                                actionsSecondaires()
+                            }
+                        } else {
+                            // Pas de marge : le hero porte déjà celle de la page,
+                            // la remettre ici indenterait les boutons deux fois.
+                            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                boutonLire()
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    actionsSecondaires()
                                 }
-                                else -> Text(stringResource(Res.string.details_lang_unavailable, streamLang.name), color = Color(0xFF8A8A8A))
                             }
                         }
-                        MoovieButton(onClick = onOpenPanel) { Text(stringResource(Res.string.details_sources)) }
-                        // Icône seule : la rangée est déjà pleine, et un
-                        // téléviseur se reconnaît sans légende. N'apparaît que
-                        // si une TV a répondu — voir onSendToTv.
-                        onSendToTv?.let { send ->
-                            MoovieIconButton(
-                                onClick = send,
-                                icon = Icons.Default.Cast,
-                                contentDescription = stringResource(Res.string.details_send_to_tv),
-                            )
-                        }
-                        // Bande-annonce et « En savoir plus » ne sont plus ici :
-                        // ils vivent en haut à droite de la fiche. La rangée
-                        // d'actions retrouve de l'air, et ces deux-là ne sont
-                        // pas des actions sur le titre — l'un ouvre une vidéo,
-                        // l'autre change de vue.
-                        DownloadBestButton(downloadSearching, onDownloadBest)
-                        // Œil = marquer vu / non vu (outline verte quand vu).
-                        MoovieIconButton(
-                            onClick = { onToggleWatched(movieKey) },
-                            icon = if (movieWatched) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                            contentDescription = if (movieWatched) stringResource(Res.string.mark_unwatched) else stringResource(Res.string.mark_watched),
-                            selected = movieWatched,
+                    }
+
+                    if (compact) {
+                        // Même mise en page que la fiche d'épisode — visuel à gauche,
+                        // métadonnées et synopsis à droite — pour que les deux fiches
+                        // du catalogue se ressemblent au lieu de diverger.
+                        MovieHeader(
+                            details = s.details,
+                            isWatched = movieWatched,
+                            showOverview = false,
                         )
-                        // Signet = « À regarder plus tard ». Plein + outline verte
-                        // quand le titre y est déjà, comme l'œil juste avant :
-                        // l'état se lit sans avoir à ouvrir quoi que ce soit.
-                        MoovieIconButton(
-                            onClick = onToggleWatchlist,
-                            icon = if (inWatchlist) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
-                            contentDescription = stringResource(
-                                if (inWatchlist) Res.string.watchlist_remove else Res.string.watchlist_add,
-                            ),
-                            selected = inWatchlist,
+                        actionsFilm()
+                    } else {
+                        DetailsHero(
+                            backdropUrl = s.details.backdropUrl(),
+                            afficheUrl = s.details.posterUrl(),
+                            titre = s.details.title,
+                            meta = metaFilm(s.details),
+                            synopsis = s.details.overview,
+                            credits = creditsDe(s.details.credits, s.details.countries.map { it.name }),
+                            hauteur = hauteurHero,
+                            marge = margeHero,
+                            actions = actionsFilm,
+                            // La bande-annonce joue derrière, dans ce cadre
+                            // exact : l'image la masquerait.
+                            imageMasquee = apercuDansHero,
+                            controles = if (apercuDansHero) {
+                                {
+                                    ApercuControles(
+                                        controller = trailerController,
+                                        muet = apercuMuet,
+                                        onCoupeLeSon = { apercuMuet = !apercuMuet },
+                                        onAgrandir = onPlayTrailer,
+                                        onRedescend = {
+                                            runCatching { primaryFocus.requestFocus() }.isSuccess
+                                        },
+                                    )
+                                }
+                            } else {
+                                null
+                            },
                         )
                     }
                     // Synopsis après les boutons sur téléphone : le glisser avant
@@ -942,21 +1266,50 @@ fun DetailsScreenContent(
                             modifier = hPad,
                         )
                     }
-                    // « En savoir plus » prend la place du casting plutôt que de
-                    // s'ajouter sous lui : c'est ce qui rend le retour immédiat.
-                    if (infoVisible) {
-                        MovieInfoPanel(
-                            details = s.details,
-                            country = country,
-                            modifier = hPad.fillMaxWidth(),
-                            // La page du film défile déjà en bloc.
-                            scrollable = false,
-                        )
+                    if (compact) {
+                        // « En savoir plus » prend la place du casting plutôt que de
+                        // s'ajouter sous lui : c'est ce qui rend le retour immédiat.
+                        if (infoVisible) {
+                            MovieInfoPanel(
+                                details = s.details,
+                                country = country,
+                                modifier = hPad.fillMaxWidth(),
+                                // La page du film défile déjà en bloc.
+                                scrollable = false,
+                            )
+                        } else {
+                            // Casting sous les boutons, comme sur la fiche d'épisode :
+                            // la descente au D-pad atteint d'abord Lire, pas une
+                            // vignette d'acteur.
+                            CastRow(s.details.credits?.cast.orEmpty(), hPadDp, onOpenPerson)
+                        }
                     } else {
-                        // Casting sous les boutons, comme sur la fiche d'épisode :
-                        // la descente au D-pad atteint d'abord Lire, pas une
-                        // vignette d'acteur.
-                        CastRow(s.details.credits?.cast.orEmpty(), hPadDp, onOpenPerson)
+                        barreOnglets()
+                        when (ongletActif) {
+                            // Un film n'a pas d'épisodes : l'onglet n'est pas
+                            // dans la barre, et la branche n'est là que pour
+                            // que le `when` reste exhaustif.
+                            DetailsTab.EPISODES -> Unit
+                            DetailsTab.SIMILAIRES ->
+                                SimilarRow(recommendations, margeHero, onOpenTitle)
+                            DetailsTab.BANDES_ANNONCES ->
+                                ready?.let { TrailerTab(it, onPlayTrailer, hPadHero) }
+                            // Le panneau technique **et** le casting : « en
+                            // savoir plus » sur un film, c'est les deux. Le
+                            // casting n'a plus de place à demeure sous le hero,
+                            // qui occupe l'écran entier ; il rejoint donc ce
+                            // qu'il complète plutôt que de flotter seul.
+                            DetailsTab.INFOS -> {
+                                MovieInfoPanel(
+                                    details = s.details,
+                                    country = country,
+                                    modifier = hPadHero.fillMaxWidth(),
+                                    // La page du film défile déjà en bloc.
+                                    scrollable = false,
+                                )
+                                CastRow(s.details.credits?.cast.orEmpty(), margeHero, onOpenPerson)
+                            }
+                        }
                     }
                 }
                 is DetailsState.Tv -> {
@@ -997,61 +1350,28 @@ fun DetailsScreenContent(
                             fallbackArt = s.details.backdropUrl() ?: s.details.posterUrl(),
                         )
                     } else {
-                        // Deux volets plutôt qu'un empilement : l'écran fait
-                        // 960 × 540 dp, et un synopsis qui occupe toute la
-                        // largeur pour trois lignes prend à la liste la hauteur
-                        // de trois épisodes. Côte à côte, la description garde
-                        // sa place et la liste récupère toute la colonne.
-                        SeriesPanes(
-                            compact = compact,
-                            episodesState = episodesState,
-                            modifier = Modifier.weight(1f).fillMaxWidth(),
-                            header = { headerModifier ->
-                        Column(
-                            modifier = headerModifier,
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
-                        ) {
-                        // En-tête posé hors du défilement : il décrit ce qu'on
-                        // est en train de parcourir, et le perdre au premier
-                        // appui vers le bas revenait à naviguer à l'aveugle
-                        // dans une liste de vingt épisodes.
-                        Text(s.details.name, style = MaterialTheme.typography.headlineSmall)
-                        // Année et résumé **de la saison** quand TMDB les donne.
-                        // Ils ne l'étaient jamais : le parseur ignorait les deux
-                        // champs, si bien que les vingt-deux saisons d'une série
-                        // affichaient le même texte et la même année.
+                        val seasonAllWatched = s.episodes.isNotEmpty() &&
+                            s.episodes.all { episodeKey(s.season, it.episodeNumber) in watched }
                         // Saison annoncée mais pas commencée : sa date de
                         // première diffusion vaut mieux que son année nue.
                         val seasonUpcoming = upcomingDate(s.seasonAirDate)
-                        if (seasonUpcoming != null) {
-                            Text(
-                                stringResource(Res.string.details_episode_upcoming, seasonUpcoming),
-                                color = MOOVIE_ACCENT,
-                            )
-                        } else (s.seasonYear ?: s.details.year)?.let { Text(it) }
-                        ScrollingSynopsis(
-                            text = s.seasonOverview.ifBlank { s.details.overview },
-                            // Colonne étroite : le texte y tient sur plus de
-                            // lignes, et il reste de la place sous les saisons.
-                            // Empilé sur téléphone, il mange en revanche la
-                            // liste d'épisodes — on le resserre.
-                            lines = if (compact) 3 else 8,
-                            style = MaterialTheme.typography.bodyMedium,
-                            // Déroulé en continu : dans l'en-tête il n'y a pas
-                            // de carte à focaliser pour déclencher la lecture,
-                            // et un résumé tronqué net serait inatteignable.
-                            active = true,
-                        )
-                        val seasonAllWatched = s.episodes.isNotEmpty() &&
-                            s.episodes.all { episodeKey(s.season, it.episodeNumber) in watched }
-                        // Bloc de commande resserré : titre, saisons et actions
-                        // se suivent de près pour rendre à la liste la hauteur
-                        // de deux épisodes. L'espacement de 16 dp de la colonne
-                        // parente, appliqué entre chacun, la lui prenait.
+
+                        // L'épisode que le bouton principal du hero lancera :
+                        // celui qu'on reprend, ou le premier de la saison. Il
+                        // n'y en a jamais eu sur une fiche de série — il fallait
+                        // descendre dans la liste — alors que c'est le geste le
+                        // plus fréquent qu'on y fait.
+                        val episodeAReprendre = s.episodes.firstOrNull {
+                            it.episodeNumber == s.resumeEpisode
+                        } ?: s.episodes.firstOrNull { it.episodeNumber > 0 }
+
+                        // ── Blocs partagés par les deux mises en page ────────
                         //
-                        // L'interception du Haut qui ramenait la page en haut a
-                        // disparu avec elle : l'en-tête ne défile plus, il n'y a
-                        // plus rien à découvrir au-dessus.
+                        // Écrits une fois et posés à deux endroits : au doigt
+                        // dans l'en-tête de `SeriesPanes`, sur grand écran sous
+                        // l'onglet « Épisodes ». Ce sont les mêmes commandes, et
+                        // les dupliquer les aurait laissées diverger.
+                        val selecteurSaisons: @Composable () -> Unit = {
                         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -1134,7 +1454,17 @@ fun DetailsScreenContent(
                                         // Et le focus arrive sur elle, pas sur S1 —
                                         // sinon on remonte des saisons pour se
                                         // retrouver au début d'une série qu'on suit.
-                                        modifier = if (isCurrent) primaryModifier else Modifier,
+                                        //
+                                        // Sur grand écran, le point d'entrée est
+                                        // désormais le bouton « Lire » du hero :
+                                        // `primaryModifier` porte un
+                                        // `FocusRequester` unique, qui ne peut pas
+                                        // être posé sur deux nœuds à la fois.
+                                        modifier = if (isCurrent && compact) {
+                                            primaryModifier
+                                        } else {
+                                            Modifier
+                                        },
                                     ) {
                                         // Compté une fois : le libellé et la couleur
                                         // répondent à la même question.
@@ -1177,12 +1507,19 @@ fun DetailsScreenContent(
                                 }
                             }
                         }
+                        }
+                        }
+
                         // Actions de titre sur leur propre ligne, et non en fin
                         // de rangée des saisons : sur une série de vingt-deux
                         // saisons elles se retrouvaient à vingt-deux boutons du
                         // bord, donc introuvables. Ici elles sont toujours au
                         // même endroit, à un appui vers le bas.
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        val actionsSerie: @Composable () -> Unit = {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
                             MoovieIconButton(
                                 onClick = onToggleSeasonWatched,
                                 icon = if (seasonAllWatched) Icons.Default.VisibilityOff else Icons.Default.Visibility,
@@ -1197,36 +1534,26 @@ fun DetailsScreenContent(
                                 ),
                                 selected = inWatchlist,
                             )
+                            // Le téléviseur du salon, comme sur la fiche film —
+                            // et **seulement sur grand écran** : la rangée du
+                            // téléphone ne l'a jamais eu, et cette refonte ne
+                            // descend pas au doigt.
+                            if (!compact) onSendToTv?.let { send ->
+                                MoovieIconButton(
+                                    onClick = send,
+                                    icon = Icons.Default.Cast,
+                                    contentDescription = stringResource(Res.string.details_send_to_tv),
+                                )
+                            }
                         }
                         }
-                        }
-                            },
-                        // « En savoir plus » prend la place de la liste des
-                        // épisodes. C'est le cas qui a dicté la conception — on
-                        // consulte la date du prochain épisode, puis on veut ses
-                        // épisodes, sans avoir à défiler.
-                            infoPanel = if (infoVisible) {
-                                { modifierPanneau ->
-                                    TvInfoPanel(
-                                        details = s.details,
-                                        country = country,
-                                        // Au doigt il est un élément d'une liste
-                                        // qui porte déjà le défilement de la page :
-                                        // lui en donner un second l'imbriquerait.
-                                        // Sur grand écran il remplace la liste, et
-                                        // reste donc le seul élément défilant.
-                                        scrollable = !compact,
-                                        modifier = modifierPanneau,
-                                    )
-                                }
-                            } else {
-                                null
-                            },
-                            episodes = {
-                        item {
-                            Text(stringResource(Res.string.details_episodes_season, s.season), style = MaterialTheme.typography.titleMedium)
-                        }
-                        itemsIndexed(s.episodes) { index, ep ->
+
+                        // Une ligne d'épisode, la même dans les deux mises en
+                        // page. Seul le recentrage diffère : au doigt la liste
+                        // est paresseuse et sait se caler par index, sur grand
+                        // écran la page défile en bloc et `bringIntoView` s'en
+                        // charge tout seul.
+                        val ligneEpisode: @Composable (Int, Episode) -> Unit = { index, ep ->
                             val key = episodeKey(s.season, ep.episodeNumber)
                             val isNext = ep.episodeNumber == s.resumeEpisode
                             Box(
@@ -1257,7 +1584,7 @@ fun DetailsScreenContent(
                                     // passer le `bringIntoView` du système, qui
                                     // part sur la même prise de focus et
                                     // écraserait l'alignement.
-                                    if (it.isFocused) pageScope.launch {
+                                    if (it.isFocused && compact) pageScope.launch {
                                         delay(80)
                                         episodesState.animateScrollToItem(index + episodeItemOffset)
                                     }
@@ -1282,38 +1609,205 @@ fun DetailsScreenContent(
                                 )
                             }
                         }
-                        // Casting **dans** le défilement, en queue de liste, et
-                        // seulement sur téléphone. Posé sous les volets, c'était
-                        // un bloc fixe d'environ 190 dp pris à une liste qui n'a
-                        // déjà que ce qui reste sous l'en-tête : il restait une
-                        // fenêtre d'un épisode et demi pour parcourir la saison.
-                        //
-                        // En dernier élément il ne coûte plus rien tant qu'on ne
-                        // descend pas le chercher, et la liste récupère toute la
-                        // hauteur.
+
+                        if (compact) {
+                        // Deux volets plutôt qu'un empilement : l'écran fait
+                        // 960 × 540 dp, et un synopsis qui occupe toute la
+                        // largeur pour trois lignes prend à la liste la hauteur
+                        // de trois épisodes. Côte à côte, la description garde
+                        // sa place et la liste récupère toute la colonne.
+                        SeriesPanes(
+                            episodesState = episodesState,
+                            modifier = Modifier.weight(1f).fillMaxWidth(),
+                            header = { headerModifier ->
+                        Column(
+                            modifier = headerModifier,
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                        // En-tête posé hors du défilement : il décrit ce qu'on
+                        // est en train de parcourir, et le perdre au premier
+                        // appui vers le bas revenait à naviguer à l'aveugle
+                        // dans une liste de vingt épisodes.
+                        Text(s.details.name, style = MaterialTheme.typography.headlineSmall)
+                        // Année et résumé **de la saison** quand TMDB les donne.
+                        // Ils ne l'étaient jamais : le parseur ignorait les deux
+                        // champs, si bien que les vingt-deux saisons d'une série
+                        // affichaient le même texte et la même année.
+                        if (seasonUpcoming != null) {
+                            Text(
+                                stringResource(Res.string.details_episode_upcoming, seasonUpcoming),
+                                color = MOOVIE_ACCENT,
+                            )
+                        } else (s.seasonYear ?: s.details.year)?.let { Text(it) }
+                        ScrollingSynopsis(
+                            text = s.seasonOverview.ifBlank { s.details.overview },
+                            // Empilé sur téléphone, il mange la liste
+                            // d'épisodes — on le resserre.
+                            lines = 3,
+                            style = MaterialTheme.typography.bodyMedium,
+                            // Déroulé en continu : dans l'en-tête il n'y a pas
+                            // de carte à focaliser pour déclencher la lecture,
+                            // et un résumé tronqué net serait inatteignable.
+                            active = true,
+                        )
+                        // Bloc de commande resserré : titre, saisons et actions
+                        // se suivent de près pour rendre à la liste la hauteur
+                        // de deux épisodes. L'espacement de 16 dp de la colonne
+                        // parente, appliqué entre chacun, la lui prenait.
+                        selecteurSaisons()
+                        actionsSerie()
+                        }
+                            },
+                        // « En savoir plus » prend la place de la liste des
+                        // épisodes. C'est le cas qui a dicté la conception — on
+                        // consulte la date du prochain épisode, puis on veut ses
+                        // épisodes, sans avoir à défiler.
+                            infoPanel = if (infoVisible) {
+                                { modifierPanneau ->
+                                    TvInfoPanel(
+                                        details = s.details,
+                                        country = country,
+                                        // Au doigt il est un élément d'une liste
+                                        // qui porte déjà le défilement de la page :
+                                        // lui en donner un second l'imbriquerait.
+                                        scrollable = false,
+                                        modifier = modifierPanneau,
+                                    )
+                                }
+                            } else {
+                                null
+                            },
+                            episodes = {
+                        item {
+                            Text(stringResource(Res.string.details_episodes_season, s.season), style = MaterialTheme.typography.titleMedium)
+                        }
+                        itemsIndexed(s.episodes) { index, ep -> ligneEpisode(index, ep) }
+                        // Casting **dans** le défilement, en queue de liste.
+                        // Posé sous les volets, c'était un bloc fixe d'environ
+                        // 190 dp pris à une liste qui n'a déjà que ce qui reste
+                        // sous l'en-tête : il restait une fenêtre d'un épisode
+                        // et demi pour parcourir la saison.
                         //
                         // hPad nul : la marge de 16 dp vient déjà du
                         // contentPadding de la liste. La cumuler décalerait la
                         // rangée par rapport aux épisodes qu'elle suit.
-                        if (compact) {
-                            item {
-                                CastRow(s.details.credits?.cast.orEmpty(), 0.dp, onOpenPerson)
-                            }
+                        item {
+                            CastRow(s.details.credits?.cast.orEmpty(), 0.dp, onOpenPerson)
                         }
                             },
                         )
-                        // Le casting d'une série est en queue de la liste des
-                        // épisodes (voir plus haut), pas ici : sous les volets il
-                        // aurait été un bloc fixe pris à la liste.
-                        //
-                        // Rien sur écran large non plus. Mesuré sur les 540 dp
-                        // d'une TV : l'en-tête (titre, résumé, saisons, actions)
-                        // en prend ~350, il en reste ~145 quand la rangée en
-                        // demande ~190. Ajoutée quand même, elle **effaçait le
-                        // sélecteur de saisons** hors de l'écran — une page qui
-                        // perd sa navigation pour gagner une illustration est un
-                        // mauvais échange. Le casting y reste à un appui : la
-                        // fiche d'un épisode, elle, a la place.
+                        } else {
+                            // ── La fiche série, comme la fiche film ─────────
+                            //
+                            // Même hero, même barre d'onglets, et la liste des
+                            // épisodes sous le premier d'entre eux. Les deux
+                            // fiches du catalogue se ressemblent enfin, ce que
+                            // ni l'ancien en-tête ni les deux volets ne
+                            // permettaient.
+                            DetailsHero(
+                                backdropUrl = s.details.backdropUrl(),
+                                afficheUrl = s.details.posterUrl(),
+                                titre = s.details.name,
+                                meta = metaSerie(s.details),
+                                // Le résumé **de la saison** quand TMDB le
+                                // donne : c'est celle qu'on est venu voir.
+                                synopsis = s.seasonOverview.ifBlank { s.details.overview },
+                                credits = creditsSerie(s.details.credits, s.details.createdBy.map { it.name }),
+                                hauteur = hauteurHero,
+                                marge = margeHero,
+                                actions = {
+                                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                        // Une saison annoncée n'a rien à lire :
+                                        // le bouton disparaît plutôt que de
+                                        // rester inerte, comme celui du
+                                        // téléchargement de saison juste à côté.
+                                        if (episodeAReprendre != null && seasonUpcoming == null) {
+                                            BoutonLireEpisode(
+                                                season = s.season,
+                                                episode = episodeAReprendre,
+                                                searching = quickPlay is QuickPlayState.Searching,
+                                                aReprendre = resume.containsKey(
+                                                    episodeKey(s.season, episodeAReprendre.episodeNumber),
+                                                ),
+                                                modifier = primaryModifier,
+                                                onClick = {
+                                                    onQuickPlayEpisode(
+                                                        s.season,
+                                                        episodeAReprendre.episodeNumber,
+                                                    )
+                                                },
+                                            )
+                                        }
+                                        actionsSerie()
+                                    }
+                                },
+                                // La bande-annonce joue derrière, dans ce cadre
+                                // exact : l'image la masquerait.
+                                imageMasquee = apercuDansHero,
+                                controles = if (apercuDansHero) {
+                                    {
+                                        ApercuControles(
+                                            controller = trailerController,
+                                            muet = apercuMuet,
+                                            onCoupeLeSon = { apercuMuet = !apercuMuet },
+                                            onAgrandir = onPlayTrailer,
+                                            onRedescend = {
+                                                runCatching { primaryFocus.requestFocus() }.isSuccess
+                                            },
+                                        )
+                                    }
+                                } else {
+                                    null
+                                },
+                            )
+                            barreOnglets()
+                            when (ongletActif) {
+                                DetailsTab.EPISODES -> Column(
+                                    modifier = hPadHero.fillMaxWidth(),
+                                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                                ) {
+                                    selecteurSaisons()
+                                    if (seasonUpcoming != null) {
+                                        Text(
+                                            stringResource(
+                                                Res.string.details_episode_upcoming,
+                                                seasonUpcoming,
+                                            ),
+                                            color = MOOVIE_ACCENT,
+                                        )
+                                    }
+                                    Text(
+                                        stringResource(Res.string.details_episodes_season, s.season),
+                                        style = MaterialTheme.typography.titleMedium,
+                                    )
+                                    // Composés tous à la fois, et non
+                                    // paresseusement : la page entière défile
+                                    // désormais, et une liste paresseuse à
+                                    // hauteur infinie dans un défilement
+                                    // vertical n'est pas mesurable. Une saison
+                                    // en compte vingt-cinq au pire — c'est le
+                                    // prix du défilement continu qu'exige la
+                                    // maquette, et il se paie une fois.
+                                    s.episodes.forEachIndexed { index, ep ->
+                                        ligneEpisode(index, ep)
+                                    }
+                                }
+                                DetailsTab.SIMILAIRES ->
+                                    SimilarRow(recommendations, margeHero, onOpenTitle)
+                                DetailsTab.BANDES_ANNONCES ->
+                                    ready?.let { TrailerTab(it, onPlayTrailer, hPadHero) }
+                                DetailsTab.INFOS -> {
+                                    TvInfoPanel(
+                                        details = s.details,
+                                        country = country,
+                                        // La page défile déjà en bloc.
+                                        scrollable = false,
+                                        modifier = hPadHero.fillMaxWidth(),
+                                    )
+                                    CastRow(s.details.credits?.cast.orEmpty(), margeHero, onOpenPerson)
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -1351,8 +1845,8 @@ fun DetailsScreenContent(
         // dessous pour garder sa position de défilement et son focus.
         AnimatedVisibility(
             visible = trailerExpanded && previewPlaying && trailerChromeVisible,
-            enter = fadeIn(animationSpec = tween(CINEMA_UI_FADE_MS)),
-            exit = fadeOut(animationSpec = tween(CINEMA_UI_FADE_MS)),
+            enter = fadeIn(animationSpec = tween(UI_FADE_MS)),
+            exit = fadeOut(animationSpec = tween(UI_FADE_MS)),
             modifier = Modifier.align(Alignment.BottomCenter),
         ) {
             TrailerControls(
@@ -1376,7 +1870,13 @@ fun DetailsScreenContent(
         //
         // Masqués quand la bande-annonce est au premier plan ou que le panneau
         // des sources est ouvert : ils recouvriraient l'un comme l'autre.
-        if (!trailerExpanded && !panelVisible && state !is DetailsState.Loading) {
+        //
+        // **Au doigt seulement, désormais.** Sur grand écran, ces deux-là sont
+        // devenus des onglets — « Bandes-annonces » et « En savoir plus » — et
+        // les garder ici en aurait fait deux chemins vers le même contenu, dont
+        // celui-ci se serait de surcroît superposé aux commandes de la
+        // bande-annonce, qui occupent le même coin du hero.
+        if (compact && !trailerExpanded && !panelVisible && state !is DetailsState.Loading) {
             Row(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
@@ -1407,9 +1907,20 @@ fun DetailsScreenContent(
 
         // Bouton retour desktop, en overlay haut-gauche (masqué quand le panneau
         // des sources est ouvert : Échap/clic-extérieur le ferme d'abord).
+        //
+        // **Il recule d'un cran, il ne quitte pas.** Sur la fiche d'un épisode,
+        // il appelait `onBack`, qui dépile la navigation : on sautait la fiche
+        // de la série pour se retrouver à l'accueil. Et quand la fiche *est* la
+        // racine de la pile — c'est le cas du crochet de développement — il n'y
+        // avait rien à dépiler, donc il ne se passait rien du tout.
+        //
+        // Échap (desktop) et la touche Retour (Android) faisaient déjà cette
+        // cascade chacun de leur côté ; le bouton, lui, ne l'avait jamais
+        // apprise. Le panneau des sources et la bande-annonce n'y figurent pas
+        // parce qu'ils masquent ce bouton — la condition juste au-dessus.
         if (showBackButton && !panelVisible && !trailerExpanded) {
             MoovieIconButton(
-                onClick = onBack,
+                onClick = { if (selectedEpisode != null) onCloseEpisode() else onBack() },
                 icon = Icons.AutoMirrored.Filled.ArrowBack,
                 contentDescription = stringResource(Res.string.common_back),
                 modifier = Modifier.align(Alignment.TopStart).padding(24.dp),
@@ -2104,6 +2615,77 @@ private fun TrailerButton(trailer: TrailerState, onClick: () -> Unit) {
     )
 }
 
+/**
+ * Les trois commandes de la bande-annonce **du cadre du hero**.
+ *
+ * Agrandir, couper le son, mettre en pause : rien d'autre, et c'est délibéré.
+ * L'aperçu n'est pas une séance — il illustre le titre. Une barre de position,
+ * un titre de vidéo ou un bouton de fermeture appartiennent à la vue agrandie,
+ * qu'[onAgrandir] ouvre d'un appui et où [TrailerControls] les donne déjà.
+ *
+ * Elles ne se replient pas. Celles du plein écran s'effacent parce qu'elles
+ * masqueraient l'image pendant qu'on regarde ; ici elles occupent un coin d'une
+ * page qu'on est en train de parcourir, et une commande qui apparaît et
+ * disparaît au bord du regard est plus gênante qu'une commande visible.
+ *
+ * @param onRedescend rend le focus au corps de la fiche. Ces boutons sont seuls
+ *   en haut à droite : sous eux, le faisceau vertical de la recherche de focus
+ *   ne rencontre rien — le contenu est à gauche — et le D-pad y resterait
+ *   coincé. Même câblage explicite que la rangée qu'ils remplacent.
+ */
+@Composable
+private fun ApercuControles(
+    controller: MooviePlayerController?,
+    muet: Boolean,
+    onCoupeLeSon: () -> Unit,
+    onAgrandir: () -> Unit,
+    onRedescend: () -> Boolean,
+) {
+    // Sondé, comme dans les contrôles du plein écran : aucun de nos moteurs ne
+    // pousse son état de lecture. Trois fois par seconde suffit à ce qu'un
+    // appui sur pause change l'icône sans qu'on le remarque.
+    var joue by remember(controller) { mutableStateOf(true) }
+    LaunchedEffect(controller) {
+        while (true) {
+            controller?.let { joue = it.isPlaying }
+            delay(APERCU_POLL_MS)
+        }
+    }
+
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.onPreviewKeyEvent { event ->
+            event.type == KeyEventType.KeyDown &&
+                event.key == Key.DirectionDown &&
+                onRedescend()
+        },
+    ) {
+        MoovieIconButton(
+            onClick = onAgrandir,
+            icon = Icons.Default.Fullscreen,
+            contentDescription = stringResource(Res.string.player_fullscreen),
+        )
+        MoovieIconButton(
+            onClick = onCoupeLeSon,
+            icon = if (muet) Icons.Default.VolumeOff else Icons.Default.VolumeUp,
+            contentDescription = stringResource(
+                if (muet) Res.string.trailer_unmute else Res.string.trailer_mute,
+            ),
+            selected = !muet,
+        )
+        MoovieIconButton(
+            onClick = { controller?.togglePause() },
+            icon = if (joue) Icons.Default.Pause else Icons.Default.PlayArrow,
+            contentDescription = stringResource(
+                if (joue) Res.string.player_pause else Res.string.player_play,
+            ),
+        )
+    }
+}
+
+private const val APERCU_POLL_MS = 300L
+
 @Composable
 private fun MovieHeader(
     details: MovieDetails,
@@ -2663,6 +3245,249 @@ private fun CastCard(member: CastMember, onClick: () -> Unit) {
         modifier = Modifier.width(CAST_CARD_WIDTH),
     ) { body() }
 }
+
+/**
+ * L'habillage du bouton principal, sur grand écran : centré, gras, en capitales.
+ *
+ * Un `MoovieButton` aligne son contenu à gauche, ce qui convient à un bouton
+ * dont la largeur épouse le libellé. Le bouton principal, lui, a une largeur
+ * **imposée** — c'est ce qui le désigne comme l'action de la page — et son
+ * libellé s'y retrouvait collé au bord gauche, avec un grand vide à droite : on
+ * lisait un bouton mal rempli plutôt qu'un bouton large. Le `weight` prend toute
+ * la place disponible et recentre.
+ *
+ * Le gras et les capitales viennent de la maquette, où le bouton porte le seul
+ * texte criard de la page. C'est cohérent : tout le reste du hero est du texte
+ * qu'on lit, celui-ci est un texte sur lequel on appuie.
+ *
+ * Rien de tout cela au doigt, où le bouton est un bouton parmi d'autres dans
+ * une rangée — voir l'appel, qui garde l'ancien contenu tel quel.
+ */
+@Composable
+private fun RowScope.LibellePrincipal(contenu: @Composable RowScope.() -> Unit) {
+    ProvideTextStyle(
+        MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+    ) {
+        Row(
+            modifier = Modifier.weight(1f),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+            content = contenu,
+        )
+    }
+}
+
+/**
+ * Le bouton principal de la fiche série : « Reprendre · S2E4 ».
+ *
+ * ## Pourquoi il n'existait pas
+ *
+ * La fiche série n'avait aucune action de lecture : on descendait dans la liste
+ * jusqu'à l'épisode voulu, et c'est lui qu'on ouvrait. Cela se tenait quand
+ * l'écran montrait la liste d'emblée. Sous un hero plein cadre, la liste est à
+ * un défilement de là, et le geste le plus fréquent d'une fiche de série —
+ * reprendre où l'on en était — n'avait plus de bouton.
+ *
+ * ## Le numéro dans le libellé
+ *
+ * « Reprendre » seul demanderait de faire confiance : reprendre *quoi* ?
+ * L'épisode visé est déduit de l'historique, et une déduction qu'on ne montre
+ * pas est une déduction qu'on ne peut pas corriger. Affiché, il se vérifie d'un
+ * coup d'œil, et la liste reste là pour choisir autrement.
+ *
+ * `S2E4` n'est pas traduit : c'est une notation, la même dans toutes les langues
+ * où le projet est distribué, et c'est aussi celle des clés de l'historique.
+ */
+@Composable
+private fun BoutonLireEpisode(
+    season: Int,
+    episode: Episode,
+    searching: Boolean,
+    aReprendre: Boolean,
+    modifier: Modifier,
+    onClick: () -> Unit,
+) {
+    MoovieButton(
+        onClick = onClick,
+        modifier = modifier
+            .fillMaxWidth()
+            .widthIn(max = LARGEUR_MAX_BOUTON_PRINCIPAL)
+            .clip(MoovieShape)
+            .background(MOOVIE_ACCENT),
+        selected = true,
+        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 20.dp),
+    ) {
+        LibellePrincipal {
+            if (searching) {
+                CircularProgressIndicator(
+                    color = Color.White,
+                    strokeWidth = 2.dp,
+                    modifier = Modifier.size(14.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(Res.string.details_playing))
+            } else {
+                Text(
+                    buildString {
+                        append(
+                            if (aReprendre) {
+                                stringResource(Res.string.details_resume)
+                            } else {
+                                stringResource(Res.string.details_play)
+                            }.uppercase(),
+                        )
+                        append("  ·  S")
+                        append(season)
+                        append('E')
+                        append(episode.episodeNumber)
+                    },
+                )
+            }
+        }
+    }
+}
+
+/**
+ * L'onglet « Bandes-annonces » : une vignette, celle qu'on sait jouable.
+ *
+ * ## Pourquoi une seule
+ *
+ * TMDB en déclare souvent une dizaine — teasers, featurettes, extraits — mais
+ * *déclarer* n'est pas *jouer* : une clé YouTube retirée, restreinte par région
+ * ou refusée par le client du jour ne se distingue d'une bonne qu'en essayant.
+ * La fiche n'en résout qu'une, la meilleure, et c'est la seule dont on sache
+ * qu'un appui la lancera (voir [TrailerState]). Un mur de vignettes dont une sur
+ * trois s'excuse serait un plus mauvais onglet qu'une vignette qui tient parole.
+ *
+ * ## Pourquoi elle est grande
+ *
+ * Il n'y a rien à comparer ni à choisir : la vignette n'est pas un élément de
+ * liste, c'est la porte de l'onglet. Aux dimensions d'une affiche de catalogue,
+ * elle aurait l'air d'un premier élément dont les suivants manquent.
+ */
+@Composable
+private fun TrailerTab(ready: TrailerState.Ready, onPlay: () -> Unit, hPad: Modifier) {
+    Column(modifier = hPad, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        MoovieCard(onClick = onPlay, modifier = Modifier.width(TRAILER_CARD_WIDTH)) {
+            Column {
+                Box {
+                    MoovieAsyncImage(
+                        // La vignette de YouTube plutôt qu'une image de TMDB :
+                        // c'est celle de la vidéo qu'on va lancer, pas une autre
+                        // du même film. `hqdefault` existe pour toute vidéo, y
+                        // compris celles qui n'ont pas de version haute
+                        // définition — `maxresdefault` rend 404 sur celles-là.
+                        model = "https://img.youtube.com/vi/${ready.video.key}/hqdefault.jpg",
+                        contentDescription = ready.video.name,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(16f / 9f)
+                            .background(Color(0xFF222222)),
+                    )
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .size(56.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xCC0A0A0A)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            Icons.Default.PlayArrow,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(32.dp),
+                        )
+                    }
+                }
+                Text(
+                    ready.video.name.ifBlank { stringResource(Res.string.details_trailer) },
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(10.dp),
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Au-delà, le bouton principal cesse de se lire comme un bouton.
+ *
+ * Il occupe la colonne de gauche du hero, qui suit la largeur de la fenêtre :
+ * sans borne, une fenêtre de 2 500 points lui en donnait plus de sept cents,
+ * soit une barre horizontale portant trois mots au milieu.
+ */
+private val LARGEUR_MAX_BOUTON_PRINCIPAL = 460.dp
+
+/** Largeur de la vignette de bande-annonce : un 16:9 qu'on voit de loin. */
+private val TRAILER_CARD_WIDTH = 360.dp
+
+/**
+ * Rangée « À voir aussi » : les titres proches, en affiches.
+ *
+ * Construite comme la rangée du casting juste dessous, et pour les mêmes
+ * raisons — marge dans le `contentPadding` pour que le focus déborde au lieu
+ * d'être rogné, `MoovieRail` pour la barre de défilement du projet. Une
+ * troisième mise en page de rangée n'aurait rien apporté qu'un écart de plus.
+ *
+ * Quinze titres au plus. TMDB en renvoie jusqu'à vingt, et au-delà d'une
+ * quinzaine on ne parcourt plus une suggestion mais un catalogue — ce que
+ * l'accueil fait déjà, mieux.
+ */
+@Composable
+private fun SimilarRow(
+    items: List<TmdbItem>,
+    hPad: Dp,
+    onOpenTitle: (tmdbId: Int, isTv: Boolean) -> Unit,
+) {
+    val proches = items.take(15)
+    if (proches.isEmpty()) return
+    val etat = rememberLazyListState()
+    MoovieRail(etat) {
+        LazyRow(
+            state = etat,
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            contentPadding = PaddingValues(horizontal = hPad),
+        ) {
+            items(proches) { item ->
+                // `mediaType` vient de TMDB et manque sur certaines entrées ;
+                // on retombe alors sur le type de la fiche d'où l'on part, qui
+                // est le bon dans l'immense majorité des cas — les
+                // recommandations d'une série sont des séries.
+                val estSerie = item.mediaType == "tv"
+                MoovieCard(
+                    onClick = { onOpenTitle(item.id, estSerie) },
+                    modifier = Modifier.width(SIMILAR_CARD_WIDTH),
+                ) {
+                    Column {
+                        MoovieAsyncImage(
+                            model = item.posterUrl(),
+                            contentDescription = item.displayTitle,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .aspectRatio(2f / 3f)
+                                .background(Color(0xFF222222)),
+                        )
+                        Text(
+                            item.displayTitle,
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(8.dp),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Largeur d'une affiche d'« À voir aussi » — celle du catalogue. */
+private val SIMILAR_CARD_WIDTH = 140.dp
 
 /**
  * Rangée du casting.

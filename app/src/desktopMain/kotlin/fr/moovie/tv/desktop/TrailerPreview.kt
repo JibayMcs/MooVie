@@ -18,10 +18,9 @@ import fr.moovie.tv.desktop.mpv.MpvVideoSurface
 import fr.moovie.tv.ui.player.MooviePlayerController
 
 /**
- * Aperçu de la bande-annonce dans le fond de la fiche, sur desktop.
+ * Aperçu de la bande-annonce dans le cadre du hero, sur desktop.
  *
- * Même intention que son pendant Android — recadré, hors du chemin du focus —
- * au son près : ici il peut monter, quand la fiche passe en mode cinéma.
+ * Même intention que son pendant Android : recadré, hors du chemin du focus.
  *
  * Le moteur est mpv, et la simplicité de ce fichier est un des dividendes du
  * changement. Son prédécesseur libVLC exigeait une fabrique unique pour le
@@ -32,8 +31,9 @@ import fr.moovie.tv.ui.player.MooviePlayerController
  * libVLC ne créait sa sortie audio qu'au démarrage et perdait tout réglage
  * antérieur, ce qui faisait sortir du son sur un aperçu censé être muet.
  *
- * @param volume 0 (muet) à 1, piloté par le mode cinéma de la fiche. Le son ne
- *   monte qu'une fois l'interface effacée : voir `DetailsScreenContent`.
+ * @param volume 0 (muet) à 1, piloté par la fiche : le réglage donne l'état de
+ *   départ, le bouton de coupure du cadre garde la main ensuite. Voir
+ *   `DetailsScreenContent`.
  */
 @Composable
 fun TrailerPreview(

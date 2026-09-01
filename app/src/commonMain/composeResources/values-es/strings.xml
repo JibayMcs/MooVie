@@ -599,6 +599,10 @@
     <!-- Pestaña «Más información» -->
     <string name="details_tab_overview">Sinopsis</string>
     <string name="details_tab_info">Más información</string>
+    <!-- Barra de pestañas de la ficha -->
+    <string name="details_tab_episodes">Episodios</string>
+    <string name="details_tab_similar">También te puede gustar</string>
+    <string name="details_tab_trailers">Tráilers</string>
     <string name="info_original_title">Título original</string>
     <string name="info_director">Dirección</string>
     <string name="info_creator">Creación</string>
@@ -630,9 +634,9 @@
     <string name="status_released">Estrenado</string>
     <string name="status_post_production">Posproducción</string>
     <string name="settings_trailer_autoplay">Tráiler automático</string>
-    <string name="settings_trailer_autoplay_help">Reproduce el tráiler sin sonido en el fondo de la ficha tras unos segundos. El botón «Tráiler» sigue disponible aunque esté desactivado.</string>
+    <string name="settings_trailer_autoplay_help">Reproduce el tráiler dentro de la imagen, en la parte superior de la ficha, tras unos segundos. Sigue estando accesible desde la ficha aunque esté desactivado.</string>
     <string name="settings_trailer_sound">Sonido del tráiler</string>
-    <string name="settings_trailer_sound_help">Sube el sonido gradualmente cuando el tráiler ocupa el fondo de la ficha, y lo corta en cuanto se mueve el ratón. Sin efecto en televisor ni en teléfono, donde la vista previa permanece en silencio.</string>
+    <string name="settings_trailer_sound_help">Inicia el tráiler con sonido en vez de silenciado. El botón de silencio, sobre la imagen, mantiene la última palabra.</string>
     <string name="common_close">Cerrar</string>
     <string name="trailer_mute">Silenciar</string>
     <string name="trailer_unmute">Activar el sonido</string>

@@ -284,6 +284,8 @@ internal fun DesktopDetailsScreen(
     onPlay: (Screen.Player) -> Unit,
     onBack: () -> Unit,
     onOpenPerson: (personId: Int, name: String) -> Unit,
+    /** Ouvre une autre fiche depuis l'onglet « À voir aussi ». */
+    onOpenTitle: (tmdbId: Int, isTv: Boolean) -> Unit,
     onRegisterBack: ((() -> Unit)?) -> Unit,
     /**
      * Ouvre la télécommande après un envoi accepté. Le geste continue sur
@@ -303,6 +305,7 @@ internal fun DesktopDetailsScreen(
     val sourceHeights by vm.heights.collectAsState()
     val sourceStatuses by vm.linkStatus.collectAsState()
     val streamLang by vm.streamLanguage.collectAsState()
+    val recommendations by vm.recommendations.collectAsState()
     // Indexés par le lien d'embed dont ils sont partis : c'est la seule façon
     // de savoir **quelle ligne** allumer dans le panneau des sources.
     val seasonDownload by vm.seasonDownload.collectAsState(initial = null)
@@ -396,6 +399,8 @@ internal fun DesktopDetailsScreen(
         resolveError = resolveError,
         resolvingUrl = resolvingUrl,
         onOpenPerson = { onOpenPerson(it.id, it.name) },
+        recommendations = recommendations,
+        onOpenTitle = onOpenTitle,
         streamLang = streamLang,
         watched = watched,
         resume = resume,
@@ -469,6 +474,7 @@ internal fun DesktopDetailsScreen(
         country = tmdbCountry(),
         onDismissQuickPlay = vm::dismissQuickPlay,
         onBack = onBack,
+        onCloseEpisode = vm::closeEpisode,
         showBackButton = true,
     )
 }
