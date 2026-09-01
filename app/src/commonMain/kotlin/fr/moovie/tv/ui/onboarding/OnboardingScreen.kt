@@ -206,6 +206,27 @@ fun OnboardingScreen(
         }
     }
 
+    /**
+     * Entre dans le questionnaire, et **déclare l'installation inachevée**.
+     *
+     * Sans cette écriture, un parcours interrompu après la première question se
+     * serait rouvert sur l'accueil. Le drapeau n'existe pas encore à ce
+     * moment-là, si bien que la règle de migration prend le relais : elle lit
+     * « une clé existe » et conclut « déjà installé ». C'est la bonne réponse
+     * pour une mise à jour — c'est la mauvaise pour quelqu'un qui vient de
+     * fermer l'application entre la clé et la langue des flux, et qui n'aurait
+     * jamais revu les trois questions suivantes.
+     *
+     * Le poser à l'entrée plutôt qu'à la sortie couvre aussi la fermeture
+     * brutale, qui ne laisse la main à personne.
+     */
+    fun ouvrirQuestionnaire(depuis: Etape) {
+        scope.launch { reglages.setOnboardingDone(false) }
+        importSansCle = false
+        etape = depuis
+        mode = Mode.QUESTIONS
+    }
+
     /** Dernière étape franchie : on nomme le profil et on ferme le parcours. */
     fun terminer() {
         scope.launch {
@@ -281,10 +302,7 @@ fun OnboardingScreen(
             Mode.BIENVENUE -> Bienvenue(
                 importSansCle = importSansCle,
                 pairingOffert = pairingDialog != null,
-                onCommencer = {
-                    importSansCle = false
-                    mode = Mode.QUESTIONS
-                },
+                onCommencer = { ouvrirQuestionnaire(Etape.CLE) },
                 onRestaurer = { mode = Mode.RESTAURATION },
                 onAppairer = { appairage = true },
             )
@@ -374,8 +392,9 @@ fun OnboardingScreen(
                     cle = reglages.tmdbApiKey.first()
                     validerCle {
                         appairage = false
-                        mode = Mode.QUESTIONS
-                        etape = Etape.LANGUE
+                        // La clé est faite : le questionnaire reprend à la
+                        // question suivante, et non au début.
+                        ouvrirQuestionnaire(Etape.LANGUE)
                     }
                 }
             },
