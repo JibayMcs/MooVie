@@ -601,7 +601,7 @@
     <string name="details_tab_info">Más información</string>
     <!-- Barra de pestañas de la ficha -->
     <string name="details_tab_episodes">Episodios</string>
-    <string name="details_tab_similar">También te puede gustar</string>
+    <string name="details_tab_similar">Recomendaciones</string>
     <string name="details_tab_trailers">Tráilers</string>
     <string name="info_original_title">Título original</string>
     <string name="info_director">Dirección</string>
