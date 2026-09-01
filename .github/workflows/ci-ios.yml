@@ -65,7 +65,12 @@ jobs:
   # ensuite **en série sur le même runner macOS** — la machine la plus chère du
   # catalogue, pour une compilation qui tourne sur n'importe quel Linux.
   # ---------------------------------------------------------------------------
-  ios:
+  # Le nom reste `compiler`, et ce n'est pas de la nostalgie : la clé de cache de
+  # `setup-gradle` inclut le nom du job. Le renommer jetait le cache Gradle
+  # accumulé, ce qui a fait passer la compilation des métadonnées de 169 s à
+  # 601 s sur le run qui a essayé — un cache froid coûte plus cher que tout ce
+  # que ce fichier cherche à économiser.
+  compiler:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -100,13 +105,14 @@ jobs:
       # lisible sur les erreurs de code partagé, avant que xcodebuild ne noie
       # tout dans sa propre sortie.
       #
-      # Le démon Gradle n'est plus refusé. Les invocations qui suivent sont sur
-      # le même runner : `--no-daemon` leur imposait à chacune un démarrage de
-      # JVM et une phase de configuration entière, pour une isolation dont un
-      # runner jetable n'a aucun besoin. `setup-gradle` arrête le démon en fin
-      # de job.
+      # `--no-daemon` conservé. Le partager entre les deux invocations aurait
+      # rendu une phase de configuration, trente à soixante secondes — mais
+      # `gradle.properties` porte un `-Xmx5g` obtenu après deux commits de
+      # correction d'OutOfMemoryError, l'édition de liens Kotlin/Native tournant
+      # dans le démon Gradle lui-même. On ne rejoue pas ce réglage-là pour une
+      # minute.
       - name: Compiler le code partagé pour iOS
-        run: ./gradlew :app:compileIosMainKotlinMetadata
+        run: ./gradlew :app:compileIosMainKotlinMetadata --no-daemon
 
       # Puis la vraie compilation native, cible appareil : c'est elle qui
       # éprouve le cinterop — CoreCrypto, Core Image, NSDateFormatter — que la
@@ -119,7 +125,7 @@ jobs:
       # déjà. Onze minutes de runner macOS pour ce delta-là n'étaient pas un
       # échange raisonnable.
       - name: Compiler le framework Kotlin/Native (appareil)
-        run: ./gradlew :app:linkDebugFrameworkIosArm64
+        run: ./gradlew :app:linkDebugFrameworkIosArm64 --no-daemon
 
       - name: Installer XcodeGen
         run: brew install xcodegen
@@ -196,4 +202,4 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
 
       - name: Non-régression Android et desktop
-        run: ./gradlew :app:compileKotlinDesktop :app:compileDebugKotlinAndroid :app:desktopTest
+        run: ./gradlew :app:compileKotlinDesktop :app:compileDebugKotlinAndroid :app:desktopTest --no-daemon
