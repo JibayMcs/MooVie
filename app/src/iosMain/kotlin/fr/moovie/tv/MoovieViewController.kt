@@ -43,6 +43,7 @@ import fr.moovie.tv.ui.onboarding.rememberStartScreen
 import fr.moovie.tv.ui.player.AvPlayerController
 import fr.moovie.tv.ui.player.OrientationEcran
 import fr.moovie.tv.ui.player.SurfaceVideo
+import fr.moovie.tv.ui.profile.ProfileHost
 import fr.moovie.tv.ui.settings.SettingsScreen
 import fr.moovie.tv.ui.theme.MooVieTheme
 import platform.UIKit.UIViewController
@@ -115,6 +116,28 @@ private fun RacineMoovie() {
             // `navigationBarsPadding()` de [MoovieBottomBar] n'ajoute rien
             // par-dessus.
             Box(modifier = Modifier.fillMaxSize().background(Color(0xFF0A0A0A))) {
+                // **La porte des profils, qui n'avait jamais été posée.**
+                //
+                // `LocalSwitchProfile` n'a de valeur que sous cette enveloppe :
+                // sans elle, le bouton « Changer de profil » des réglages
+                // appelait la lambda vide qui lui sert de défaut, et il ne se
+                // passait donc rien du tout. Android et le desktop enveloppent
+                // leur racine de la même façon, et iOS avait même déjà sa
+                // `fabriqueParDefaut` — écrite pour ce fournisseur, qui était le
+                // seul à en avoir besoin.
+                ProfileHost { profilId ->
+                // Le corps garde son indentation, comme le `ProfileHost` du
+                // desktop : décaler la page entière noierait le correctif dans
+                // une revue de tout l'écran.
+                //
+                // Les ViewModels d'iOS vivent dans un objet, hors de la
+                // composition, là où le `key(profileId)` de l'enveloppe ne peut
+                // pas les atteindre. On les rebranche donc à la main — et avant
+                // tout le reste, car un écran composé d'abord lirait les flux du
+                // profil qu'on vient de quitter. Sous `remember` pour que ce soit
+                // une fois par profil et non à chaque recomposition.
+                remember(profilId) { Vm.rattacherA(profilId) }
+
                 val depart = rememberStartScreen()
                 // Null = la réponse n'est pas encore lue. Voir le KDoc.
                 if (depart != null) {
@@ -192,6 +215,7 @@ private fun RacineMoovie() {
                             )
                         }
                     }
+                }
                 }
             }
         }

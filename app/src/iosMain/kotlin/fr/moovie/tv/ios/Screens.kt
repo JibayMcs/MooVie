@@ -40,8 +40,51 @@ import org.jetbrains.compose.resources.stringResource
  * sorte pour lancer le lecteur. `lazy`, parce que construire un ViewModel ouvre
  * ses dépôts — inutile d'ouvrir celui des téléchargements pour quelqu'un qui
  * n'ira jamais sur cet écran.
+ *
+ * ## Ils ne survivent pas à un changement de profil
+ *
+ * Un dépôt ouvre le fichier du profil actif **à sa construction** — c'est le
+ * choix qu'assume [fr.moovie.tv.data.store.ActiveProfile] — et un ViewModel
+ * construit les siens dans ses champs. Les garder d'un profil à l'autre
+ * servirait donc indéfiniment les données du précédent : exactement le défaut
+ * que raconte `ProfileHost`, où « Reprendre la lecture » proposait toujours
+ * l'épisode de quelqu'un d'autre.
+ *
+ * Le `key(profileId)` de `ProfileHost` suffit à tout ce qui est mémorisé dans la
+ * composition. Un objet Kotlin, lui, n'y est pas, et rien ne peut l'atteindre de
+ * l'extérieur. [rattacherA] est cette prise.
  */
 internal object Vm {
+
+    private var profil: String? = null
+    private var jeu = JeuDeVm()
+
+    /**
+     * Rebranche le porte-ViewModels sur [profileId], en repartant d'un jeu neuf
+     * si le profil a changé. Idempotent : l'enveloppe l'appelle à chaque
+     * composition, il ne fait quelque chose qu'au basculement.
+     *
+     * L'ancien jeu est simplement lâché. Ses flux sont en `WhileSubscribed` et
+     * perdent leur dernier collecteur au moment où l'arbre est remonté : ils
+     * s'arrêtent d'eux-mêmes, sans qu'il y ait de fermeture à ne pas oublier.
+     */
+    fun rattacherA(profileId: String) {
+        if (profil == profileId) return
+        profil = profileId
+        jeu = JeuDeVm()
+    }
+
+    val home get() = jeu.home
+    val search get() = jeu.search
+    val history get() = jeu.history
+    val details get() = jeu.details
+    val catalog get() = jeu.catalog
+    val person get() = jeu.person
+    val discovery get() = jeu.discovery
+}
+
+/** Un jeu de ViewModels : ceux d'un profil, et d'un seul. Voir [Vm]. */
+private class JeuDeVm {
     val home by lazy { HomeViewModel() }
     val search by lazy { SearchViewModel() }
     val history by lazy { HistoryViewModel() }
