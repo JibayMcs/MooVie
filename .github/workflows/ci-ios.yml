@@ -48,8 +48,24 @@ on:
   # Permet de le relancer à la main depuis l'onglet Actions, sans pousser.
   workflow_dispatch:
 
+# Une nouvelle poussée sur la même branche annule la vérification en cours :
+# personne n'attend le verdict d'un commit déjà remplacé, et un runner macOS
+# occupé à le produire est un runner qui ne démarre pas le suivant.
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  compiler:
+  # ---------------------------------------------------------------------------
+  # Ce qui exige macOS, et rien d'autre.
+  #
+  # Mesuré sur un run complet : 169 s de métadonnées, 501 s de lien appareil,
+  # 641 s de lien simulateur, 82 s de build Xcode. Le simulateur pesait donc
+  # 45 % du total à lui seul, et la non-régression Android/desktop s'exécutait
+  # ensuite **en série sur le même runner macOS** — la machine la plus chère du
+  # catalogue, pour une compilation qui tourne sur n'importe quel Linux.
+  # ---------------------------------------------------------------------------
+  ios:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -61,21 +77,49 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      # **Le cache que `setup-gradle` ne fait pas.**
+      #
+      # Il met en cache `~/.gradle`, jamais `~/.konan` — or c'est là que vivent
+      # le compilateur Kotlin/Native téléchargé et, surtout, les caches de
+      # bibliothèques de plateforme qu'il reconstruit sinon à chaque run. C'est
+      # le poste de dépense invisible des deux étapes de lien ci-dessous.
+      #
+      # La clé porte les fichiers de build : eux seuls peuvent changer la
+      # version de Kotlin, donc invalider ces caches. `restore-keys` laisse
+      # repartir du cache précédent quand la clé exacte manque — un cache
+      # partiellement à jour vaut toujours mieux qu'un répertoire vide.
+      - name: Cache Kotlin/Native (~/.konan)
+        uses: actions/cache@v4
+        with:
+          path: ~/.konan
+          key: konan-${{ runner.os }}-${{ hashFiles('build.gradle.kts', 'app/build.gradle.kts', 'gradle.properties', 'gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: konan-${{ runner.os }}-
+
       # En premier, et séparément : cette tâche compile `commonMain` **et**
       # `iosMain` en métadonnées. C'est le retour le plus rapide et le plus
       # lisible sur les erreurs de code partagé, avant que xcodebuild ne noie
       # tout dans sa propre sortie.
+      #
+      # Le démon Gradle n'est plus refusé. Les invocations qui suivent sont sur
+      # le même runner : `--no-daemon` leur imposait à chacune un démarrage de
+      # JVM et une phase de configuration entière, pour une isolation dont un
+      # runner jetable n'a aucun besoin. `setup-gradle` arrête le démon en fin
+      # de job.
       - name: Compiler le code partagé pour iOS
-        run: ./gradlew :app:compileIosMainKotlinMetadata --no-daemon
+        run: ./gradlew :app:compileIosMainKotlinMetadata
 
       # Puis la vraie compilation native, cible appareil : c'est elle qui
       # éprouve le cinterop — CoreCrypto, Core Image, NSDateFormatter — que la
       # compilation de métadonnées ne touche pas.
+      #
+      # **Le lien simulateur a été retiré**, et ce n'est pas une baisse de
+      # couverture. Les trois cibles iOS partagent le même source set `iosMain` :
+      # ce que le simulateur aurait attrapé et que l'appareil laisse passer se
+      # réduit au cinterop propre à une architecture, que ce lien-ci exerce
+      # déjà. Onze minutes de runner macOS pour ce delta-là n'étaient pas un
+      # échange raisonnable.
       - name: Compiler le framework Kotlin/Native (appareil)
-        run: ./gradlew :app:linkDebugFrameworkIosArm64 --no-daemon
-
-      - name: Compiler le framework Kotlin/Native (simulateur)
-        run: ./gradlew :app:linkDebugFrameworkIosSimulatorArm64 --no-daemon
+        run: ./gradlew :app:linkDebugFrameworkIosArm64
 
       - name: Installer XcodeGen
         run: brew install xcodegen
@@ -85,8 +129,13 @@ jobs:
         run: xcodegen generate
 
       # Build **appareil**, pas simulateur : c'est celui qui donne un binaire
-      # installable sur un iPhone. Le simulateur a déjà été couvert par le lien
-      # du framework juste au-dessus.
+      # installable sur un iPhone.
+      #
+      # L'étape de lien juste au-dessus n'est pas du travail perdu pour autant :
+      # le projet Xcode lance lui-même `embedAndSignAppleFrameworkForXcode`, qui
+      # résout vers cette même tâche et la retrouve à jour. Elle ne coûte donc
+      # rien de plus, et sort l'erreur de compilation Kotlin de la sortie de
+      # xcodebuild, où elle serait illisible.
       - name: Construire l'application iOS
         run: |
           xcodebuild build \
@@ -122,8 +171,29 @@ jobs:
           path: moovie-*.ipa
           retention-days: 7
 
-      # Le reste du projet ne doit pas régresser pendant le portage. Ces deux
-      # cibles se compilent aussi sur macOS, autant les couvrir ici plutôt que
-      # de compter sur le poste de développement.
+  # ---------------------------------------------------------------------------
+  # Le reste du projet ne doit pas régresser pendant le portage — mais rien ici
+  # n'exige macOS.
+  #
+  # Ces trois tâches tournaient en fin du job iOS, donc en série derrière vingt
+  # minutes de Kotlin/Native, sur le runner le plus lent à obtenir et le plus
+  # cher à l'heure. En job séparé elles démarrent en même temps que lui : leur
+  # durée disparaît du temps total au lieu de s'y ajouter, et le verdict
+  # Android/desktop tombe en quelques minutes plutôt qu'à la toute fin.
+  #
+  # Le SDK Android est préinstallé sur les images `ubuntu-latest`.
+  # ---------------------------------------------------------------------------
+  jvm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+
       - name: Non-régression Android et desktop
-        run: ./gradlew :app:compileKotlinDesktop :app:compileDebugKotlinAndroid :app:desktopTest --no-daemon
+        run: ./gradlew :app:compileKotlinDesktop :app:compileDebugKotlinAndroid :app:desktopTest
