@@ -33,7 +33,7 @@ import kotlinx.coroutines.launch
  * socket, et un état Compose ne se modifie pas depuis n'importe où.
  */
 @Composable
-fun Modifier.remoteTypable(
+actual fun Modifier.remoteTypable(
     label: String,
     value: String,
     onValueChange: (String) -> Unit,
@@ -46,7 +46,7 @@ fun Modifier.remoteTypable(
      * qui dit si un réglage est renseigné sans jamais montrer sa valeur : la
      * commodité de saisie ne doit pas devenir une fuite.
      */
-    secret: Boolean = false,
+    secret: Boolean,
 ): Modifier {
     val id = remember { RemoteTyping.nextId() }
     val currentValue = rememberUpdatedState(if (secret) "" else value)

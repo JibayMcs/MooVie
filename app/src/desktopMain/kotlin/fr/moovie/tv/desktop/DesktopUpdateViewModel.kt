@@ -1,5 +1,6 @@
 package fr.moovie.tv.desktop
 
+import fr.moovie.tv.data.update.downloadApk
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import fr.moovie.tv.data.settings.SettingsRepository

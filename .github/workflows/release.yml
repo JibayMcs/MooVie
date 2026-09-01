@@ -1,8 +1,11 @@
 name: Release
 
 # Publie à chaque tag vX.Y.Z : APK Android signé + paquets desktop natifs
-# (deb Linux, msi Windows, dmg macOS) sur la même GitHub Release.
-# L'auto-updater in-app (Android et desktop) lit releases/latest.
+# (AppImage Linux, msi Windows, dmg macOS) + .ipa iOS non signé, sur la même
+# GitHub Release.
+# L'auto-updater in-app (Android et desktop) lit releases/latest. iOS n'en a
+# pas : une app iOS ne peut pas s'installer elle-même. La mise à jour y passe
+# par SideStore, qui lit la source JSON publiée à côté du .ipa.
 #
 # Un tag qui porte un suffixe semver de préversion — `v1.15.0-rc.1` — sort en
 # **pré-release**. C'est ce qui met une version à l'épreuve sans l'imposer :
@@ -277,6 +280,181 @@ jobs:
           # Une préversion ne peut pas être « latest ». On le dit explicitement
           # au lieu de compter sur le refus de l'API : c'est ce drapeau, et lui
           # seul, qui protège les utilisateurs installés d'une bannière.
+          make_latest: ${{ !contains(github.ref_name, '-') }}
+
+  # iOS : .ipa **non signé**, destiné au sideload par SideStore.
+  #
+  # Non signé parce qu'une app d'extraction de sources ne passe pas la revue de
+  # l'App Store : il n'y a pas de canal officiel à viser, et signer ici
+  # supposerait un compte Apple Developer dont la clé privée vivrait dans les
+  # secrets du dépôt. SideStore resigne à l'installation avec le certificat de
+  # l'utilisateur, ce qui est de toute façon la seule signature qui vaille sur
+  # son appareil — et il sait la renouveler **depuis l'appareil**, là où
+  # AltStore exige un ordinateur sur le même réseau tous les sept jours.
+  #
+  # C'est le **seul endroit où le code Kotlin/Native est compilé** : la toolchain
+  # Apple n'existe que sur macOS, un poste Linux ou Windows configure les cibles
+  # iOS sans pouvoir les bâtir. Ce job est donc aussi la vérification de
+  # compilation du portage.
+  ipa:
+    needs: changelog
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # Le projet Xcode n'est pas versionné : il se génère depuis
+      # iosApp/project.yml. Voir le commentaire en tête de ce fichier-là.
+      - name: Installer XcodeGen
+        run: brew install xcodegen
+
+      - name: Générer le projet Xcode
+        working-directory: iosApp
+        run: xcodegen generate
+
+      # CFBundleShortVersionString n'accepte que du numérique pointé : le
+      # suffixe de préversion — « -rc.1 » — y est refusé, exactement comme
+      # jpackage le refuse pour le MSI et le DMG. Même traitement, donc, que le
+      # `jpackageVersion` de app/build.gradle.kts. Le numéro de build prend le
+      # compteur du workflow, qui croît strictement.
+      - name: Archiver (non signé)
+        env:
+          OPENSUBTITLES_API_KEY: ${{ secrets.MOOVIE_OPENSUBTITLES_KEY }}
+        run: |
+          set -e
+          version="${GITHUB_REF_NAME#v}"
+          xcodebuild archive \
+            -project iosApp/Moovie.xcodeproj \
+            -scheme Moovie \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$PWD/build/Moovie.xcarchive" \
+            MARKETING_VERSION="${version%%-*}" \
+            CURRENT_PROJECT_VERSION="${GITHUB_RUN_NUMBER}" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+
+      # Un .ipa est un zip dont le seul contenu obligatoire est Payload/<app>.
+      # Aucun outil n'est nécessaire pour le fabriquer, et `xcodebuild
+      # -exportArchive` en exigerait un profil de provisioning — ce que
+      # précisément on n'a pas.
+      - name: Empaqueter le .ipa
+        run: |
+          set -e
+          app=$(find build/Moovie.xcarchive/Products/Applications -maxdepth 1 -name '*.app' | head -1)
+          [ -n "$app" ] || { echo "aucun .app dans l'archive"; exit 1; }
+          mkdir -p Payload
+          cp -R "$app" Payload/
+          zip -qry "moovie-${GITHUB_REF_NAME}.ipa" Payload
+          ls -lh moovie-*.ipa
+
+      # Source SideStore : le seul mécanisme de mise à jour possible sur iOS.
+      #
+      # Une app iOS ne peut pas s'installer elle-même — c'est verrouillé par le
+      # système, pas une API manquante. L'updater intégré des autres
+      # plateformes n'a donc pas d'équivalent ici. Ce que sait faire SideStore,
+      # c'est interroger périodiquement une « source » : un JSON listant les
+      # versions et leurs URLs. L'utilisateur l'ajoute une fois, SideStore
+      # s'occupe du reste. Le format est celui d'AltStore, dont SideStore est un
+      # fork : la même source sert donc aux deux.
+      #
+      # L'URL de la source est **stable** parce que GitHub résout toujours
+      # `releases/latest/download/<asset>` vers la dernière release non
+      # préversion. Pas besoin d'une branche gh-pages ni d'un hébergement à
+      # côté : le fichier voyage avec le .ipa qu'il décrit.
+      - name: Construire la source SideStore
+        run: |
+          set -e
+          ipa=$(ls moovie-*.ipa | head -1)
+          taille=$(wc -c < "$ipa" | tr -d ' ')
+          # **La version annoncée doit être celle que l'application déclare.**
+          # SideStore compare `version` au `CFBundleShortVersionString` de l'app
+          # installée, et `buildVersion` à son `CFBundleVersion` ; ce sont ces
+          # deux comparaisons qui décident s'il y a du neuf.
+          #
+          # D'où le même `%%-*` qu'à l'archivage : `CFBundleShortVersionString`
+          # n'accepte que du numérique pointé, si bien qu'un tag `v1.19.0-rc.1`
+          # produit une app en « 1.19.0 ». Annoncer « 1.19.0-rc.1 » dans la
+          # source ne correspondrait donc à aucune version installable, et
+          # SideStore aurait proposé la même mise à jour indéfiniment.
+          #
+          # `buildVersion` est ce qui distingue alors deux préversions du même
+          # numéro : c'est le compteur du workflow, qui croît strictement, et
+          # c'est exactement ce que l'archivage met dans `CFBundleVersion`.
+          version="${GITHUB_REF_NAME#v}"
+          version="${version%%-*}"
+          build="${GITHUB_RUN_NUMBER}"
+          # Empreinte du fichier : SideStore la vérifie après téléchargement et
+          # refuse un .ipa qui ne correspond pas. Elle ne coûte rien à produire
+          # et transforme un téléchargement corrompu en refus explicite plutôt
+          # qu'en installation qui échoue sans raison lisible.
+          sha=$(shasum -a 256 "$ipa" | cut -d" " -f1)
+          base="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}"
+          # `date -u` et non la date du tag : c'est la date de publication que
+          # lit SideStore pour décider s'il a du neuf.
+          # `app/icons/moovie.png` et non la bannière : SideStore affiche cette
+          # image dans une tuile **carrée**. Une bannière pleine largeur y
+          # arriverait écrasée, et c'est déjà l'icône que porte l'application.
+          python3 - <<PYEOF > sidestore.json
+          import json, os, datetime
+          notes = os.environ.get("NOTES", "").strip() or "Voir les notes de version sur GitHub."
+          print(json.dumps({
+              "name": "Moo-vie",
+              "identifier": "fr.moovie.sidestore",
+              "apps": [{
+                  "name": "Moo-vie",
+                  "bundleIdentifier": "fr.moovie.tv",
+                  "developerName": "Moo-vie",
+                  "subtitle": "Streaming multiplateforme, sans compte ni publicite.",
+                  "localizedDescription":
+                      "Streaming sur Android TV, Android, desktop et iOS, "
+                      "depuis une base de code Kotlin Multiplatform unique. "
+                      "L'extraction des sources tourne sur l'appareil : pas de "
+                      "serveur, pas de compte, pas de publicité.",
+                  "iconURL": "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/main/app/icons/moovie.png",
+                  "tintColor": "1B1B1F",
+                  "versions": [{
+                      "version": "$version",
+                      "buildVersion": "$build",
+                      "date": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                      "localizedDescription": notes,
+                      "downloadURL": "$base/$ipa",
+                      "size": $taille,
+                      "sha256": "$sha",
+                      # Compose Multiplatform exige iOS 15 ; c'est aussi la
+                      # cible de déploiement du projet Xcode.
+                      "minOSVersion": "15.0",
+                  }],
+              }],
+          }, indent=2, ensure_ascii=False))
+          PYEOF
+          echo "source SideStore : version $version (build $build) pour $ipa ($taille octets)"
+          # Relu avant publication : une source mal formée n'échoue pas ici, elle
+          # échoue chez l'utilisateur, sous la forme d'une source qui refuse de
+          # s'ajouter sans dire pourquoi.
+          python3 -c "import json,sys; json.load(open('sidestore.json')); print('source SideStore : JSON valide')"
+        env:
+          NOTES: ${{ needs.changelog.outputs.notes }}
+
+      - name: Publier sur la release GitHub
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            moovie-*.ipa
+            sidestore.json
+          body: ${{ needs.changelog.outputs.notes }}
+          generate_release_notes: true
+          # Les publications visent la *même* release : elles doivent s'accorder
+          # sur ce marquage, sinon la dernière arrivée déclasse les précédentes.
+          prerelease: ${{ contains(github.ref_name, '-') }}
           make_latest: ${{ !contains(github.ref_name, '-') }}
 
   # Linux passe par un AppImage : il embarque ses bibliothèques, tourne sur

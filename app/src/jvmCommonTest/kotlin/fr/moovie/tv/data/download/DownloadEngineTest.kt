@@ -3,6 +3,9 @@ package fr.moovie.tv.data.download
 import fr.moovie.tv.core.sources.model.PlayableStream
 import fr.moovie.tv.core.sources.model.StreamFormat
 import kotlinx.coroutines.test.runTest
+import okio.FileSystem
+import okio.Path
+import okio.Path.Companion.toOkioPath
 import java.io.File
 import kotlin.test.AfterTest
 import kotlin.test.Test
@@ -47,7 +50,7 @@ class DownloadEngineTest {
         override suspend fun fetch(
             url: String,
             headers: Map<String, String>,
-            target: File,
+            target: Path,
             onProgress: suspend (recus: Long, total: Long) -> Unit,
         ): Long {
             calls += url
@@ -57,12 +60,14 @@ class DownloadEngineTest {
                 throw java.io.IOException("HTTP 403 sur $url")
             }
             val body = bodies[url] ?: "octets-de-$url"
-            target.writeText(body)
+            target.parent?.let(FileSystem.SYSTEM::createDirectories)
+            FileSystem.SYSTEM.write(target) { writeUtf8(body) }
+            val taille = FileSystem.SYSTEM.metadataOrNull(target)?.size ?: 0L
             // Un vrai transfert rend compte pendant qu'il coule, pas seulement
             // à la fin : c'est ce que le moteur doit relayer.
-            onProgress(target.length() / 2, target.length())
-            onProgress(target.length(), target.length())
-            return target.length()
+            onProgress(taille / 2, taille)
+            onProgress(taille, taille)
+            return taille
         }
     }
 
@@ -77,12 +82,12 @@ class DownloadEngineTest {
         resolver: StreamResolver,
         seen: MutableList<Download>,
         /** Octets libres annoncés par le volume. Par défaut : de la place. */
-        freeSpace: (File) -> Long = { Long.MAX_VALUE },
+        freeSpace: (Path) -> Long = { Long.MAX_VALUE },
     ) = DownloadEngine(
         fetcher = fetcher,
         progress = { seen += it },
         resolver = resolver,
-        dirFor = { File(root, safeName(it)) },
+        dirFor = { root.toOkioPath() / safeName(it) },
         freeSpace = freeSpace,
     )
 

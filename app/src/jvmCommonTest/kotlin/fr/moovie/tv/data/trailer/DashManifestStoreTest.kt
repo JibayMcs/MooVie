@@ -1,5 +1,7 @@
 package fr.moovie.tv.data.trailer
 
+import okio.Path
+import okio.Path.Companion.toOkioPath
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -14,7 +16,7 @@ class DashManifestStoreTest {
 
     @Test
     fun `l'URI rendue porte trois barres obliques`() {
-        val uri = DashManifestStore(tempDir()).write("<MPD/>")
+        val uri = DashManifestStore(tempDir().toOkioPath()).write("<MPD/>")
         assertNotNull(uri)
         // `File.toURI()` rend `file:/home/…`, que libVLC prend pour un chemin
         // relatif : il la colle derrière le répertoire courant et n'ouvre rien.
@@ -24,7 +26,7 @@ class DashManifestStoreTest {
 
     @Test
     fun `l'URI designe un fichier qui existe et contient le manifeste`() {
-        val uri = DashManifestStore(tempDir()).write("<MPD>bonjour</MPD>")
+        val uri = DashManifestStore(tempDir().toOkioPath()).write("<MPD>bonjour</MPD>")
         assertNotNull(uri)
         val file = File(uri.removePrefix("file://"))
         assertTrue(file.isFile, "fichier absent : $file")
@@ -35,7 +37,7 @@ class DashManifestStoreTest {
     @Test
     fun `le meme manifeste ne seme pas un fichier par ouverture`() {
         val dir = tempDir()
-        val store = DashManifestStore(dir)
+        val store = DashManifestStore(dir.toOkioPath())
         repeat(3) { store.write("<MPD/>") }
         assertEquals(1, dir.listFiles()?.size)
     }
@@ -49,7 +51,7 @@ class DashManifestStoreTest {
             // YouTube, donc plus qu'un fichier d'URLs mortes.
             setLastModified(System.currentTimeMillis() - 7L * 60 * 60 * 1000)
         }
-        DashManifestStore(dir).write("<MPD>neuf</MPD>")
+        DashManifestStore(dir.toOkioPath()).write("<MPD>neuf</MPD>")
         assertTrue(!vieux.exists(), "le manifeste périmé aurait dû être effacé")
     }
 }

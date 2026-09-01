@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>fr</string>
+	<key>CFBundleDisplayName</key>
+	<string>Moo-vie</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<!-- Renseignés par la CI depuis l'`appVersion` de app/build.gradle.kts, pour
+	     que les quatre plateformes affichent le même numéro. -->
+	<key>CFBundleShortVersionString</key>
+	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleVersion</key>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+
+	<!-- Les catalogues et les hébergeurs servent une partie de leurs manifestes
+	     et de leurs segments en clair. Sans cette dérogation, App Transport
+	     Security coupe la connexion et la source échoue sans message
+	     exploitable. C'est une contrainte des sources, pas un choix. -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
+
+	<!-- Lecture qui continue écran verrouillé, comme sur Android. -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+	</array>
+
+	<!-- Nom du jeu d'icônes dans le catalogue d'assets. Sans cette clé, iOS
+	     n'affiche aucune icône : le catalogue seul ne suffit pas, il faut le
+	     désigner. -->
+	<key>CFBundleIconName</key>
+	<string>AppIcon</string>
+	<!-- L'écran de lancement, que le système affiche avant la première image
+	     de Compose. Un dictionnaire vide donnait du blanc : l'ouverture
+	     éclatait donc en blanc avant de basculer sur le fond sombre. La couleur
+	     vient du catalogue d'assets, seule façon d'en désigner une ici. -->
+	<key>UILaunchScreen</key>
+	<dict>
+		<key>UIColorName</key>
+		<string>LaunchBackground</string>
+	</dict>
+
+	<!-- L'application est sombre, et seulement sombre — la palette de
+	     `MooVieTheme` est un `darkColorScheme` fixe, sans variante claire. Le
+	     déclarer au système fait deux choses qu'on aurait dû demander
+	     séparément : l'heure et les indicateurs de la barre d'état passent en
+	     clair (ils étaient noirs sur fond noir, donc invisibles), et les
+	     claviers et menus du système s'affichent sombres au lieu de trancher
+	     en blanc au milieu d'un écran de réglages. -->
+	<key>UIUserInterfaceStyle</key>
+	<string>Dark</string>
+	<!-- **La clé qui manquait, et qui fermait l'application au lancement.**
+
+	     Compose Multiplatform vérifie sa présence au démarrage
+	     (`PlistSanityCheck.performIfNeeded`) et lève une `IllegalStateException`
+	     si elle est absente. Sur Kotlin/Native une exception non rattrapée
+	     termine le processus : `abort()`, SIGABRT, l'app se ferme à l'instant
+	     où on l'ouvre — c'est exactement ce que montrait le journal de crash
+	     d'un iPhone 17.
+
+	     Ce qu'elle fait par ailleurs : sans elle, iOS plafonne à 60 Hz une
+	     application qui ne s'est pas déclarée, même sur un écran ProMotion à
+	     120 Hz. Compose rend dans sa propre couche Metal et veut la cadence
+	     complète ; d'où une vérification qui refuse de démarrer plutôt que de
+	     laisser passer une animation deux fois moins fluide sans un mot. -->
+	<key>CADisableMinimumFrameDurationOnPhone</key>
+	<true/>
+	<!-- `arm64` et surtout **pas** `armv7` : celui-ci est la capacité ARM 32
+	     bits, qu'un iPhone moderne — arm64 uniquement — ne satisfait pas. iOS
+	     refuse alors de lancer l'application, sans message : elle se ferme à
+	     l'instant où on l'ouvre. C'est le défaut qu'avait le premier .ipa. -->
+	<key>UIRequiredDeviceCapabilities</key>
+	<array>
+		<string>arm64</string>
+	</array>
+	<!-- Les trois orientations que l'application peut prendre — la borne
+	     extérieure, pas le comportement.
+
+	     Le partage réel se décide à l'exécution : portrait partout, paysage
+	     dans le lecteur, comme sur le téléphone Android. C'est
+	     `MoovieAppDelegate` qui répond au système, sur signal d'`OrientationEcran`
+	     ; cette clé ne fait que l'autoriser. Elle était là depuis le début en
+	     annonçant ce partage, mais rien ne l'appliquait : le lecteur restait en
+	     portrait si le téléphone y était.
+
+	     `PortraitUpsideDown` reste absente : un iPhone tenu à l'envers ne se
+	     retourne pas de lui-même, et personne ne regarde un film ainsi. -->
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+</dict>
+</plist>

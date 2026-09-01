@@ -6,7 +6,7 @@ import java.io.File
 // ~/Library/Application Support (macOS), %LOCALAPPDATA% (Windows). Des
 // gigaoctets n'ont rien à faire dans %APPDATA%, qui est parfois synchronisé
 // avec le profil itinérant d'un domaine.
-actual fun moovieDownloadsDir(): File {
+fun moovieDownloadsFichier(): File {
     val os = System.getProperty("os.name").lowercase()
     val home = System.getProperty("user.home")
     val base = when {
@@ -18,3 +18,5 @@ actual fun moovieDownloadsDir(): File {
     }
     return File(base, "moovie/downloads").also { it.mkdirs() }
 }
+
+actual fun moovieDownloadsChemin(): String = moovieDownloadsFichier().absolutePath

@@ -59,6 +59,46 @@ val openSubtitlesApiKey: String =
         ?: System.getenv("OPENSUBTITLES_API_KEY")
         ?: ""
 
+/**
+ * Équivalent iOS de `BuildConfig`.
+ *
+ * La version affichée et la clé OpenSubtitles atteignent l'APK par un champ
+ * `BuildConfig` et le desktop par une propriété système passée à la JVM.
+ * Kotlin/Native n'a ni l'un ni l'autre : pas de `System.getProperty`, et rien
+ * n'injecte de constante dans un binaire natif après coup. On génère donc une
+ * source, ce qui garde l'unique `appVersion` de ce fichier comme seule origine
+ * du numéro de version sur les quatre plateformes.
+ *
+ * Passer par `Info.plist` aurait été possible pour la version, mais pas pour la
+ * clé : le plist est en clair dans le bundle, là où une constante compilée est
+ * au moins noyée dans le binaire — même protection, faible, que côté Android.
+ */
+val genererBuildConfigIos by tasks.registering {
+    val sortie = layout.buildDirectory.dir("generated/moovie/ios")
+    // Sans ces deux `inputs`, Gradle considérerait la tâche à jour après un
+    // changement de version ou de clé, et le binaire iOS embarquerait
+    // silencieusement les anciennes valeurs.
+    inputs.property("version", appVersion)
+    inputs.property("cleOpenSubtitles", openSubtitlesApiKey)
+    outputs.dir(sortie)
+    doLast {
+        // Échappement : la clé vient d'un secret CI, rien ne garantit qu'elle
+        // ne porte pas de guillemet ou d'antislash.
+        fun litteral(v: String) = v.replace("\\", "\\\\").replace("\"", "\\\"")
+        val f = sortie.get().file("MoovieBuildConfig.kt").asFile
+        f.parentFile.mkdirs()
+        f.writeText(
+            """
+            // Généré par la tâche Gradle `genererBuildConfigIos`. Ne pas éditer.
+            package fr.moovie.tv.shared
+
+            internal const val VERSION_GENEREE: String = "${litteral(appVersion)}"
+            internal const val CLE_OPENSUBTITLES_GENEREE: String = "${litteral(openSubtitlesApiKey)}"
+            """.trimIndent() + "\n",
+        )
+    }
+}
+
 kotlin {
     androidTarget {
         compilerOptions {
@@ -72,6 +112,31 @@ kotlin {
         }
     }
 
+    // Cibles iOS.
+    //
+    // Kotlin/Native ne sait compiler une cible Apple que **depuis macOS** : la
+    // toolchain est celle de Xcode. Sur Linux et Windows, Gradle configure ces
+    // cibles sans broncher mais leurs tâches de compilation sont inexécutables.
+    // C'est sans conséquence pour les autres plateformes — `assembleRelease` et
+    // `packageDistributionForCurrentOS` ne dépendent d'aucune d'elles — et cela
+    // veut dire que la vérification de compilation iOS appartient au runner
+    // macOS de la CI, pas au poste de développement.
+    //
+    // iosX64 est le simulateur sur Mac Intel, iosSimulatorArm64 celui des Mac
+    // Apple Silicon, iosArm64 l'appareil réel — seule cette dernière entre dans
+    // le .ipa.
+    listOf(iosX64(), iosArm64(), iosSimulatorArm64()).forEach { cible ->
+        cible.binaries.framework {
+            baseName = "MoovieShared"
+            // Statique, et non dynamique : Compose Multiplatform embarque son
+            // propre moteur de rendu Skia, et un .ipa distribué hors App Store
+            // n'a aucun mécanisme de partage de frameworks entre applications.
+            // Le lien statique évite en prime l'étape d'embarquement de
+            // framework dans le bundle, que la signature AltStore n'aime pas.
+            isStatic = true
+        }
+    }
+
     sourceSets {
         val commonMain by getting {
             dependencies {
@@ -82,6 +147,48 @@ kotlin {
                 implementation(compose.materialIconsExtended)
                 implementation(compose.components.resources)
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+                // Explicite depuis que la couche sources est en commun : elle
+                // référence `CoroutineDispatcher`. Les cibles JVM la tiraient
+                // jusque-là transitivement, à la même version — rien ne change
+                // pour elles.
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
+                // Réglages persistants. L'artefact était déjà multiplateforme,
+                // il était simplement déclaré côté JVM faute d'utilisateur
+                // commun ; le chemin du fichier vient de l'expect/actual
+                // `moovieDataStoreChemin`.
+                implementation("androidx.datastore:datastore-preferences-core:1.1.1")
+                // `createWithPath` prend un `okio.Path` là où l'API JVM prenait
+                // un `File`. DataStore tire déjà okio, on le déclare pour ne pas
+                // dépendre d'une transitivité.
+                implementation("com.squareup.okio:okio:3.9.1")
+                // ViewModels multiplateformes. Le port JetBrains vise aussi iOS :
+                // ces artefacts étaient déclarés côté JVM faute d'utilisateur
+                // commun, pas par contrainte. Les remonter ici est ce qui permet
+                // aux ViewModels de l'application de devenir partagés.
+                implementation("org.jetbrains.androidx.lifecycle:lifecycle-viewmodel:2.8.4")
+                // LocalViewModelStoreOwner, que ProfileHost redéfinit pour donner
+                // à chaque profil son propre magasin de ViewModels — sans quoi
+                // `viewModel()` rend l'instance construite sous le profil
+                // précédent.
+                implementation("org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-compose:2.8.4")
+                // Ktor : client HTTP commun de la couche TMDB. Le *moteur* reste
+                // par plateforme — OkHttp côté JVM, ce qui permet de réutiliser
+                // le client existant et son cache disque sans rien changer au
+                // comportement d'Android et du desktop.
+                implementation("io.ktor:ktor-client-core:3.0.3")
+                implementation("io.ktor:ktor-client-content-negotiation:3.0.3")
+                implementation("io.ktor:ktor-serialization-kotlinx-json:3.0.3")
+                // ksoup : portage Kotlin/Multiplatform de jsoup, même API de
+                // sélection CSS. Remplace `org.jsoup`, qui est du Java pur.
+                implementation("com.fleeksoft.ksoup:ksoup:0.2.0")
+                // Dates : analyse ISO, calendrier local, arithmétique. Le
+                // *formatage localisé*, lui, reste en expect/actual — aucune
+                // bibliothèque multiplateforme ne connaît les motifs de date
+                // propres à chaque langue, seuls les OS les portent.
+                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.1")
+                // Coil 3 est multiplateforme ; seul son moteur réseau ne l'est
+                // pas, et celui-ci reste déclaré par cible.
+                implementation("io.coil-kt.coil3:coil-compose:3.0.4")
             }
         }
 
@@ -91,34 +198,55 @@ kotlin {
         val jvmCommon by creating {
             dependsOn(commonMain)
             dependencies {
-                implementation("com.squareup.retrofit2:retrofit:2.11.0")
-                implementation("com.squareup.retrofit2:converter-kotlinx-serialization:2.11.0")
                 implementation("com.squareup.okhttp3:okhttp:4.12.0")
                 implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
                 // DNS-over-HTTPS : contourne le blocage DNS des FAI sur les domaines sources
                 implementation("com.squareup.okhttp3:okhttp-dnsoverhttps:4.12.0")
+                // Moteur Ktor adossé à OkHttp : `preconfigured` lui passe le
+                // client existant, cache et interceptors compris.
+                implementation("io.ktor:ktor-client-okhttp:3.0.3")
                 implementation("org.jsoup:jsoup:1.18.1")
                 // Encodage QR seulement (Java pur, sans dépendance Android) :
                 // l'appairage du téléphone en affiche un. Le codage QR est du
                 // Reed-Solomon et du masquage — pas quelque chose qu'on écrit
                 // à la main pour économiser un jar.
                 implementation("com.google.zxing:core:3.5.3")
-                // Images multiplateforme (Coil 3), fetcher réseau OkHttp
-                implementation("io.coil-kt.coil3:coil-compose:3.0.4")
+                // Fetcher réseau OkHttp de Coil : lui seul est propre à la JVM.
                 implementation("io.coil-kt.coil3:coil-network-okhttp:3.0.4")
-                // Réglages persistants (artefact KMP ; le chemin du fichier est
-                // fourni par expect/actual moovieDataStoreFile)
-                implementation("androidx.datastore:datastore-preferences-core:1.1.1")
-                // ViewModels multiplateformes (androidx.lifecycle réel côté Android,
-                // port JetBrains côté desktop)
-                implementation("org.jetbrains.androidx.lifecycle:lifecycle-viewmodel:2.8.4")
-                // LocalViewModelStoreOwner, que ProfileHost redéfinit pour donner
-                // à chaque profil son propre magasin de ViewModels — sans quoi
-                // `viewModel()` rend l'instance construite sous le profil
-                // précédent. Le port JetBrains, pour rester en jvmCommon.
-                implementation("org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-compose:2.8.4")
             }
         }
+
+        // Pendant iOS de `jvmCommon` : ce que les deux cibles JVM tirent de
+        // Retrofit/OkHttp/jsoup, Kotlin/Native doit le tirer d'ailleurs. Le
+        // source set est déclaré à la main parce que le Default Hierarchy
+        // Template est désactivé sur ce projet — les `dependsOn` explicites de
+        // `jvmCommon` le désactivent pour tout le module, `iosMain` ne serait
+        // donc pas créé tout seul.
+        val iosMain by creating {
+            dependsOn(commonMain)
+            // Dépendance de tâche portée par le srcDir : Gradle génère le
+            // fichier avant de compiler, sans qu'on ait à câbler un `dependsOn`
+            // sur chacune des trois tâches de compilation iOS.
+            kotlin.srcDir(genererBuildConfigIos)
+            dependencies {
+                // Ktor remplace OkHttp. Le moteur Darwin s'appuie sur
+                // NSURLSession, seule pile HTTP disponible sans JVM.
+                implementation("io.ktor:ktor-client-core:3.0.3")
+                implementation("io.ktor:ktor-client-darwin:3.0.3")
+                // Pendant iOS du fetcher OkHttp : Coil passe par Ktor, donc par
+                // NSURLSession.
+                implementation("io.coil-kt.coil3:coil-network-ktor3:3.0.4")
+                // Chiffrement. Uniquement côté iOS : la JVM garde `javax.crypto`
+                // tel quel, il n'y a aucune raison de remplacer une pile qui
+                // marche chez les utilisateurs Android et desktop. Le provider
+                // Apple s'adosse à CommonCrypto et CryptoKit.
+                implementation("dev.whyoleg.cryptography:cryptography-core:0.4.0")
+                implementation("dev.whyoleg.cryptography:cryptography-provider-apple:0.4.0")
+            }
+        }
+        val iosX64Main by getting { dependsOn(iosMain) }
+        val iosArm64Main by getting { dependsOn(iosMain) }
+        val iosSimulatorArm64Main by getting { dependsOn(iosMain) }
 
         val commonTest by getting {
             dependencies {

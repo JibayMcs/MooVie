@@ -1,0 +1,48 @@
+package fr.moovie.tv.data.sources
+
+import fr.moovie.tv.core.sources.model.EmbedLink
+import fr.moovie.tv.core.sources.model.PlayableStream
+import fr.moovie.tv.core.sources.model.StreamFormat
+import fr.moovie.tv.core.sources.port.HttpGateway
+import fr.moovie.tv.core.sources.port.getBody
+import fr.moovie.tv.core.sources.port.SourceExtractor
+import fr.moovie.tv.shared.dispatcherEs
+import kotlinx.coroutines.withContext
+
+/**
+ * Extracteur fsvid.lol — page d'embed → dé-obfuscation du packer → m3u8.
+ * Port de fsvid_extract_handler (API/proxiesembed/server.py).
+ */
+class FsvidExtractor(private val http: HttpGateway) : SourceExtractor {
+
+    override val hoster = "fsvid"
+
+    // "fsvid" en substring (et non "fsvid.lol") : l'hôte peut changer de TLD.
+    override fun canHandle(url: String): Boolean = url.contains("fsvid", ignoreCase = true)
+
+    override suspend fun extract(link: EmbedLink): PlayableStream? = withContext(dispatcherEs) {
+        val origin = originOf(link.url, "https://fsvid.lol")
+
+        runCatching {
+            val html = http.getBody(
+                link.url,
+                mapOf(
+                    "User-Agent" to Ua.BROWSER,
+                    "Referer" to "$origin/",
+                    "Accept" to "text/html,*/*",
+                ),
+            ) ?: return@runCatching null
+            val m3u8 = PackedJs.findM3u8(html, link.url) ?: return@runCatching null
+            PlayableStream(
+                url = m3u8,
+                format = StreamFormat.HLS,
+                headers = mapOf(
+                    "Referer" to "$origin/",
+                    "Origin" to origin,
+                    "User-Agent" to Ua.BROWSER,
+                ),
+                language = link.language,
+            )
+        }.getOrNull()
+    }
+}

@@ -32,6 +32,8 @@ import fr.moovie.tv.ui.navigation.Screen
 import fr.moovie.tv.ui.search.SearchScreenContent
 import fr.moovie.tv.ui.search.SearchViewModel
 import fr.moovie.tv.data.download.Download
+import fr.moovie.tv.ui.settings.RemoteSection
+import fr.moovie.tv.ui.pairing.PairingDialog
 import fr.moovie.tv.ui.settings.SettingsScreenContent
 import fr.moovie.tv.ui.settings.SettingsViewModel
 import fr.moovie.tv.resources.Res
@@ -267,6 +269,12 @@ internal fun DesktopSettingsScreen(
                 onSelect = { DesktopLocale.set(it) },
             )
         },
+        // Les deux sections qui parlent à un autre appareil. Passées en
+        // paramètre parce qu'elles s'adossent aux sockets de `data.cast` et
+        // `data.remote` : l'écran, lui, est commun aux quatre plateformes
+        // depuis le portage iOS. Voir RemoteSection.kt.
+        remoteSection = { onPair -> RemoteSection(onPair) },
+        pairingDialog = { onDismiss -> PairingDialog(onDismiss = onDismiss) },
     )
 }
 

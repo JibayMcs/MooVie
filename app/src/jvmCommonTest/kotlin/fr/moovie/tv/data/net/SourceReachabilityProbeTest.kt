@@ -1,5 +1,6 @@
 package fr.moovie.tv.data.net
 
+import fr.moovie.tv.data.sources.ClientExtraction
 import fr.moovie.tv.data.sources.ExtractorRegistry
 import fr.moovie.tv.data.sources.Ua
 import okhttp3.Request
@@ -50,7 +51,7 @@ class SourceReachabilityProbeTest {
                 .build()
 
             val line = runCatching {
-                ExtractorRegistry.http.newCall(request).execute().use { resp ->
+                ClientExtraction.http.newCall(request).execute().use { resp ->
                     val body = resp.body?.string().orEmpty()
                     // Ne PAS se fier à « cdn-cgi/challenge-platform » : ce script est
                     // injecté par Cloudflare sur des pages servies normalement. Un vrai
