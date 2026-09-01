@@ -2,6 +2,7 @@ package fr.moovie.tv.ui.home
 
 import fr.moovie.tv.shared.formaterDecimal
 import androidx.compose.animation.Crossfade
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -80,6 +81,7 @@ import fr.moovie.tv.data.tmdb.TmdbItem
 import fr.moovie.tv.data.watch.ResumeEntry
 import fr.moovie.tv.data.watch.WatchlistEntry
 import fr.moovie.tv.resources.Res
+import fr.moovie.tv.resources.app_name
 import fr.moovie.tv.resources.catalog_open
 import fr.moovie.tv.resources.common_loading
 import fr.moovie.tv.resources.history_episodes
@@ -123,6 +125,8 @@ import fr.moovie.tv.ui.components.MoovieMarqueeText
 import fr.moovie.tv.ui.components.MoovieRail
 import fr.moovie.tv.ui.components.SkeletonRail
 import fr.moovie.tv.ui.components.scrollAsWholeBlock
+import fr.moovie.tv.resources.moovie_icon
+import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 
@@ -245,6 +249,38 @@ fun HomeScreenContent(
                 .fillMaxSize()
                 .padding(top = 32.dp, bottom = 16.dp),
         ) {
+            // **Le logo, et seulement au doigt.**
+            //
+            // Le wordmark a été retiré pour rendre ~56 dp à une rangée
+            // d'affiches, et l'argument tient toujours sur un téléviseur : 540 dp
+            // de haut en tout, et l'on sait à trois mètres dans quelle
+            // application on est. Un téléphone n'a ni ce budget contraint ni ce
+            // contexte — l'accueil s'ouvrait directement sur une rangée, sans
+            // rien pour dire où l'on est, là où le haut de l'écran est
+            // précisément l'endroit où toute application mobile pose son nom.
+            //
+            // L'icône plutôt que le nom seul : c'est le dessin qu'on vient de
+            // toucher sur la page d'accueil du téléphone, donc la même chose
+            // reconnue deux fois plutôt que deux identités pour une application.
+            if (useBottomNav) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Image(
+                        painter = painterResource(Res.drawable.moovie_icon),
+                        // Nul : le nom qui suit dit déjà ce que l'image montre,
+                        // et l'annoncer deux fois n'apprend rien à personne.
+                        contentDescription = null,
+                        modifier = Modifier.size(28.dp),
+                    )
+                    Text(
+                        stringResource(Res.string.app_name),
+                        style = MaterialTheme.typography.titleLarge,
+                    )
+                }
+            }
             // Le wordmark « Moo-vie » et sa rangée dédiée sont partis : ils
             // coûtaient ~56 dp de haut pour une information qu'on connaît déjà
             // (on est dans l'app). Récupérés, ils laissent enfin passer une
