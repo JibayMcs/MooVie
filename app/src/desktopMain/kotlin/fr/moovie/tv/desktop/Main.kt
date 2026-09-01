@@ -405,7 +405,6 @@ private fun DesktopApp(
                     onOpenCatalogGenre = { nav.push(Screen.Catalog(it)) },
                 )
                 Screen.Onboarding -> OnboardingScreen(
-                    onOpenSettings = { nav.push(Screen.Settings) },
                     // Remplace au lieu d'empiler : une fois installé, revenir sur
                     // l'écran d'installation n'aurait plus rien à proposer.
                     onReady = { nav.replace(Screen.Home) },

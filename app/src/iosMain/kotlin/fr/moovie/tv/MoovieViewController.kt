@@ -269,7 +269,6 @@ private fun EcranCourant(nav: NavStack, online: Boolean) {
         }
 
         Screen.Onboarding -> OnboardingScreen(
-            onOpenSettings = { nav.push(Screen.Settings) },
             // Remplace au lieu d'empiler : une fois installé, revenir sur
             // l'écran d'installation n'aurait plus rien à proposer.
             onReady = { nav.replace(Screen.Home) },
