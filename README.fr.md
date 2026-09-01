@@ -140,6 +140,18 @@ L'extraction des sources se fait **on-device** : pas de backend, pas de compte, 
   box**, à la manière de Cast - la page web porte les trois mêmes boutons pour un téléphone
   sans l'application. Elle pilote Moo-vie et le son de la box, pas le téléviseur : elle ne
   peut ni l'allumer, ni changer de source.
+- **Cast vers un Chromecast** (Google Cast) - envoyer ce qui est en cours de lecture vers
+  un appareil Cast, depuis la fiche d'un titre ou depuis le lecteur, le téléphone ou le
+  desktop gardant les commandes. Poser le SDK n'aurait pas suffi : un Chromecast va
+  chercher le flux lui-même, or presque aucune source ne répond sans un `Referer` et un
+  `User-Agent` que le récepteur ne sait pas envoyer. Le flux sort donc par un petit relais
+  HTTP sur l'appareil, qui les réattache - et qui garde le DNS-over-HTTPS dans la boucle,
+  là où le Chromecast serait passé par le résolveur de la box et se serait heurté au
+  blocage même que l'application existe pour contourner. Les sous-titres suivent, convertis
+  en WebVTT puisque c'est le seul format que lit le récepteur ; les touches de volume du
+  téléphone pilotent le récepteur ; et quitter l'écran de diffusion coupe la diffusion au
+  lieu de la laisser tourner. La découverte insiste au lieu de se fier à un seul balayage,
+  et quand elle ne trouve toujours rien, elle dit quelle étape a échoué.
 - **Mode hors ligne** - quand le réseau tombe, l'application change de rôle au lieu
   d'échouer : l'accueil devient la bibliothèque locale, la recherche cherche dans les
   titres téléchargés plutôt que dans TMDB, et la synchro, la vérification des mises à
@@ -157,24 +169,6 @@ L'extraction des sources se fait **on-device** : pas de backend, pas de compte, 
 
 ## Feuille de route
 
-- **Cast vers une télé (Google Cast)** - à l'étude, pour les utilisateurs mobiles
-  qui n'ont pas d'Android TV. Ce n'est pas qu'une affaire de SDK : un Chromecast
-  va chercher le flux lui-même, or presque aucune source ne répond sans un
-  `Referer` et un `User-Agent` que le récepteur ne sait pas envoyer. La forme
-  viable est un petit proxy HTTP sur le téléphone qui les réattache - ce qui
-  garde au passage le DNS-over-HTTPS dans la boucle, là où un Chromecast
-  passerait par le résolveur de la box et se heurterait au blocage même que
-  l'app existe pour contourner. Une question décide si tout cela tient debout,
-  et elle n'est pas tranchée : donc pas de date.
-- **iOS : livré, et maintenu par contribution.** L'entrée précédente disait
-  qu'il n'y en aurait pas, pour une raison qui n'a pas changé - je n'ai aucun
-  appareil Apple, et publier ce que je ne peux pas faire tourner moi-même serait
-  pire que de ne rien publier. Ce qui a changé, c'est que quelqu'un d'autre le
-  fait tourner : le portage a été construit et éprouvé sur un iPhone réel, et le
-  runner macOS de la CI compile Kotlin/Native et le projet Xcode à chaque PR qui
-  touche au code commun. La réserve subsiste et il faut la connaître avant
-  d'installer - les défauts propres à iOS mettront plus longtemps à être vus que
-  ceux d'Android. Voir [docs/ios.fr.md](docs/ios.fr.md).
 - **Cast et télécommande sur iOS** - hors du portage, et sans date. Les deux
   reposent sur une découverte réseau et un serveur HTTP local, qui n'existent que
   sur les cibles JVM. Ce sont des rôles de salon, et le téléviseur est un
@@ -215,8 +209,17 @@ utilisateur - sans droits administrateur - et ajoute des raccourcis au menu Dém
 et au bureau ; le bandeau intégré le met alors à jour en place. Sous **macOS**, le
 bandeau ouvre la page de release (le `.dmg` s'installe à la main).
 
-Au premier lancement, coller une [clé API TMDB](https://www.themoviedb.org/settings/api)
-gratuite dans **Réglages → API & Clés**. Les mises à jour suivantes se font depuis l'app.
+**iOS est maintenu par contribution**, et il vaut mieux le savoir avant d'installer. Je
+n'ai aucun appareil Apple, donc je ne peux pas faire tourner ce qui y est publié : le
+portage a été construit et éprouvé sur un iPhone réel par son auteur, et le runner macOS
+de la CI compile Kotlin/Native et le projet Xcode à chaque pull request touchant au code
+commun. Les défauts propres à iOS mettront tout de même plus longtemps à être vus que ceux
+d'Android.
+
+Au premier lancement, l'application pose quatre questions - clé TMDB, langue des flux, les
+deux automatismes de lecture, nom du profil. La [clé TMDB](https://www.themoviedb.org/settings/api)
+est gratuite et vérifiée auprès de TMDB avant d'être gardée ; tout le reste reste
+modifiable ensuite dans les **Réglages**. Les mises à jour se font depuis l'application.
 
 ## Build
 
@@ -228,7 +231,7 @@ gratuite dans **Réglages → API & Clés**. Les mises à jour suivantes se font
 ```
 
 Découpage : `app/src/commonMain` (ressources, ViewModels, repositories et **toute
-l'UI partagée**), `app/src/jvmCommon` (ce qui tient à OkHttp, Jsoup et aux sockets :
+l'UI partagée**), `app/src/jvmCommon` (ce qui tient à OkHttp et aux sockets :
 Cast, télécommande, appairage), puis `app/src/androidMain`, `app/src/desktopMain` et
 `app/src/iosMain`. La coque Xcode est dans `iosApp/` ; un émulateur Android TV
 préconfiguré et ses scripts de test sont dans `emulator/`.
@@ -304,8 +307,11 @@ Moo-vie repose sur le travail d'autres personnes.
   [DataStore](https://developer.android.com/topic/libraries/architecture/datastore) - Google / AndroidX
 - [mpv / libmpv](https://mpv.io) - le projet mpv, qui assure la lecture vidéo sur
   les versions desktop, et [FFmpeg](https://ffmpeg.org) dont il tire son décodage
-- [OkHttp et Retrofit](https://square.github.io/okhttp/) - Square
-- [jsoup](https://jsoup.org) - analyse les pages dont les sources sont extraites
+- [OkHttp](https://square.github.io/okhttp/) - Square, le moteur HTTP sur lequel
+  les cibles JVM tournent toujours, sous Ktor
+- [Ktor](https://ktor.io) - JetBrains, le client HTTP commun
+- [ksoup](https://github.com/fleeksoft/ksoup) - analyse les pages dont les sources
+  sont extraites, sur toutes les plateformes
 - [Coil](https://coil-kt.github.io/coil/) - chargement des images et cache disque
 
 ## Licence

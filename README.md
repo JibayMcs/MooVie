@@ -128,6 +128,17 @@ and **iOS**, built from a single Kotlin Multiplatform codebase. Source extractio
   does - the web page carries the same three buttons for a phone without the app. It
   drives Moo-vie and the box's sound, not the television set: it cannot turn it on or
   change its input.
+- **Cast to a Chromecast** (Google Cast) - send what is playing to a Cast device, from a
+  title's page or from the player, with the phone or the desktop keeping the controls.
+  Dropping in the SDK would not have been enough: a Chromecast fetches the stream itself,
+  and nearly every source only answers with a `Referer` and a `User-Agent` the receiver
+  cannot send. The stream therefore leaves through a small HTTP relay on the device, which
+  re-attaches them - and keeps DNS-over-HTTPS in the loop, where the Chromecast would have
+  used the router's resolver and hit the very blocking the app exists to route around.
+  Subtitles follow, converted to WebVTT since that is the only format the receiver reads;
+  the phone's volume keys drive the receiver; and leaving the cast screen stops the cast
+  instead of leaving it running. Discovery keeps looking rather than trusting a single
+  sweep, and when it still finds nothing it says which step failed.
 - **Offline mode** - lose the network and the app changes role instead of failing:
   the home becomes your local library, search looks through what you downloaded rather
   than TMDB, and sync, update checks and source resolution all stand down. With nothing
@@ -144,22 +155,6 @@ and **iOS**, built from a single Kotlin Multiplatform codebase. Source extractio
 
 ## Roadmap
 
-- **Cast to a TV (Google Cast)** - under study, for phone users who own no
-  Android TV. Not a matter of dropping in the SDK: a Chromecast fetches the
-  stream itself, and nearly every source only answers with a `Referer` and a
-  `User-Agent` the receiver has no way to send. The workable shape is a small
-  HTTP proxy on the phone that re-attaches them - which conveniently keeps
-  DNS-over-HTTPS in the loop, where a Chromecast would use the router's resolver
-  and hit the very blocking the app exists to route around. One question decides
-  whether any of it stands, and it is untested, so there is no date on this.
-- **iOS: shipped, and contributor-maintained.** The previous entry said there
-  would be none, for a reason that has not changed - I have no Apple device, and
-  shipping something I cannot run myself would be worse than not shipping it.
-  What changed is that somebody else runs it: the port was built and exercised on
-  a real iPhone, and the CI macOS runner compiles Kotlin/Native and the Xcode
-  project on every PR touching shared code. The caveat stands and you should know
-  it before installing - iOS-specific defects will take longer to be spotted than
-  Android ones. See [docs/ios.md](docs/ios.md).
 - **Cast and remote on iOS** - out of scope for the port, with no date. Both rest
   on network discovery and a local HTTP server, which only exist on the JVM
   targets. These are living-room roles, and the TV is an Android device.
@@ -198,8 +193,16 @@ and adds Start-menu and desktop shortcuts; the in-app banner then updates it in
 place. On **macOS**, the banner opens the release page (the `.dmg` is installed by
 hand).
 
-On first launch, paste a free [TMDB API key](https://www.themoviedb.org/settings/api)
-under **Settings → API & Keys**. Later updates are handled from inside the app.
+**iOS is contributor-maintained**, and that is worth knowing before installing. I own no
+Apple device, so I cannot run what ships there: the port was built and exercised on a real
+iPhone by its author, and the CI macOS runner compiles Kotlin/Native and the Xcode project
+on every pull request touching shared code. iOS-specific defects will still take longer to
+be spotted than Android ones.
+
+On first launch, the app asks four questions - TMDB key, stream language, the two playback
+automations, profile name. The [TMDB key](https://www.themoviedb.org/settings/api) is free
+and is checked against TMDB before it is kept; everything else can be changed later under
+**Settings**. Updates are handled from inside the app.
 
 ## Build
 
@@ -211,7 +214,7 @@ under **Settings → API & Keys**. Later updates are handled from inside the app
 ```
 
 Layout: `app/src/commonMain` (resources, ViewModels, repositories and **all the
-shared UI**), `app/src/jvmCommon` (whatever depends on OkHttp, Jsoup and sockets:
+shared UI**), `app/src/jvmCommon` (whatever depends on OkHttp and sockets:
 Cast, remote, pairing), then `app/src/androidMain`, `app/src/desktopMain` and
 `app/src/iosMain`. The Xcode shell lives in `iosApp/`; a preconfigured Android TV
 emulator and its test scripts live in `emulator/`.
@@ -286,8 +289,11 @@ Moo-vie stands on work done by others.
   [DataStore](https://developer.android.com/topic/libraries/architecture/datastore) - Google / AndroidX
 - [mpv / libmpv](https://mpv.io) - the mpv project, which is what plays video on the
   desktop builds, and [FFmpeg](https://ffmpeg.org) that it decodes with
-- [OkHttp and Retrofit](https://square.github.io/okhttp/) - Square
-- [jsoup](https://jsoup.org) - parses the pages sources are extracted from
+- [OkHttp](https://square.github.io/okhttp/) - Square, the HTTP engine the JVM
+  targets still run on under Ktor
+- [Ktor](https://ktor.io) - JetBrains, the common HTTP client
+- [ksoup](https://github.com/fleeksoft/ksoup) - parses the pages sources are
+  extracted from, on every platform
 - [Coil](https://coil-kt.github.io/coil/) - image loading and disk cache
 
 ## License
