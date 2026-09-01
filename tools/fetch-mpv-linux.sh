@@ -43,13 +43,53 @@ EXCLUES='^(ld-linux.*|libc|libm|libdl|libpthread|librt|libresolv|libGL.*|libGLX.
 # libstdc++ *plus récente* est sûr : la compatibilité ascendante est garantie
 # dans ce sens, c'est l'inverse qui casse.
 
+# Trois essais espacés, pour les deux téléchargements.
+#
+# Ce script se tient entre une release et son artefact Linux : un hoquet d'un
+# hôte tiers ne doit pas coûter une publication. C'est arrivé — la v1.23.0 a
+# échoué sur un `503` de micro.mamba.pm, une seconde après quoi le même appel
+# passait. La leçon est celle déjà tirée pour la libmpv Windows, dont l'étape
+# porte le même garde-fou : ce qu'on va chercher ailleurs, on le redemande.
+reessaye() {
+  local essai
+  for essai in 1 2 3; do
+    if "$@"; then return 0; fi
+    echo "  essai $essai échoué, nouvelle tentative dans $((10 * essai)) s" >&2
+    sleep $((10 * essai))
+  done
+  return 1
+}
+
+# Deux sources, et GitHub d'abord.
+#
+# `micro.mamba.pm` est l'adresse que la documentation amont donne, mais elle
+# répond 503 par intermittence — un backend sur plusieurs, mesuré : trois essais
+# d'affilée peuvent tous tomber sur un mauvais. Le dépôt GitHub sert le même
+# binaire, sans archive à décompresser, sur l'hôte où la CI vit déjà. L'autre
+# reste en repli : deux hôtes qui tombent en même temps, c'est un autre problème.
 echo "→ micromamba"
-mkdir -p "$TRAVAIL/mm"
-curl -fsSL https://micro.mamba.pm/api/micromamba/linux-64/latest \
-  | tar -xj -C "$TRAVAIL/mm" bin/micromamba
+mkdir -p "$TRAVAIL/mm/bin"
+depuis_github() {
+  curl -fsSL --retry 3 --retry-delay 5 --retry-all-errors -o "$TRAVAIL/mm/bin/micromamba" \
+    https://github.com/mamba-org/micromamba-releases/releases/latest/download/micromamba-linux-64 &&
+    chmod +x "$TRAVAIL/mm/bin/micromamba" &&
+    "$TRAVAIL/mm/bin/micromamba" --version >/dev/null
+}
+depuis_mamba_pm() {
+  curl -fsSL --retry 3 --retry-delay 5 --retry-all-errors \
+    https://micro.mamba.pm/api/micromamba/linux-64/latest \
+    | tar -xj -C "$TRAVAIL/mm" bin/micromamba
+}
+reessaye depuis_github || reessaye depuis_mamba_pm
 
 echo "→ mpv depuis conda-forge (quelques minutes)"
-"$TRAVAIL/mm/bin/micromamba" create -y -q -p "$TRAVAIL/env" -c conda-forge mpv >/dev/null
+cree_env() {
+  "$TRAVAIL/mm/bin/micromamba" create -y -q -p "$TRAVAIL/env" -c conda-forge mpv >/dev/null
+}
+# L'environnement à demi créé d'un essai raté ferait échouer le suivant sur
+# « prefix already exists » — un cas où réessayer aggrave au lieu d'aider.
+cree_env_propre() { rm -rf "$TRAVAIL/env"; cree_env; }
+reessaye cree_env_propre
 
 LIB="$TRAVAIL/env/lib"
 [ -f "$LIB/libmpv.so.2" ] || { echo "libmpv absente du paquet conda" >&2; exit 1; }
