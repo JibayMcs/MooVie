@@ -233,6 +233,16 @@ private const val SCROLL_SETTLE_MS = 120L
 private val ESPACEMENT_PAGE = 16.dp
 
 /**
+ * Place du titre, de la méta, des actions et du synopsis sous l'image, en
+ * portrait.
+ *
+ * En paysage ce bloc se pose **sur** l'image, dans sa moitié gauche restée
+ * libre. En portrait il n'y a pas de moitié libre : l'image est un 16:9 pleine
+ * largeur, et le texte prend la suite.
+ */
+private val BLOC_TEXTE_FICHE = 300.dp
+
+/**
  * De combien on grossit la bande-annonce pour sortir ses barres du cadre.
  *
  * 2,39 ÷ 2,07 : le rapport entre le format d'un film et celui du hero. En
@@ -859,8 +869,14 @@ fun DetailsScreenContent(
     // fond perdu, et doit donc toucher le bord comme ses voisines. La laisser
     // dehors lui gardait une bande noire de 96 points au-dessus de l'image,
     // plus le fond flouté de la page derrière.
-    val heroPleinCadre = !compact && state !is DetailsState.Loading &&
-        state !is DetailsState.Error
+    val heroPleinCadre = when {
+        state is DetailsState.Loading || state is DetailsState.Error -> false
+        // Le film a son cadre partout, portrait compris.
+        state is DetailsState.Movie -> true
+        // La série et l'épisode ne l'ont encore qu'en paysage : au doigt, la
+        // première garde ses volets et le second son empilement.
+        else -> !compact
+    }
     BoxWithConstraints(
         modifier = Modifier.fillMaxSize().then(
             // Observé seulement quand la bande-annonce est au premier plan :
@@ -931,8 +947,15 @@ fun DetailsScreenContent(
         // Le plancher tient le cas d'une fenêtre écrasée en hauteur, où le titre
         // et les boutons ne tiendraient plus — on préfère alors déborder et
         // laisser défiler.
-        val hauteurHero = (maxHeight - hauteurOnglets() - amorceSousOnglets())
-            .coerceAtLeast(300.dp)
+        // En portrait, le cadre vaut l'image plus ce que le texte réclame ; en
+        // paysage, tout ce qui reste sous la barre d'onglets. Deux formats,
+        // deux calculs — « ce qui reste » n'a pas de sens sur un écran haut et
+        // étroit, où il donnerait un cadre deux fois plus grand que l'image.
+        val hauteurHero = if (compact) {
+            maxWidth / 16f * 9f + BLOC_TEXTE_FICHE
+        } else {
+            (maxHeight - hauteurOnglets() - amorceSousOnglets()).coerceAtLeast(300.dp)
+        }
         // Le hero et la page partagent désormais la même marge — voir
         // `margePage`, dont la règle du dixième est née ici.
         val margeHero = hPadDp
@@ -1154,9 +1177,7 @@ fun DetailsScreenContent(
                                 // principale de ses voisines. C'est le rose de
                                 // l'identité, pas une couleur inventée ici.
                                 modifier = primaryModifier.then(
-                                    if (compact) {
-                                        Modifier
-                                    } else {
+                                    run {
                                         // Toute la colonne de gauche, comme le
                                         // « S'ABONNER » de la maquette : c'est
                                         // cette largeur — pas seulement sa
@@ -1177,7 +1198,11 @@ fun DetailsScreenContent(
                                 // peint à la main dans le modificateur, il
                                 // recouvrait le traitement de focus du thème et
                                 // le bouton paraissait inerte au survol.
-                                remplissage = if (compact) null else MOOVIE_ACCENT,
+                                // Plein sur tous les appareils : au doigt aussi,
+                                // « Lire » avait exactement le poids de
+                                // « Sources », et l'action principale de la page
+                                // ne se distinguait pas de ses voisines.
+                                remplissage = MOOVIE_ACCENT,
                                 // **L'action principale doit se voir comme
                                 // telle.** Au repos, un MoovieButton n'est que
                                 // son libellé : posé au milieu de quatre autres,
@@ -1187,12 +1212,11 @@ fun DetailsScreenContent(
                                 // c'est le gros bouton de la maquette, obtenu
                                 // avec le bouton du projet plutôt qu'avec un
                                 // second modèle à entretenir.
-                                selected = !compact,
-                                contentPadding = if (compact) {
-                                    PaddingValues(horizontal = 16.dp, vertical = 10.dp)
-                                } else {
-                                    PaddingValues(horizontal = 24.dp, vertical = 20.dp)
-                                },
+                                selected = true,
+                                contentPadding = PaddingValues(
+                                    horizontal = 24.dp,
+                                    vertical = if (compact) 16.dp else 20.dp,
+                                ),
                             ) {
                                 val libelle: @Composable RowScope.() -> Unit = {
                                     when {
@@ -1214,7 +1238,7 @@ fun DetailsScreenContent(
                                                     } else {
                                                         stringResource(Res.string.details_play)
                                                     }
-                                                    ).let { if (compact) it else it.uppercase() },
+                                                    ).uppercase(),
                                             )
                                         }
                                         loadingSources -> {
@@ -1229,7 +1253,7 @@ fun DetailsScreenContent(
                                         else -> Text(stringResource(Res.string.details_lang_unavailable, streamLang.name), color = MOOVIE_TEXT_DIM)
                                     }
                                 }
-                                if (compact) libelle() else LibellePrincipal(libelle)
+                                LibellePrincipal(libelle)
                             }
                     }
 
@@ -1274,7 +1298,7 @@ fun DetailsScreenContent(
                             )
                     }
 
-                    // **Deux lignes sur grand écran, une seule au doigt.**
+                    // **Deux lignes, partout.**
                     //
                     // Aligné avec ses voisines, « Lire » n'était que le premier
                     // bouton d'une rangée de six : la couleur le distinguait, la
@@ -1285,44 +1309,47 @@ fun DetailsScreenContent(
                     // D-pad : du bouton principal on tombe sur les autres, au lieu
                     // de les traverser latéralement pour sortir de la fiche.
                     //
-                    // Au doigt la largeur ne le permet pas : deux lignes de boutons
-                    // sur 448 dp repousseraient le synopsis hors de l'écran, et la
-                    // rangée unique y tient déjà.
+                    // Y compris au doigt, depuis que le bouton principal y est
+                    // plein : sur une seule ligne, un bouton rose de pleine
+                    // largeur ne laissait plus de place à ses voisins.
                     val actionsFilm: @Composable () -> Unit = {
-                        if (compact) {
+                        // Pas de marge : le hero porte déjà celle de la page,
+                        // la remettre ici indenterait les boutons deux fois.
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            boutonLire()
                             Row(
-                                modifier = hPad,
                                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                boutonLire()
                                 actionsSecondaires()
-                            }
-                        } else {
-                            // Pas de marge : le hero porte déjà celle de la page,
-                            // la remettre ici indenterait les boutons deux fois.
-                            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                boutonLire()
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    actionsSecondaires()
-                                }
                             }
                         }
                     }
 
                     if (compact) {
-                        // Même mise en page que la fiche d'épisode — visuel à gauche,
-                        // métadonnées et synopsis à droite — pour que les deux fiches
-                        // du catalogue se ressemblent au lieu de diverger.
-                        MovieHeader(
-                            details = s.details,
-                            isWatched = movieWatched,
-                            showOverview = false,
+                        // **Le même hero, en colonne.**
+                        //
+                        // Le téléphone montrait une affiche 2:3 centrée sur le
+                        // tiers haut de l'écran, puis le titre, puis une rangée
+                        // où « Lire » avait exactement le poids de « Sources ».
+                        // L'action principale d'une page ne s'y distinguait pas,
+                        // et l'image — le seul argument visuel d'un film — y
+                        // était réduite à une vignette.
+                        //
+                        // Empilé, c'est la même page que sur grand écran : image
+                        // à fond perdu, titre dessous, bouton plein.
+                        DetailsHero(
+                            backdropUrl = s.details.backdropUrl(),
+                            afficheUrl = s.details.posterUrl(),
+                            titre = s.details.title,
+                            meta = metaFilm(s.details),
+                            synopsis = s.details.overview,
+                            credits = emptyList(),
+                            hauteur = hauteurHero,
+                            marge = hPadDp,
+                            actions = actionsFilm,
+                            enColonne = true,
                         )
-                        actionsFilm()
                     } else {
                         DetailsHero(
                             backdropUrl = s.details.backdropUrl(),
@@ -1354,17 +1381,8 @@ fun DetailsScreenContent(
                             },
                         )
                     }
-                    // Synopsis après les boutons sur téléphone : le glisser avant
-                    // reléguait « Lire » sous dix-sept lignes de résumé, donc hors
-                    // écran, pour un film qu'on venait pourtant de choisir.
-                    if (compact && s.details.overview.isNotBlank()) {
-                        Text(
-                            s.details.overview,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MOOVIE_TEXT_MUTED,
-                            modifier = hPad,
-                        )
-                    }
+                    // Le synopsis est dans le hero, y compris en portrait : le
+                    // répéter ici l'affichait deux fois de suite.
                     if (compact) {
                         // « En savoir plus » prend la place du casting plutôt que de
                         // s'ajouter sous lui : c'est ce qui rend le retour immédiat.
