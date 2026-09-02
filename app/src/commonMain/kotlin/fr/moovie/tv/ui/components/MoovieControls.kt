@@ -68,6 +68,7 @@ import fr.moovie.tv.ui.theme.rememberGlow
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import fr.moovie.tv.ui.theme.MOOVIE_SURFACE
 
 /**
  * Couleurs de contenu. Il n'y a plus de couleur de *fond* : au repos un bouton
@@ -451,7 +452,7 @@ fun MoovieCard(
                 scaleY = scale
             }
             .clip(MoovieShape)
-            .background(Color(0xFF141414))
+            .background(MOOVIE_SURFACE)
             // Le focus se lit sur le cadre dégradé, pas sur un aplat : l'affiche
             // reste le sujet, la carte n'est qu'un support.
             .then(

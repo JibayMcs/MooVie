@@ -40,6 +40,9 @@ import fr.moovie.tv.ui.components.MoovieButton
 import fr.moovie.tv.ui.components.MoovieIconButton
 import fr.moovie.tv.ui.theme.MoovieShape
 import org.jetbrains.compose.resources.stringResource
+import fr.moovie.tv.ui.theme.MOOVIE_SURFACE
+import fr.moovie.tv.ui.theme.MOOVIE_TEXT_DIM
+import fr.moovie.tv.ui.theme.MOOVIE_TEXT_FAINT
 
 /**
  * Réorganisation de l'accueil : déplacer, masquer, retirer.
@@ -61,7 +64,7 @@ fun HomeLayoutSection(viewModel: HomeLayoutViewModel = remember { HomeLayoutView
     Text(
         stringResource(Res.string.layout_help),
         style = MaterialTheme.typography.bodySmall,
-        color = Color(0xFF9A9A9A),
+        color = MOOVIE_TEXT_DIM,
     )
 
     layout.forEachIndexed { index, entry ->
@@ -98,7 +101,7 @@ private fun LayoutRow(
             // Grisé quand la rangée est masquée : sur un téléphone, la mention
             // « Masquée » passe à la ligne suivante et se lit après coup — la
             // couleur, elle, se voit du premier coup d'œil.
-            color = if (entry.visible) Color.White else Color(0xFF777777),
+            color = if (entry.visible) Color.White else MOOVIE_TEXT_FAINT,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -106,7 +109,7 @@ private fun LayoutRow(
             Text(
                 stringResource(Res.string.layout_hidden),
                 style = MaterialTheme.typography.bodySmall,
-                color = Color(0xFF777777),
+                color = MOOVIE_TEXT_FAINT,
             )
         }
     }
@@ -150,7 +153,7 @@ private fun LayoutRow(
     val surface = Modifier
         .fillMaxWidth()
         .clip(MoovieShape)
-        .background(if (index % 2 == 0) Color(0xFF161616) else Color.Transparent)
+        .background(if (index % 2 == 0) MOOVIE_SURFACE else Color.Transparent)
 
     // Sur téléphone, le libellé prend la ligne et les boutons celle d'en
     // dessous, comme les autres lignes de réglage.

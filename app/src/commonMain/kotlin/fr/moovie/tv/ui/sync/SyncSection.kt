@@ -46,9 +46,11 @@ import fr.moovie.tv.ui.settings.ApiKeyField
 import fr.moovie.tv.ui.theme.MoovieShape
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
+import fr.moovie.tv.ui.theme.MOOVIE_SURFACE
+import fr.moovie.tv.ui.theme.MOOVIE_TEXT_DIM
 
-private val DIM = Color(0xFF9A9A9A)
-private val PANEL = Color(0xFF1A1A1A)
+private val DIM = MOOVIE_TEXT_DIM
+private val PANEL = MOOVIE_SURFACE
 
 /**
  * Réglages de la synchro en ligne.

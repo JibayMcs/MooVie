@@ -199,6 +199,13 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
+import fr.moovie.tv.ui.theme.MOOVIE_ERROR
+import fr.moovie.tv.ui.theme.MOOVIE_SCRIM
+import fr.moovie.tv.ui.theme.MOOVIE_SURFACE
+import fr.moovie.tv.ui.theme.MOOVIE_SURFACE_HIGH
+import fr.moovie.tv.ui.theme.MOOVIE_TEXT_DIM
+import fr.moovie.tv.ui.theme.MOOVIE_TEXT_MUTED
+import fr.moovie.tv.ui.theme.MOOVIE_WARN
 
 /**
  * Délai laissé au `bringIntoView` déclenché par la prise de focus avant de
@@ -1220,7 +1227,7 @@ fun DetailsScreenContent(
                                             Spacer(Modifier.width(8.dp))
                                             Text(stringResource(Res.string.details_searching, streamLang.name))
                                         }
-                                        else -> Text(stringResource(Res.string.details_lang_unavailable, streamLang.name), color = Color(0xFF8A8A8A))
+                                        else -> Text(stringResource(Res.string.details_lang_unavailable, streamLang.name), color = MOOVIE_TEXT_DIM)
                                     }
                                 }
                                 if (compact) libelle() else LibellePrincipal(libelle)
@@ -1355,7 +1362,7 @@ fun DetailsScreenContent(
                         Text(
                             s.details.overview,
                             style = MaterialTheme.typography.bodyMedium,
-                            color = Color(0xFFDDDDDD),
+                            color = MOOVIE_TEXT_MUTED,
                             modifier = hPad,
                         )
                     }
@@ -1518,7 +1525,7 @@ fun DetailsScreenContent(
                                     },
                                     style = MaterialTheme.typography.labelMedium,
                                     color = if (seasonDownload?.done == true && seasonDownload.failed > 0) {
-                                        Color(0xFFE0B057)
+                                        MOOVIE_WARN
                                     } else {
                                         Color.Unspecified
                                     },
@@ -2135,7 +2142,7 @@ fun DetailsScreenContent(
                         Text(
                             stringResource(Res.string.details_lang_unavailable, q.lang),
                             style = MaterialTheme.typography.bodyMedium,
-                            color = Color(0xFFE0A0A0),
+                            color = MOOVIE_ERROR,
                         )
                         unavailableReason?.let {
                             Text(
@@ -2219,7 +2226,7 @@ private fun SourcesSlideOver(
         if (state.anyLoading) {
             LinearProgressIndicator(
                 color = MOOVIE_ACCENT,
-                trackColor = Color(0xFF2A2A2A),
+                trackColor = MOOVIE_SURFACE_HIGH,
                 modifier = Modifier.fillMaxWidth().then(pPad),
             )
         }
@@ -2238,13 +2245,13 @@ private fun SourcesSlideOver(
         }
 
         resolveError?.let {
-            Text(it, style = MaterialTheme.typography.labelMedium, color = Color(0xFFE06A6A), modifier = pPad)
+            Text(it, style = MaterialTheme.typography.labelMedium, color = MOOVIE_ERROR, modifier = pPad)
         }
         if (prefMissing) {
             Text(
                 stringResource(Res.string.details_lang_missing, preferred.name),
                 style = MaterialTheme.typography.labelMedium,
-                color = Color(0xFFE0A0A0),
+                color = MOOVIE_ERROR,
                 modifier = pPad,
             )
         }
@@ -2255,7 +2262,7 @@ private fun SourcesSlideOver(
             links.isEmpty() -> Column(modifier = pPad, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
                     stringResource(Res.string.details_no_sources),
-                    color = Color(0xFFE0A0A0),
+                    color = MOOVIE_ERROR,
                 )
                 // Le « pourquoi », qui distingue un titre absent d'une panne
                 // réseau : sans lui les deux se lisent comme une app cassée.
@@ -2448,10 +2455,10 @@ private fun SourceRow(
                     it,
                     style = MaterialTheme.typography.labelSmall,
                     color = when {
-                        download?.state == DownloadState.DONE -> Color(0xFF7DDC7D)
-                        download?.state == DownloadState.FAILED -> Color(0xFFE0A0A0)
+                        download?.state == DownloadState.DONE -> MOOVIE_READY
+                        download?.state == DownloadState.FAILED -> MOOVIE_ERROR
                         downloadLine != null -> MOOVIE_ACCENT
-                        dead -> Color(0xFFE0A0A0)
+                        dead -> MOOVIE_ERROR
                         quality != null -> Color.White.copy(alpha = 0.9f)
                         else -> Color.White.copy(alpha = 0.55f)
                     },
@@ -2530,7 +2537,7 @@ private fun SourcesSummary(
             Text(
                 stringResource(Res.string.details_sources_searching),
                 style = MaterialTheme.typography.labelMedium,
-                color = Color(0xFFCCCCCC),
+                color = MOOVIE_TEXT_MUTED,
             )
         }
         if (sourceCount > 0) {
@@ -2539,14 +2546,14 @@ private fun SourcesSummary(
                     " · " +
                     pluralStringResource(Res.plurals.details_catalogue_count, withResults, withResults),
                 style = MaterialTheme.typography.labelMedium,
-                color = Color(0xFFCCCCCC),
+                color = MOOVIE_TEXT_MUTED,
             )
         }
         if (failed.isNotEmpty()) {
             Text(
                 failed.joinToString(", ") { it.name },
                 style = MaterialTheme.typography.labelMedium,
-                color = Color(0xFFE06A6A),
+                color = MOOVIE_ERROR,
             )
         }
     }
@@ -2618,7 +2625,7 @@ private fun WatchedBadge(modifier: Modifier = Modifier) {
         modifier = modifier
             .size(24.dp)
             .clip(CircleShape)
-            .background(Color(0xCC0A0A0A)),
+            .background(MOOVIE_SCRIM),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
@@ -2818,7 +2825,7 @@ private fun MovieHeader(
                 .width(if (compact) 150.dp else 160.dp)
                 .aspectRatio(2f / 3f)
                 .clip(MoovieShape)
-                .background(Color(0xFF222222)),
+                .background(MOOVIE_SURFACE_HIGH),
         ) {
             MoovieAsyncImage(
                 model = details.posterUrl() ?: details.backdropUrl(),
@@ -2897,13 +2904,13 @@ private fun MovieMeta(
                         color = MOOVIE_ACCENT,
                     )
                 } else details.year?.let {
-                    Text(it, style = MaterialTheme.typography.titleSmall, color = Color(0xFFCCCCCC))
+                    Text(it, style = MaterialTheme.typography.titleSmall, color = MOOVIE_TEXT_MUTED)
                 }
                 formatDuration(details.runtime)?.let {
                     Text(
                         it,
                         style = MaterialTheme.typography.titleSmall,
-                        color = Color(0xFFCCCCCC),
+                        color = MOOVIE_TEXT_MUTED,
                     )
                 }
                 if (details.voteAverage > 0) {
@@ -2914,7 +2921,7 @@ private fun MovieMeta(
                 Text(
                     details.overview,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = Color(0xFFDDDDDD),
+                    color = MOOVIE_TEXT_MUTED,
                 )
             }
     }
@@ -2972,7 +2979,7 @@ private fun EpisodeDetail(
             modifier = modifier
                 .aspectRatio(16f / 9f)
                 .clip(MoovieShape)
-                .background(Color(0xFF222222)),
+                .background(MOOVIE_SURFACE_HIGH),
         ) {
             MoovieAsyncImage(
                 model = ep.stillUrlLarge(),
@@ -3002,13 +3009,13 @@ private fun EpisodeDetail(
             }
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 formatMediaDate(ep.airDate)?.let {
-                    Text(it, style = MaterialTheme.typography.titleSmall, color = Color(0xFFCCCCCC))
+                    Text(it, style = MaterialTheme.typography.titleSmall, color = MOOVIE_TEXT_MUTED)
                 }
                 formatDuration(ep.runtime)?.let {
                     Text(
                         it,
                         style = MaterialTheme.typography.titleSmall,
-                        color = Color(0xFFCCCCCC),
+                        color = MOOVIE_TEXT_MUTED,
                     )
                 }
                 if (ep.voteAverage > 0) {
@@ -3018,7 +3025,7 @@ private fun EpisodeDetail(
             // Sur téléphone le synopsis passe après les boutons, comme sur la
             // fiche d'un film : sinon « Lire » se retrouve sous le résumé.
             if (!compact && ep.overview.isNotBlank()) {
-                Text(ep.overview, style = MaterialTheme.typography.bodyMedium, color = Color(0xFFDDDDDD))
+                Text(ep.overview, style = MaterialTheme.typography.bodyMedium, color = MOOVIE_TEXT_MUTED)
             }
         }
     }
@@ -3082,7 +3089,7 @@ private fun EpisodeDetail(
         Text(
             ep.overview,
             style = MaterialTheme.typography.bodyMedium,
-            color = Color(0xFFDDDDDD),
+            color = MOOVIE_TEXT_MUTED,
             modifier = hPad,
         )
     }
@@ -3138,7 +3145,7 @@ private fun EpisodeRow(
                 modifier = Modifier
                     .size(160.dp, 90.dp)
                     .clip(MoovieShape)
-                    .background(Color(0xFF222222)),
+                    .background(MOOVIE_SURFACE_HIGH),
             ) {
                 MoovieAsyncImage(
                     model = ep.stillUrl(),
@@ -3167,7 +3174,7 @@ private fun EpisodeRow(
                         Icon(
                             Icons.Default.DownloadDone,
                             contentDescription = stringResource(Res.string.player_download_done),
-                            tint = Color(0xFF7DDC7D),
+                            tint = MOOVIE_READY,
                             modifier = Modifier.size(16.dp),
                         )
                     }
@@ -3197,7 +3204,7 @@ private fun EpisodeRow(
                 MoovieMarqueeText(
                     text = "${ep.episodeNumber}. ${ep.name}",
                     style = MaterialTheme.typography.titleSmall,
-                    color = if (isWatched) Color(0xFF9A9A9A) else Color.White,
+                    color = if (isWatched) MOOVIE_TEXT_DIM else Color.White,
                 )
                 // Épisode à venir : sa date remplace le synopsis, qui est de
                 // toute façon vide à ce stade. C'est ce que le cadre gris ne
@@ -3299,7 +3306,7 @@ private fun CastCard(member: CastMember, onClick: () -> Unit) {
                     // Carré : un portrait TMDB est en 2:3, le rogner au carré
                     // cadre sur le visage plutôt que sur le buste.
                     .aspectRatio(1f)
-                    .background(Color(0xFF222222)),
+                    .background(MOOVIE_SURFACE_HIGH),
             )
             // Hauteurs **réservées**, pas subies : un nom sur deux lignes
                 // (« Tramell Tillman ») rendait sa carte plus haute que ses
@@ -3319,7 +3326,7 @@ private fun CastCard(member: CastMember, onClick: () -> Unit) {
                     minLines = 1,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    color = Color(0xFF9A9A9A),
+                    color = MOOVIE_TEXT_DIM,
                     style = MaterialTheme.typography.labelSmall,
                 )
             }
@@ -3333,7 +3340,7 @@ private fun CastCard(member: CastMember, onClick: () -> Unit) {
             modifier = Modifier
                 .width(CAST_CARD_WIDTH)
                 .clip(MoovieShape)
-                .background(Color(0xFF141414)),
+                .background(MOOVIE_SURFACE),
         ) { body() }
         return
     }
@@ -3484,14 +3491,14 @@ private fun TrailerTab(ready: TrailerState.Ready, onPlay: () -> Unit, hPad: Modi
                         modifier = Modifier
                             .fillMaxWidth()
                             .aspectRatio(16f / 9f)
-                            .background(Color(0xFF222222)),
+                            .background(MOOVIE_SURFACE_HIGH),
                     )
                     Box(
                         modifier = Modifier
                             .align(Alignment.Center)
                             .size(56.dp)
                             .clip(CircleShape)
-                            .background(Color(0xCC0A0A0A)),
+                            .background(MOOVIE_SCRIM),
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(
@@ -3571,7 +3578,7 @@ private fun SimilarRow(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .aspectRatio(2f / 3f)
-                                .background(Color(0xFF222222)),
+                                .background(MOOVIE_SURFACE_HIGH),
                         )
                         Text(
                             item.displayTitle,

@@ -102,6 +102,7 @@ import fr.moovie.tv.ui.components.MoovieButton
 import fr.moovie.tv.ui.components.MoovieIconButton
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.roundToInt
+import fr.moovie.tv.ui.theme.MOOVIE_TEXT_MUTED
 
 // Chrome du lecteur partagée entre Android TV et desktop : barre de contrôles,
 // barre de progression, menus, overlay de titre, boutons « Passer », pastille de
@@ -289,7 +290,7 @@ fun PlayerControlBar(
             Text(
                 formatPlayerTime(positionMs),
                 style = MaterialTheme.typography.labelLarge,
-                color = if (scrubbing) MOOVIE_ACCENT else Color(0xFFCCCCCC),
+                color = if (scrubbing) MOOVIE_ACCENT else MOOVIE_TEXT_MUTED,
             )
             PlayerSeekBar(
                 fraction = if (durationMs > 0) {
@@ -314,7 +315,7 @@ fun PlayerControlBar(
             Text(
                 formatPlayerTime(durationMs),
                 style = MaterialTheme.typography.labelLarge,
-                color = Color(0xFFCCCCCC),
+                color = MOOVIE_TEXT_MUTED,
             )
         }
     }
@@ -612,7 +613,7 @@ fun PlayerTitleOverlay(
             Text(
                 subtitle,
                 style = MaterialTheme.typography.titleMedium,
-                color = Color(0xFFBBBBBB),
+                color = MOOVIE_TEXT_MUTED,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -622,7 +623,7 @@ fun PlayerTitleOverlay(
             Text(
                 it,
                 style = MaterialTheme.typography.titleMedium,
-                color = Color(0xFFDDDDDD),
+                color = MOOVIE_TEXT_MUTED,
                 maxLines = 1,
                 modifier = Modifier.align(Alignment.TopEnd),
             )

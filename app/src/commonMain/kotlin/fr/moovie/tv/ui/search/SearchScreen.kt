@@ -117,6 +117,12 @@ import fr.moovie.tv.resources.watchlist_add
 import fr.moovie.tv.resources.watchlist_remove
 import androidx.compose.foundation.shape.CircleShape
 import fr.moovie.tv.resources.watchlist_added
+import fr.moovie.tv.ui.theme.MOOVIE_ERROR
+import fr.moovie.tv.ui.theme.MOOVIE_SCRIM
+import fr.moovie.tv.ui.theme.MOOVIE_SURFACE_HIGH
+import fr.moovie.tv.ui.theme.MOOVIE_TEXT_DIM
+import fr.moovie.tv.ui.theme.MOOVIE_TEXT_FAINT
+import fr.moovie.tv.ui.theme.MOOVIE_TEXT_MUTED
 
 /** Résultats rapportés avant tri, à garder aligné sur `SearchViewModel.DEEP_PAGES`. */
 private const val SEARCH_SCOPE = 60
@@ -319,10 +325,10 @@ fun SearchScreenContent(
             )
             results is SearchState.NeedsKey -> Text(
                 stringResource(Res.string.search_needs_key),
-                color = Color(0xFFE0A0A0),
+                color = MOOVIE_ERROR,
                 modifier = Modifier.padding(horizontal = searchHPad()),
             )
-            results is SearchState.Empty -> Text(stringResource(Res.string.search_no_results, query), color = Color(0xFFBBBBBB), modifier = Modifier.padding(horizontal = searchHPad()))
+            results is SearchState.Empty -> Text(stringResource(Res.string.search_no_results, query), color = MOOVIE_TEXT_MUTED, modifier = Modifier.padding(horizontal = searchHPad()))
             results is SearchState.Results -> ResultsGrid(
                 filters = filters,
                 items = results.items,
@@ -353,7 +359,7 @@ internal fun SearchField(
     val focusManager = LocalFocusManager.current
     Box(
         modifier = modifier
-            .border(1.5.dp, Color(0xFF555555), MoovieShape)
+            .border(1.5.dp, MOOVIE_TEXT_FAINT, MoovieShape)
             .padding(horizontal = 16.dp, vertical = 14.dp),
     ) {
         if (value.isEmpty()) {
@@ -364,7 +370,7 @@ internal fun SearchField(
                 stringResource(
                     if (useBottomNav) Res.string.search_hint_short else Res.string.search_hint,
                 ),
-                color = Color(0xFF888888),
+                color = MOOVIE_TEXT_DIM,
                 fontSize = 18.sp,
                 // Garde-fou : quelle que soit la traduction, le champ reste haut
                 // d'une ligne.
@@ -424,7 +430,7 @@ private fun HistorySection(
     modifier: Modifier = Modifier,
 ) {
     if (history.isEmpty()) {
-        Text(stringResource(Res.string.search_empty_hint), color = Color(0xFF888888), modifier = modifier)
+        Text(stringResource(Res.string.search_empty_hint), color = MOOVIE_TEXT_DIM, modifier = modifier)
         return
     }
     // Croix de suppression visible en permanence dès qu'on désigne directement
@@ -464,7 +470,7 @@ private fun HistorySection(
             Text(
                 stringResource(Res.string.search_recent_hint),
                 style = MaterialTheme.typography.labelMedium,
-                color = Color(0xFF888888),
+                color = MOOVIE_TEXT_DIM,
             )
         }
         Spacer(Modifier.height(12.dp))
@@ -572,7 +578,7 @@ private fun RemoveQueryCross(query: String, onRemove: () -> Unit) {
             Icon(
                 Icons.Default.Close,
                 contentDescription = label,
-                tint = if (hovered) Color.White else Color(0xFFAAAAAA),
+                tint = if (hovered) Color.White else MOOVIE_TEXT_DIM,
                 modifier = Modifier.size(14.dp),
             )
         } else {
@@ -607,7 +613,7 @@ private fun ResultsGrid(
         Text(
             stringResource(Res.string.search_filters_scope, SEARCH_SCOPE),
             style = MaterialTheme.typography.labelSmall,
-            color = Color(0xFF9A9A9A),
+            color = MOOVIE_TEXT_DIM,
             modifier = Modifier.padding(horizontal = searchHPad(), vertical = 4.dp),
         )
     }
@@ -658,7 +664,7 @@ private fun ResultCard(
                     model = item.posterUrl(),
                     contentDescription = item.displayTitle,
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxWidth().aspectRatio(2f / 3f).background(Color(0xFF222222)),
+                    modifier = Modifier.fillMaxWidth().aspectRatio(2f / 3f).background(MOOVIE_SURFACE_HIGH),
                 )
                 // Sans ce repère, rien ne distingue un titre déjà mis de côté :
                 // on le rajoutait sans le savoir, autant de fois qu'on retombait
@@ -670,7 +676,7 @@ private fun ResultCard(
                             .padding(6.dp)
                             .size(24.dp)
                             .clip(CircleShape)
-                            .background(Color(0xCC0A0A0A)),
+                            .background(MOOVIE_SCRIM),
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(

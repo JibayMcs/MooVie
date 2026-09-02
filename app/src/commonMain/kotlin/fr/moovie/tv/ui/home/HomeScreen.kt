@@ -133,6 +133,11 @@ import fr.moovie.tv.resources.moovie_icon
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
+import fr.moovie.tv.ui.theme.MOOVIE_BG
+import fr.moovie.tv.ui.theme.MOOVIE_SCRIM
+import fr.moovie.tv.ui.theme.MOOVIE_SURFACE_HIGH
+import fr.moovie.tv.ui.theme.MOOVIE_TEXT_DIM
+import fr.moovie.tv.ui.theme.MOOVIE_TEXT_MUTED
 
 /**
  * Écran d'accueil partagé TV + desktop : état hoisté (le ViewModel reste
@@ -221,7 +226,7 @@ fun HomeScreenContent(
     // Abonnement unique de l'écran : les trois sortes de cartes y puisent
     // leur pastille « hors ligne » sans que les rangées aient à la convoyer.
     ProvideTitleDownloads {
-    Box(modifier = Modifier.fillMaxSize().background(Color(0xFF0A0A0A))) {
+    Box(modifier = Modifier.fillMaxSize().background(MOOVIE_BG)) {
         // Backdrop dynamique avec fondu enchaîné quand l'élément focalisé change.
         Crossfade(
             targetState = featured?.backdropUrl(),
@@ -625,7 +630,7 @@ private fun CatalogHero(item: TmdbItem) {
         )
         Spacer(Modifier.height(6.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            item.year?.let { Text(it, style = MaterialTheme.typography.titleMedium, color = Color(0xFFCCCCCC)) }
+            item.year?.let { Text(it, style = MaterialTheme.typography.titleMedium, color = MOOVIE_TEXT_MUTED) }
             if (item.voteAverage > 0) {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(5.dp),
@@ -652,7 +657,7 @@ private fun CatalogHero(item: TmdbItem) {
             Text(
                 item.overview.orEmpty(),
                 style = MaterialTheme.typography.bodyLarge,
-                color = Color(0xFFDDDDDD),
+                color = MOOVIE_TEXT_MUTED,
                 // Deux lignes sur toute la largeur portent plus de texte que
                 // trois sur 60 % : on ne perd rien, et la rangée d'affiches
                 // récupère la hauteur qui lui manquait.
@@ -684,7 +689,7 @@ private fun ResumeHero(entry: ResumeEntry) {
         Spacer(Modifier.height(6.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             entry.episodeLabel?.let {
-                Text(it, style = MaterialTheme.typography.titleMedium, color = Color(0xFFCCCCCC))
+                Text(it, style = MaterialTheme.typography.titleMedium, color = MOOVIE_TEXT_MUTED)
             }
             Text(
                 when {
@@ -697,7 +702,7 @@ private fun ResumeHero(entry: ResumeEntry) {
                     else -> stringResource(Res.string.home_in_progress)
                 },
                 style = MaterialTheme.typography.titleMedium,
-                color = Color(0xFFCCCCCC),
+                color = MOOVIE_TEXT_MUTED,
             )
         }
         Spacer(Modifier.height(12.dp))
@@ -743,7 +748,7 @@ private fun WatchlistHero(entry: WatchlistEntry) {
                 },
             ).joinToString(" · "),
             style = MaterialTheme.typography.titleMedium,
-            color = Color(0xFFCCCCCC),
+            color = MOOVIE_TEXT_MUTED,
         )
     }
 }
@@ -895,7 +900,7 @@ private fun ResumeCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(16f / 9f)
-                    .background(Color(0xFF222222)),
+                    .background(MOOVIE_SURFACE_HIGH),
             ) {
                 MoovieAsyncImage(
                     model = entry.imageUrl,
@@ -925,7 +930,7 @@ private fun ResumeCard(
                         },
                     ).joinToString(" · ").ifBlank { stringResource(Res.string.home_in_progress) },
                     style = MaterialTheme.typography.labelSmall,
-                    color = Color(0xFF9A9A9A),
+                    color = MOOVIE_TEXT_DIM,
                 )
             }
         }
@@ -1076,7 +1081,7 @@ private fun PosterCard(
                             .padding(6.dp)
                             .size(22.dp)
                             .clip(CircleShape)
-                            .background(Color(0xCC0A0A0A)),
+                            .background(MOOVIE_SCRIM),
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(
@@ -1096,7 +1101,7 @@ private fun PosterCard(
                             .padding(6.dp)
                             .size(22.dp)
                             .clip(CircleShape)
-                            .background(Color(0xCC0A0A0A)),
+                            .background(MOOVIE_SCRIM),
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(
@@ -1194,7 +1199,7 @@ private fun WatchlistCard(
                         .padding(6.dp)
                         .size(22.dp)
                         .clip(CircleShape)
-                        .background(Color(0xCC0A0A0A)),
+                        .background(MOOVIE_SCRIM),
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(

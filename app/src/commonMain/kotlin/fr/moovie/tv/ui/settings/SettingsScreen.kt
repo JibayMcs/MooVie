@@ -214,6 +214,10 @@ import fr.moovie.tv.ui.components.MoovieIconButton
 import fr.moovie.tv.ui.components.MoovieSelect
 import org.jetbrains.compose.resources.stringResource
 import fr.moovie.tv.shared.appVersionName
+import fr.moovie.tv.ui.theme.MOOVIE_ERROR
+import fr.moovie.tv.ui.theme.MOOVIE_SURFACE
+import fr.moovie.tv.ui.theme.MOOVIE_TEXT_DIM
+import fr.moovie.tv.ui.theme.MOOVIE_TEXT_FAINT
 
 /**
  * Largeur du volet de navigation. Volontairement contenue : en 1080p l'écran ne
@@ -412,7 +416,7 @@ fun SettingsScreenContent(
                 .zIndex(1f)
                 .width(if (expanded) NAV_WIDTH else RAIL_WIDTH)
                 .fillMaxHeight()
-                .background(Color(0xFF141414))
+                .background(MOOVIE_SURFACE)
                 // Défilant : à neuf sections, la liste dépasse la hauteur d'un
                 // écran 1080p et poussait le bouton Retour hors champ.
                 .verticalScroll(rememberScrollState())
@@ -716,11 +720,11 @@ fun SettingsScreenContent(
                             // sans ce retour le bouton paraîtrait inerte.
                             when (updateCheck) {
                                 UpdateCheck.CHECKING ->
-                                    Text(stringResource(Res.string.settings_check_running), color = Color(0xFF9A9A9A))
+                                    Text(stringResource(Res.string.settings_check_running), color = MOOVIE_TEXT_DIM)
                                 UpdateCheck.UP_TO_DATE ->
-                                    Text(stringResource(Res.string.settings_check_uptodate), color = Color(0xFF9A9A9A))
+                                    Text(stringResource(Res.string.settings_check_uptodate), color = MOOVIE_TEXT_DIM)
                                 UpdateCheck.FAILED ->
-                                    Text(stringResource(Res.string.settings_check_failed), color = Color(0xFFE0A0A0))
+                                    Text(stringResource(Res.string.settings_check_failed), color = MOOVIE_ERROR)
                                 UpdateCheck.IDLE -> Unit
                             }
                             // Toujours `enabled` : le passer à false pendant la
@@ -771,7 +775,7 @@ fun SettingsScreenContent(
                     Text(
                         stringResource(Res.string.settings_sources_help),
                         style = MaterialTheme.typography.bodySmall,
-                        color = Color(0xFF9A9A9A),
+                        color = MOOVIE_TEXT_DIM,
                     )
                     providers.forEachIndexed { index, provider ->
                         ProviderRow(
@@ -888,7 +892,7 @@ internal fun SettingRow(
             Text(
                 help,
                 style = MaterialTheme.typography.bodySmall,
-                color = Color(0xFF9A9A9A),
+                color = MOOVIE_TEXT_DIM,
             )
         }
     }
@@ -964,7 +968,7 @@ private fun ProviderRow(
         modifier = Modifier
             .fillMaxWidth()
             .clip(MoovieShape)
-            .background(if (index % 2 == 0) Color(0xFF161616) else Color.Transparent)
+            .background(if (index % 2 == 0) MOOVIE_SURFACE else Color.Transparent)
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -972,7 +976,7 @@ private fun ProviderRow(
         Text(
             "${index + 1}. ${provider.name}",
             style = MaterialTheme.typography.titleMedium,
-            color = if (provider.enabled) Color.White else Color(0xFF777777),
+            color = if (provider.enabled) Color.White else MOOVIE_TEXT_FAINT,
             modifier = Modifier.weight(1f),
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1080,11 +1084,11 @@ internal fun ApiKeyField(value: String, hint: String, onValueChange: (String) ->
         Box(
             modifier = Modifier
                 .weight(1f)
-                .border(1.dp, Color(0xFF555555), MoovieShape)
+                .border(1.dp, MOOVIE_TEXT_FAINT, MoovieShape)
                 .padding(horizontal = 12.dp, vertical = 10.dp),
         ) {
             if (draft.isEmpty()) {
-                Text(hint, color = Color(0xFF888888))
+                Text(hint, color = MOOVIE_TEXT_DIM)
             }
             BasicTextField(
                 value = draft,

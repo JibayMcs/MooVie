@@ -52,6 +52,9 @@ import fr.moovie.tv.ui.settings.ApiKeyField
 import fr.moovie.tv.ui.theme.MOOVIE_ACCENT
 import fr.moovie.tv.ui.theme.MoovieShape
 import org.jetbrains.compose.resources.stringResource
+import fr.moovie.tv.ui.theme.MOOVIE_TEXT_DIM
+import fr.moovie.tv.ui.theme.MOOVIE_TEXT_FAINT
+import fr.moovie.tv.ui.theme.MOOVIE_WARN
 
 /**
  * La mise en page commune à toutes les questions : un titre, une explication,
@@ -121,7 +124,7 @@ internal fun EtapeCle(
             verdict != null -> Text(
                 verdict,
                 style = MaterialTheme.typography.bodyMedium,
-                color = Color(0xFFE0B057),
+                color = MOOVIE_WARN,
             )
             validee -> Text(
                 stringResource(Res.string.onboarding_key_valid),
@@ -291,10 +294,10 @@ private fun ChampTexte(
         modifier = modifier
             .fillMaxWidth()
             .widthIn(max = 420.dp)
-            .border(1.dp, Color(0xFF555555), MoovieShape)
+            .border(1.dp, MOOVIE_TEXT_FAINT, MoovieShape)
             .padding(horizontal = 12.dp, vertical = 10.dp),
     ) {
-        if (valeur.isEmpty()) Text(indication, color = Color(0xFF888888))
+        if (valeur.isEmpty()) Text(indication, color = MOOVIE_TEXT_DIM)
         BasicTextField(
             value = valeur,
             onValueChange = onValeur,

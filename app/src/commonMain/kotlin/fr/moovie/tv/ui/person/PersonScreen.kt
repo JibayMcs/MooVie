@@ -48,6 +48,10 @@ import fr.moovie.tv.ui.components.SkeletonGrid
 import fr.moovie.tv.ui.theme.MOOVIE_ACCENT
 import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.stringResource
+import fr.moovie.tv.ui.theme.MOOVIE_BG
+import fr.moovie.tv.ui.theme.MOOVIE_SCRIM
+import fr.moovie.tv.ui.theme.MOOVIE_SURFACE_HIGH
+import fr.moovie.tv.ui.theme.MOOVIE_TEXT_DIM
 
 /** Colonnes sur un écran large (TV 960 dp, desktop) — comme la recherche. */
 private const val COLUMNS = 6
@@ -93,7 +97,7 @@ fun PersonScreenContent(
 
     val hPad = if (useBottomNav) 16.dp else 40.dp
 
-    Box(modifier = Modifier.fillMaxSize().background(Color(0xFF0A0A0A))) {
+    Box(modifier = Modifier.fillMaxSize().background(MOOVIE_BG)) {
         Column(modifier = Modifier.fillMaxSize().padding(vertical = if (useBottomNav) 16.dp else 32.dp)) {
             Row(
                 modifier = Modifier.padding(horizontal = hPad),
@@ -122,7 +126,7 @@ fun PersonScreenContent(
                 is PersonState.Empty -> Text(
                     state.reason,
                     style = MaterialTheme.typography.bodyLarge,
-                    color = Color(0xFF9A9A9A),
+                    color = MOOVIE_TEXT_DIM,
                     modifier = Modifier.padding(horizontal = hPad),
                 )
 
@@ -172,7 +176,7 @@ private fun PosterCard(
                     modifier = Modifier
                         .fillMaxWidth()
                         .aspectRatio(2f / 3f)
-                        .background(Color(0xFF222222)),
+                        .background(MOOVIE_SURFACE_HIGH),
                 )
                 if (inWatchlist || isWatched) {
                     Box(
@@ -181,7 +185,7 @@ private fun PosterCard(
                             .padding(6.dp)
                             .size(24.dp)
                             .clip(CircleShape)
-                            .background(Color(0xCC0A0A0A)),
+                            .background(MOOVIE_SCRIM),
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(

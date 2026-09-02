@@ -38,6 +38,7 @@ import fr.moovie.tv.resources.search_sort_title
 import fr.moovie.tv.resources.search_sort_year
 import fr.moovie.tv.ui.components.MoovieButton
 import org.jetbrains.compose.resources.stringResource
+import fr.moovie.tv.ui.theme.MOOVIE_WARN
 
 /**
  * Barre de tri et de filtres de la recherche.
@@ -166,7 +167,7 @@ fun SearchFilterBar(
                     Text(
                         stringResource(Res.string.search_filters_reset),
                         style = MaterialTheme.typography.labelMedium,
-                        color = Color(0xFFE0B057),
+                        color = MOOVIE_WARN,
                     )
                 }
             }

@@ -82,9 +82,12 @@ import fr.moovie.tv.ui.theme.MoovieShape
 import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
+import fr.moovie.tv.ui.theme.MOOVIE_SURFACE
+import fr.moovie.tv.ui.theme.MOOVIE_TEXT_DIM
+import fr.moovie.tv.ui.theme.MOOVIE_WARN
 
-private val DIM = Color(0xFF9A9A9A)
-private val PANEL = Color(0xFF161616)
+private val DIM = MOOVIE_TEXT_DIM
+private val PANEL = MOOVIE_SURFACE
 
 /**
  * Section « Sauvegarde » des réglages : export vers un support, import depuis un
@@ -357,7 +360,7 @@ private fun Warning(text: String) {
     Text(
         text,
         style = MaterialTheme.typography.bodySmall,
-        color = Color(0xFFE0B057),
+        color = MOOVIE_WARN,
         modifier = Modifier
             .fillMaxWidth()
             .border(1.dp, Color(0xFF7A5E22), MoovieShape)

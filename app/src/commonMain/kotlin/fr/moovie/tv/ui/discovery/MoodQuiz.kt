@@ -65,6 +65,8 @@ import fr.moovie.tv.ui.theme.MoovieShape
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
+import fr.moovie.tv.ui.theme.MOOVIE_SCRIM
+import fr.moovie.tv.ui.theme.MOOVIE_TEXT_DIM
 
 /**
  * Le questionnaire : une question par écran, les réponses en cartes.
@@ -226,7 +228,7 @@ private fun PasserCard(onClick: () -> Unit) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowForward,
                     contentDescription = null,
-                    tint = Color(0xFF9A9AA5),
+                    tint = MOOVIE_TEXT_DIM,
                     modifier = Modifier.size(26.dp),
                 )
                 Text(
@@ -272,7 +274,7 @@ private fun MoodOptionCard(option: MoodOption, selected: Boolean, onClick: () ->
                     .background(
                         Brush.verticalGradient(
                             0.45f to Color.Transparent,
-                            1f to Color(0xCC0A0A0A),
+                            1f to MOOVIE_SCRIM,
                         ),
                     ),
             )

@@ -27,6 +27,7 @@ import fr.moovie.tv.ui.components.MoovieButton
 import fr.moovie.tv.ui.theme.MOOVIE_ACCENT
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
+import fr.moovie.tv.ui.theme.MOOVIE_BG
 
 /**
  * Les onglets d'une fiche, sur grand écran.
@@ -157,7 +158,7 @@ internal fun BandeauOnglets(modifier: Modifier = Modifier, contenu: @Composable 
         modifier = modifier
             .fillMaxWidth()
             .height(hauteurOnglets())
-            .background(Color(0xFF0A0A0A))
+            .background(MOOVIE_BG)
             .padding(vertical = 6.dp),
         contentAlignment = Alignment.CenterStart,
     ) {
