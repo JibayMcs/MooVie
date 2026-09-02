@@ -33,6 +33,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -80,6 +81,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import fr.moovie.tv.ui.theme.MoovieShape
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -217,6 +219,15 @@ private const val SCROLL_SETTLE_MS = 120L
  * la page se calerait alors seize points à côté, ce qui se voit.
  */
 private val ESPACEMENT_PAGE = 16.dp
+
+/**
+ * De combien on grossit la bande-annonce pour sortir ses barres du cadre.
+ *
+ * 2,39 ÷ 2,07 : le rapport entre le format d'un film et celui du hero. En
+ * dessous, les barres d'un 2,39:1 restent visibles ; au-dessus, on ampute pour
+ * rien les bandes-annonces qui n'en ont pas.
+ */
+private const val ZOOM_APERCU = 1.16f
 
 private const val HERO_PREVIEW_DELAY_MS = 3_000L
 
@@ -856,7 +867,7 @@ fun DetailsScreenContent(
         // Le plancher tient le cas d'une fenêtre écrasée en hauteur, où le titre
         // et les boutons ne tiendraient plus — on préfère alors déborder et
         // laisser défiler.
-        val hauteurHero = (maxHeight - HAUTEUR_ONGLETS - AMORCE_SOUS_ONGLETS)
+        val hauteurHero = (maxHeight - hauteurOnglets() - amorceSousOnglets())
             .coerceAtLeast(300.dp)
         // **La marge du hero n'est pas celle de la page.**
         //
@@ -925,12 +936,33 @@ fun DetailsScreenContent(
                     Modifier.fillMaxSize()
                 },
             ) {
-                trailerPreview(
-                    ready.stream,
-                    volume,
-                    { trailerController = it },
-                    Modifier.fillMaxSize(),
-                )
+                // **Un peu plus que remplir : mordre.**
+                //
+                // Les deux lecteurs recadrent déjà pour couvrir le cadre, et ça
+                // ne suffit pas. Une bande-annonce de cinéma est un 2,39:1
+                // **encodé dans un 16:9** : les barres noires sont dans les
+                // images, pas autour de la vidéo, et aucun mode de
+                // redimensionnement ne les distingue du film. Couvrir un cadre
+                // de 2,07:1 avec ce 16:9 en retire la moitié ; le reste
+                // s'affiche en haut et en bas du hero, en bandes franches — ce
+                // qu'on nous a remonté d'un salon comme des « séparations ».
+                //
+                // Ce grossissement les fait sortir du cadre. Il coûte 15 % de
+                // débord à une bande-annonce réellement en 16:9, ce qui est le
+                // bon échange : c'est un décor, pas un plan qu'on cadre.
+                Box(
+                    modifier = Modifier.fillMaxSize().clipToBounds(),
+                ) {
+                    trailerPreview(
+                        ready.stream,
+                        volume,
+                        { trailerController = it },
+                        Modifier.fillMaxSize().graphicsLayer {
+                            scaleX = ZOOM_APERCU
+                            scaleY = ZOOM_APERCU
+                        },
+                    )
+                }
             }
         }
 
@@ -981,15 +1013,20 @@ fun DetailsScreenContent(
         // haut : on garde le moyen de changer d'avis.
         //
         // La cible se calcule, elle ne se mesure pas : le hero est le premier
-        // élément de la colonne et la barre le suit, séparés du seul espacement
-        // de la colonne. Un `onGloballyPositioned` aurait donné le même nombre
-        // au prix d'un état de plus et d'une image de retard.
+        // élément de la colonne et la barre lui est collée. Un
+        // `onGloballyPositioned` aurait donné le même nombre au prix d'un état
+        // de plus et d'une image de retard.
         val densite = LocalDensity.current
-        val hautDesOnglets = with(densite) { (hauteurHero + ESPACEMENT_PAGE).roundToPx() }
+        val hautDesOnglets = with(densite) { hauteurHero.roundToPx() }
         // Défini une fois pour les deux fiches : c'est la même barre, au même
         // endroit, et la dupliquer aurait fini par la faire diverger.
         val barreOnglets: @Composable () -> Unit = {
-            BandeauOnglets {
+            // Remontée de l'espacement de la page : la barre doit **toucher**
+            // le bas de l'image, comme la maquette. Les seize points de noir
+            // que la colonne glissait entre les deux ajoutaient une troisième
+            // bande sombre à un bas d'écran qui en comptait déjà deux — et
+            // c'est cet empilement qu'on lit comme des blocs séparés.
+            BandeauOnglets(modifier = Modifier.offset(y = -ESPACEMENT_PAGE)) {
                 DetailsTabs(
                     onglets = onglets,
                     actif = ongletActif,

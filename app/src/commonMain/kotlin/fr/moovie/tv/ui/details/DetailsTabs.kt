@@ -21,6 +21,8 @@ import fr.moovie.tv.resources.details_tab_episodes
 import fr.moovie.tv.resources.details_tab_info
 import fr.moovie.tv.resources.details_tab_similar
 import fr.moovie.tv.resources.details_tab_trailers
+import fr.moovie.tv.ui.adaptive.HeightClass
+import fr.moovie.tv.ui.adaptive.LocalHeightClass
 import fr.moovie.tv.ui.components.MoovieButton
 import fr.moovie.tv.ui.theme.MOOVIE_ACCENT
 import org.jetbrains.compose.resources.StringResource
@@ -125,24 +127,28 @@ internal enum class DetailsTab(val libelle: StringResource) {
 }
 
 /**
- * La hauteur que la barre prend sous le hero.
+ * La hauteur que la barre prend sous le hero, et l'amorce laissée dessous.
  *
  * Le hero s'en sert pour se dimensionner : la maquette montre l'image jusqu'au
- * bas de l'écran **et** la barre posée dessous, visible sans défiler. C'est
- * elle qui dit qu'il y a une suite — sans quoi la page paraît finie, et l'on ne
- * saurait pas que les épisodes existent.
- */
-internal val HAUTEUR_ONGLETS: Dp = 64.dp
-
-/**
- * L'amorce laissée **sous** la barre.
+ * bas de l'écran **et** la barre posée dessous, visible sans défiler. L'amorce,
+ * elle, découvre le haut de ce que la barre ouvre — une affiche, une ligne
+ * d'épisode — et c'est elle, pas la barre, qui donne envie de défiler.
  *
- * Réserver la seule hauteur de la barre la posait pile sur le bord de l'écran :
- * on la voyait, mais rien ne disait qu'elle avait un contenu. Ces quelques
- * points découvrent le haut de ce qu'elle ouvre — une affiche, une ligne
- * d'épisode — et c'est cette amorce, pas la barre, qui donne envie de défiler.
+ * **Deux jeux de valeurs, parce que ce sont deux budgets.** Ensemble elles
+ * prennent 104 dp au cadre. Sur une fenêtre de bureau haute de 1 045 dp, c'est
+ * un dixième et personne ne le remarque ; sur un téléviseur 1080p, qui n'en
+ * fait que 540, c'est un cinquième de l'écran — un cinquième de noir sous
+ * l'image, qui la fait lire comme un bandeau posé sur un bloc. La barre reste
+ * confortable à viser à la télécommande : le bouton qu'elle porte fait sa
+ * propre hauteur, on ne réduit que l'air autour.
  */
-internal val AMORCE_SOUS_ONGLETS: Dp = 40.dp
+@Composable
+internal fun hauteurOnglets(): Dp =
+    if (LocalHeightClass.current == HeightClass.EXPANDED) 64.dp else 52.dp
+
+@Composable
+internal fun amorceSousOnglets(): Dp =
+    if (LocalHeightClass.current == HeightClass.EXPANDED) 40.dp else 24.dp
 
 /** Bandeau plein pour la barre, comme la maquette : elle sort de l'image. */
 @Composable
@@ -150,7 +156,7 @@ internal fun BandeauOnglets(modifier: Modifier = Modifier, contenu: @Composable 
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(HAUTEUR_ONGLETS)
+            .height(hauteurOnglets())
             .background(Color(0xFF0A0A0A))
             .padding(vertical = 6.dp),
         contentAlignment = Alignment.CenterStart,

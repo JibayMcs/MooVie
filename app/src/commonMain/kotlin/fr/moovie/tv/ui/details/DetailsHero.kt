@@ -36,12 +36,37 @@ import fr.moovie.tv.resources.info_creator
 import fr.moovie.tv.resources.info_director
 import fr.moovie.tv.resources.media_movie
 import fr.moovie.tv.resources.media_series
+import fr.moovie.tv.ui.adaptive.HeightClass
+import fr.moovie.tv.ui.adaptive.LocalHeightClass
 import fr.moovie.tv.ui.components.MoovieAsyncImage
 import fr.moovie.tv.ui.theme.MoovieShape
 import org.jetbrains.compose.resources.stringResource
 
 /** Le gris des lignes secondaires du hero — celui du reste de la fiche. */
 private val HERO_DIM = Color(0xFF9A9A9A)
+
+/**
+ * La hauteur que le voile couvre, mesurée depuis le bas du cadre.
+ *
+ * C'est la place que prend le bloc de texte — titre, ligne de méta, bouton
+ * principal, rangée d'actions — plus de quoi respirer au-dessus. Deux valeurs
+ * parce que le bloc lui-même en a deux : resserré sur un cadre court, ample
+ * ailleurs (voir [CADRE_COURT]). Un voile calé sur la version ample couvrirait
+ * neuf dixièmes d'un cadre de téléviseur, soit très exactement le défaut qu'il
+ * est censé corriger.
+ */
+private val HAUTEUR_VOILE = 330.dp
+private val HAUTEUR_VOILE_COURT = 210.dp
+
+/**
+ * Largeur au-delà de laquelle un titre cesse de se lire d'un trait.
+ *
+ * Le titre occupe toute la largeur du cadre pour ne jamais être coupé (voir
+ * plus bas), mais « toute la largeur » d'une fenêtre de bureau fait mille sept
+ * cents points : l'œil y perd la fin de la première ligne avant d'avoir trouvé
+ * le début de la seconde.
+ */
+private val LARGEUR_MAX_TITRE = 1100.dp
 
 /**
  * L'en-tête d'une fiche, sur les écrans qu'on regarde de loin ou en grand.
@@ -140,18 +165,36 @@ internal fun DetailsHero(
         // ciel de jour derrière lui suffit à le rendre illisible. Le second est
         // plus faible que le premier — il corrige, il ne repeint pas.
         //
-        // **Les paliers suivent le texte, pas une proportion fixe.** Le cadre
-        // occupe désormais toute la hauteur visible : les mêmes arrêts, calés
-        // pour un hero de 620 dp, noircissaient la moitié d'une image de
-        // 1 400 dp — c'est-à-dire l'image elle-même, qui est tout le sujet.
-        // Le bloc de texte tient dans le dernier tiers ; le dégradé n'assombrit
-        // donc que là, et laisse le reste tel qu'il est.
+        // **Le voile s'ancre sur le bas, en points, pas en fraction.**
+        //
+        // Des paliers exprimés en pourcentage supposent que le bloc de texte
+        // occupe toujours la même part du cadre. Il n'en occupe pas du tout la
+        // même : il fait à peu près la même hauteur physique partout — un
+        // titre, une ligne de méta, un bouton, une rangée d'icônes — alors que
+        // le cadre, lui, suit l'écran. Sur une fenêtre de bureau haute de
+        // 1 045 dp, le hero en fait 941 et le texte un quart ; sur un
+        // téléviseur 1080p, qui ne fait que 540 dp de haut, le hero tombe à 436
+        // et le même texte en occupe plus de la moitié.
+        //
+        // Les mêmes fractions y noircissaient donc la moitié de l'image, et le
+        // cadre se lisait comme une bande d'image posée sur un bloc noir —
+        // exactement ce qu'on nous a remonté d'un salon. Ancré en points, le
+        // voile couvre le texte et rien de plus, quelle que soit la hauteur.
+        val voile = if (LocalHeightClass.current != HeightClass.EXPANDED) {
+            HAUTEUR_VOILE_COURT
+        } else {
+            HAUTEUR_VOILE
+        }
+        val debutVoile = ((hauteur - voile) / hauteur).coerceIn(0.05f, 0.75f)
         Box(
             modifier = Modifier.fillMaxSize().background(
                 Brush.verticalGradient(
                     0f to Color(0x000A0A0A),
-                    0.38f to Color(0x1A0A0A0A),
-                    0.62f to Color(0x990A0A0A),
+                    debutVoile to Color(0x000A0A0A),
+                    // Le gros de l'assombrissement se fait sur la seconde
+                    // moitié du voile : au-dessus, le texte n'a pas encore
+                    // commencé et l'image n'a aucune raison de payer pour lui.
+                    (debutVoile + (1f - debutVoile) * 0.45f) to Color(0x800A0A0A),
                     1f to Color(0xFF0A0A0A),
                 ),
             ),
@@ -165,11 +208,48 @@ internal fun DetailsHero(
             ),
         )
 
-        Row(
+        // **Court quand l'appareil est court, pas quand le cadre l'est.**
+        //
+        // C'est la hauteur offerte par l'appareil qui décide de la typographie,
+        // et le projet la nomme déjà : un téléviseur 1080p fait 540 dp de haut
+        // ([HeightClass.MEDIUM]), une fenêtre de bureau plus de 900
+        // ([HeightClass.EXPANDED]). Un seuil maison sur la hauteur du cadre
+        // aurait dit à peu près la même chose, en inventant un second
+        // vocabulaire pour la même question.
+        val court = LocalHeightClass.current != HeightClass.EXPANDED
+        Column(
             modifier = Modifier
                 .align(Alignment.BottomStart)
                 .fillMaxWidth()
-                .padding(horizontal = marge, vertical = 28.dp),
+                .padding(horizontal = marge, vertical = if (court) 18.dp else 28.dp),
+            verticalArrangement = Arrangement.spacedBy(if (court) 8.dp else 12.dp),
+        ) {
+        // **Le titre occupe toute la largeur, au-dessus des deux colonnes.**
+        //
+        // Enfermé dans la colonne de gauche — un tiers du cadre —, il était
+        // coupé dès qu'il dépassait trois mots : « The Lord of the Rings: The
+        // Fellowship of the Ring » n'y tenait pas, et l'ellipse tombait au
+        // milieu du titre qu'on venait chercher. C'est le seul élément du hero
+        // dont la longueur ne se négocie pas : on lui donne la largeur.
+        Text(
+            titre,
+            // `displayMedium` fait quarante-cinq points : sur un téléviseur,
+            // un titre de deux mots y passe à la ligne et coûte cent vingt
+            // points de cadre à lui seul. Un cran en dessous tient sur une
+            // ligne et rend cette hauteur à l'image, sans qu'on lise moins bien
+            // de trois mètres — la taille reste très au-dessus du reste.
+            style = if (court) {
+                MaterialTheme.typography.headlineLarge
+            } else {
+                MaterialTheme.typography.displayMedium
+            },
+            color = Color.White,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.widthIn(max = LARGEUR_MAX_TITRE),
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(40.dp),
             verticalAlignment = Alignment.Bottom,
         ) {
@@ -211,15 +291,8 @@ internal fun DetailsHero(
             // ligne devient trop longue pour qu'on retrouve la suivante.
             Column(
                 modifier = Modifier.weight(0.34f),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(if (court) 8.dp else 12.dp),
             ) {
-                Text(
-                    titre,
-                    style = MaterialTheme.typography.displayMedium,
-                    color = Color.White,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
                 val ligne = meta.filter { it.isNotBlank() }
                 if (ligne.isNotEmpty()) {
                     Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -247,7 +320,7 @@ internal fun DetailsHero(
                         synopsis,
                         style = MaterialTheme.typography.bodyMedium,
                         color = Color(0xFFDDDDDD),
-                        maxLines = 4,
+                        maxLines = if (court) 3 else 4,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
@@ -265,6 +338,7 @@ internal fun DetailsHero(
             if (aside != null) {
                 Box(modifier = Modifier.align(Alignment.Bottom)) { aside() }
             }
+        }
         }
 
         // Dernier de la pile : elles se posent sur la vidéo comme sur les
