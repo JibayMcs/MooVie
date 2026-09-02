@@ -147,6 +147,8 @@ import fr.moovie.tv.ui.adaptive.LocalWindowHeight
 import fr.moovie.tv.ui.components.HAUTEUR_NAV
 import androidx.compose.foundation.layout.BoxWithConstraints
 import fr.moovie.tv.ui.components.MooviePosterCard
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.focus.FocusDirection
 
 /**
  * Écran d'accueil partagé TV + desktop : état hoisté (le ViewModel reste
@@ -329,15 +331,44 @@ fun HomeScreenContent(
             // Hissé : `useBottomNav` est un accesseur composable, et le corps
             // d'une liste paresseuse ne l'est pas.
             val auDoigt = useBottomNav
+            // Le héros est un élément de la liste sur grand écran, et pas au
+            // doigt : tout ce qui raisonne en indices de liste doit le savoir.
+            val decalageHeros = if (auDoigt) 0 else 1
 
-            // Descente explicite depuis la barre : la 1re carte est hors de son
-            // faisceau vertical, et la recherche de focus native y échoue.
-            val navDown = Modifier.onPreviewKeyEvent { event ->
-                if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionDown) {
-                    runCatching { firstContentFocus.requestFocus() }.isSuccess
-                } else {
-                    false
+            // **Descente depuis la barre, avec un filet.**
+            //
+            // La première carte est hors du faisceau vertical de la barre : la
+            // recherche de focus native n'y arrive pas, d'où la visée explicite.
+            // Mais la cible n'est attachée qu'à la **première rangée**, et
+            // celle-ci n'existe pas toujours — « Reprendre » et « À regarder
+            // plus tard » sont vides sur un profil neuf, et le
+            // `FocusRequester` posé dessus ne correspond alors à aucun nœud.
+            // La demande échouait en silence, et Bas ne faisait rien du tout :
+            // on restait prisonnier de la barre, ce qu'on a constaté sur
+            // l'émulateur.
+            //
+            // Le repli est la recherche native. Elle ne trouve pas toujours la
+            // *bonne* carte, mais elle sort toujours de la barre — et sortir de
+            // la barre est le minimum qu'on doive à quelqu'un qui appuie sur
+            // Bas.
+            val gestionnaireFocus = LocalFocusManager.current
+            // **Revenir sur la barre, c'est revenir en haut.**
+            //
+            // Le héros est le premier élément de la liste : une fois qu'on est
+            // descendu de deux rangées, il est hors écran, et remonter jusqu'à
+            // la barre ne le ramenait pas — on se retrouvait avec une barre
+            // posée sur des rangées, sans plus aucun moyen de revoir le titre
+            // mis en avant. Même correctif que sur la fiche de détails, où
+            // atteindre le bouton principal ramène la page en haut.
+            val retourEnHaut = Modifier.onFocusChanged { etat ->
+                if (etat.isFocused) rowsScope.launch { rowsState.animateScrollToItem(0) }
+            }
+            val navDown = retourEnHaut.onPreviewKeyEvent { event ->
+                if (event.type != KeyEventType.KeyDown || event.key != Key.DirectionDown) {
+                    return@onPreviewKeyEvent false
                 }
+                runCatching { firstContentFocus.requestFocus() }.isSuccess ||
+                    gestionnaireFocus.moveFocus(FocusDirection.Down)
             }
             // **Le logo, et seulement au doigt.**
             //
@@ -500,7 +531,13 @@ fun HomeScreenContent(
                         // premier créneau affiché, quel qu'il soit : la 1re carte
                         // est hors du faisceau vertical du D-pad.
                         val entry = if (index == 0) firstContentFocus else null
-                        RowSlot(index, rowsState, rowsScope) {
+                        // **L'indice de la liste, pas celui du créneau.** Le
+                        // héros occupe désormais l'élément 0 : sans ce décalage,
+                        // prendre la première rangée en visée recalait la liste
+                        // sur le héros, la rangée sortait de l'écran et le focus
+                        // s'en allait avec elle. On restait alors prisonnier de
+                        // la barre de navigation, Bas ne faisant rien du tout.
+                        RowSlot(index + decalageHeros, rowsState, rowsScope) {
                             when (slot) {
                                 HomeSlot.Resume -> ResumeRow(
                                     entries = resume,
