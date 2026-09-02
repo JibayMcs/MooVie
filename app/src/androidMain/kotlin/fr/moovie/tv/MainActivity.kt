@@ -858,11 +858,40 @@ class MainActivity : ComponentActivity() {
                         // parmi d'autres. C'est une distinction d'état et non de
                         // destination : `Screen.Remote` héberge aussi la
                         // télécommande, qui garde sa barre.
-                        if (useBottomNav &&
+                        val barreEnBas = useBottomNav &&
                             !hidesBottomBar(nav.current) &&
                             !onVideo &&
                             !(nav.current is Screen.Remote && castPlayback != null)
-                        ) {
+
+                        // **La barre système prend la couleur de celle qu'elle
+                        // prolonge.**
+                        //
+                        // La fenêtre s'arrête au-dessus de la barre de gestes —
+                        // `setDecorFitsSystemWindows` juste au-dessus — donc
+                        // c'est Android qui peint cette bande, et il la peignait
+                        // en noir. La barre d'onglets s'y terminait donc net sur
+                        // un gris qui n'était pas le sien, avec la poignée de
+                        // gestes posée sur la frontière : la barre paraissait
+                        // flotter au-dessus d'un liseré.
+                        //
+                        // Le `navigationBarsPadding()` de la barre ne peut rien
+                        // ici : l'inset vaut zéro tant que la fenêtre ne descend
+                        // pas jusque-là. Passer l'application en bord-à-bord
+                        // ferait descendre *tout* le contenu sous la barre
+                        // d'état, ce qui est une autre revue ; dire au système
+                        // quelle couleur employer coûte une ligne et donne le
+                        // même résultat à l'œil.
+                        //
+                        // Le fond de page quand la barre n'est pas là : sur le
+                        // lecteur ou l'installation, un gris de barre d'onglets
+                        // n'aurait rien à prolonger.
+                        @Suppress("DEPRECATION")
+                        LaunchedEffect(barreEnBas) {
+                            window.navigationBarColor =
+                                if (barreEnBas) COULEUR_BARRE_BASSE else COULEUR_FOND
+                        }
+
+                        if (barreEnBas) {
                             MoovieBottomBar(
                                 current = nav.current,
                                 onSelect = { nav.switchTop(it) },
@@ -1026,3 +1055,14 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+
+/**
+ * Les deux couleurs que la barre système peut prendre.
+ *
+ * Elles doublent `MOOVIE_BG` et le fond de [MoovieBottomBar] parce que
+ * `window.navigationBarColor` attend un entier ARGB et non une `Color` de
+ * Compose. Les garder côte à côte est le meilleur moyen de ne pas les laisser
+ * diverger : une seule d'entre elles qui bouge et le liseré revient.
+ */
+private const val COULEUR_BARRE_BASSE = 0xFF121212.toInt()
+private const val COULEUR_FOND = 0xFF0A0A0A.toInt()
