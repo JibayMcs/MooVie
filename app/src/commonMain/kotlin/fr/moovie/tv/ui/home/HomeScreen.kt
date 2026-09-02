@@ -146,6 +146,7 @@ import fr.moovie.tv.ui.components.MoovieNavSpacer
 import fr.moovie.tv.ui.adaptive.LocalWindowHeight
 import fr.moovie.tv.ui.components.HAUTEUR_NAV
 import androidx.compose.foundation.layout.BoxWithConstraints
+import fr.moovie.tv.ui.components.MooviePosterCard
 
 /**
  * Écran d'accueil partagé TV + desktop : état hoisté (le ViewModel reste
@@ -1055,15 +1056,32 @@ private fun CatalogRow(
                 contentPadding = PaddingValues(horizontal = margePage(), vertical = 12.dp),
             ) {
                 itemsIndexed(row.items) { index, item ->
-                    PosterCard(
-                        item = item,
-                        // Badge ✓ seulement pour les films (une série n'a pas de clé unique).
+                    MooviePosterCard(
+                        posterUrl = item.posterUrl(),
+                        titre = item.displayTitle,
+                        note = item.voteAverage,
+                        annee = item.year,
+                        // Marque « vu » seulement pour les films : une série
+                        // n'a pas de clé unique, elle se suit épisode par
+                        // épisode.
                         isWatched = !item.isTv && "movie:${item.id}" in watched,
                         inWatchlist = (if (item.isTv) "tv:${item.id}" else "movie:${item.id}") in watchlistKeys,
                         onClick = { onOpenTitle(item.id, item.isTv) },
                         onLongClick = { onMenu(item) },
-                        onFocusItem = onFocusItem,
-                        modifier = if (index == 0) Modifier.focusRequester(entryFocus) else Modifier,
+                        surAffiche = { DownloadPosterBadge(titleKeyOf(item.id, item.isTv)) },
+                        modifier = Modifier
+                            .width(POSTER_WIDTH)
+                            // C'est cette carte qui alimente le héros de la
+                            // page : la prendre en visée change ce qu'il
+                            // montre.
+                            .heroSubject { onFocusItem(item) }
+                            .then(
+                                if (index == 0) {
+                                    Modifier.focusRequester(entryFocus)
+                                } else {
+                                    Modifier
+                                },
+                            ),
                     )
                 }
                 // Seules les rangées épinglées en ont une : elles viennent d'un
@@ -1131,82 +1149,6 @@ private fun SeeMoreCard(onClick: () -> Unit) {
                 style = MaterialTheme.typography.bodySmall,
                 maxLines = 1,
                 modifier = Modifier.padding(8.dp),
-            )
-        }
-    }
-}
-
-@Composable
-private fun PosterCard(
-    item: TmdbItem,
-    isWatched: Boolean,
-    onClick: () -> Unit,
-    onFocusItem: (TmdbItem) -> Unit,
-    inWatchlist: Boolean = false,
-    onLongClick: (() -> Unit)? = null,
-    modifier: Modifier = Modifier,
-) {
-    MoovieCard(
-        onClick = onClick,
-        onLongClick = onLongClick,
-        modifier = modifier
-            .width(POSTER_WIDTH)
-            .heroSubject { onFocusItem(item) },
-    ) {
-        Column {
-            Box {
-                MoovieAsyncImage(
-                    model = item.posterUrl(),
-                    contentDescription = item.displayTitle,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(2f / 3f),
-                )
-                if (isWatched) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(6.dp)
-                            .size(22.dp)
-                            .clip(CircleShape)
-                            .background(MOOVIE_SCRIM),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            Icons.Default.Check,
-                            contentDescription = null,
-                            tint = MOOVIE_READY,
-                            modifier = Modifier.size(14.dp),
-                        )
-                    }
-                }
-                // Signet en bas : l'ajout depuis une rangée doit se voir tout de
-                // suite, sans quoi rien ne distingue une carte déjà mise de côté.
-                if (inWatchlist) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(6.dp)
-                            .size(22.dp)
-                            .clip(CircleShape)
-                            .background(MOOVIE_SCRIM),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            Icons.Default.Bookmark,
-                            contentDescription = null,
-                            tint = MOOVIE_ACCENT,
-                            modifier = Modifier.size(13.dp),
-                        )
-                    }
-                }
-                DownloadPosterBadge(titleKeyOf(item.id, item.isTv))
-            }
-            MoovieMarqueeText(
-                text = item.displayTitle,
-                modifier = Modifier.padding(8.dp),
-                style = MaterialTheme.typography.bodySmall,
             )
         }
     }

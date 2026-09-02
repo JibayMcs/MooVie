@@ -98,26 +98,17 @@ fun MooviePosterCard(
                         .aspectRatio(2f / 3f)
                         .background(MOOVIE_SURFACE_HIGH),
                 )
-                // Les deux états qu'on veut voir sans réfléchir : mis de côté,
-                // déjà vu. Dans un rond opaque parce qu'une icône blanche sur
-                // une affiche claire n'existe pas.
-                if (inWatchlist || isWatched) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(6.dp)
-                            .size(24.dp)
-                            .clip(CircleShape)
-                            .background(MOOVIE_SCRIM),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            if (inWatchlist) Icons.Default.Bookmark else Icons.Default.Check,
-                            contentDescription = null,
-                            tint = if (inWatchlist) MOOVIE_ACCENT else MOOVIE_READY,
-                            modifier = Modifier.size(14.dp),
-                        )
-                    }
+                // **Deux états, deux coins.** Un titre peut être à la fois vu
+                // et mis de côté, et c'est même le cas le plus courant sur une
+                // série qu'on suit. Trois écrans sur quatre n'en montraient
+                // qu'un, celui qui gagnait un `if` — on croyait alors avoir
+                // retiré de la liste un titre qu'on venait de marquer vu.
+                //
+                // Dans un rond opaque : une icône blanche sur une affiche
+                // claire n'existe pas.
+                if (isWatched) PastilleAffiche(Alignment.TopEnd, Icons.Default.Check, MOOVIE_READY)
+                if (inWatchlist) {
+                    PastilleAffiche(Alignment.BottomEnd, Icons.Default.Bookmark, MOOVIE_ACCENT)
                 }
                 surAffiche?.invoke(this)
             }
@@ -164,5 +155,25 @@ fun MooviePosterCard(
                 }
             }
         }
+    }
+}
+
+/** Le rond opaque qui porte une marque d'état sur une affiche. */
+@Composable
+private fun BoxScope.PastilleAffiche(
+    coin: Alignment,
+    icone: androidx.compose.ui.graphics.vector.ImageVector,
+    teinte: androidx.compose.ui.graphics.Color,
+) {
+    Box(
+        modifier = Modifier
+            .align(coin)
+            .padding(6.dp)
+            .size(22.dp)
+            .clip(CircleShape)
+            .background(MOOVIE_SCRIM),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(icone, contentDescription = null, tint = teinte, modifier = Modifier.size(13.dp))
     }
 }
