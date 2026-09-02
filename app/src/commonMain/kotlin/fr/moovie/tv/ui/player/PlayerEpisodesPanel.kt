@@ -193,8 +193,22 @@ private fun ContenuPanneau(
     // On l'amène à l'écran **avant** de lui demander le focus : une cible qui
     // n'est pas composée n'existe pas pour Compose, et la demande échouerait en
     // silence sur une série de cent épisodes.
-    LaunchedEffect(lignes.size) {
-        if (lignes.isEmpty()) return@LaunchedEffect
+    //
+    // **Une seule fois, à la première saison arrivée.** L'effet était keyé sur
+    // `lignes.size`, qui grandit à chaque saison reçue : il repartait donc à
+    // chaque réponse, recalait la liste et reprenait le focus pendant qu'on la
+    // parcourait — sur une série de dix saisons, dix fois. Le drapeau le
+    // ramène à ce qu'il est vraiment : le cadrage d'entrée, qui n'a lieu qu'à
+    // l'ouverture.
+    //
+    // La saison en cours est demandée en premier (voir plus haut), donc la
+    // première fournée contient bien l'épisode visé. Les saisons qui arrivent
+    // ensuite s'insèrent **au-dessus** sans déplacer la vue : les lignes
+    // portent une clé, et la liste paresseuse s'ancre dessus.
+    var cadre by remember(tmdbId) { mutableStateOf(false) }
+    LaunchedEffect(lignes.isEmpty()) {
+        if (cadre || lignes.isEmpty()) return@LaunchedEffect
+        cadre = true
         if (indexEntree > 0) runCatching { listeEtat.scrollToItem(indexEntree) }
         runCatching { focusEntree.requestFocus() }
     }
