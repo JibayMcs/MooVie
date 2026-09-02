@@ -853,14 +853,14 @@ fun DetailsScreenContent(
     // Vrai quand la page s'ouvre sur une image à fond perdu : elle décide du
     // fond, de la marge haute et de la hauteur du hero.
     //
-    // La fiche d'un **épisode** en est exclue : elle a son propre en-tête
-    // (`EpisodeHero`), qui montre l'image de l'épisode et non celle de la
-    // série, et qui n'a jamais été le sujet de cette refonte.
-    val heroPleinCadre = !compact && when (state) {
-        is DetailsState.Movie -> true
-        is DetailsState.Tv -> selectedEpisode == null
-        else -> false
-    }
+    // La fiche d'un épisode en fait partie **depuis qu'elle a le même cadre**.
+    // Elle en était exclue tant qu'elle affichait une vignette de 420 points à
+    // côté d'un bloc de texte ; elle montre maintenant l'image de l'épisode à
+    // fond perdu, et doit donc toucher le bord comme ses voisines. La laisser
+    // dehors lui gardait une bande noire de 96 points au-dessus de l'image,
+    // plus le fond flouté de la page derrière.
+    val heroPleinCadre = !compact && state !is DetailsState.Loading &&
+        state !is DetailsState.Error
     BoxWithConstraints(
         modifier = Modifier.fillMaxSize().then(
             // Observé seulement quand la bande-annonce est au premier plan :
@@ -1446,6 +1446,7 @@ fun DetailsScreenContent(
                             cast = s.details.credits?.cast.orEmpty(),
                             onOpenPerson = onOpenPerson,
                             fallbackArt = s.details.backdropUrl() ?: s.details.posterUrl(),
+                            hauteurHero = hauteurHero,
                         )
                     } else {
                         val seasonAllWatched = s.episodes.isNotEmpty() &&
@@ -2964,9 +2965,12 @@ private fun EpisodeDetail(
     onOpenPerson: (CastMember) -> Unit = {},
     /** Voir [EpisodeRow]. Même repli, en grand. */
     fallbackArt: Any? = null,
+    /** Hauteur du cadre plein écran, la même que pour un film ou une série. */
+    hauteurHero: Dp = 400.dp,
 ) {
     val compact = useBottomNav
-    val hPadDp = if (compact) 16.dp else 48.dp
+    // La marge de page partagée. C'était le dernier écran à garder la sienne.
+    val hPadDp = margePage()
     val hPad = Modifier.padding(horizontal = hPadDp)
     // La vignette fait 420 dp de large. Sur les 448 dp d'un téléphone en
     // portrait il ne restait que 28 dp à la colonne de texte : titre, synopsis
@@ -3028,43 +3032,63 @@ private fun EpisodeDetail(
         }
     }
 
-    if (compact) {
-        Column(
-            modifier = hPad.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+    // Les actions, hissées : sur grand écran elles se posent dans le hero, sous
+    // le titre, exactement comme sur un film. Une seule définition pour les deux
+    // mises en page.
+    val boutonLireEpisode: @Composable () -> Unit = {
+        // Le même bouton principal que sur un film ou une série. Il était ici le
+        // petit modèle : trois fiches du même catalogue, trois poids pour le
+        // même geste, et l'épisode — celui qu'on lance vraiment — avait le plus
+        // discret des trois.
+        MoovieButton(
+            onClick = onPlay,
+            modifier = primaryModifier.then(
+                if (compact) {
+                    Modifier
+                } else {
+                    Modifier
+                        .fillMaxWidth()
+                        .widthIn(max = LARGEUR_MAX_BOUTON_PRINCIPAL)
+                        .clip(MoovieShape)
+                        .background(MOOVIE_ACCENT)
+                },
+            ),
+            selected = !compact,
+            contentPadding = if (compact) {
+                PaddingValues(horizontal = 16.dp, vertical = 10.dp)
+            } else {
+                PaddingValues(horizontal = 24.dp, vertical = 20.dp)
+            },
         ) {
-            still(Modifier.fillMaxWidth())
-            meta()
-        }
-    } else {
-        Row(
-            modifier = hPad.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(28.dp),
-        ) {
-            still(Modifier.width(420.dp))
-            Box(modifier = Modifier.weight(1f)) { meta() }
+            val libelle: @Composable RowScope.() -> Unit = {
+                if (searching) {
+                    CircularProgressIndicator(
+                        color = Color.White,
+                        strokeWidth = 2.dp,
+                        modifier = Modifier.size(14.dp),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(Res.string.details_playing))
+                } else {
+                    IconeLecture()
+                    Text(
+                        (
+                            if (hasResume) {
+                                stringResource(Res.string.details_resume)
+                            } else {
+                                stringResource(Res.string.details_play)
+                            }
+                            ).let { if (compact) it else it.uppercase() },
+                    )
+                }
+            }
+            if (compact) libelle() else LibellePrincipal(libelle)
         }
     }
 
-    Row(
-        modifier = hPad,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        MoovieButton(onClick = onPlay, modifier = primaryModifier) {
-            if (searching) {
-                CircularProgressIndicator(
-                    color = Color.White,
-                    strokeWidth = 2.dp,
-                    modifier = Modifier.size(14.dp),
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(Res.string.details_playing))
-            } else {
-                IconeLecture()
-                Text(if (hasResume) stringResource(Res.string.details_resume) else stringResource(Res.string.details_play))
-            }
-        }
+    // Les gestes secondaires : ce qu'on fait de l'épisode une fois qu'on a
+    // décidé de ne pas le lancer tout de suite.
+    val actionsSecondairesEpisode: @Composable () -> Unit = {
         MoovieButton(onClick = onOpenSources) { Text(stringResource(Res.string.details_sources)) }
         // Même bouton que sur une fiche de film, et à la même place : c'est
         // depuis un épisode qu'on veut le plus souvent continuer sur la TV.
@@ -3083,6 +3107,70 @@ private fun EpisodeDetail(
             selected = isWatched,
         )
     }
+
+    // **Deux lignes sur grand écran, une seule au doigt** — la règle de la
+    // fiche d'un film, pour la même raison : aligné avec ses voisines, le
+    // bouton principal n'est que le premier d'une rangée.
+    val actionsEpisode: @Composable () -> Unit = {
+        if (compact) {
+            Row(
+                modifier = hPad,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                boutonLireEpisode()
+                actionsSecondairesEpisode()
+            }
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                boutonLireEpisode()
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    actionsSecondairesEpisode()
+                }
+            }
+        }
+    }
+
+    if (compact) {
+        Column(
+            modifier = hPad.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            still(Modifier.fillMaxWidth())
+            meta()
+        }
+        actionsEpisode()
+    } else {
+        // **Le même cadre que le film et la série.**
+        //
+        // C'était le dernier écran à l'ancienne mise en page : une vignette de
+        // 420 points à gauche, du texte à droite — la fiche produit que le hero
+        // a remplacée partout ailleurs. On ouvrait une série sur une image plein
+        // cadre, on cliquait un épisode, et l'on retombait sur une vignette.
+        //
+        // L'épisode a justement l'image qu'il faut : sa vignette est un 16:9,
+        // le format même du cadre. Le repli sur le fond de la série couvre les
+        // épisodes que TMDB n'a pas illustrés.
+        DetailsHero(
+            backdropUrl = ep.stillUrlLarge() ?: fallbackArt as? String,
+            afficheUrl = null,
+            titre = "${ep.episodeNumber}. ${ep.name}",
+            meta = listOfNotNull(
+                stringResource(Res.string.details_episode_header, showName, season),
+                formatMediaDate(ep.airDate),
+                formatDuration(ep.runtime),
+            ),
+            synopsis = ep.overview,
+            credits = emptyList(),
+            hauteur = hauteurHero,
+            marge = hPadDp,
+            actions = actionsEpisode,
+        )
+    }
+
     if (compact && ep.overview.isNotBlank()) {
         Text(
             ep.overview,
