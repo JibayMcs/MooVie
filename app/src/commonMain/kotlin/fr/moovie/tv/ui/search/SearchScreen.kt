@@ -127,6 +127,8 @@ import fr.moovie.tv.ui.theme.MOOVIE_TEXT
 import androidx.compose.material.icons.filled.Search
 import fr.moovie.tv.ui.theme.MOOVIE_SURFACE
 import fr.moovie.tv.ui.theme.margePage
+import fr.moovie.tv.ui.components.MooviePageHeader
+import fr.moovie.tv.ui.theme.ESPACE_SECTION
 
 /** Résultats rapportés avant tri, à garder aligné sur `SearchViewModel.DEEP_PAGES`. */
 private const val SEARCH_SCOPE = 60
@@ -228,24 +230,11 @@ fun SearchScreenContent(
     // Marges horizontales portées par les enfants : la grille de résultats
     // s'étend jusqu'aux bords et ne rogne plus les cartes agrandies au focus.
     Column(modifier = Modifier.fillMaxSize().padding(vertical = 40.dp)) {
-        Row(
-            modifier = Modifier.padding(horizontal = searchHPad()),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            if (showBackButton) {
-                MoovieIconButton(
-                    onClick = onBack,
-                    icon = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = stringResource(Res.string.common_back),
-                )
-            }
-            Text(
-                stringResource(Res.string.search_title),
-                style = MaterialTheme.typography.headlineMedium,
-            )
-        }
-        Spacer(Modifier.height(16.dp))
+        MooviePageHeader(
+            titre = stringResource(Res.string.search_title),
+            onBack = onBack.takeIf { showBackButton },
+        )
+        Spacer(Modifier.height(ESPACE_SECTION))
 
         Row(
             modifier = Modifier.padding(horizontal = searchHPad()),

@@ -53,6 +53,8 @@ import fr.moovie.tv.ui.theme.MOOVIE_SCRIM
 import fr.moovie.tv.ui.theme.MOOVIE_SURFACE_HIGH
 import fr.moovie.tv.ui.theme.MOOVIE_TEXT_DIM
 import fr.moovie.tv.ui.theme.margePage
+import fr.moovie.tv.ui.components.MooviePageHeader
+import fr.moovie.tv.ui.theme.ESPACE_SECTION
 
 /** Colonnes sur un écran large (TV 960 dp, desktop) — comme la recherche. */
 private const val COLUMNS = 6
@@ -100,21 +102,11 @@ fun PersonScreenContent(
 
     Box(modifier = Modifier.fillMaxSize().background(MOOVIE_BG)) {
         Column(modifier = Modifier.fillMaxSize().padding(vertical = if (useBottomNav) 16.dp else 32.dp)) {
-            Row(
-                modifier = Modifier.padding(horizontal = hPad),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                if (showBackButton) {
-                    MoovieIconButton(
-                        onClick = onBack,
-                        icon = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = stringResource(Res.string.common_back),
-                    )
-                }
-                Text(name, style = MaterialTheme.typography.headlineSmall, color = MOOVIE_ACCENT)
-            }
-            Spacer(Modifier.height(16.dp))
+            MooviePageHeader(
+                titre = name,
+                onBack = onBack.takeIf { showBackButton },
+            )
+            Spacer(Modifier.height(ESPACE_SECTION))
 
             when (state) {
                 // Grille fantôme au même nombre de colonnes que la vraie : la
