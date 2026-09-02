@@ -340,10 +340,13 @@ private fun EcranCourant(nav: NavStack, online: Boolean) {
 
         Screen.History -> IosHistoryScreen(onOpenTitle = ouvrirTitre, onBack = { nav.pop() })
 
+        // Sans bouton retour : « Téléchargements » est un onglet de la barre
+        // basse, pas une page où l'on est descendu. La flèche y proposait de
+        // revenir à un écran d'où l'on n'était jamais parti — c'est le cas
+        // qu'Android a corrigé en passant `useBottomNav`, et qu'iOS avait gardé.
         Screen.Downloads -> DownloadsScreen(
             onPlay = { d -> lancerTelechargement(nav, d) },
             onBack = { nav.pop() },
-            showBackButton = true,
         )
 
         is Screen.Catalog -> IosCatalogScreen(
