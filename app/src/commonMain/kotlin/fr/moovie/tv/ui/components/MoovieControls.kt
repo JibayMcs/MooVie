@@ -101,6 +101,19 @@ fun MoovieButton(
      * contentant de répéter les KeyDown tant que la touche est tenue.
      */
     onLongClick: (() -> Unit)? = null,
+    /**
+     * Couleur de remplissage, pour **l'action principale d'une page** — et elle
+     * seule. Le reste de l'application ne remplit pas : un bouton au repos n'a
+     * pas de fond, ce qui laisse les affiches porter l'écran.
+     *
+     * Elle existe parce que le traitement de focus habituel disparaît sur un
+     * fond saturé : le verre est un blanc à 8 %, le halo un magenta sur du
+     * magenta, et le liseré dégradé se perd dans la couleur qu'il souligne. Un
+     * bouton rempli avait donc l'air inerte — on le survolait sans que rien ne
+     * bouge. Rempli, il se signale par un **contour clair** et par sa hauteur,
+     * pas par un voile qu'on ne voit pas.
+     */
+    remplissage: Color? = null,
     content: @Composable RowScope.() -> Unit,
 ) {
     val interaction = remember { MutableInteractionSource() }
@@ -140,11 +153,35 @@ fun MoovieButton(
                 },
             )
             .clip(MoovieShape)
-            .moovieSurface(
-                active = active,
-                selected = selected,
-                pressed = pressed && enabled,
-                glowAlpha = glow,
+            .then(
+                if (remplissage == null) {
+                    Modifier.moovieSurface(
+                        active = active,
+                        selected = selected,
+                        pressed = pressed && enabled,
+                        glowAlpha = glow,
+                    )
+                } else {
+                    // Le fond d'abord, le contour ensuite : dessiné derrière le
+                    // contenu, il ne mange pas le libellé. L'appui l'éclaircit
+                    // franchement — sur une couleur pleine, un assombrissement
+                    // ne se distingue pas d'une ombre.
+                    Modifier
+                        .background(
+                            if (pressed && enabled) {
+                                remplissage.copy(alpha = 0.82f)
+                            } else {
+                                remplissage
+                            },
+                        )
+                        .then(
+                            if (active) {
+                                Modifier.border(CONTOUR_REMPLI, Color.White, MoovieShape)
+                            } else {
+                                Modifier
+                            },
+                        )
+                }
             )
             .then(longPressKeys(onLongClick))
             .secondaryClick(onLongClick)
@@ -309,6 +346,14 @@ fun MoovieIconButton(
  * titres qui défilent, synopsis qui se déroule…
  */
 val LocalMoovieCardActive = compositionLocalOf { false }
+
+/**
+ * Épaisseur du contour qui signale un bouton **rempli** visé.
+ *
+ * Deux points : en dessous, le trait se perd sur une couleur saturée vue de
+ * trois mètres ; au-dessus, il mange le libellé qu'il entoure.
+ */
+private val CONTOUR_REMPLI = 2.dp
 
 /** Touches « OK » d'une télécommande / d'un clavier. */
 private val CONFIRM_KEYS = setOf(Key.DirectionCenter, Key.Enter, Key.NumPadEnter)
