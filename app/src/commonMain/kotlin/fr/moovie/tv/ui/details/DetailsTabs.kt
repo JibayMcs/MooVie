@@ -1,11 +1,24 @@
 package fr.moovie.tv.ui.details
 
 import androidx.compose.foundation.background
+import fr.moovie.tv.ui.theme.MOOVIE_TEXT_DIM
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.runtime.getValue
+import androidx.compose.material3.Icon
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.Icons
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -14,6 +27,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -73,35 +90,123 @@ internal fun DetailsTabs(
     onSelect: (DetailsTab) -> Unit,
     modifier: Modifier = Modifier,
     /**
+     * La marge de la page, appliquée **dans** le défilement et non autour.
+     *
+     * Posée autour, elle arrêtait la zone défilante à quarante points du bord :
+     * l'onglet suivant disparaissait avant d'y arriver, et la barre se
+     * terminait aussi net qu'une barre complète. Passée en marge de contenu,
+     * le premier onglet est au même endroit qu'avant, mais ce qui suit vient
+     * mourir sur le bord de l'écran — où le dégradé peut enfin l'éteindre.
+     */
+    marge: Dp = 0.dp,
+    /**
      * Le focus arrive-t-il ici. Vrai sur la fiche série, où les onglets sont le
      * premier arrêt sous le hero ; ailleurs le focus reste au bouton principal.
      */
     premierFocus: Modifier = Modifier,
 ) {
-    Row(
-        // **La barre défile quand elle ne tient pas.**
-        //
-        // Quatre onglets réclament près de six cents points ; un téléphone en
-        // portrait en offre quatre cents. Le dernier — « En savoir plus » —
-        // sortait donc simplement de l'écran, sans rien pour le laisser
-        // deviner : sur une série, la fiche n'avait plus de casting ni de
-        // fiche technique du tout. Un `Row` ne déborde pas, il tronque.
-        //
-        // Rogner les libellés ou empiler sur deux lignes coûterait à tous les
-        // écrans ce qu'un seul ne peut pas payer. Sur un téléviseur, les
-        // quatre tiennent et rien ne défile.
-        modifier = modifier.horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
+    // **La barre défile quand elle ne tient pas — et le dit.**
+    //
+    // Quatre onglets réclament près de six cents points ; un téléphone en
+    // portrait en offre quatre cents. Le dernier — « En savoir plus » —
+    // sortait donc simplement de l'écran : sur une série, la fiche n'avait
+    // plus de casting ni de fiche technique du tout. Un `Row` ne déborde pas,
+    // il tronque.
+    //
+    // Le rendre défilant ne suffisait pas. Le dernier onglet visible se
+    // terminait net avant le bord, exactement comme se termine une liste
+    // complète : rien ne distinguait « c'est tout » de « il y en a encore ».
+    // Un dégradé posé sur le bord vers lequel il reste à aller éteint le
+    // libellé au lieu de le couper, et cette coupure douce **est** le signe
+    // qu'on lit comme « continue par là ».
+    //
+    // Il ne paraît que du côté où il y a quelque chose : arrivé au bout, le
+    // bord redevient franc et la barre dit qu'elle est finie. Sur un
+    // téléviseur, où les quatre tiennent, aucun des deux ne s'allume.
+    //
+    // **Le dégradé seul ne suffisait pas non plus.** Ce qui dépasse au bord,
+    // ce n'est pas le libellé de l'onglet suivant mais le rembourrage de son
+    // bouton — quelques dizaines de points de vide. Le voile s'appliquait donc
+    // à du noir et n'éteignait rien du tout : le bord restait aussi franc
+    // qu'une barre complète. D'où le chevron, qui ne dépend pas de ce qui se
+    // trouve dessous pour se voir. Décoratif : il montre le chemin, on ne
+    // l'appuie pas — le geste, c'est de faire glisser la barre.
+    val defilement = rememberScrollState()
+    val versLaGauche = defilement.value > 0
+    val versLaDroite = defilement.value < defilement.maxValue
+    // Étroit à dessein. Ce qui dépasse d'un onglet suivant se compte en
+    // dizaines de points ; un voile plus large que ce dépassement l'efface
+    // entièrement, et l'on retrouve un bord franc — le dégradé s'appliquait
+    // alors à du noir. Il doit éteindre le libellé, pas le supprimer.
+    val voile = 20.dp
+    Box(
+        modifier = modifier.drawWithContent {
+            drawContent()
+            val largeur = voile.toPx()
+            if (versLaGauche) {
+                drawRect(
+                    brush = Brush.horizontalGradient(
+                        colors = listOf(MOOVIE_BG, Color.Transparent),
+                        startX = 0f,
+                        endX = largeur,
+                    ),
+                    size = Size(largeur, size.height),
+                )
+            }
+            if (versLaDroite) {
+                drawRect(
+                    brush = Brush.horizontalGradient(
+                        colors = listOf(Color.Transparent, MOOVIE_BG),
+                        startX = size.width - largeur,
+                        endX = size.width,
+                    ),
+                    topLeft = Offset(size.width - largeur, 0f),
+                    size = Size(largeur, size.height),
+                )
+            }
+        },
     ) {
-        onglets.forEachIndexed { index, onglet ->
-            OngletFiche(
-                onglet = onglet,
-                actif = onglet == actif,
-                onClick = { onSelect(onglet) },
-                modifier = if (index == 0) premierFocus else Modifier,
-            )
+        Row(
+            modifier = Modifier.fillMaxWidth().horizontalScroll(defilement),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Spacer(Modifier.width(marge))
+            onglets.forEachIndexed { index, onglet ->
+                OngletFiche(
+                    onglet = onglet,
+                    actif = onglet == actif,
+                    onClick = { onSelect(onglet) },
+                    modifier = if (index == 0) premierFocus else Modifier,
+                )
+            }
+            Spacer(Modifier.width(marge))
         }
+        Chevron(Icons.AutoMirrored.Filled.KeyboardArrowLeft, versLaGauche, Alignment.CenterStart)
+        Chevron(Icons.AutoMirrored.Filled.KeyboardArrowRight, versLaDroite, Alignment.CenterEnd)
+    }
+}
+
+/**
+ * Le repère de défilement, à un bord de la barre d'onglets.
+ *
+ * Il apparaît et disparaît en fondu plutôt que d'un coup : la barre bouge sous
+ * le doigt, et une icône qui s'allume sèchement pendant ce mouvement se lit
+ * comme un élément de plus, pas comme un état de celui qu'on manipule.
+ *
+ * `MOOVIE_TEXT_DIM` et non la couleur des libellés : c'est un panneau, pas un
+ * onglet, et deux blancs côte à côte les mettraient sur le même plan.
+ */
+@Composable
+private fun BoxScope.Chevron(icone: ImageVector, visible: Boolean, cote: Alignment) {
+    val opacite by animateFloatAsState(if (visible) 1f else 0f, label = "chevronOnglets")
+    if (opacite > 0f) {
+        Icon(
+            imageVector = icone,
+            contentDescription = null,
+            tint = MOOVIE_TEXT_DIM,
+            modifier = Modifier.align(cote).size(20.dp).graphicsLayer { alpha = opacite },
+        )
     }
 }
 

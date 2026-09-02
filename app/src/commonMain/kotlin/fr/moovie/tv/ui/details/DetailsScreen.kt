@@ -1068,7 +1068,7 @@ fun DetailsScreenContent(
                         ongletChoisi = it
                         pageScope.launch { pageScroll.animateScrollTo(hautDesOnglets) }
                     },
-                    modifier = hPadHero,
+                    marge = margeHero,
                 )
             }
         }
