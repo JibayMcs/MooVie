@@ -104,6 +104,7 @@ import org.jetbrains.compose.resources.stringResource
 import kotlin.math.roundToInt
 import fr.moovie.tv.ui.theme.MOOVIE_TEXT_MUTED
 import fr.moovie.tv.ui.theme.margePage
+import fr.moovie.tv.ui.theme.ESPACE_LARGE
 
 // Chrome du lecteur partagée entre Android TV et desktop : barre de contrôles,
 // barre de progression, menus, overlay de titre, boutons « Passer », pastille de
@@ -206,11 +207,16 @@ fun PlayerControlBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
+            // Le retour n'est pas une commande de lecture : il quitte le
+            // lecteur. Un écart le détache du transport, sinon on le vise en
+            // croyant reculer de quinze secondes — les deux icônes sont des
+            // flèches, et elles étaient collées.
             MoovieIconButton(
                 onClick = onBack,
                 icon = Icons.AutoMirrored.Filled.ArrowBack,
                 contentDescription = stringResource(Res.string.common_back),
             )
+            Spacer(modifier = Modifier.width(ESPACE_LARGE))
             MoovieIconButton(
                 onClick = onTogglePause,
                 icon = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
@@ -254,6 +260,21 @@ fun PlayerControlBar(
                     contentDescription = stringResource(Res.string.player_next_episode),
                 )
             }
+            // **Deux groupes, et l'écran entre eux.**
+            //
+            // Les dix commandes étaient alignées à gauche, dans le même souffle :
+            // retour, lecture, saut arrière, saut avant, épisode précédent,
+            // suivant, sous-titres, signalement, diffusion, réglages. Un mur.
+            // Rien n'y distinguait ce qui pilote **ce qui joue** de ce qui règle
+            // **comment ça joue**, et l'on cherchait « sous-titres » parmi des
+            // triangles quand on venait de viser « pause ».
+            //
+            // À gauche le transport, à droite les options : c'est la
+            // disposition de tous les lecteurs, et elle n'est pas arbitraire —
+            // le transport se manipule sans regarder, les options se
+            // choisissent en regardant. Les mettre à deux endroits, c'est dire
+            // lequel est lequel sans un mot.
+            Spacer(modifier = Modifier.weight(1f))
             onOpenSubtitles?.let { open ->
                 MoovieIconButton(
                     onClick = open,
