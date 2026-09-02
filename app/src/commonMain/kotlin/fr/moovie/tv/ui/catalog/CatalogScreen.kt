@@ -89,6 +89,7 @@ import fr.moovie.tv.ui.theme.MOOVIE_SCRIM
 import fr.moovie.tv.ui.theme.MOOVIE_SURFACE
 import fr.moovie.tv.ui.theme.MOOVIE_SURFACE_HIGH
 import fr.moovie.tv.ui.theme.MOOVIE_TEXT_DIM
+import fr.moovie.tv.ui.theme.margePage
 
 /**
  * Largeur du volet des genres. Reprend celle des réglages : en 1080p l'écran ne
@@ -611,6 +612,6 @@ private fun Message(text: String) {
         text,
         style = MaterialTheme.typography.bodyLarge,
         color = MOOVIE_TEXT_DIM,
-        modifier = Modifier.padding(horizontal = 40.dp),
+        modifier = Modifier.padding(horizontal = margePage()),
     )
 }

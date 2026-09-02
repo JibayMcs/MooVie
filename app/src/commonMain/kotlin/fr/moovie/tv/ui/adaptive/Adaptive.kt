@@ -3,6 +3,7 @@ package fr.moovie.tv.ui.adaptive
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
@@ -107,6 +108,19 @@ val LocalWidthClass = staticCompositionLocalOf { WidthClass.EXPANDED }
 /** Classe de hauteur de la fenêtre. Voir [HeightClass] : c'est elle qui manque en paysage. */
 val LocalHeightClass = staticCompositionLocalOf { HeightClass.MEDIUM }
 
+/**
+ * La largeur de la fenêtre, en points, telle qu'elle est.
+ *
+ * Les classes disent dans quel régime on est ; elles ne disent pas de combien
+ * on dispose. Une marge de page qui vaut un dixième de la largeur a besoin du
+ * nombre, pas du régime — et sans lui, chaque écran remesurait la fenêtre avec
+ * son propre `BoxWithConstraints`, ce qui donnait quatre marges différentes
+ * pour une même application.
+ *
+ * `compositionLocalOf` et non `static` : celle-ci change au redimensionnement.
+ */
+val LocalWindowWidth = compositionLocalOf { 960.dp }
+
 /** Vrai sur un appareil piloté au doigt — téléphone ou tablette. */
 val isTouchUi: Boolean
     @Composable get() = LocalUiFlavor.current == UiFlavor.TOUCH
@@ -166,6 +180,7 @@ fun AdaptiveRoot(
             LocalUiFlavor provides flavor,
             LocalWidthClass provides widthClassOf(maxWidth),
             LocalHeightClass provides heightClassOf(maxHeight),
+            LocalWindowWidth provides maxWidth,
             content = content,
         )
     }

@@ -138,6 +138,7 @@ import fr.moovie.tv.ui.theme.MOOVIE_SCRIM
 import fr.moovie.tv.ui.theme.MOOVIE_SURFACE_HIGH
 import fr.moovie.tv.ui.theme.MOOVIE_TEXT_DIM
 import fr.moovie.tv.ui.theme.MOOVIE_TEXT_MUTED
+import fr.moovie.tv.ui.theme.margePage
 
 /**
  * Écran d'accueil partagé TV + desktop : état hoisté (le ViewModel reste
@@ -421,7 +422,7 @@ fun HomeScreenContent(
                 ) {
                     repeat(2) { SkeletonRail(posterWidth = POSTER_WIDTH) }
                 }
-                is HomeState.NeedsApiKey -> Column(modifier = Modifier.padding(horizontal = 32.dp)) {
+                is HomeState.NeedsApiKey -> Column(modifier = Modifier.padding(horizontal = margePage())) {
                     Text(s.reason)
                     Spacer(Modifier.height(16.dp))
                     MoovieButton(onClick = onOpenSettings) { Text(stringResource(Res.string.home_open_settings)) }
@@ -607,7 +608,7 @@ private fun Hero(target: HeroTarget?, modifier: Modifier = Modifier) {
         modifier = modifier
             .fillMaxWidth()
             .height(HERO_HEIGHT)
-            .padding(horizontal = 32.dp, vertical = 8.dp),
+            .padding(horizontal = margePage(), vertical = 8.dp),
     ) {
         when (target) {
             is HeroTarget.Catalog -> CatalogHero(target.item)
@@ -766,7 +767,7 @@ private fun ResumeRow(
         Text(
             stringResource(Res.string.home_continue_watching),
             style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.padding(horizontal = 32.dp),
+            modifier = Modifier.padding(horizontal = margePage()),
         )
         Spacer(Modifier.height(8.dp))
         val listState = rememberLazyListState()
@@ -777,7 +778,7 @@ private fun ResumeRow(
         LazyRow(
             state = listState,
             horizontalArrangement = Arrangement.spacedBy(16.dp),
-            contentPadding = PaddingValues(horizontal = 32.dp, vertical = 12.dp),
+            contentPadding = PaddingValues(horizontal = margePage(), vertical = 12.dp),
         ) {
             itemsIndexed(entries, key = { _, e -> e.key }) { index, entry ->
                 ResumeCard(
@@ -952,7 +953,7 @@ private fun CatalogRow(
         Text(
             text = row.title,
             style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.padding(horizontal = 32.dp),
+            modifier = Modifier.padding(horizontal = margePage()),
         )
         Spacer(Modifier.height(8.dp))
         val listState = rememberLazyListState()
@@ -963,7 +964,7 @@ private fun CatalogRow(
             LazyRow(
                 state = listState,
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
-                contentPadding = PaddingValues(horizontal = 32.dp, vertical = 12.dp),
+                contentPadding = PaddingValues(horizontal = margePage(), vertical = 12.dp),
             ) {
                 itemsIndexed(row.items) { index, item ->
                     PosterCard(
@@ -1139,7 +1140,7 @@ private fun WatchlistRow(
         Text(
             stringResource(Res.string.watchlist_row),
             style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.padding(horizontal = 32.dp),
+            modifier = Modifier.padding(horizontal = margePage()),
         )
         Spacer(Modifier.height(8.dp))
         val listState = rememberLazyListState()
@@ -1150,7 +1151,7 @@ private fun WatchlistRow(
             LazyRow(
                 state = listState,
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
-                contentPadding = PaddingValues(horizontal = 32.dp, vertical = 12.dp),
+                contentPadding = PaddingValues(horizontal = margePage(), vertical = 12.dp),
             ) {
                 itemsIndexed(entries, key = { _, e -> e.key }) { index, entry ->
                     WatchlistCard(

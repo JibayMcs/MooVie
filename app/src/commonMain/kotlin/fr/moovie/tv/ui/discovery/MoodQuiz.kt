@@ -67,6 +67,7 @@ import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import fr.moovie.tv.ui.theme.MOOVIE_SCRIM
 import fr.moovie.tv.ui.theme.MOOVIE_TEXT_DIM
+import fr.moovie.tv.ui.theme.margePage
 
 /**
  * Le questionnaire : une question par écran, les réponses en cartes.
@@ -89,7 +90,7 @@ fun MoodQuizContent(
     onReset: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
-    val hPad = if (useBottomNav) 16.dp else 40.dp
+    val hPad = margePage()
     val options = remember(question) { moodOptionsFor(question) }
     val choisie = answers.answerFor(question)
 

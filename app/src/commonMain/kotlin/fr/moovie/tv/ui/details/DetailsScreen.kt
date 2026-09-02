@@ -206,6 +206,7 @@ import fr.moovie.tv.ui.theme.MOOVIE_SURFACE_HIGH
 import fr.moovie.tv.ui.theme.MOOVIE_TEXT_DIM
 import fr.moovie.tv.ui.theme.MOOVIE_TEXT_MUTED
 import fr.moovie.tv.ui.theme.MOOVIE_WARN
+import fr.moovie.tv.ui.theme.margePage
 
 /**
  * Délai laissé au `bringIntoView` déclenché par la prise de focus avant de
@@ -905,7 +906,10 @@ fun DetailsScreenContent(
         // blocs ordinaires, la valeur pour ce qui a besoin d'un `contentPadding`
         // (les rangées défilantes). Deux constantes séparées finiraient par
         // diverger, et c'est exactement ce qui avait décalé le casting.
-        val hPadDp = if (compact) 16.dp else 48.dp
+        // La marge de page vient maintenant du thème : c'est cette page qui a
+        // servi de modèle, et la garder locale l'aurait fait diverger du reste
+        // dès la première retouche ailleurs.
+        val hPadDp = margePage()
         val hPad = Modifier.padding(horizontal = hPadDp)
         // **Le hero commence au pixel zéro, tout le reste non.**
         //
@@ -929,15 +933,9 @@ fun DetailsScreenContent(
         // laisser défiler.
         val hauteurHero = (maxHeight - hauteurOnglets() - amorceSousOnglets())
             .coerceAtLeast(300.dp)
-        // **La marge du hero n'est pas celle de la page.**
-        //
-        // 48 dp collaient le titre et le synopsis contre le bord gauche, tout
-        // le contenu tassé sur le premier tiers d'une image qui en fait trois.
-        // La maquette respire : elle rentre son bloc d'environ un dixième de la
-        // largeur de chaque côté, ce qui fait de la place au texte au lieu de
-        // l'empiler. Le plancher garde la marge de page sur une fenêtre
-        // étroite, où un dixième ne serait plus rien.
-        val margeHero = (maxWidth * 0.09f).coerceAtLeast(hPadDp)
+        // Le hero et la page partagent désormais la même marge — voir
+        // `margePage`, dont la règle du dixième est née ici.
+        val margeHero = hPadDp
         // Ce qui suit le hero s'aligne sur lui : la barre d'onglets, les
         // rangées, les panneaux. Un contenu rentré de 48 dp sous un titre rentré
         // de 170 en aurait fait deux pages posées l'une sur l'autre.

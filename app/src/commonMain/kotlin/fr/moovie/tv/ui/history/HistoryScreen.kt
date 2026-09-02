@@ -81,6 +81,7 @@ import fr.moovie.tv.ui.theme.MOOVIE_BG
 import fr.moovie.tv.ui.theme.MOOVIE_SURFACE
 import fr.moovie.tv.ui.theme.MOOVIE_SURFACE_HIGH
 import fr.moovie.tv.ui.theme.MOOVIE_TEXT_DIM
+import fr.moovie.tv.ui.theme.margePage
 
 /** Colonnes de la grille. Six tient en 1080p sans réduire les vignettes à rien. */
 private const val COLUMNS = 6
@@ -95,7 +96,7 @@ private fun historyColumns(): Int = if (useBottomNav) 3 else COLUMNS
 
 /** Marge horizontale : 32 dp est un recul de salon, trop sur un téléphone. */
 @Composable
-private fun historyHPad(): Dp = if (useBottomNav) 16.dp else 32.dp
+private fun historyHPad(): Dp = margePage()
 
 /**
  * Page d'historique, partagée TV + desktop : une grille groupée par jour, et

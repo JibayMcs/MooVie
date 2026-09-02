@@ -52,6 +52,7 @@ import fr.moovie.tv.ui.theme.MOOVIE_BG
 import fr.moovie.tv.ui.theme.MOOVIE_SCRIM
 import fr.moovie.tv.ui.theme.MOOVIE_SURFACE_HIGH
 import fr.moovie.tv.ui.theme.MOOVIE_TEXT_DIM
+import fr.moovie.tv.ui.theme.margePage
 
 /** Colonnes sur un écran large (TV 960 dp, desktop) — comme la recherche. */
 private const val COLUMNS = 6
@@ -95,7 +96,7 @@ fun PersonScreenContent(
         }
     }
 
-    val hPad = if (useBottomNav) 16.dp else 40.dp
+    val hPad = margePage()
 
     Box(modifier = Modifier.fillMaxSize().background(MOOVIE_BG)) {
         Column(modifier = Modifier.fillMaxSize().padding(vertical = if (useBottomNav) 16.dp else 32.dp)) {
