@@ -57,6 +57,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import fr.moovie.tv.ui.theme.MoovieShape
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
@@ -139,6 +140,7 @@ import fr.moovie.tv.ui.theme.MOOVIE_SCRIM
 import fr.moovie.tv.ui.theme.MOOVIE_SURFACE_HIGH
 import fr.moovie.tv.ui.theme.MOOVIE_TEXT_DIM
 import fr.moovie.tv.ui.theme.MOOVIE_TEXT_MUTED
+import fr.moovie.tv.ui.theme.MoovieGradient
 import fr.moovie.tv.ui.theme.margePage
 import fr.moovie.tv.ui.components.MoovieTopNav
 import fr.moovie.tv.ui.components.MoovieNavItem
@@ -394,7 +396,7 @@ fun HomeScreenContent(
                 runCatching { firstContentFocus.requestFocus() }.isSuccess ||
                     gestionnaireFocus.moveFocus(FocusDirection.Down)
             }
-            // **Le logo, et seulement au doigt.**
+            // **Le nom, et seulement au doigt.**
             //
             // Le wordmark a été retiré pour rendre ~56 dp à une rangée
             // d'affiches, et l'argument tient toujours sur un téléviseur : 540 dp
@@ -404,27 +406,26 @@ fun HomeScreenContent(
             // rien pour dire où l'on est, là où le haut de l'écran est
             // précisément l'endroit où toute application mobile pose son nom.
             //
-            // L'icône plutôt que le nom seul : c'est le dessin qu'on vient de
-            // toucher sur la page d'accueil du téléphone, donc la même chose
-            // reconnue deux fois plutôt que deux identités pour une application.
+            // **Le nom seul, et non l'icône de lancement.** Elle a d'abord été
+            // posée à côté : c'était le dessin qu'on venait de toucher sur la
+            // page d'accueil du téléphone, donc la même chose reconnue deux
+            // fois. Mais une icône de lancement est dessinée pour vivre dans sa
+            // tuile — fond plein, coins arrondis, marges internes calculées pour
+            // une grille d'icônes. Réduite à 28 points et posée sur le noir de
+            // la page, elle y garde son carré, qui ne correspond à rien : c'est
+            // la seule forme arrondie d'une interface où tout est à angle droit,
+            // et une deuxième couleur de fond au-dessus du fond.
+            //
+            // Le dégradé de l'identité passe donc dans les lettres elles-mêmes.
+            // Il dit ce que l'icône disait — orange, magenta, violet — sans
+            // rapporter la tuile avec lui.
             if (useBottomNav) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    Image(
-                        painter = painterResource(Res.drawable.moovie_icon),
-                        // Nul : le nom qui suit dit déjà ce que l'image montre,
-                        // et l'annoncer deux fois n'apprend rien à personne.
-                        contentDescription = null,
-                        modifier = Modifier.size(28.dp),
-                    )
-                    Text(
-                        stringResource(Res.string.app_name),
-                        style = MaterialTheme.typography.titleLarge,
-                    )
-                }
+                Text(
+                    stringResource(Res.string.app_name),
+                    style = MaterialTheme.typography.headlineSmall.copy(brush = MoovieGradient),
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = margePage(), vertical = 6.dp),
+                )
             } else {
                 // **La barre de navigation, en haut et pleine largeur.**
                 //

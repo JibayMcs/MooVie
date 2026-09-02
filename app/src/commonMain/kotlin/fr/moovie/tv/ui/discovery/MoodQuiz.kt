@@ -156,11 +156,50 @@ fun MoodQuizContent(
         )
         Spacer(Modifier.height(if (useBottomNav) 20.dp else 28.dp))
 
-        // **La main dit qu'elle continue.** Six ou sept humeurs, dont trois
-        // tiennent en portrait : les autres attendaient hors de l'écran sans que
-        // rien ne le laisse deviner, et la question se répondait donc au tiers
-        // des choix. Le cadre porte les mêmes repères que les barres d'onglets
-        // et de filtres — un seul endroit décide de leur allure.
+        // **En portrait, une grille — pas une main qui défile.**
+        //
+        // Six ou sept humeurs, dont trois tenaient à l'écran : les autres
+        // attendaient hors champ, et la question se répondait sur un tiers des
+        // choix. Un repère de défilement l'aurait signalé, mais il aurait fallu
+        // le suivre — or c'est un questionnaire, pas un catalogue : on veut
+        // comparer les réponses d'un regard, ce qu'une file ne permet jamais.
+        //
+        // Trois par ligne, la largeur partagée à parts égales. Deux lignes
+        // affichent alors les sept, « Passer » compris, sans un geste.
+        //
+        // La main reste sur les écrans larges : elle y tient tout entière, et
+        // c'est la même forme que les rangées de la découverte.
+        if (useBottomNav) {
+            val toutes: List<MoodOption?> = options + listOf(null)
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = hPad, vertical = 14.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                toutes.chunked(COLONNES_GRILLE).forEach { ligne ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        ligne.forEach { option ->
+                            if (option == null) {
+                                PasserCard(onClick = onSkip, modifier = Modifier.weight(1f))
+                            } else {
+                                MoodOptionCard(
+                                    option = option,
+                                    selected = option.id == choisie?.id,
+                                    onClick = { onAnswer(option) },
+                                    modifier = Modifier.weight(1f),
+                                )
+                            }
+                        }
+                        // La dernière ligne est incomplète : les cases vides
+                        // gardent la largeur de leurs voisines, sans quoi deux
+                        // cartes seules s'étireraient sur toute la ligne et ne
+                        // ressembleraient plus à celles du dessus.
+                        repeat(COLONNES_GRILLE - ligne.size) {
+                            Spacer(Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
+        } else {
         val mainState = rememberLazyListState()
         CadreDefilant(etat = mainState, modifier = Modifier.fillMaxWidth()) {
         // Marges dans le contentPadding, jamais autour : la carte grandit au
@@ -187,6 +226,7 @@ fun MoodQuizContent(
             item(key = "passer") { PasserCard(onClick = onSkip) }
         }
         }
+        }
 
         // Effacer les réponses reste un bouton, et reste en bas : c'est le seul
         // geste destructeur de l'écran, il n'a rien à faire dans la main où
@@ -209,6 +249,23 @@ fun MoodQuizContent(
 }
 
 /**
+ * Le gabarit d'une carte du questionnaire.
+ *
+ * En grille, elle prend la part de largeur que sa colonne lui donne ; en main,
+ * elle porte sa propre largeur. Le rapport 0,72 est commun aux deux : c'est lui
+ * qui fait qu'une carte se lit comme une carte, et non comme une vignette.
+ */
+/** Colonnes de la grille en portrait. Trois : quatre donneraient des cartes de
+ * 90 dp, où le sous-titre — « thriller, policier » — ne tiendrait plus. */
+private const val COLONNES_GRILLE = 3
+
+@Composable
+private fun gabaritCarte(): Modifier = Modifier
+    .then(if (useBottomNav) Modifier.fillMaxWidth() else Modifier.width(168.dp))
+    .aspectRatio(0.72f)
+    .clip(MoovieShape)
+
+/**
  * La carte « Passer », en bout de main.
  *
  * Volontairement **sans illustration** : elle n'est pas une réponse de plus,
@@ -217,14 +274,10 @@ fun MoodQuizContent(
  * de sorte qu'on ne la choisisse jamais par méprise en parcourant les visuels.
  */
 @Composable
-private fun PasserCard(onClick: () -> Unit) {
-    val largeur = if (useBottomNav) 128.dp else 168.dp
-    MoovieCard(onClick = onClick, focusedScale = 1.06f) {
+private fun PasserCard(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    MoovieCard(onClick = onClick, focusedScale = 1.06f, modifier = modifier) {
         Box(
-            modifier = Modifier
-                .width(largeur)
-                .aspectRatio(0.72f)
-                .clip(MoovieShape)
+            modifier = gabaritCarte()
                 .background(
                     Brush.verticalGradient(
                         listOf(Color(0xFF17171D), Color(0xFF0C0C11)),
@@ -263,14 +316,15 @@ private fun PasserCard(onClick: () -> Unit) {
  * arbitraire.
  */
 @Composable
-private fun MoodOptionCard(option: MoodOption, selected: Boolean, onClick: () -> Unit) {
-    val largeur = if (useBottomNav) 128.dp else 168.dp
-    MoovieCard(onClick = onClick, focusedScale = 1.06f) {
+private fun MoodOptionCard(
+    option: MoodOption,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    MoovieCard(onClick = onClick, focusedScale = 1.06f, modifier = modifier) {
         Box(
-            modifier = Modifier
-                .width(largeur)
-                .aspectRatio(0.72f)
-                .clip(MoovieShape),
+            modifier = gabaritCarte(),
         ) {
             Image(
                 painter = painterResource(moodDrawable(option.id)),

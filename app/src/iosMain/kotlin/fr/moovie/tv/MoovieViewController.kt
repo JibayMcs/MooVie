@@ -4,6 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.safeDrawing
@@ -185,17 +187,46 @@ private fun RacineMoovie() {
                     // `MoovieApp.swift` demande `ignoresSafeArea(.all)`, et la
                     // rogner reviendrait à afficher un film en médaillon. Les
                     // commandes du lecteur portent déjà leurs propres marges.
+                    // **Le bas n'est pas retiré ici quand la barre est là.**
+                    //
+                    // La colonne consommait toute la zone sûre, indicateur
+                    // d'accueil compris : la barre s'arrêtait donc au-dessus de
+                    // lui, et la bande qui restait dessous prenait le fond de la
+                    // page. Deux gris sombres l'un sur l'autre, avec la poignée
+                    // posée sur la frontière — la barre paraissait flotter.
+                    //
+                    // C'est à elle de payer cette marge, parce qu'elle peint son
+                    // fond avant de l'appliquer et la couvre donc. Quand elle
+                    // n'est pas là, personne ne le ferait : le contenu la prend
+                    // à son compte.
+                    val barreVisible = !hidesBottomBar(nav.current) && !videoPleinEcran
+                    val basSysteme = WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)
                     Column(
                         modifier = if (videoPleinEcran) {
                             Modifier.fillMaxSize()
                         } else {
-                            Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)
+                            Modifier.fillMaxSize().windowInsetsPadding(
+                                WindowInsets.safeDrawing.only(
+                                    WindowInsetsSides.Top + WindowInsetsSides.Horizontal,
+                                ),
+                            )
                         },
                     ) {
                         // Le contenu prend la place restante, la barre occupe le
                         // bas. Empilé plutôt que superposé : la barre ne doit pas
                         // recouvrir la dernière ligne d'une liste.
-                        Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f)
+                                .then(
+                                    if (barreVisible || videoPleinEcran) {
+                                        Modifier
+                                    } else {
+                                        Modifier.windowInsetsPadding(basSysteme)
+                                    },
+                                ),
+                        ) {
                             EcranCourant(nav = nav, online = online)
                         }
 
@@ -208,10 +239,13 @@ private fun RacineMoovie() {
                         // fiche et que `hidesBottomBar` ne peut pas la
                         // reconnaître ; la barre restait donc posée en travers
                         // de la vidéo.
-                        if (!hidesBottomBar(nav.current) && !videoPleinEcran) {
+                        if (barreVisible) {
                             MoovieBottomBar(
                                 current = nav.current,
                                 onSelect = { nav.switchTop(it) },
+                                // iOS ne remplit pas `navigationBars` : sa zone
+                                // sûre basse vit dans `safeDrawing`.
+                                insetBas = basSysteme,
                             )
                         }
                     }

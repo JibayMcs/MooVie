@@ -10,7 +10,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
@@ -141,6 +143,21 @@ fun MoovieBottomBar(
     current: Screen,
     onSelect: (Screen) -> Unit,
     modifier: Modifier = Modifier,
+    /**
+     * La marge du bas, réservée au système sous la barre.
+     *
+     * Appliquée **dedans**, après le fond : la couleur de la barre couvre donc
+     * la poignée de gestes au lieu de s'arrêter au-dessus. Sur iPhone,
+     * s'arrêter net laissait deux gris sombres l'un sur l'autre — celui de la
+     * barre puis celui de la page — avec l'indicateur d'accueil posé sur la
+     * frontière, ce qui donnait l'impression que la barre flottait.
+     *
+     * Paramétrable parce que les deux plateformes ne nomment pas la même chose :
+     * Android connaît `navigationBars`, iOS met sa zone sûre basse dans
+     * `safeDrawing`. Une seule des deux ici aurait rendu l'autre nulle — donc
+     * une barre qui s'arrête trop tôt, ou un dernier onglet sous la poignée.
+     */
+    insetBas: WindowInsets = WindowInsets.navigationBars,
 ) {
     Row(
         modifier = modifier
@@ -148,7 +165,7 @@ fun MoovieBottomBar(
             .background(Color(0xFF121212))
             // Laisse passer la barre de gestes du système : sans ça le dernier
             // onglet se retrouve sous la poignée et devient intappable.
-            .navigationBarsPadding()
+            .windowInsetsPadding(insetBas)
             .heightIn(min = 56.dp),
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically,
