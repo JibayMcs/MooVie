@@ -89,6 +89,8 @@ import fr.moovie.tv.ui.theme.MOOVIE_SCRIM
 import fr.moovie.tv.ui.theme.MOOVIE_SURFACE
 import fr.moovie.tv.ui.theme.MOOVIE_SURFACE_HIGH
 import fr.moovie.tv.ui.theme.MOOVIE_TEXT_DIM
+import androidx.compose.ui.text.style.TextAlign
+import fr.moovie.tv.ui.theme.ESPACE_SECTION
 import fr.moovie.tv.ui.theme.margePage
 import fr.moovie.tv.ui.components.MooviePosterCard
 import fr.moovie.tv.ui.components.MooviePageHeader
@@ -191,6 +193,23 @@ fun CatalogScreenContent(
         runCatching { firstGenreFocus.requestFocus() }
     }
 
+    // Le genre affiché, pour l'en-tête des deux dispositions. Il vivait dans la
+    // branche du bureau seulement : le portrait n'avait donc aucun titre, et le
+    // seul repère y était la puce surlignée d'une rangée qui défile.
+    val genreCourant = selection?.let { sel ->
+        entries.filterIsInstance<CatalogEntry.GenreEntry>()
+            .firstOrNull { it.isTv == sel.isTv && it.genre.id == sel.genreId }
+    }
+    val enTete = @Composable {
+        MooviePageHeader(
+            titre = genreCourant?.genre?.name ?: stringResource(Res.string.catalog_title),
+            sousTitre = genreCourant?.let {
+                stringResource(if (it.isTv) Res.string.media_series else Res.string.media_movie)
+            },
+            onBack = onBack.takeIf { showBackButton },
+        )
+    }
+
     val results = @Composable {
         when {
             state is CatalogState.NeedsKey -> Message(stringResource(Res.string.search_needs_key))
@@ -239,6 +258,15 @@ fun CatalogScreenContent(
 
     if (useBottomNav) {
         Column(modifier = Modifier.fillMaxSize().background(MOOVIE_BG)) {
+            // **La page dit ce qu'elle montre, en portrait aussi.**
+            //
+            // Elle s'ouvrait sur une rangée de puces et rien d'autre : ni titre,
+            // ni genre courant, ni indication qu'on était dans le catalogue —
+            // l'icône de la barre du bas est une grille, qui ne dit rien à elle
+            // seule. Et une fois un genre choisi, la seule marque restait une
+            // puce surlignée qui pouvait avoir défilé hors de l'écran.
+            Spacer(Modifier.height(ESPACE_LARGE))
+            enTete()
             GenreChipRow(
                 entries = entries,
                 selection = selection,
@@ -277,20 +305,7 @@ fun CatalogScreenContent(
             //
             // L'en-tête commun porte donc le genre courant, et le retour le
             // rejoint : c'est sa place sur toutes les autres pages.
-            val genreCourant = selection?.let { sel ->
-                entries.filterIsInstance<CatalogEntry.GenreEntry>()
-                    .firstOrNull { it.isTv == sel.isTv && it.genre.id == sel.genreId }
-            }
-            MooviePageHeader(
-                titre = genreCourant?.genre?.name
-                    ?: stringResource(Res.string.catalog_title),
-                sousTitre = genreCourant?.let {
-                    stringResource(
-                        if (it.isTv) Res.string.media_series else Res.string.media_movie,
-                    )
-                },
-                onBack = onBack.takeIf { showBackButton },
-            )
+            enTete()
             Spacer(Modifier.height(ESPACE_LARGE))
             results()
         }
@@ -586,10 +601,18 @@ private fun ResultsGrid(
 
 @Composable
 private fun Message(text: String) {
-    Text(
-        text,
-        style = MaterialTheme.typography.bodyLarge,
-        color = MOOVIE_TEXT_DIM,
-        modifier = Modifier.padding(horizontal = margePage()),
-    )
+    // Centrée dans ce qui reste de la page. Posée en haut à gauche d'un écran
+    // noir de deux mille points, une phrase seule ne se lit pas comme une
+    // réponse mais comme un chargement qui n'a pas abouti.
+    Box(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = margePage(), vertical = ESPACE_SECTION),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MOOVIE_TEXT_DIM,
+            textAlign = TextAlign.Center,
+        )
+    }
 }
