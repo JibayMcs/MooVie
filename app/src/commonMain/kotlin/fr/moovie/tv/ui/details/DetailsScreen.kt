@@ -1161,9 +1161,7 @@ fun DetailsScreenContent(
                                         // « S'ABONNER » de la maquette : c'est
                                         // cette largeur — pas seulement sa
                                         // couleur — qui le désigne comme
-                                        // l'action de la page. Un bouton qui se
-                                        // contente d'entourer « Lire » reste un
-                                        // bouton parmi d'autres.
+                                        // l'action de la page.
                                         //
                                         // Borné quand même : sur une fenêtre
                                         // très large, la colonne dépasse le
@@ -1173,10 +1171,13 @@ fun DetailsScreenContent(
                                         Modifier
                                             .fillMaxWidth()
                                             .widthIn(max = LARGEUR_MAX_BOUTON_PRINCIPAL)
-                                            .clip(MoovieShape)
-                                            .background(MOOVIE_ACCENT)
                                     },
                                 ),
+                                // Le remplissage passe par le bouton lui-même :
+                                // peint à la main dans le modificateur, il
+                                // recouvrait le traitement de focus du thème et
+                                // le bouton paraissait inerte au survol.
+                                remplissage = if (compact) null else MOOVIE_ACCENT,
                                 // **L'action principale doit se voir comme
                                 // telle.** Au repos, un MoovieButton n'est que
                                 // son libellé : posé au milieu de quatre autres,
@@ -3049,10 +3050,9 @@ private fun EpisodeDetail(
                     Modifier
                         .fillMaxWidth()
                         .widthIn(max = LARGEUR_MAX_BOUTON_PRINCIPAL)
-                        .clip(MoovieShape)
-                        .background(MOOVIE_ACCENT)
                 },
             ),
+            remplissage = if (compact) null else MOOVIE_ACCENT,
             selected = !compact,
             contentPadding = if (compact) {
                 PaddingValues(horizontal = 16.dp, vertical = 10.dp)
@@ -3111,6 +3111,12 @@ private fun EpisodeDetail(
     // **Deux lignes sur grand écran, une seule au doigt** — la règle de la
     // fiche d'un film, pour la même raison : aligné avec ses voisines, le
     // bouton principal n'est que le premier d'une rangée.
+    // Un épisode non diffusé n'a rien à lire : le bouton disparaît au lieu de
+    // rester là à ne rien faire. Même règle que le téléchargement d'une saison
+    // annoncée, où l'appui ne produisait aucun effet visible et ressemblait à
+    // une panne. Les gestes secondaires restent : on peut vouloir le mettre de
+    // côté ou consulter ses sources dès son annonce.
+    val aVenir = upcomingDate(ep.airDate) != null
     val actionsEpisode: @Composable () -> Unit = {
         if (compact) {
             Row(
@@ -3118,12 +3124,12 @@ private fun EpisodeDetail(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                boutonLireEpisode()
+                if (!aVenir) boutonLireEpisode()
                 actionsSecondairesEpisode()
             }
         } else {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                boutonLireEpisode()
+                if (!aVenir) boutonLireEpisode()
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -3160,7 +3166,13 @@ private fun EpisodeDetail(
             titre = "${ep.episodeNumber}. ${ep.name}",
             meta = listOfNotNull(
                 stringResource(Res.string.details_episode_header, showName, season),
-                formatMediaDate(ep.airDate),
+                // **« Prévu le 12 mars » et non « 12 mars ».** Une date nue ne
+                // dit pas de quel côté du présent elle tombe : sur un épisode à
+                // venir, elle se lisait comme une date de diffusion passée, et
+                // la page proposait tranquillement de le lire.
+                upcomingDate(ep.airDate)?.let {
+                    stringResource(Res.string.details_episode_upcoming, it)
+                } ?: formatMediaDate(ep.airDate),
                 formatDuration(ep.runtime),
             ),
             synopsis = ep.overview,
@@ -3504,9 +3516,8 @@ private fun BoutonLireEpisode(
         onClick = onClick,
         modifier = modifier
             .fillMaxWidth()
-            .widthIn(max = LARGEUR_MAX_BOUTON_PRINCIPAL)
-            .clip(MoovieShape)
-            .background(MOOVIE_ACCENT),
+            .widthIn(max = LARGEUR_MAX_BOUTON_PRINCIPAL),
+        remplissage = MOOVIE_ACCENT,
         selected = true,
         contentPadding = PaddingValues(horizontal = 24.dp, vertical = 20.dp),
     ) {
@@ -3530,9 +3541,13 @@ private fun BoutonLireEpisode(
                                 stringResource(Res.string.details_play)
                             }.uppercase(),
                         )
+                        // « S1 E1 » et non « S1E1 » : collés, le chiffre de
+                        // saison et la lettre d'épisode forment un bloc qu'on
+                        // déchiffre au lieu de le lire — surtout à trois mètres,
+                        // et surtout au-delà de la saison 9.
                         append("  ·  S")
                         append(season)
-                        append('E')
+                        append(" E")
                         append(episode.episodeNumber)
                     },
                 )
