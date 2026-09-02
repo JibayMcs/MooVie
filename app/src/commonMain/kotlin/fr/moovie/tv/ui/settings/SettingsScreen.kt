@@ -225,12 +225,24 @@ import fr.moovie.tv.ui.theme.MOOVIE_TEXT
 import fr.moovie.tv.ui.theme.ESPACE
 import fr.moovie.tv.ui.theme.ESPACE_SERRE
 import fr.moovie.tv.ui.theme.ESPACE_LARGE
+import fr.moovie.tv.ui.theme.margePage
+import androidx.compose.foundation.layout.widthIn
 
 /**
  * Largeur du volet de navigation. Volontairement contenue : en 1080p l'écran ne
  * fait que 960 dp de large, un volet trop large étrangle la colonne des libellés.
  */
 private val NAV_WIDTH = 260.dp
+
+/**
+ * Au-delà, un réglage cesse de se lire d'un trait.
+ *
+ * Le nom est à gauche, la commande à droite : plus la ligne est longue, plus
+ * les deux se dissocient. Neuf cents points laissent la place à un libellé, son
+ * aide sur deux lignes et un sélecteur à trois choix, sans qu'on ait à balayer
+ * l'écran des yeux pour les rapprocher.
+ */
+private val LARGEUR_REGLAGES = 900.dp
 
 /** Sections de l'écran, dans l'ordre d'affichage du volet gauche. */
 
@@ -546,9 +558,22 @@ fun SettingsScreenContent(
                 .padding(start = if (compact) RAIL_WIDTH else NAV_WIDTH)
                 .verticalScroll(rememberScrollState())
                 .padding(
-                    horizontal = if (compact) 20.dp else 40.dp,
+                    horizontal = if (compact) 20.dp else margePage(),
                     vertical = if (compact) 24.dp else 40.dp,
-                ),
+                )
+                // **Borné, sinon le contrôle quitte son libellé.**
+                //
+                // Une ligne de réglage pose son nom à gauche et sa commande à
+                // droite. Sur une fenêtre de bureau ouverte en grand, ça met
+                // cinq cents points de vide entre les deux : l'œil doit
+                // traverser la page pour savoir ce que « Activé » active, et
+                // deux lignes voisines se confondent d'autant plus qu'elles
+                // sont longues. C'est le défaut classique du formulaire en
+                // pleine largeur, et la seule réponse est de ne pas l'être.
+                //
+                // La borne est celle de l'onboarding, pour la même raison : ce
+                // sont deux pages qu'on lit, pas qu'on parcourt.
+                .widthIn(max = LARGEUR_REGLAGES),
             verticalArrangement = Arrangement.spacedBy(ESPACE_LARGE),
         ) {
             // **Le nom de la section au rang de titre de page.**
