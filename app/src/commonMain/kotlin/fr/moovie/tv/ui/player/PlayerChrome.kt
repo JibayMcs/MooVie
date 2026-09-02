@@ -103,6 +103,7 @@ import fr.moovie.tv.ui.components.MoovieIconButton
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.roundToInt
 import fr.moovie.tv.ui.theme.MOOVIE_TEXT_MUTED
+import fr.moovie.tv.ui.theme.margePage
 
 // Chrome du lecteur partagée entre Android TV et desktop : barre de contrôles,
 // barre de progression, menus, overlay de titre, boutons « Passer », pastille de
@@ -193,7 +194,11 @@ fun PlayerControlBar(
         modifier = Modifier
             .fillMaxWidth()
             .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xE6000000))))
-            .padding(horizontal = 32.dp, vertical = 24.dp),
+            // La marge de page vaut aussi ici. Un téléviseur rogne ses bords au
+            // sur-balayage, et une barre de lecture calée à trente-deux points
+            // du bord y passait partiellement sous le cadre du poste — c'est
+            // précisément le cas que la marge proportionnelle couvre.
+            .padding(horizontal = margePage(), vertical = 24.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Row(
@@ -597,7 +602,7 @@ fun PlayerTitleOverlay(
         modifier = modifier
             .fillMaxWidth()
             .background(Brush.verticalGradient(listOf(Color(0xCC000000), Color.Transparent)))
-            .padding(horizontal = 48.dp, vertical = 32.dp),
+            .padding(horizontal = margePage(), vertical = 32.dp),
     ) {
     Column {
         if (title.isNotBlank()) {
