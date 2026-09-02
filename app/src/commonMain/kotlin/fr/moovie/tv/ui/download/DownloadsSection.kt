@@ -57,6 +57,10 @@ import fr.moovie.tv.resources.downloads_paused
 import fr.moovie.tv.resources.downloads_play
 import fr.moovie.tv.resources.downloads_pause
 import fr.moovie.tv.resources.downloads_queued
+import fr.moovie.tv.resources.size_gb
+import fr.moovie.tv.resources.size_mb
+import fr.moovie.tv.resources.size_kb
+import fr.moovie.tv.resources.size_b
 import fr.moovie.tv.resources.downloads_ready
 import fr.moovie.tv.resources.downloads_remove
 import fr.moovie.tv.resources.downloads_resume
@@ -440,10 +444,20 @@ private fun statusOf(download: Download): String = when (download.state) {
  * En base 1000 et non 1024 : c'est ce qu'annoncent les fabricants de disques et
  * les réglages d'Android, et une app qui compte autrement fait douter de son
  * chiffre plutôt que de celui du système.
+ *
+ * **L'unité est traduite.** Elle était écrite en dur — « Go », « Mo », « o » —
+ * dans une application qui parle trois langues : l'écran des téléchargements
+ * annonçait « 0 o used » et « 15.2 Go free of 16.7 Go » à qui l'avait mise en
+ * anglais. Un chiffre dont l'unité n'est pas dans la langue du reste se lit
+ * comme une chaîne oubliée, et c'en était une.
  */
+@Composable
 internal fun formatSize(bytes: Long): String = when {
-    bytes >= 1_000_000_000 -> formaterDecimal(bytes / 1_000_000_000.0, 1) + " Go"
-    bytes >= 1_000_000 -> formaterDecimal(bytes / 1_000_000.0, 0) + " Mo"
-    bytes >= 1_000 -> formaterDecimal(bytes / 1_000.0, 0) + " Ko"
-    else -> "$bytes o"
+    bytes >= 1_000_000_000 ->
+        stringResource(Res.string.size_gb, formaterDecimal(bytes / 1_000_000_000.0, 1))
+    bytes >= 1_000_000 ->
+        stringResource(Res.string.size_mb, formaterDecimal(bytes / 1_000_000.0, 0))
+    bytes >= 1_000 ->
+        stringResource(Res.string.size_kb, formaterDecimal(bytes / 1_000.0, 0))
+    else -> stringResource(Res.string.size_b, bytes.toString())
 }
