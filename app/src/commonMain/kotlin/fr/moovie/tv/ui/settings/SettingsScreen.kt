@@ -218,6 +218,12 @@ import fr.moovie.tv.ui.theme.MOOVIE_ERROR
 import fr.moovie.tv.ui.theme.MOOVIE_SURFACE
 import fr.moovie.tv.ui.theme.MOOVIE_TEXT_DIM
 import fr.moovie.tv.ui.theme.MOOVIE_TEXT_FAINT
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Size
+import fr.moovie.tv.ui.theme.MOOVIE_SURFACE_HIGH
+import fr.moovie.tv.ui.theme.MOOVIE_TEXT
+import fr.moovie.tv.ui.theme.ESPACE
+import fr.moovie.tv.ui.theme.ESPACE_SERRE
 
 /**
  * Largeur du volet de navigation. Volontairement contenue : en 1080p l'écran ne
@@ -887,7 +893,7 @@ internal fun SettingRow(
     control: @Composable () -> Unit,
 ) {
     val texts = @Composable {
-        Text(label, style = MaterialTheme.typography.titleMedium)
+        Text(label, style = MaterialTheme.typography.titleMedium, color = MOOVIE_TEXT)
         if (help != null) {
             Text(
                 help,
@@ -897,10 +903,28 @@ internal fun SettingRow(
         }
     }
 
+    // **Un filet sous chaque réglage.**
+    //
+    // La page en aligne une cinquantaine, sans rien entre eux : un libellé, son
+    // aide en gris, un contrôle à droite, et on recommence. Rien ne dit où
+    // finit un réglage et où commence le suivant, si bien qu'une aide se lit
+    // comme le début du réglage d'en dessous. Un filet à peine visible suffit à
+    // les redécouper — c'est le rôle d'un séparateur, et il n'en faut pas plus.
+    //
+    // Il est **au-dessus** et non en dessous : le dernier réglage d'une section
+    // n'a alors pas de trait flottant sous lui, et le premier se détache du
+    // titre de sa section.
+    val filet = Modifier.drawBehind {
+        drawRect(
+            color = MOOVIE_SURFACE_HIGH,
+            size = Size(size.width, 1.dp.toPx()),
+        )
+    }
+
     if (useBottomNav) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth().then(filet).padding(vertical = ESPACE),
+            verticalArrangement = Arrangement.spacedBy(ESPACE_SERRE),
         ) {
             texts()
             // Aligné à gauche, dans le fil du libellé qu'il complète : renvoyé
@@ -911,7 +935,10 @@ internal fun SettingRow(
     }
 
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        // Quatre points de marge verticale tassaient les réglages les uns sur
+        // les autres ; le contrôle d'un réglage touchait presque l'aide du
+        // précédent. Le rythme de la page dit douze.
+        modifier = Modifier.fillMaxWidth().then(filet).padding(vertical = ESPACE),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
