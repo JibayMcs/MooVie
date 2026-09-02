@@ -435,22 +435,6 @@ internal fun IosPlayerScreen(
     ) {
         surface(Modifier.fillMaxSize())
 
-        // La liste des épisodes, en panneau glissant plutôt qu'en modale
-        // centrée : on choisit un épisode en gardant l'image sous les yeux.
-        identiteMedia?.takeIf { it.isTv }?.let { identite ->
-            PlayerEpisodesPanel(
-                visible = episodesOuverts,
-                tmdbId = identite.tmdbId,
-                saisonCourante = identite.season,
-                episodeCourant = identite.episode,
-                onJouer = { saison, numero ->
-                    episodesOuverts = false
-                    onNextEpisode(saison, numero)
-                },
-                onFermer = { episodesOuverts = false },
-            )
-        }
-
         // **L'image garde la dalle, les commandes se rangent dedans.**
         //
         // C'est le seul écran qui ne retire pas les encoches à sa racine, et
@@ -624,6 +608,29 @@ internal fun IosPlayerScreen(
                     style = MaterialTheme.typography.labelLarge,
                 )
             }
+        }
+
+        // La liste des épisodes, en panneau glissant plutôt qu'en modale
+        // centrée : on choisit un épisode en gardant l'image sous les yeux.
+        //
+        // **En dernier, comme sur Android et sur le bureau.** Il était composé
+        // juste après la surface vidéo, donc *sous* tout le reste : la barre de
+        // contrôles, qui occupe toute la largeur, se peignait par-dessus le
+        // panneau et interceptait les appuis destinés à la liste. Dans un `Box`,
+        // l'ordre de composition est l'ordre d'empilement — un panneau qui
+        // recouvre l'écran doit être écrit après ce qu'il recouvre.
+        identiteMedia?.takeIf { it.isTv }?.let { identite ->
+            PlayerEpisodesPanel(
+                visible = episodesOuverts,
+                tmdbId = identite.tmdbId,
+                saisonCourante = identite.season,
+                episodeCourant = identite.episode,
+                onJouer = { saison, numero ->
+                    episodesOuverts = false
+                    onNextEpisode(saison, numero)
+                },
+                onFermer = { episodesOuverts = false },
+            )
         }
     }
 }
