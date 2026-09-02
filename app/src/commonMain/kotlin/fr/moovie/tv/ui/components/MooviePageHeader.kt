@@ -15,6 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import fr.moovie.tv.resources.Res
 import fr.moovie.tv.resources.common_back
 import fr.moovie.tv.ui.theme.ESPACE
@@ -47,6 +48,10 @@ import org.jetbrains.compose.resources.stringResource
  * @param actions posées à droite, sur la même ligne que le titre. C'est la
  *   place qu'on cherche pour agir sur toute la page — vider un historique,
  *   changer un tri.
+ * @param marge la marge horizontale. Vaut celle de la page, sauf pour les
+ *   appelants qui sont **déjà** dans un conteneur marginé — leur passer la
+ *   marge une seconde fois la doublerait, et la retrancher n'est pas possible :
+ *   Compose refuse les marges négatives.
  */
 @Composable
 fun MooviePageHeader(
@@ -54,12 +59,13 @@ fun MooviePageHeader(
     modifier: Modifier = Modifier,
     sousTitre: String? = null,
     onBack: (() -> Unit)? = null,
+    marge: Dp = margePage(),
     actions: (@Composable RowScope.() -> Unit)? = null,
 ) {
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = margePage()),
+            .padding(horizontal = marge),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(ESPACE),
     ) {

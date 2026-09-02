@@ -117,6 +117,7 @@ import kotlin.math.abs
 import fr.moovie.tv.ui.theme.MOOVIE_BG
 import fr.moovie.tv.ui.theme.MOOVIE_TEXT_DIM
 import fr.moovie.tv.ui.theme.margePage
+import fr.moovie.tv.ui.components.MooviePageHeader
 
 /**
  * Page Découverte : des mains de cartes, une par recette.
@@ -260,49 +261,26 @@ private fun EnTete(
             .fillMaxWidth()
             .padding(horizontal = hPad(), vertical = if (empile) 16.dp else 32.dp),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
+        // L'en-tête commun aux pages secondaires. La pastille d'humeur et le
+        // rechargement vont dans sa fente d'actions : ce sont bien deux gestes
+        // qui portent sur la page entière, ce que cette place signifie.
+        //
+        // La borne de largeur sur la pastille reste. Le titre est le seul
+        // enfant élastique de la rangée ; sans borne, un libellé d'humeur long
+        // pousserait le rechargement hors du cadre dans une fenêtre étroite.
+        MooviePageHeader(
+            titre = stringResource(Res.string.discovery_title),
+            onBack = onBack.takeIf { showBackButton },
+            // La colonne parente porte déjà la marge de page.
+            marge = 0.dp,
         ) {
-            if (showBackButton) {
-                MoovieIconButton(
-                    onClick = onBack,
-                    icon = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = stringResource(Res.string.common_back),
-                )
-            }
-            // Le titre absorbe le mou et **remplace le Spacer** : deux poids
-            // dans la même rangée se partageaient la place moitié-moitié, et le
-            // titre s'abrégeait en « Découve… » alors qu'il y avait de la place
-            // de reste. Un seul enfant élastique, c'est lui.
-            Text(
-                stringResource(Res.string.discovery_title),
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
             if (!empile) {
-                // **Pas de poids ici.** Deux enfants élastiques dans la même
-                // rangée se partagent le mou moitié-moitié : la pastille et le
-                // rechargement se retrouvaient plantés au milieu, avec un vide
-                // de deux cents pixels à leur droite. Le titre est seul à
-                // s'étirer, ces deux-là se posent donc au bord.
-                //
-                // Une borne haute suffit à les protéger d'un libellé trop long
-                // dans une fenêtre étroite : le texte s'abrège, il ne pousse
-                // personne.
                 PastilleHumeur(
                     mood = mood,
                     onClick = onEditMood,
                     modifier = Modifier.widthIn(max = 420.dp),
                 )
             }
-            // Dernier de la rangée, et jamais contraint : c'est le seul bouton
-            // qui redistribue la page, il ne doit dépendre de la longueur
-            // d'aucun texte voisin.
             MoovieIconButton(
                 onClick = onReload,
                 icon = Icons.Default.Refresh,
