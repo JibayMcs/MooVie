@@ -50,6 +50,7 @@ import fr.moovie.tv.resources.player_seek_forward
 import fr.moovie.tv.ui.player.ApplySubtitleStyle
 import fr.moovie.tv.ui.player.MooviePlayerController
 import fr.moovie.tv.ui.player.PLAYER_SEEK_STEP_MS
+import fr.moovie.tv.ui.player.PlayerEpisodesPanel
 import fr.moovie.tv.ui.player.PlayerControlBar
 import fr.moovie.tv.ui.player.PlayerDurationGuard
 import fr.moovie.tv.ui.player.PlayerSkipButton
@@ -172,6 +173,10 @@ internal fun IosPlayerScreen(
     var activityTick by remember { mutableStateOf(0) }
     var autoNextSeconds by remember { mutableStateOf<Int?>(null) }
     var scrubTargetMs by remember { mutableStateOf<Long?>(null) }
+    // L'identité du média : série, saison, épisode. Lue une fois, elle sert au
+    // panneau des épisodes — qui n'existe que si l'on sait quelle série joue.
+    val identiteMedia = remember(mediaKey) { parseMediaKey(mediaKey) }
+    var episodesOuverts by remember(mediaKey) { mutableStateOf(false) }
 
     // Vrai d'emblée : le lecteur ouvre son flux, et la boucle d'état ne dira le
     // contraire qu'un demi-tour plus tard. Partir de « ça joue » ferait
@@ -430,6 +435,22 @@ internal fun IosPlayerScreen(
     ) {
         surface(Modifier.fillMaxSize())
 
+        // La liste des épisodes, en panneau glissant plutôt qu'en modale
+        // centrée : on choisit un épisode en gardant l'image sous les yeux.
+        identiteMedia?.takeIf { it.isTv }?.let { identite ->
+            PlayerEpisodesPanel(
+                visible = episodesOuverts,
+                tmdbId = identite.tmdbId,
+                saisonCourante = identite.season,
+                episodeCourant = identite.episode,
+                onJouer = { saison, numero ->
+                    episodesOuverts = false
+                    onNextEpisode(saison, numero)
+                },
+                onFermer = { episodesOuverts = false },
+            )
+        }
+
         // **L'image garde la dalle, les commandes se rangent dedans.**
         //
         // C'est le seul écran qui ne retire pas les encoches à sa racine, et
@@ -508,6 +529,12 @@ internal fun IosPlayerScreen(
                     if (nextEpisode > 1) onNextEpisode(nextSeason, nextEpisode - 2)
                 },
                 onNextEpisode = { onNextEpisode(nextSeason, nextEpisode) },
+                // Seulement sur une série : la clé de média porte l'identifiant
+                // TMDB, et sans lui le panneau n'a rien à lister. Là où il est
+                // branché, il remplace les deux flèches — voir `PlayerControlBar`.
+                onOpenEpisodes = identiteMedia?.takeIf { it.isTv }?.let {
+                    { episodesOuverts = true }
+                },
                 mediaKey = mediaKey,
                 onActivity = ::signalActivity,
                 onSeekToFraction = { fraction ->
