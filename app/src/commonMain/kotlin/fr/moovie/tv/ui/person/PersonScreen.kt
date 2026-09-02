@@ -55,6 +55,7 @@ import fr.moovie.tv.ui.theme.MOOVIE_TEXT_DIM
 import fr.moovie.tv.ui.theme.margePage
 import fr.moovie.tv.ui.components.MooviePageHeader
 import fr.moovie.tv.ui.theme.ESPACE_SECTION
+import fr.moovie.tv.ui.components.MooviePosterCard
 
 /** Colonnes sur un écran large (TV 960 dp, desktop) — comme la recherche. */
 private const val COLUMNS = 6
@@ -133,8 +134,11 @@ fun PersonScreenContent(
                 ) {
                     items(state.credits, key = { "${it.id}_${it.isTv}" }) { item ->
                         val key = if (item.isTv) "tv:${item.id}" else "movie:${item.id}"
-                        PosterCard(
-                            item = item,
+                        MooviePosterCard(
+                            posterUrl = item.posterUrl(),
+                            titre = item.displayTitle,
+                            note = item.voteAverage,
+                            annee = item.year,
                             isWatched = key in watched,
                             inWatchlist = key in watchlistKeys,
                             onClick = { onOpenTitle(item.id, item.isTv) },
@@ -151,52 +155,3 @@ fun PersonScreenContent(
     }
 }
 
-@Composable
-private fun PosterCard(
-    item: TmdbItem,
-    isWatched: Boolean,
-    inWatchlist: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    MoovieCard(onClick = onClick, modifier = modifier.fillMaxWidth()) {
-        Column {
-            Box {
-                MoovieAsyncImage(
-                    model = item.posterUrl(),
-                    contentDescription = item.displayTitle,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(2f / 3f)
-                        .background(MOOVIE_SURFACE_HIGH),
-                )
-                if (inWatchlist || isWatched) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(6.dp)
-                            .size(24.dp)
-                            .clip(CircleShape)
-                            .background(MOOVIE_SCRIM),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            Icons.Default.Bookmark,
-                            contentDescription = stringResource(Res.string.watchlist_added),
-                            tint = MOOVIE_ACCENT,
-                            modifier = Modifier.size(14.dp),
-                        )
-                    }
-                }
-            }
-            // L'année désambiguïse : une filmographie aligne volontiers deux
-            // titres proches, et parfois un remake du même nom.
-            MoovieMarqueeText(
-                text = item.year?.let { "${item.displayTitle} · $it" } ?: item.displayTitle,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(8.dp),
-            )
-        }
-    }
-}

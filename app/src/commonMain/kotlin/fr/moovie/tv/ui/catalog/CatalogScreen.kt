@@ -90,6 +90,7 @@ import fr.moovie.tv.ui.theme.MOOVIE_SURFACE
 import fr.moovie.tv.ui.theme.MOOVIE_SURFACE_HIGH
 import fr.moovie.tv.ui.theme.MOOVIE_TEXT_DIM
 import fr.moovie.tv.ui.theme.margePage
+import fr.moovie.tv.ui.components.MooviePosterCard
 
 /**
  * Largeur du volet des genres. Reprend celle des réglages : en 1080p l'écran ne
@@ -545,62 +546,15 @@ private fun ResultsGrid(
 
         itemsIndexed(items, key = { _, it -> "${it.id}_${it.isTv}" }) { _, item ->
             val key = if (item.isTv) "tv:${item.id}" else "movie:${item.id}"
-            PosterCard(
-                item = item,
+            MooviePosterCard(
+                posterUrl = item.posterUrl(),
+                titre = item.displayTitle,
+                note = item.voteAverage,
+                annee = item.year,
                 isWatched = key in watched,
                 inWatchlist = key in watchlistKeys,
-                downloads = downloadsByTitle[key],
                 onClick = { onOpenTitle(item.id, item.isTv) },
-            )
-        }
-    }
-}
-
-@Composable
-private fun PosterCard(
-    item: TmdbItem,
-    isWatched: Boolean,
-    inWatchlist: Boolean,
-    /** Ce que ce titre a hors ligne, null s'il n'a rien. */
-    downloads: TitleDownloads?,
-    onClick: () -> Unit,
-) {
-    MoovieCard(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
-        Column {
-            Box {
-                MoovieAsyncImage(
-                    model = item.posterUrl(),
-                    contentDescription = item.displayTitle,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(2f / 3f)
-                        .background(MOOVIE_SURFACE_HIGH),
-                )
-                if (inWatchlist || isWatched) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(6.dp)
-                            .size(24.dp)
-                            .clip(CircleShape)
-                            .background(MOOVIE_SCRIM),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            Icons.Default.Bookmark,
-                            contentDescription = stringResource(Res.string.watchlist_added),
-                            tint = MOOVIE_ACCENT,
-                            modifier = Modifier.size(14.dp),
-                        )
-                    }
-                }
-                DownloadPosterBadge(downloads)
-            }
-            MoovieMarqueeText(
-                text = item.displayTitle,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(8.dp),
+                surAffiche = { DownloadPosterBadge(downloadsByTitle[key]) },
             )
         }
     }
