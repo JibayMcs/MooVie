@@ -176,6 +176,7 @@ import fr.moovie.tv.resources.update_every_minutes
 import fr.moovie.tv.resources.update_never
 import fr.moovie.tv.ui.backup.BackupSection
 import fr.moovie.tv.ui.home.HomeLayoutSection
+import fr.moovie.tv.ui.adaptive.GesteRetour
 import fr.moovie.tv.ui.adaptive.LocalUiFlavor
 import fr.moovie.tv.resources.pairing_title
 import fr.moovie.tv.resources.pairing_scan
@@ -768,9 +769,23 @@ fun SettingsScreenContent(
     // liste. Chaque écran a alors toute la largeur — celle-là même qui manquait
     // aux libellés.
     if (compact) {
-        var ouverte by rememberSaveable { mutableStateOf<SettingsSection?>(null) }
-        val visible = ouverte
-        if (visible == null) {
+        // **Une seule mémoire pour les deux vues.**
+        //
+        // Le détail retenait *quelle* section était ouverte, dans un
+        // `rememberSaveable`, pendant que `section` — que lit le corps de la
+        // page — n'était qu'un `remember`. Après une restauration d'état, la
+        // première revenait sur la section quittée et la seconde repartait sur
+        // API : l'en-tête annonçait un écran, le contenu en affichait un autre.
+        //
+        // Le détail ne retient plus que le fait d'être ouvert ; c'est `section`
+        // qui dit sur quoi, et les deux ne peuvent plus se contredire.
+        var enDetail by rememberSaveable { mutableStateOf(false) }
+        // Le geste de retour du système referme le détail avant de quitter les
+        // réglages. Sans lui, le glissement depuis le bord sautait la liste des
+        // sections et sortait de l'écran — la flèche de l'en-tête était le seul
+        // chemin de retour, sur le seul appareil où personne ne la cherche.
+        GesteRetour(actif = enDetail) { enDetail = false }
+        if (!enDetail) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -786,7 +801,7 @@ fun SettingsScreenContent(
                         entry = entry,
                         onClick = {
                             section = entry
-                            ouverte = entry
+                            enDetail = true
                         },
                     )
                 }
@@ -802,8 +817,8 @@ fun SettingsScreenContent(
                 verticalArrangement = Arrangement.spacedBy(ESPACE_LARGE),
             ) {
                 MooviePageHeader(
-                    titre = sectionLabel(visible),
-                    onBack = { ouverte = null },
+                    titre = sectionLabel(section),
+                    onBack = { enDetail = false },
                 )
                 Column(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = margePage()),
