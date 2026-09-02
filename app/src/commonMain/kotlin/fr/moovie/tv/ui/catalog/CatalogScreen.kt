@@ -91,6 +91,10 @@ import fr.moovie.tv.ui.theme.MOOVIE_SURFACE_HIGH
 import fr.moovie.tv.ui.theme.MOOVIE_TEXT_DIM
 import fr.moovie.tv.ui.theme.margePage
 import fr.moovie.tv.ui.components.MooviePosterCard
+import fr.moovie.tv.ui.components.MooviePageHeader
+import fr.moovie.tv.ui.theme.ESPACE_LARGE
+import fr.moovie.tv.resources.media_movie
+import fr.moovie.tv.resources.media_series
 
 /**
  * Largeur du volet des genres. Reprend celle des réglages : en 1080p l'écran ne
@@ -262,7 +266,32 @@ fun CatalogScreenContent(
             showBackButton = showBackButton,
         )
 
-        Column(modifier = Modifier.weight(1f).fillMaxHeight().padding(vertical = 40.dp)) {
+        Column(modifier = Modifier.weight(1f).fillMaxHeight().padding(vertical = 32.dp)) {
+            // **La grille dit ce qu'elle montre.**
+            //
+            // Le titre de la page vivait dans le volet des genres, avec le
+            // bouton retour : la moitié droite — celle qu'on regarde — n'avait
+            // aucun libellé. Trois genres plus tard on ne savait plus lequel on
+            // parcourait, et le seul repère était la ligne surlignée dans une
+            // liste de quarante entrées.
+            //
+            // L'en-tête commun porte donc le genre courant, et le retour le
+            // rejoint : c'est sa place sur toutes les autres pages.
+            val genreCourant = selection?.let { sel ->
+                entries.filterIsInstance<CatalogEntry.GenreEntry>()
+                    .firstOrNull { it.isTv == sel.isTv && it.genre.id == sel.genreId }
+            }
+            MooviePageHeader(
+                titre = genreCourant?.genre?.name
+                    ?: stringResource(Res.string.catalog_title),
+                sousTitre = genreCourant?.let {
+                    stringResource(
+                        if (it.isTv) Res.string.media_series else Res.string.media_movie,
+                    )
+                },
+                onBack = onBack.takeIf { showBackButton },
+            )
+            Spacer(Modifier.height(ESPACE_LARGE))
             results()
         }
     }
@@ -372,22 +401,17 @@ private fun GenrePane(
         item(key = "title") {
             Column {
                 Text(
+                    // Le nom du volet, pas celui de la page : celui-ci est
+                    // passé à droite, sur la grille, où il dit enfin ce qu'on
+                    // regarde. Ici on annonce seulement une liste de genres.
                     stringResource(Res.string.catalog_title),
-                    style = MaterialTheme.typography.headlineSmall,
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MOOVIE_TEXT_DIM,
                     modifier = Modifier.padding(start = 8.dp, bottom = 12.dp),
                 )
-                if (showBackButton) {
-                    MoovieButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text(stringResource(Res.string.common_back), modifier = Modifier.weight(1f))
-                    }
-                    Spacer(Modifier.height(12.dp))
-                }
+                // Le retour est passé dans l'en-tête de la grille, à droite,
+                // où il est sur toutes les autres pages. Le garder ici en
+                // aurait fait deux.
             }
         }
 
