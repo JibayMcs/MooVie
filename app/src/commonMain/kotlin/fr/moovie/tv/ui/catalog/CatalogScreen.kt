@@ -196,7 +196,7 @@ fun CatalogScreenContent(
                 // page ne se réorganise pas quand les affiches arrivent.
                 SkeletonGrid(
                     columns = if (useBottomNav) COMPACT_COLUMNS else COLUMNS,
-                    modifier = Modifier.padding(horizontal = if (useBottomNav) 16.dp else 40.dp),
+                    modifier = Modifier.padding(horizontal = margePage()),
                 )
             else -> ResultsGrid(
                 items = items,
@@ -517,7 +517,7 @@ private fun ResultsGrid(
         // contredisaient à l'écran, l'une chassant l'autre à l'arrivée des
         // affiches.
         contentPadding = PaddingValues(
-            horizontal = if (useBottomNav) 16.dp else 40.dp,
+            horizontal = margePage(),
             vertical = 12.dp,
         ),
     ) {
