@@ -650,10 +650,15 @@ class MainActivity : ComponentActivity() {
                                     null
                                 },
                             )
+                            // Sans bouton retour : au doigt, les téléchargements
+                            // sont une destination de la barre du bas, comme
+                            // l'historique et le catalogue — dont aucun n'en
+                            // porte. C'était le seul, et la flèche y ramenait à
+                            // l'accueil depuis un onglet qu'on venait de choisir.
+                            // Sur téléviseur, la télécommande a sa touche.
                             Screen.Downloads -> DownloadsScreen(
                                 onPlay = { d -> downloadPlayerScreen(d)?.let(nav::push) },
                                 onBack = { nav.pop() },
-                                showBackButton = useBottomNav,
                             )
 
                             Screen.Settings -> SettingsScreen(

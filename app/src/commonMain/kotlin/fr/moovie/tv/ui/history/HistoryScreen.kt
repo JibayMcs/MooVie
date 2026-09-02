@@ -92,9 +92,15 @@ private const val COLUMNS = 6
  * Colonnes de la grille. Six tiennent sur les 960 dp d'un 1080p ; sur les
  * 448 dp d'un téléphone, chaque vignette tombait à une centaine de dp et son
  * titre à « Hou… ».
+ *
+ * **Deux et non trois en portrait.** Trois laissaient 137 dp par vignette, soit
+ * une image de 77 dp de haut — plus petite que la ligne de texte posée dessous,
+ * et trop petite pour reconnaître un plan. Deux en donnent le double, ce qui
+ * suffit à retrouver un épisode d'un coup d'œil : c'est tout ce qu'on demande à
+ * un historique.
  */
 @Composable
-private fun historyColumns(): Int = if (useBottomNav) 3 else COLUMNS
+private fun historyColumns(): Int = if (useBottomNav) 2 else COLUMNS
 
 /** Marge horizontale : 32 dp est un recul de salon, trop sur un téléphone. */
 @Composable

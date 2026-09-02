@@ -482,6 +482,10 @@
     <string name="downloads_used">%1$s ocupados</string>
     <string name="downloads_empty">Ninguna descarga. Mantener pulsada una fuente, desde una ficha, para iniciar una.</string>
     <string name="downloads_ready">Listo sin conexión · %1$s</string>
+    <string name="size_gb">%1$s GB</string>
+    <string name="size_mb">%1$s MB</string>
+    <string name="size_kb">%1$s kB</string>
+    <string name="size_b">%1$s B</string>
     <string name="downloads_queued">En espera</string>
     <string name="downloads_paused">En pausa. Al reanudar continúa donde se detuvo.</string>
     <string name="downloads_failed">Error</string>
