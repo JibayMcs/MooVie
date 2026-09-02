@@ -81,6 +81,7 @@ import fr.moovie.tv.resources.player_audio
 import fr.moovie.tv.resources.player_next_episode
 import fr.moovie.tv.resources.player_next_in
 import fr.moovie.tv.resources.player_cast
+import fr.moovie.tv.resources.details_tab_episodes
 import fr.moovie.tv.resources.player_pause
 import fr.moovie.tv.resources.player_play
 import fr.moovie.tv.resources.player_prev_episode
@@ -151,6 +152,20 @@ fun PlayerControlBar(
      * ses réglages. Même règle que [onReportSegment] juste en dessous : l'icône
      * disparaît alors, une cible inerte étant une cible de trop.
      */
+    /**
+     * Ouvre la liste des épisodes.
+     *
+     * **Quand elle existe, les deux flèches disparaissent.** Elles ne savaient
+     * dire que « d'un cran », sans jamais montrer où l'on en était ni ce qui
+     * suivait ; le panneau répond aux deux, et garder les trois aurait fait deux
+     * chemins vers le même geste — dont l'un occupe deux cibles de la rangée du
+     * transport, là où l'on cherche pause et recul.
+     *
+     * Nulle sur un film, et sur les plateformes qui n'ont pas encore posé le
+     * panneau : les flèches y restent, plutôt que de laisser une série sans
+     * aucun moyen de changer d'épisode.
+     */
+    onOpenEpisodes: (() -> Unit)? = null,
     onOpenSubtitles: (() -> Unit)? = null,
     onOpenSettings: (() -> Unit)? = null,
     /**
@@ -247,7 +262,7 @@ fun PlayerControlBar(
                 contentDescription = stringResource(Res.string.player_seek_forward),
                 mirrored = true,
             )
-            if (showEpisodeButtons) {
+            if (showEpisodeButtons && onOpenEpisodes == null) {
                 MoovieIconButton(
                     onClick = onPreviousEpisode,
                     icon = Icons.Default.SkipPrevious,
@@ -275,6 +290,24 @@ fun PlayerControlBar(
             // choisissent en regardant. Les mettre à deux endroits, c'est dire
             // lequel est lequel sans un mot.
             Spacer(modifier = Modifier.weight(1f))
+            // En tête des options, et non dans le transport : changer d'épisode
+            // n'est pas piloter celui qui joue. C'est le même partage que la
+            // fiche, où la liste des épisodes est un onglet et non un bouton.
+            onOpenEpisodes?.let { open ->
+                // **Écrit, et non dessiné.** Les autres commandes de cette
+                // rangée sont des icônes parce qu'elles ont chacune un dessin
+                // que tout le monde connaît — sous-titres, diffusion, réglages.
+                // « La liste des épisodes » n'en a pas : le pictogramme de liste
+                // veut dire « liste » et pas « épisodes », et il se serait
+                // confondu avec les quatre autres carrés de la rangée. Un mot
+                // coûte quelques points de large et ne se devine pas.
+                MoovieButton(onClick = open) {
+                    Text(
+                        stringResource(Res.string.details_tab_episodes),
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                }
+            }
             onOpenSubtitles?.let { open ->
                 MoovieIconButton(
                     onClick = open,

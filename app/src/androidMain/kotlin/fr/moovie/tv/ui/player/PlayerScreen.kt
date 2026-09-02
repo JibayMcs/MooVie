@@ -127,6 +127,15 @@ private val RESUME_KEYS = setOf(
 private val CONFIRM_KEYS = setOf(Key.DirectionCenter, Key.Enter, Key.NumPadEnter)
 
 /**
+ * Les touches qui veulent dire « reviens ».
+ *
+ * `Escape` autant que `Back` : le lecteur tourne aussi sur un téléphone posé
+ * dans un dock avec un clavier, et sur l'émulateur, où c'est la seule des deux
+ * qu'on ait sous la main.
+ */
+private val RETOUR_KEYS = setOf(Key.Back, Key.Escape)
+
+/**
  * Touches qui basculent lecture/pause, **quel que soit l'état de la barre**.
  *
  * Elles n'étaient traitées que barre masquée. Barre visible, l'événement
@@ -1097,6 +1106,15 @@ fun PlayerScreen(
                     return@onPreviewKeyEvent true
                 }
                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                // Le panneau des épisodes se ferme avant tout le reste. Les
+                // autres menus sont des `Dialog`, qui interceptent Retour eux-
+                // mêmes ; celui-ci glisse dans la page et ne le fait pas — sans
+                // cette ligne, Retour quitterait le lecteur avec le panneau
+                // encore ouvert par-dessus.
+                if (dialog == PlayerDialogKind.EPISODES && event.key in RETOUR_KEYS) {
+                    dialog = null
+                    return@onPreviewKeyEvent true
+                }
                 // Décompte en cours : la 1re touche l'interrompt, quelle qu'elle
                 // soit — on ne subit pas l'enchaînement en réveillant les contrôles.
                 if (autoNextSeconds != null) {
@@ -1342,6 +1360,9 @@ fun PlayerScreen(
                         onNextEpisode(it.tmdbId, it.season, it.episode + 1)
                     }
                 },
+                // Seulement sur une série, et seulement si l'on sait de
+                // laquelle il s'agit : la clé de média porte l'identifiant TMDB.
+                onOpenEpisodes = pid?.takeIf { it.isTv }?.let { { dialog = PlayerDialogKind.EPISODES } },
                 onOpenSubtitles = { dialog = PlayerDialogKind.SUBTITLES },
                 onOpenSettings = { dialog = PlayerDialogKind.SETTINGS },
                 // **Reprendre sur la télé ce qui joue ici.** Null tant qu'aucun
@@ -1457,6 +1478,23 @@ fun PlayerScreen(
             )
         }
 
+        // La liste des épisodes, en panneau glissant. Hors PiP : la fenêtre y
+        // fait quelques centimètres, et un panneau de quatre cents points la
+        // recouvrirait entièrement.
+        pid?.takeIf { it.isTv && !enPip }?.let { identite ->
+            PlayerEpisodesPanel(
+                visible = dialog == PlayerDialogKind.EPISODES,
+                tmdbId = identite.tmdbId,
+                saisonCourante = identite.season,
+                episodeCourant = identite.episode,
+                onJouer = { saison, numero ->
+                    dialog = null
+                    onNextEpisode(identite.tmdbId, saison, numero)
+                },
+                onFermer = { dialog = null },
+            )
+        }
+
         // La diffusion n'a pas pris : on le dit, et la lecture locale continue
         // là où elle était. Rester muet ferait croire à un bouton mort.
         if (castEchoue) {
@@ -1472,7 +1510,11 @@ fun PlayerScreen(
             }
         }
 
-        when (dialog.takeIf { !enPip }) {
+        // Le panneau des épisodes est rendu plus haut, dans la page : il n'a
+        // rien à faire parmi les modales centrées.
+        @Suppress("KotlinConstantConditions")
+        when (dialog.takeIf { !enPip && it != PlayerDialogKind.EPISODES }) {
+            PlayerDialogKind.EPISODES -> Unit
             PlayerDialogKind.SUBTITLES -> PlayerOptionsDialog(
                 sections = listOf(
                     subtitleSection(tracks) { trackId ->

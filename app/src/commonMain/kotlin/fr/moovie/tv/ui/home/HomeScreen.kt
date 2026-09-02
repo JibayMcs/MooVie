@@ -59,6 +59,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.runtime.derivedStateOf
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.text.font.FontWeight
 import fr.moovie.tv.ui.theme.MoovieShape
 import androidx.compose.ui.draw.blur
@@ -561,6 +566,37 @@ fun HomeScreenContent(
                     // titre de la rangée suivante en bas d'écran.
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                     contentPadding = PaddingValues(bottom = 48.dp),
+                    // **Les rangées s'éteignent en haut au lieu d'être coupées.**
+                    //
+                    // La liste est bornée par le bas de la barre de navigation :
+                    // ce qui la traverse est tranché net, et une rangée à demi
+                    // sortie s'arrête sur une ligne droite en travers des
+                    // affiches. On lit une image tronquée, pas un défilement.
+                    //
+                    // Un rectangle noir posé par-dessus ne conviendrait pas : ce
+                    // qu'il y a derrière la liste n'est pas noir mais l'affiche
+                    // floutée de la page, et il ferait une bande sombre là où
+                    // l'on veut une transition. On efface donc les pixels de la
+                    // liste plutôt que de les recouvrir — `DstIn` avec un
+                    // dégradé d'opacité — et c'est le fond qui reparaît dessous.
+                    //
+                    // `compositingStrategy` est indispensable : sans couche
+                    // hors écran, le mélange s'appliquerait à tout ce qui est
+                    // déjà dessiné et effacerait la page entière.
+                    modifier = Modifier
+                        .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                        .drawWithContent {
+                            drawContent()
+                            drawRect(
+                                brush = Brush.verticalGradient(
+                                    colors = listOf(Color.Transparent, Color.Black),
+                                    startY = 0f,
+                                    endY = FONDU_HAUT.toPx(),
+                                ),
+                                size = Size(size.width, FONDU_HAUT.toPx()),
+                                blendMode = BlendMode.DstIn,
+                            )
+                        },
                 ) {
                     // **Le héros prend l'écran, et les rangées commencent
                     // dessous.**
@@ -750,6 +786,13 @@ private val HERO_HEIGHT = 148.dp
  * La valeur vient du relevé fait pour [POSTER_WIDTH] : 310 points pour le bloc
  * complet en 1080p.
  */
+/**
+ * Hauteur du fondu en haut des rangées. Assez pour qu'une affiche s'éteigne au
+ * lieu de se couper, assez peu pour ne pas manger le titre de la rangée qui
+ * arrive.
+ */
+private val FONDU_HAUT = 28.dp
+
 private val BLOC_RANGEE = 310.dp
 
 /**

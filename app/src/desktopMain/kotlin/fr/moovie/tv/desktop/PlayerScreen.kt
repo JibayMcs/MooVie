@@ -128,6 +128,7 @@ import fr.moovie.tv.ui.player.PlayerTitleOverlay
 import fr.moovie.tv.ui.player.PlayerTracks
 import fr.moovie.tv.ui.player.PlayerUpdateChip
 import fr.moovie.tv.core.player.matchAudioTrack
+import fr.moovie.tv.ui.player.PlayerEpisodesPanel
 import fr.moovie.tv.ui.player.parseMediaKey
 import fr.moovie.tv.ui.player.toPlayerSegments
 import fr.moovie.tv.data.sources.streamHeights
@@ -967,6 +968,9 @@ internal fun DesktopPlayerScreen(
                         onNextEpisode(nextSeason, nextEpisode)
                     }
                 },
+                // Seulement sur une série : la clé de média porte l'identifiant
+                // TMDB, et sans lui le panneau n'a rien à lister.
+                onOpenEpisodes = pid?.takeIf { it.isTv }?.let { { dialog = PlayerDialogKind.EPISODES } },
                 onOpenSubtitles = {
                     tracks = controller.tracks()
                     dialog = PlayerDialogKind.SUBTITLES
@@ -1100,7 +1104,27 @@ internal fun DesktopPlayerScreen(
             }
         }
 
-        when (dialog) {
+        // La liste des épisodes, en panneau glissant plutôt qu'en modale
+        // centrée : on choisit un épisode en gardant l'image sous les yeux.
+        pid?.takeIf { it.isTv }?.let { identite ->
+            PlayerEpisodesPanel(
+                visible = dialog == PlayerDialogKind.EPISODES,
+                tmdbId = identite.tmdbId,
+                saisonCourante = identite.season,
+                episodeCourant = identite.episode,
+                onJouer = { saison, numero ->
+                    dialog = null
+                    onNextEpisode(saison, numero)
+                },
+                onFermer = { dialog = null },
+            )
+        }
+
+        // Le panneau des épisodes est rendu juste au-dessus, dans la page : il
+        // n'a rien à faire parmi les modales centrées.
+        @Suppress("KotlinConstantConditions")
+        when (dialog.takeIf { it != PlayerDialogKind.EPISODES }) {
+            PlayerDialogKind.EPISODES -> Unit
             PlayerDialogKind.SUBTITLES -> PlayerOptionsDialog(
                 sections = listOf(
                     subtitleSection(tracks) { trackId ->
