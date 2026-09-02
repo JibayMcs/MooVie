@@ -11,6 +11,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -427,6 +430,21 @@ internal fun IosPlayerScreen(
     ) {
         surface(Modifier.fillMaxSize())
 
+        // **L'image garde la dalle, les commandes se rangent dedans.**
+        //
+        // C'est le seul écran qui ne retire pas les encoches à sa racine, et
+        // c'est voulu : rogner un film reviendrait à l'afficher en médaillon.
+        // Mais la conséquence était que sa chrome ne les retirait pas non plus.
+        // Un iPhone en paysage met la Dynamic Island sur un bord — une
+        // cinquantaine de points — et l'indicateur d'accueil en bas : le retour
+        // ou l'icône de fin de rangée y passaient dessous selon le sens de
+        // rotation, et la barre de progression courait sous la poignée.
+        //
+        // Les seize points de `margePage()` ne pouvaient rien pour ça : ils sont
+        // une marge de mise en page, pas une mesure de l'appareil. Chaque
+        // couche de commandes prend donc la marge de sécurité, et elle seule.
+        val marqueSecurite = Modifier.windowInsetsPadding(WindowInsets.safeDrawing)
+
         // **Chaque couche porte son alignement, et la barre n'en a pas d'elle-même.**
         //
         // `PlayerControlBar` est un `Column(fillMaxWidth)` dont le dégradé va du
@@ -443,7 +461,7 @@ internal fun IosPlayerScreen(
             visible = controlsVisible,
             enter = fadeIn(),
             exit = fadeOut(),
-            modifier = Modifier.align(Alignment.TopCenter),
+            modifier = Modifier.align(Alignment.TopCenter).then(marqueSecurite),
         ) {
             PlayerTitleOverlay(title = title, subtitle = subtitle)
         }
@@ -452,7 +470,7 @@ internal fun IosPlayerScreen(
             visible = controlsVisible,
             enter = fadeIn() + slideInVertically(initialOffsetY = { it }),
             exit = fadeOut() + slideOutVertically(targetOffsetY = { it }),
-            modifier = Modifier.align(Alignment.BottomCenter),
+            modifier = Modifier.align(Alignment.BottomCenter).then(marqueSecurite),
         ) {
             PlayerControlBar(
                 isPlaying = isPlaying,
@@ -514,7 +532,9 @@ internal fun IosPlayerScreen(
                     }
                     signalActivity()
                 },
-                modifier = Modifier.align(Alignment.BottomEnd).padding(24.dp),
+                modifier = Modifier.align(Alignment.BottomEnd)
+                    .then(marqueSecurite)
+                    .padding(24.dp),
             )
         }
 
