@@ -43,6 +43,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -118,6 +119,10 @@ import fr.moovie.tv.ui.theme.MOOVIE_BG
 import fr.moovie.tv.ui.theme.MOOVIE_TEXT_DIM
 import fr.moovie.tv.ui.theme.margePage
 import fr.moovie.tv.ui.components.MooviePageHeader
+import fr.moovie.tv.ui.theme.ESPACE
+import fr.moovie.tv.ui.theme.ESPACE_SERRE
+import fr.moovie.tv.ui.theme.MOOVIE_TEXT
+import fr.moovie.tv.ui.theme.MOOVIE_RATING
 
 /**
  * Page Découverte : des mains de cartes, une par recette.
@@ -927,12 +932,25 @@ private fun Contexte(
     onListe: () -> Unit,
     onVu: () -> Unit,
 ) {
-    Column(Modifier.padding(horizontal = hPad())) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+    // **Le titre désigné est le sujet de la page, pas une légende.**
+    //
+    // Il était en `bodyMedium`, à la taille d'un synopsis, sous une main de
+    // cartes qui prend la moitié de l'écran : à trois mètres, on voyait
+    // parfaitement quelle carte était choisie et pas du tout laquelle c'était.
+    // Le rang de titre le remet à sa place, et l'espace au-dessus le décolle
+    // des cartes au lieu de l'y coller.
+    Column(
+        modifier = Modifier.padding(horizontal = hPad()),
+        verticalArrangement = Arrangement.spacedBy(ESPACE_SERRE),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(ESPACE),
+        ) {
             Text(
                 carte.title,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold,
+                style = MaterialTheme.typography.titleLarge,
+                color = MOOVIE_TEXT,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f, fill = false),
@@ -940,10 +958,22 @@ private fun Contexte(
             when (carte) {
                 is DiscoveryCard.Title -> {
                     carte.year?.let { Puce(it) }
-                    if (carte.rating > 0) Puce(
-                        formaterDecimal(carte.rating, 1),
-                        MOOVIE_ORANGE,
-                    )
+                    // L'étoile, comme partout ailleurs : cette note était le
+                    // seul nombre de l'application à s'annoncer tout seul.
+                    if (carte.rating > 0) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                Icons.Default.Star,
+                                contentDescription = null,
+                                tint = MOOVIE_RATING,
+                                modifier = Modifier.size(14.dp),
+                            )
+                            Puce(formaterDecimal(carte.rating, 1), MOOVIE_RATING)
+                        }
+                    }
                 }
                 is DiscoveryCard.Saga -> Puce(
                     stringResource(Res.string.discovery_saga_progress, carte.seen, carte.total),
@@ -952,13 +982,13 @@ private fun Contexte(
         }
         Text(
             stringResource(groupWhy(kind)),
-            style = MaterialTheme.typography.labelSmall,
-            color = Color(0xFF7A7A86),
+            style = MaterialTheme.typography.bodySmall,
+            color = MOOVIE_TEXT_DIM,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
-        Spacer(Modifier.height(8.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Spacer(Modifier.height(ESPACE_SERRE))
+        Row(horizontalArrangement = Arrangement.spacedBy(ESPACE_SERRE)) {
             MoovieButton(onClick = onOuvrir) {
                 Text(stringResource(Res.string.discovery_action_open))
             }
