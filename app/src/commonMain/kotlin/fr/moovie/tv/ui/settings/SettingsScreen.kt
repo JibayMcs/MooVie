@@ -208,6 +208,10 @@ import kotlinx.coroutines.launch
 import fr.moovie.tv.resources.pairing_action
 import fr.moovie.tv.ui.adaptive.UiFlavor
 import fr.moovie.tv.ui.adaptive.useBottomNav
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import fr.moovie.tv.ui.components.MooviePageHeader
+import fr.moovie.tv.ui.theme.ESPACE_SECTION
 import fr.moovie.tv.ui.components.MoovieButton
 import fr.moovie.tv.ui.subtitles.SubtitlesSection
 import fr.moovie.tv.ui.components.MoovieIconButton
@@ -255,12 +259,6 @@ private enum class SettingsSection {
     SOURCES, BACKUP, SYNC, DOWNLOADS,
 }
 
-/**
- * Largeur de la barre repliée : une icône de 20 dp dans une cible de 48 dp,
- * marges comprises. C'est ce qu'elle coûte au contenu sur un téléphone — 68 dp
- * sur 448, contre 260 pour le volet déplié.
- */
-private val RAIL_WIDTH = 68.dp
 
 /**
  * Icône de chaque section, pour la barre repliée.
@@ -393,15 +391,7 @@ fun SettingsScreenContent(
     pairingDialog: (@Composable (onDismiss: () -> Unit) -> Unit)? = null,
 ) {
     var section by remember { mutableStateOf(SettingsSection.API) }
-    // Sur téléphone, le volet de navigation se replie en barre d'icônes : 260 dp
-    // sur 448 ne laissaient que 190 dp au contenu, qui cassait les libellés mot
-    // par mot. Replié il n'en coûte que 68, et le contenu reste visible à côté —
-    // ce qu'un écran de liste séparé ne permettait pas.
     val compact = useBottomNav
-    // Déplié en permanence hors tactile : la télécommande n'a pas de quoi
-    // déplier commodément, et la place ne manque pas sur un 1080p.
-    var railExpanded by remember { mutableStateOf(false) }
-    val expanded = !compact || railExpanded
     // La section ne suit le focus que si celui-ci vient d'un appui haut/bas dans
     // le volet. Compose replie le focus sur le premier élément focalisable quand
     // celui qui le portait disparaît : sans ce garde-fou, un contrôle du volet
@@ -422,18 +412,416 @@ fun SettingsScreenContent(
     // se déplacerait avec elle.
     val sectionInitiale = remember { section }
     val firstSectionFocus = remember { FocusRequester() }
-    LaunchedEffect(Unit) { runCatching { firstSectionFocus.requestFocus() } }
+    LaunchedEffect(compact) { if (!compact) runCatching { firstSectionFocus.requestFocus() } }
 
-    // Superposition plutôt que côte à côte : dépliée, la barre se pose **par
-    // dessus** le contenu au lieu de le comprimer. Le pousser à 190 dp le
-    // recassait mot par mot — le défaut même qu'on est en train de corriger.
-    // Le contenu ne réserve donc que la largeur repliée, et ne bouge plus.
+    // L'écran de veille n'a pas de sens sur un téléphone : le système y éteint
+    // déjà l'écran tout seul, et personne ne laisse un film en pause sur un
+    // appareil qu'il tient en main. La section disparaît plutôt que de rester
+    // là, inutile. La télécommande, elle, n'a de sens qu'aux deux bouts du
+    // salon : le téléviseur qu'on pilote et le téléphone qui pilote. Sur un
+    // ordinateur, la section n'aurait aucune ligne à afficher. Et une section
+    // n'existe que si la plateforme a fourni de quoi la dessiner — voir le
+    // paramètre `remoteSection`.
+    //
+    // Calculée ici et non dans le volet : les deux mises en page doivent
+    // proposer exactement les mêmes, et la liste du téléphone la lisait par
+    // dessus l'épaule de la barre du bureau.
+    val remote = remoteSection != null
+    val sections = SettingsSection.entries.filterNot {
+        (compact && it == SettingsSection.SCREENSAVER) ||
+            (!remote && it == SettingsSection.REMOTE) ||
+            (onCheckUpdates == null && it == SettingsSection.UPDATE)
+    }
+
+    /**
+     * Le contenu d'une section, sans son cadre.
+     *
+     * Extrait parce qu'il a désormais deux logements : le volet droit du
+     * bureau, et une page à lui tout seul sur un téléphone. C'est la même
+     * matière — ce sont les cadres qui diffèrent.
+     */
+    val contenuSection: @Composable ColumnScope.() -> Unit = {
+        // **Le nom de la section au rang de titre de page.**
+        //
+        // Il était en `titleLarge` et rose, c'est-à-dire au rang d'un titre
+        // de rangée : sur une page qui n'affiche qu'une section à la fois,
+        // c'est pourtant elle, le sujet. Le rose venait du volet, où la
+        // ligne sélectionnée est déjà marquée — la couleur disait deux fois
+        // la même chose et manquait là où on lit.
+        if (!compact) {
+            Text(
+                sectionLabel(section),
+                style = MaterialTheme.typography.headlineMedium,
+                color = MOOVIE_TEXT,
+            )
+        }
+
+        // Appairage d'un téléphone pour la saisie. L'état vit hors du `when`
+        // pour que sa mémoire ne dépende pas de la branche affichée.
+        var pairing by remember { mutableStateOf(false) }
+        if (pairing) pairingDialog?.invoke({ pairing = false })
+
+        when (section) {
+            SettingsSection.REMOTE -> remoteSection?.invoke { pairing = true }
+
+            SettingsSection.API -> {
+                SettingRow(
+                    label = stringResource(Res.string.settings_tmdb_key),
+                    help = stringResource(Res.string.settings_tmdb_help),
+                ) {
+                    ApiKeyField(
+                        value = apiKey,
+                        hint = stringResource(Res.string.settings_tmdb_hint),
+                        onValueChange = onSetApiKey,
+                    )
+                }
+                // Deuxième clé, et deuxième modèle : celle de TheIntroDB
+                // identifie un contributeur, pas l'application. D'où sa
+                // place ici, à côté de celle de TMDB.
+                SettingRow(
+                    label = stringResource(Res.string.settings_introdb_key),
+                    help = stringResource(Res.string.settings_introdb_help),
+                ) {
+                    ApiKeyField(
+                        value = introDbKey,
+                        hint = stringResource(Res.string.settings_introdb_hint),
+                        onValueChange = onSetIntroDbKey,
+                    )
+                }
+            }
+
+            SettingsSection.PLAYBACK -> {
+                SettingRow(label = stringResource(Res.string.settings_stream_lang)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        StreamLanguage.entries.forEach { lang ->
+                            MoovieButton(
+                                onClick = { onSetStreamLanguage(lang) },
+                                selected = lang == streamLang,
+                            ) { Text(lang.name) }
+                        }
+                    }
+                }
+                SettingRow(label = stringResource(Res.string.settings_language)) {
+                    languageSelector()
+                }
+                SettingRow(
+                    label = stringResource(Res.string.settings_splash),
+                    help = stringResource(Res.string.settings_splash_help),
+                ) {
+                    OnOff(value = splashAnimation, onChange = onSetSplashAnimation)
+                }
+                SettingRow(
+                    label = stringResource(Res.string.settings_player_clock),
+                    help = stringResource(Res.string.settings_player_clock_help),
+                ) {
+                    OnOff(value = playerClock, onChange = onSetPlayerClock)
+                }
+                SettingRow(
+                    label = stringResource(Res.string.settings_trailer_autoplay),
+                    help = stringResource(Res.string.settings_trailer_autoplay_help),
+                ) {
+                    OnOff(value = trailerAutoplay, onChange = onSetTrailerAutoplay)
+                }
+                // Sous l'aperçu, et non ailleurs : c'est son son. Le
+                // laisser actif quand l'aperçu est coupé n'a pas de sens,
+                // mais on n'en grise pas la ligne — un réglage grisé se
+                // lit mal, et le texte d'aide dit déjà ce qu'il commande.
+                SettingRow(
+                    label = stringResource(Res.string.settings_trailer_sound),
+                    help = stringResource(Res.string.settings_trailer_sound_help),
+                ) {
+                    OnOff(value = trailerSound, onChange = onSetTrailerSound)
+                }
+            }
+
+            SettingsSection.INTRO -> {
+                SettingRow(
+                    label = stringResource(Res.string.settings_skip_intro),
+                    help = stringResource(Res.string.settings_intro_help),
+                ) {
+                    OnOff(value = skipIntroOutro, onChange = onSetSkipIntroOutro)
+                }
+                SettingRow(
+                    label = stringResource(Res.string.settings_autoplay),
+                    help = stringResource(Res.string.settings_autoplay_help),
+                ) {
+                    OnOff(value = autoPlayNext, onChange = onSetAutoPlayNext)
+                }
+            }
+
+            SettingsSection.HISTORY -> SettingRow(
+                label = stringResource(Res.string.settings_history_widgets),
+                help = stringResource(Res.string.settings_history_help),
+            ) {
+                // Le réglage stocké dit « masquer » ; les boutons disent ce
+                // qu'ils font. D'où l'inversion, faite ici plutôt que dans
+                // le dépôt : les sauvegardes déjà écrites gardent leur sens.
+                OnOff(
+                    value = !hideHistoryWidgets,
+                    onChange = { onSetHideHistoryWidgets(!it) },
+                    onLabel = stringResource(Res.string.common_show),
+                    offLabel = stringResource(Res.string.common_hide),
+                )
+            }
+
+            SettingsSection.SCREENSAVER -> SettingRow(
+                label = stringResource(Res.string.settings_screensaver_delay),
+                help = stringResource(Res.string.settings_screensaver_help),
+            ) {
+                MoovieSelect(
+                    title = stringResource(Res.string.settings_screensaver_delay),
+                    options = ScreensaverDelay.entries.toList(),
+                    selected = screensaverDelay,
+                    label = { screensaverDelayLabel(it) },
+                    onSelect = onSetScreensaverDelay,
+                )
+            }
+
+            SettingsSection.UPDATE -> {
+                // La version installée, en tête de section.
+                //
+                // Elle manquait, et son absence a coûté cher : « À jour » ne
+                // dit pas *depuis quoi*, si bien qu'un appareil portant une
+                // version plus haute que tout ce qui est publié — un build
+                // local, une rc dépassée — se lit exactement comme un canal
+                // en panne. C'est la première chose à regarder quand une
+                // mise à jour n'arrive pas, elle a donc sa place ici et non
+                // dans un écran « À propos ».
+                SettingRow(label = stringResource(Res.string.settings_current_version)) {
+                    Text(appVersionName, style = MaterialTheme.typography.titleMedium)
+                }
+                SettingRow(
+                    label = stringResource(Res.string.settings_update_interval),
+                    help = stringResource(Res.string.settings_update_help),
+                ) {
+                    MoovieSelect(
+                        title = stringResource(Res.string.settings_update_interval),
+                        options = UpdateInterval.entries.toList(),
+                        selected = updateInterval,
+                        label = { updateIntervalLabel(it) },
+                        onSelect = onSetUpdateInterval,
+                    )
+                }
+                // Juste sous la fréquence : les deux disent *quand* et *quoi*
+                // on ira chercher, et se lisent ensemble.
+                SettingRow(
+                    label = stringResource(Res.string.settings_update_prereleases),
+                    help = stringResource(Res.string.settings_update_prereleases_help),
+                ) {
+                    OnOff(value = updatePrereleases, onChange = onSetUpdatePrereleases)
+                }
+                // Vérification immédiate : sans elle, installer une version
+                // tout juste publiée imposait d'attendre le prochain tour de
+                // la minuterie — jusqu'à deux heures — ou de relancer l'app.
+                SettingRow(
+                    label = stringResource(Res.string.settings_check_now),
+                    help = stringResource(Res.string.settings_check_now_help),
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
+                        // Le cas « rien de neuf » est le plus fréquent, et
+                        // c'est le seul que la bannière ne sait pas dire :
+                        // sans ce retour le bouton paraîtrait inerte.
+                        when (updateCheck) {
+                            UpdateCheck.CHECKING ->
+                                Text(stringResource(Res.string.settings_check_running), color = MOOVIE_TEXT_DIM)
+                            UpdateCheck.UP_TO_DATE ->
+                                Text(stringResource(Res.string.settings_check_uptodate), color = MOOVIE_TEXT_DIM)
+                            UpdateCheck.FAILED ->
+                                Text(stringResource(Res.string.settings_check_failed), color = MOOVIE_ERROR)
+                            UpdateCheck.IDLE -> Unit
+                        }
+                        // Toujours `enabled` : le passer à false pendant la
+                        // vérification faisait perdre le focus au bouton —
+                        // Compose le retire d'un nœud désactivé et ne le
+                        // rend pas — et la télécommande se retrouvait
+                        // renvoyée dans le volet des sections. Les appuis
+                        // répétés sont absorbés par checkNow() lui-même.
+                        MoovieButton(onClick = { onCheckUpdates?.invoke() }) {
+                            Text(stringResource(Res.string.settings_check_now))
+                        }
+                    }
+                }
+            }
+
+            SettingsSection.DNS -> {
+                SettingRow(
+                    label = stringResource(Res.string.settings_doh_on),
+                    help = stringResource(Res.string.settings_dns_help),
+                ) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        MoovieButton(
+                            onClick = { onSetDohEnabled(true) },
+                            selected = dohEnabled,
+                        ) { Text(stringResource(Res.string.settings_doh_on)) }
+                        MoovieButton(
+                            onClick = { onSetDohEnabled(false) },
+                            selected = !dohEnabled,
+                        ) { Text(stringResource(Res.string.settings_doh_off)) }
+                    }
+                }
+                // Le résolveur n'a de sens que si le DoH est actif.
+                if (dohEnabled) {
+                    SettingRow(label = stringResource(Res.string.settings_doh_resolver)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            DohProvider.entries.forEach { provider ->
+                                MoovieButton(
+                                    onClick = { onSetDohProvider(provider) },
+                                    selected = provider == dohProvider,
+                                ) { Text(provider.label) }
+                            }
+                        }
+                    }
+                }
+            }
+
+            SettingsSection.SOURCES -> {
+                Text(
+                    stringResource(Res.string.settings_sources_help),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MOOVIE_TEXT_DIM,
+                )
+                providers.forEachIndexed { index, provider ->
+                    ProviderRow(
+                        index = index,
+                        provider = provider,
+                        isLast = index == providers.lastIndex,
+                        onMoveUp = { onMoveProviderUp(provider.name) },
+                        onMoveDown = { onMoveProviderDown(provider.name) },
+                        onToggle = { onToggleProvider(provider.name, !provider.enabled) },
+                    )
+                }
+
+                // Vider le cache des sources, à la main.
+                //
+                // Les liens trouvés sont gardés six heures pour que revenir
+                // sur une fiche soit instantané. Le revers est qu'un site
+                // qui change de format — ou un correctif qu'on vient
+                // d'installer — reste invisible pendant tout ce temps sur
+                // les titres déjà ouverts, sans aucun moyen d'insister.
+                //
+                // La version de l'application invalide déjà les entrées à
+                // chaque mise à jour ; ce bouton couvre l'autre cas, celui
+                // où c'est le **site** qui a bougé et pas nous.
+                val cacheScope = rememberCoroutineScope()
+                var cleared by remember { mutableStateOf(false) }
+                SettingRow(
+                    label = stringResource(Res.string.settings_sources_cache),
+                    help = stringResource(
+                        if (cleared) Res.string.settings_sources_cache_done
+                        else Res.string.settings_sources_cache_help,
+                    ),
+                ) {
+                    MoovieButton(
+                        enabled = !cleared,
+                        onClick = {
+                            cacheScope.launch {
+                                SourceCacheRepository().clear()
+                                // Les mesures de qualité aussi : les deux
+                                // magasins répondent à la même question —
+                                // « l'application me ressert du vieux » —
+                                // et n'en vider qu'un laisserait la moitié
+                                // du symptôme, les sources étant alors
+                                // reclassées sur des hauteurs d'avant.
+                                StreamMeasureRepository().clear()
+                                cleared = true
+                            }
+                        },
+                    ) { Text(stringResource(Res.string.settings_sources_cache_action)) }
+                }
+            }
+
+            // Comme la sauvegarde : un parcours (se connecter), pas un
+            // réglage. D'où son état porté par elle-même.
+            SettingsSection.SUBTITLES -> SubtitlesSection()
+
+            // Seule autre section à porter son propre état : c'est un parcours en
+            // plusieurs étapes, pas un réglage. Voir [BackupSection].
+            // Comme la sauvegarde : son état est le magasin lui-même,
+            // pas un réglage hissé jusqu'ici. Voir [HomeLayoutSection].
+            SettingsSection.HOME -> HomeLayoutSection()
+
+            SettingsSection.PROFILES -> ProfilesSection()
+
+            SettingsSection.BACKUP -> BackupSection()
+
+            // Comme la sauvegarde : un parcours qui porte son propre état.
+            SettingsSection.SYNC -> SyncSection()
+
+            SettingsSection.DOWNLOADS -> DownloadsSection(onPlay = onPlayDownload)
+        }
+    }
+
+    // ── Au doigt : une liste, puis une page ─────────────────────────────────
+    //
+    // Le téléphone héritait du volet du bureau, replié en barre de soixante-huit
+    // points : quinze icônes sans libellé, empilées le long du bord, et le
+    // contenu comprimé dans ce qui restait. Une icône seule ne dit pas
+    // « sous-titres » ni « DNS » — il fallait les ouvrir une par une pour savoir
+    // laquelle était laquelle, et la barre mangeait la moitié de la largeur dès
+    // qu'on la dépliait pour lire.
+    //
+    // Un téléphone n'affiche pas deux volets, il en affiche un et navigue :
+    // la liste des sections d'abord, la section ensuite, le retour ramène à la
+    // liste. Chaque écran a alors toute la largeur — celle-là même qui manquait
+    // aux libellés.
+    if (compact) {
+        var ouverte by rememberSaveable { mutableStateOf<SettingsSection?>(null) }
+        val visible = ouverte
+        if (visible == null) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    // Le titre touchait la barre d'état : la page vient d'un
+                    // volet qui, lui, avait ses quarante points de marge haute.
+                    .padding(top = ESPACE_LARGE, bottom = ESPACE_SECTION),
+                verticalArrangement = Arrangement.spacedBy(ESPACE_SERRE),
+            ) {
+                MooviePageHeader(titre = stringResource(Res.string.settings_title))
+                sections.forEach { entry ->
+                    LigneSection(
+                        entry = entry,
+                        onClick = {
+                            section = entry
+                            ouverte = entry
+                        },
+                    )
+                }
+            }
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    // Le titre touchait la barre d'état : la page vient d'un
+                    // volet qui, lui, avait ses quarante points de marge haute.
+                    .padding(top = ESPACE_LARGE, bottom = ESPACE_SECTION),
+                verticalArrangement = Arrangement.spacedBy(ESPACE_LARGE),
+            ) {
+                MooviePageHeader(
+                    titre = sectionLabel(visible),
+                    onBack = { ouverte = null },
+                )
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = margePage()),
+                    verticalArrangement = Arrangement.spacedBy(ESPACE_LARGE),
+                ) {
+                    contenuSection()
+                }
+            }
+        }
+        return
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         // ── Volet gauche : navigation ────────────────────────────────────────
         Column(
             modifier = Modifier
                 .zIndex(1f)
-                .width(if (expanded) NAV_WIDTH else RAIL_WIDTH)
+                .width(NAV_WIDTH)
                 .fillMaxHeight()
                 .background(MOOVIE_SURFACE)
                 // Défilant : à neuf sections, la liste dépasse la hauteur d'un
@@ -454,54 +842,18 @@ fun SettingsScreenContent(
                     }
                     false
                 }
-                .padding(
-                    vertical = if (compact) 24.dp else 40.dp,
-                    horizontal = if (expanded) 20.dp else 10.dp,
-                ),
+                .padding(vertical = 40.dp, horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            if (compact) {
-                // Déplier / replier. Le titre « Réglages » ne tient pas dans une
-                // barre de 68 dp, ce bouton en tient lieu — et l'onglet du bas
-                // dit déjà où l'on est.
-                MoovieIconButton(
-                    onClick = { railExpanded = !railExpanded },
-                    icon = if (expanded) Icons.AutoMirrored.Filled.MenuOpen else Icons.Default.Menu,
-                    contentDescription = stringResource(
-                        if (expanded) Res.string.common_hide else Res.string.common_show,
-                    ),
-                )
-                Spacer(Modifier.height(8.dp))
-            } else {
-                Text(
-                    stringResource(Res.string.settings_title),
-                    style = MaterialTheme.typography.headlineSmall,
-                    modifier = Modifier.padding(start = 8.dp, bottom = 20.dp),
-                )
-            }
-            // L'écran de veille n'a pas de sens sur un téléphone : le système y
-            // éteint déjà l'écran tout seul, et personne ne laisse un film en
-            // pause sur un appareil qu'il tient en main. La section disparaît
-            // plutôt que de rester là, inutile.
-            // La télécommande, elle, n'a de sens qu'aux deux bouts du salon :
-            // le téléviseur qu'on pilote et le téléphone qui pilote. Sur un
-            // ordinateur, la section n'aurait aucune ligne à afficher.
-            // La section n'existe que si la plateforme a fourni de quoi la
-            // dessiner. Voir le paramètre `remoteSection`.
-            val remote = remoteSection != null
-            val sections = SettingsSection.entries.filterNot {
-                (compact && it == SettingsSection.SCREENSAVER) ||
-                    (!remote && it == SettingsSection.REMOTE) ||
-                    (onCheckUpdates == null && it == SettingsSection.UPDATE)
-            }
+            Text(
+                stringResource(Res.string.settings_title),
+                style = MaterialTheme.typography.headlineSmall,
+                modifier = Modifier.padding(start = 8.dp, bottom = 20.dp),
+            )
             sections.forEach { entry ->
                 MoovieButton(
                     onClick = {
                         section = entry
-                        // Replié après le choix : la barre dépliée mange la
-                        // moitié d'un écran de téléphone, et on l'a ouverte pour
-                        // choisir, pas pour rester dedans.
-                        if (compact) railExpanded = false
                     },
                     selected = entry == section,
                     modifier = Modifier
@@ -521,16 +873,12 @@ fun SettingsScreenContent(
                 ) {
                     Icon(
                         imageVector = sectionIcon(entry),
-                        // Le libellé le dit déjà quand il est là ; replié, c'est
-                        // l'icône qui doit parler aux lecteurs d'écran.
-                        contentDescription = if (expanded) null else sectionLabel(entry),
+                        contentDescription = null,
                         modifier = Modifier.size(20.dp),
                     )
-                    if (expanded) {
-                        Spacer(Modifier.width(12.dp))
-                        // weight : le libellé occupe la ligne, donc reste aligné à gauche.
-                        Text(sectionLabel(entry), modifier = Modifier.weight(1f))
-                    }
+                    Spacer(Modifier.width(12.dp))
+                    // weight : le libellé occupe la ligne, donc reste aligné à gauche.
+                    Text(sectionLabel(entry), modifier = Modifier.weight(1f))
                 }
             }
             // Écart fixe, plus un poids : dans une colonne défilante, `weight`
@@ -539,13 +887,11 @@ fun SettingsScreenContent(
             MoovieButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = if (expanded) null else stringResource(Res.string.common_back),
+                    contentDescription = null,
                     modifier = Modifier.size(20.dp),
                 )
-                if (expanded) {
-                    Spacer(Modifier.width(12.dp))
-                    Text(stringResource(Res.string.common_back), modifier = Modifier.weight(1f))
-                }
+                Spacer(Modifier.width(12.dp))
+                Text(stringResource(Res.string.common_back), modifier = Modifier.weight(1f))
             }
         }
 
@@ -555,11 +901,11 @@ fun SettingsScreenContent(
                 .fillMaxSize()
                 // Largeur repliée seulement : déplier ne doit pas redistribuer
                 // la place, sinon le texte se recompose à chaque ouverture.
-                .padding(start = if (compact) RAIL_WIDTH else NAV_WIDTH)
+                .padding(start = NAV_WIDTH)
                 .verticalScroll(rememberScrollState())
                 .padding(
-                    horizontal = if (compact) 20.dp else margePage(),
-                    vertical = if (compact) 24.dp else 40.dp,
+                    horizontal = margePage(),
+                    vertical = 40.dp,
                 )
                 // **Borné, sinon le contrôle quitte son libellé.**
                 //
@@ -576,316 +922,41 @@ fun SettingsScreenContent(
                 .widthIn(max = LARGEUR_REGLAGES),
             verticalArrangement = Arrangement.spacedBy(ESPACE_LARGE),
         ) {
-            // **Le nom de la section au rang de titre de page.**
-            //
-            // Il était en `titleLarge` et rose, c'est-à-dire au rang d'un titre
-            // de rangée : sur une page qui n'affiche qu'une section à la fois,
-            // c'est pourtant elle, le sujet. Le rose venait du volet, où la
-            // ligne sélectionnée est déjà marquée — la couleur disait deux fois
-            // la même chose et manquait là où on lit.
-            Text(
-                sectionLabel(section),
-                style = MaterialTheme.typography.headlineMedium,
-                color = MOOVIE_TEXT,
-            )
-
-            // Appairage d'un téléphone pour la saisie. L'état vit hors du `when`
-            // pour que sa mémoire ne dépende pas de la branche affichée.
-            var pairing by remember { mutableStateOf(false) }
-            if (pairing) pairingDialog?.invoke({ pairing = false })
-
-            when (section) {
-                SettingsSection.REMOTE -> remoteSection?.invoke { pairing = true }
-
-                SettingsSection.API -> {
-                    SettingRow(
-                        label = stringResource(Res.string.settings_tmdb_key),
-                        help = stringResource(Res.string.settings_tmdb_help),
-                    ) {
-                        ApiKeyField(
-                            value = apiKey,
-                            hint = stringResource(Res.string.settings_tmdb_hint),
-                            onValueChange = onSetApiKey,
-                        )
-                    }
-                    // Deuxième clé, et deuxième modèle : celle de TheIntroDB
-                    // identifie un contributeur, pas l'application. D'où sa
-                    // place ici, à côté de celle de TMDB.
-                    SettingRow(
-                        label = stringResource(Res.string.settings_introdb_key),
-                        help = stringResource(Res.string.settings_introdb_help),
-                    ) {
-                        ApiKeyField(
-                            value = introDbKey,
-                            hint = stringResource(Res.string.settings_introdb_hint),
-                            onValueChange = onSetIntroDbKey,
-                        )
-                    }
-                }
-
-                SettingsSection.PLAYBACK -> {
-                    SettingRow(label = stringResource(Res.string.settings_stream_lang)) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            StreamLanguage.entries.forEach { lang ->
-                                MoovieButton(
-                                    onClick = { onSetStreamLanguage(lang) },
-                                    selected = lang == streamLang,
-                                ) { Text(lang.name) }
-                            }
-                        }
-                    }
-                    SettingRow(label = stringResource(Res.string.settings_language)) {
-                        languageSelector()
-                    }
-                    SettingRow(
-                        label = stringResource(Res.string.settings_splash),
-                        help = stringResource(Res.string.settings_splash_help),
-                    ) {
-                        OnOff(value = splashAnimation, onChange = onSetSplashAnimation)
-                    }
-                    SettingRow(
-                        label = stringResource(Res.string.settings_player_clock),
-                        help = stringResource(Res.string.settings_player_clock_help),
-                    ) {
-                        OnOff(value = playerClock, onChange = onSetPlayerClock)
-                    }
-                    SettingRow(
-                        label = stringResource(Res.string.settings_trailer_autoplay),
-                        help = stringResource(Res.string.settings_trailer_autoplay_help),
-                    ) {
-                        OnOff(value = trailerAutoplay, onChange = onSetTrailerAutoplay)
-                    }
-                    // Sous l'aperçu, et non ailleurs : c'est son son. Le
-                    // laisser actif quand l'aperçu est coupé n'a pas de sens,
-                    // mais on n'en grise pas la ligne — un réglage grisé se
-                    // lit mal, et le texte d'aide dit déjà ce qu'il commande.
-                    SettingRow(
-                        label = stringResource(Res.string.settings_trailer_sound),
-                        help = stringResource(Res.string.settings_trailer_sound_help),
-                    ) {
-                        OnOff(value = trailerSound, onChange = onSetTrailerSound)
-                    }
-                }
-
-                SettingsSection.INTRO -> {
-                    SettingRow(
-                        label = stringResource(Res.string.settings_skip_intro),
-                        help = stringResource(Res.string.settings_intro_help),
-                    ) {
-                        OnOff(value = skipIntroOutro, onChange = onSetSkipIntroOutro)
-                    }
-                    SettingRow(
-                        label = stringResource(Res.string.settings_autoplay),
-                        help = stringResource(Res.string.settings_autoplay_help),
-                    ) {
-                        OnOff(value = autoPlayNext, onChange = onSetAutoPlayNext)
-                    }
-                }
-
-                SettingsSection.HISTORY -> SettingRow(
-                    label = stringResource(Res.string.settings_history_widgets),
-                    help = stringResource(Res.string.settings_history_help),
-                ) {
-                    // Le réglage stocké dit « masquer » ; les boutons disent ce
-                    // qu'ils font. D'où l'inversion, faite ici plutôt que dans
-                    // le dépôt : les sauvegardes déjà écrites gardent leur sens.
-                    OnOff(
-                        value = !hideHistoryWidgets,
-                        onChange = { onSetHideHistoryWidgets(!it) },
-                        onLabel = stringResource(Res.string.common_show),
-                        offLabel = stringResource(Res.string.common_hide),
-                    )
-                }
-
-                SettingsSection.SCREENSAVER -> SettingRow(
-                    label = stringResource(Res.string.settings_screensaver_delay),
-                    help = stringResource(Res.string.settings_screensaver_help),
-                ) {
-                    MoovieSelect(
-                        title = stringResource(Res.string.settings_screensaver_delay),
-                        options = ScreensaverDelay.entries.toList(),
-                        selected = screensaverDelay,
-                        label = { screensaverDelayLabel(it) },
-                        onSelect = onSetScreensaverDelay,
-                    )
-                }
-
-                SettingsSection.UPDATE -> {
-                    // La version installée, en tête de section.
-                    //
-                    // Elle manquait, et son absence a coûté cher : « À jour » ne
-                    // dit pas *depuis quoi*, si bien qu'un appareil portant une
-                    // version plus haute que tout ce qui est publié — un build
-                    // local, une rc dépassée — se lit exactement comme un canal
-                    // en panne. C'est la première chose à regarder quand une
-                    // mise à jour n'arrive pas, elle a donc sa place ici et non
-                    // dans un écran « À propos ».
-                    SettingRow(label = stringResource(Res.string.settings_current_version)) {
-                        Text(appVersionName, style = MaterialTheme.typography.titleMedium)
-                    }
-                    SettingRow(
-                        label = stringResource(Res.string.settings_update_interval),
-                        help = stringResource(Res.string.settings_update_help),
-                    ) {
-                        MoovieSelect(
-                            title = stringResource(Res.string.settings_update_interval),
-                            options = UpdateInterval.entries.toList(),
-                            selected = updateInterval,
-                            label = { updateIntervalLabel(it) },
-                            onSelect = onSetUpdateInterval,
-                        )
-                    }
-                    // Juste sous la fréquence : les deux disent *quand* et *quoi*
-                    // on ira chercher, et se lisent ensemble.
-                    SettingRow(
-                        label = stringResource(Res.string.settings_update_prereleases),
-                        help = stringResource(Res.string.settings_update_prereleases_help),
-                    ) {
-                        OnOff(value = updatePrereleases, onChange = onSetUpdatePrereleases)
-                    }
-                    // Vérification immédiate : sans elle, installer une version
-                    // tout juste publiée imposait d'attendre le prochain tour de
-                    // la minuterie — jusqu'à deux heures — ou de relancer l'app.
-                    SettingRow(
-                        label = stringResource(Res.string.settings_check_now),
-                        help = stringResource(Res.string.settings_check_now_help),
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(16.dp),
-                        ) {
-                            // Le cas « rien de neuf » est le plus fréquent, et
-                            // c'est le seul que la bannière ne sait pas dire :
-                            // sans ce retour le bouton paraîtrait inerte.
-                            when (updateCheck) {
-                                UpdateCheck.CHECKING ->
-                                    Text(stringResource(Res.string.settings_check_running), color = MOOVIE_TEXT_DIM)
-                                UpdateCheck.UP_TO_DATE ->
-                                    Text(stringResource(Res.string.settings_check_uptodate), color = MOOVIE_TEXT_DIM)
-                                UpdateCheck.FAILED ->
-                                    Text(stringResource(Res.string.settings_check_failed), color = MOOVIE_ERROR)
-                                UpdateCheck.IDLE -> Unit
-                            }
-                            // Toujours `enabled` : le passer à false pendant la
-                            // vérification faisait perdre le focus au bouton —
-                            // Compose le retire d'un nœud désactivé et ne le
-                            // rend pas — et la télécommande se retrouvait
-                            // renvoyée dans le volet des sections. Les appuis
-                            // répétés sont absorbés par checkNow() lui-même.
-                            MoovieButton(onClick = { onCheckUpdates?.invoke() }) {
-                                Text(stringResource(Res.string.settings_check_now))
-                            }
-                        }
-                    }
-                }
-
-                SettingsSection.DNS -> {
-                    SettingRow(
-                        label = stringResource(Res.string.settings_doh_on),
-                        help = stringResource(Res.string.settings_dns_help),
-                    ) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            MoovieButton(
-                                onClick = { onSetDohEnabled(true) },
-                                selected = dohEnabled,
-                            ) { Text(stringResource(Res.string.settings_doh_on)) }
-                            MoovieButton(
-                                onClick = { onSetDohEnabled(false) },
-                                selected = !dohEnabled,
-                            ) { Text(stringResource(Res.string.settings_doh_off)) }
-                        }
-                    }
-                    // Le résolveur n'a de sens que si le DoH est actif.
-                    if (dohEnabled) {
-                        SettingRow(label = stringResource(Res.string.settings_doh_resolver)) {
-                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                DohProvider.entries.forEach { provider ->
-                                    MoovieButton(
-                                        onClick = { onSetDohProvider(provider) },
-                                        selected = provider == dohProvider,
-                                    ) { Text(provider.label) }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                SettingsSection.SOURCES -> {
-                    Text(
-                        stringResource(Res.string.settings_sources_help),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MOOVIE_TEXT_DIM,
-                    )
-                    providers.forEachIndexed { index, provider ->
-                        ProviderRow(
-                            index = index,
-                            provider = provider,
-                            isLast = index == providers.lastIndex,
-                            onMoveUp = { onMoveProviderUp(provider.name) },
-                            onMoveDown = { onMoveProviderDown(provider.name) },
-                            onToggle = { onToggleProvider(provider.name, !provider.enabled) },
-                        )
-                    }
-
-                    // Vider le cache des sources, à la main.
-                    //
-                    // Les liens trouvés sont gardés six heures pour que revenir
-                    // sur une fiche soit instantané. Le revers est qu'un site
-                    // qui change de format — ou un correctif qu'on vient
-                    // d'installer — reste invisible pendant tout ce temps sur
-                    // les titres déjà ouverts, sans aucun moyen d'insister.
-                    //
-                    // La version de l'application invalide déjà les entrées à
-                    // chaque mise à jour ; ce bouton couvre l'autre cas, celui
-                    // où c'est le **site** qui a bougé et pas nous.
-                    val cacheScope = rememberCoroutineScope()
-                    var cleared by remember { mutableStateOf(false) }
-                    SettingRow(
-                        label = stringResource(Res.string.settings_sources_cache),
-                        help = stringResource(
-                            if (cleared) Res.string.settings_sources_cache_done
-                            else Res.string.settings_sources_cache_help,
-                        ),
-                    ) {
-                        MoovieButton(
-                            enabled = !cleared,
-                            onClick = {
-                                cacheScope.launch {
-                                    SourceCacheRepository().clear()
-                                    // Les mesures de qualité aussi : les deux
-                                    // magasins répondent à la même question —
-                                    // « l'application me ressert du vieux » —
-                                    // et n'en vider qu'un laisserait la moitié
-                                    // du symptôme, les sources étant alors
-                                    // reclassées sur des hauteurs d'avant.
-                                    StreamMeasureRepository().clear()
-                                    cleared = true
-                                }
-                            },
-                        ) { Text(stringResource(Res.string.settings_sources_cache_action)) }
-                    }
-                }
-
-                // Comme la sauvegarde : un parcours (se connecter), pas un
-                // réglage. D'où son état porté par elle-même.
-                SettingsSection.SUBTITLES -> SubtitlesSection()
-
-                // Seule autre section à porter son propre état : c'est un parcours en
-                // plusieurs étapes, pas un réglage. Voir [BackupSection].
-                // Comme la sauvegarde : son état est le magasin lui-même,
-                // pas un réglage hissé jusqu'ici. Voir [HomeLayoutSection].
-                SettingsSection.HOME -> HomeLayoutSection()
-
-                SettingsSection.PROFILES -> ProfilesSection()
-
-                SettingsSection.BACKUP -> BackupSection()
-
-                // Comme la sauvegarde : un parcours qui porte son propre état.
-                SettingsSection.SYNC -> SyncSection()
-
-                SettingsSection.DOWNLOADS -> DownloadsSection(onPlay = onPlayDownload)
-            }
+            contenuSection()
         }
+    }
+}
+
+/**
+ * Une entrée de la liste des sections, au doigt.
+ *
+ * Icône, nom, chevron. Le chevron n'est pas un ornement : c'est lui qui dit que
+ * la ligne mène ailleurs plutôt que de basculer un réglage — la même ligne sans
+ * lui se lit comme une case à cocher dont on ne voit pas la case.
+ */
+@Composable
+private fun LigneSection(entry: SettingsSection, onClick: () -> Unit) {
+    MoovieButton(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = margePage()),
+    ) {
+        Icon(
+            imageVector = sectionIcon(entry),
+            contentDescription = null,
+            modifier = Modifier.size(20.dp),
+        )
+        Spacer(Modifier.width(ESPACE))
+        Text(
+            sectionLabel(entry),
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.weight(1f),
+        )
+        Icon(
+            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            contentDescription = null,
+            tint = MOOVIE_TEXT_DIM,
+            modifier = Modifier.size(20.dp),
+        )
     }
 }
 
