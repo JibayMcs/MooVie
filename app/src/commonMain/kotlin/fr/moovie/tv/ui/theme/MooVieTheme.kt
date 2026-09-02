@@ -20,7 +20,12 @@ private val MooVieColors = darkColorScheme(
 
 @Composable
 fun MooVieTheme(content: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = MooVieColors) {
+    // La typographie est **calculée**, pas constante : elle se resserre sur les
+    // écrans courts (voir `moovieTypography`). Un `Typography` figé aurait
+    // obligé chaque page à corriger ses tailles à la main, ce qu'on a
+    // effectivement fait sur la fiche de détails avant de comprendre que le
+    // problème était à la racine.
+    MaterialTheme(colorScheme = MooVieColors, typography = moovieTypography()) {
         // Couleur de contenu par défaut : sans Surface parent, les Text libres
         // hériteraient du noir par défaut → invisibles sur le fond sombre.
         CompositionLocalProvider(LocalContentColor provides MooVieColors.onBackground, content = content)

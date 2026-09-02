@@ -27,6 +27,20 @@ val MOOVIE_VIOLET = Color(0xFF7B3FB0)
 /** Teinte d'accent unique quand un dégradé n'a pas de sens (texte, séparateur). */
 val MOOVIE_ACCENT = MOOVIE_MAGENTA
 
+/**
+ * Les deux couleurs d'**état**, hors identité.
+ *
+ * La palette ci-dessus signale l'attention : ce qui est visé, sélectionné, en
+ * cours. Elle ne sait pas dire « c'est prêt » ni « voici la note », et l'y
+ * forcer reviendrait à peindre trois choses différentes de la même couleur.
+ *
+ * Elles vivent ici plutôt que dans l'écran qui les a introduites, parce que
+ * quatre écrans les emploient déjà — accueil, découverte, fiche, épisodes — et
+ * que deux verts voisins se lisent comme deux états différents.
+ */
+val MOOVIE_READY = Color(0xFF5FD98A)
+val MOOVIE_RATING = Color(0xFFE6B800)
+
 /** Le dégradé identité, dans le sens de lecture. */
 val MoovieGradient = Brush.horizontalGradient(
     listOf(MOOVIE_ORANGE, MOOVIE_MAGENTA, MOOVIE_VIOLET),

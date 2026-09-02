@@ -42,6 +42,8 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SettingsRemote
 import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -110,6 +112,8 @@ import fr.moovie.tv.resources.watchlist_row
 import fr.moovie.tv.ui.components.LocalMoovieFocusMemory
 import fr.moovie.tv.ui.catalog.CatalogSelection
 import fr.moovie.tv.ui.theme.MOOVIE_ACCENT
+import fr.moovie.tv.ui.theme.MOOVIE_RATING
+import fr.moovie.tv.ui.theme.MOOVIE_READY
 import fr.moovie.tv.ui.components.MoovieButton
 import fr.moovie.tv.data.download.titleKeyOf
 import fr.moovie.tv.ui.components.MoovieAsyncImage
@@ -623,7 +627,22 @@ private fun CatalogHero(item: TmdbItem) {
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             item.year?.let { Text(it, style = MaterialTheme.typography.titleMedium, color = Color(0xFFCCCCCC)) }
             if (item.voteAverage > 0) {
-                Text("★ " + formaterDecimal(item.voteAverage, 1), style = MaterialTheme.typography.titleMedium, color = Color(0xFFE6B800))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(5.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        Icons.Default.Star,
+                        contentDescription = null,
+                        tint = MOOVIE_RATING,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Text(
+                        formaterDecimal(item.voteAverage, 1),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MOOVIE_RATING,
+                    )
+                }
             }
         }
         Spacer(Modifier.height(10.dp))
@@ -1060,7 +1079,12 @@ private fun PosterCard(
                             .background(Color(0xCC0A0A0A)),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Text("✓", color = Color(0xFF5FD98A), style = MaterialTheme.typography.labelSmall)
+                        Icon(
+                            Icons.Default.Check,
+                            contentDescription = null,
+                            tint = MOOVIE_READY,
+                            modifier = Modifier.size(14.dp),
+                        )
                     }
                 }
                 // Signet en bas : l'ajout depuis une rangée doit se voir tout de
