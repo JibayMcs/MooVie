@@ -922,11 +922,25 @@ fun DetailsScreenContent(
         // déplace. Le hero occupe exactement le haut de la page, sur toute la
         // largeur : sa boîte est connue sans avoir à la mesurer.
         //
+        // **Pas de bande-annonce sur la fiche d'un épisode.**
+        //
+        // La bande-annonce appartient au titre, pas à l'épisode : sur la fiche
+        // du troisième épisode d'une saison, c'est celle de la série qui se
+        // lançait, par-dessus la vignette de l'épisode — la seule image qui
+        // décrive vraiment ce qu'on est venu voir. Et ce n'est pas ce qu'on
+        // s'apprête à regarder. Elle reste sur la fiche de la série, à un
+        // retour de là.
+        //
+        // C'est aussi ce qui corrigeait un défaut visible : le hero de
+        // l'épisode ne masquait pas son image quand la vidéo jouait derrière,
+        // et l'on se retrouvait avec une bannière posée sur une bande-annonce.
+        val surUnEpisode = selectedEpisode != null
+        val apercuPossible = previewPlaying && ready != null &&
+            trailerPreview != null && !surUnEpisode
         // Vrai quand la bande-annonce joue dans le cadre du hero : elle y prend
         // la place de l'image, et c'est le hero qui porte ses commandes.
-        val apercuDansHero = heroPleinCadre && !trailerInFront &&
-            previewPlaying && ready != null && trailerPreview != null
-        if (previewPlaying && ready != null && trailerPreview != null) {
+        val apercuDansHero = heroPleinCadre && !trailerInFront && apercuPossible
+        if (apercuPossible) {
             AnimatedVisibility(
                 visible = true,
                 enter = fadeIn(animationSpec = tween(HERO_PREVIEW_FADE_MS)),
@@ -934,7 +948,20 @@ fun DetailsScreenContent(
                     Modifier
                         .align(Alignment.TopStart)
                         .fillMaxWidth()
-                        .height(hauteurHero)
+                        // **La boîte de l'image, pas celle du cadre.**
+                        //
+                        // En paysage les deux coïncident : l'image occupe tout
+                        // le hero. En portrait non — l'image y garde son 16:9
+                        // en haut et le texte prend la suite. La vidéo calée
+                        // sur le cadre entier débordait donc derrière le titre
+                        // et les boutons, à un endroit où l'image ne va pas.
+                        .then(
+                            if (compact) {
+                                Modifier.aspectRatio(16f / 9f)
+                            } else {
+                                Modifier.height(hauteurHero)
+                            },
+                        )
                         // La page défile, le hero monte, la vidéo le suit.
                         // Lue dans la couche graphique et non dans la mesure :
                         // le défilement ne redéclenche alors qu'un dessin.
