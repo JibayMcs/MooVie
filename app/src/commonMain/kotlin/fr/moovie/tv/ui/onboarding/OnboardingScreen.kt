@@ -68,6 +68,8 @@ import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 import fr.moovie.tv.ui.theme.MOOVIE_TEXT_DIM
 import fr.moovie.tv.ui.theme.MOOVIE_WARN
+import fr.moovie.tv.ui.theme.margePage
+import fr.moovie.tv.ui.theme.ESPACE_LARGE
 
 internal val DIM = MOOVIE_TEXT_DIM
 
@@ -313,14 +315,23 @@ fun OnboardingScreen(
     // c'est le seul écran de l'application qui n'a rien d'autre à montrer que
     // lui-même. Le reste de l'app fait déjà cette distinction : 16 dp au doigt,
     // 48 dp ailleurs, sur la fiche comme sur l'accueil.
-    val margeH = if (auDoigt) 20.dp else 56.dp
     val margeV = if (auDoigt) 24.dp else 48.dp
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = margeH, vertical = margeV),
-        verticalArrangement = Arrangement.spacedBy(20.dp),
+            // La marge de la page, comme partout : c'est le premier écran que
+            // voit un nouvel arrivant, et il n'a aucune raison d'être le seul
+            // dont le bord gauche tombe ailleurs.
+            .padding(horizontal = margePage(), vertical = margeV)
+            // **Borné en largeur.** C'est une page qu'on lit et sur laquelle on
+            // décide, pas une page qu'on parcourt : trois cartes et deux
+            // paragraphes. Étirées sur une fenêtre de bureau ouverte en grand,
+            // les cartes faisaient des lignes de cent caractères pour un texte
+            // de vingt mots, et l'œil perdait le début de la suivante. La borne
+            // est celle du synopsis de la fiche, pour la même raison.
+            .widthIn(max = LARGEUR_LECTURE),
+        verticalArrangement = Arrangement.spacedBy(ESPACE_LARGE),
     ) {
         when (mode) {
             Mode.BIENVENUE -> Bienvenue(
@@ -500,6 +511,9 @@ private fun Bienvenue(
  * est le seul à dire ce qu'il reste à faire, ce qu'une pastille éteinte
  * n'exprime qu'à qui sait déjà les compter.
  */
+/** Au-delà, une ligne de texte cesse de se relire — la borne du synopsis. */
+private val LARGEUR_LECTURE = 900.dp
+
 @Composable
 private fun Progression(rang: Int, total: Int) {
     Row(
