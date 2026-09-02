@@ -224,6 +224,7 @@ import fr.moovie.tv.ui.theme.MOOVIE_SURFACE_HIGH
 import fr.moovie.tv.ui.theme.MOOVIE_TEXT
 import fr.moovie.tv.ui.theme.ESPACE
 import fr.moovie.tv.ui.theme.ESPACE_SERRE
+import fr.moovie.tv.ui.theme.ESPACE_LARGE
 
 /**
  * Largeur du volet de navigation. Volontairement contenue : en 1080p l'écran ne
@@ -548,12 +549,19 @@ fun SettingsScreenContent(
                     horizontal = if (compact) 20.dp else 40.dp,
                     vertical = if (compact) 24.dp else 40.dp,
                 ),
-            verticalArrangement = Arrangement.spacedBy(20.dp),
+            verticalArrangement = Arrangement.spacedBy(ESPACE_LARGE),
         ) {
+            // **Le nom de la section au rang de titre de page.**
+            //
+            // Il était en `titleLarge` et rose, c'est-à-dire au rang d'un titre
+            // de rangée : sur une page qui n'affiche qu'une section à la fois,
+            // c'est pourtant elle, le sujet. Le rose venait du volet, où la
+            // ligne sélectionnée est déjà marquée — la couleur disait deux fois
+            // la même chose et manquait là où on lit.
             Text(
                 sectionLabel(section),
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.primary,
+                style = MaterialTheme.typography.headlineMedium,
+                color = MOOVIE_TEXT,
             )
 
             // Appairage d'un téléphone pour la saisie. L'état vit hors du `when`
