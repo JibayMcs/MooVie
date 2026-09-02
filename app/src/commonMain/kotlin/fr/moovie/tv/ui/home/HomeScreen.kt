@@ -149,6 +149,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import fr.moovie.tv.ui.components.MooviePosterCard
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.foundation.clickable
 
 /**
  * Écran d'accueil partagé TV + desktop : état hoisté (le ViewModel reste
@@ -248,12 +249,25 @@ fun HomeScreenContent(
         // bandeau, et mangeait exactement l'amorce censée montrer la première
         // rangée : on arrivait sur une image pleine page sans rien dessous.
         val hauteurDispo = maxHeight
-        val hauteurHeros = (hauteurDispo - HAUTEUR_NAV - BLOC_RANGEE)
-            .coerceIn(200.dp, 620.dp)
+        val auDoigtIci = useBottomNav
+        // **Deux hauteurs de héros, parce que deux formats.**
+        //
+        // En paysage, le héros prend ce qui reste une fois une rangée entière
+        // réservée. En portrait ce calcul n'a pas de sens : l'écran est haut et
+        // étroit, une rangée d'affiches y tient de toute façon sous n'importe
+        // quel héros, et « ce qui reste » ferait un cadre de six cents points
+        // pour une image de deux cent trente. Le portrait se cale donc sur
+        // l'image elle-même — un 16:9 pleine largeur — plus la place du bloc de
+        // texte sous elle.
+        val hauteurHeros = if (auDoigtIci) {
+            maxWidth / 16f * 9f + BLOC_TEXTE_HEROS
+        } else {
+            (hauteurDispo - HAUTEUR_NAV - BLOC_RANGEE).coerceIn(200.dp, 620.dp)
+        }
         // La boîte que l'image et le voile doivent couvrir : le héros, barre
         // comprise. Le dégradé la reçoit en fraction, un `Brush` ne connaissant
         // que des fractions de la surface qu'il peint.
-        val hauteurFond = HAUTEUR_NAV + hauteurHeros
+        val hauteurFond = if (auDoigtIci) hauteurHeros else HAUTEUR_NAV + hauteurHeros
         val fondFrac = (hauteurFond / hauteurDispo).coerceIn(0.05f, 1f)
         // Backdrop dynamique avec fondu enchaîné quand l'élément focalisé change.
         Crossfade(
@@ -351,6 +365,16 @@ fun HomeScreenContent(
             // *bonne* carte, mais elle sort toujours de la barre — et sortir de
             // la barre est le minimum qu'on doive à quelqu'un qui appuie sur
             // Bas.
+            // Ce que fait un appui sur le héros. Les trois natures de cible
+            // mènent à trois gestes différents : reprendre une lecture en
+            // cours, ouvrir un titre mis de côté, ouvrir un titre proposé.
+            val ouvrirCible: (HeroTarget) -> Unit = { cible ->
+                when (cible) {
+                    is HeroTarget.Resume -> onResume(cible.entry)
+                    is HeroTarget.Watchlist -> onOpenTitle(cible.entry.tmdbId, cible.entry.isTv)
+                    is HeroTarget.Catalog -> onOpenTitle(cible.item.id, cible.item.isTv)
+                }
+            }
             val gestionnaireFocus = LocalFocusManager.current
             // **Revenir sur la barre, c'est revenir en haut.**
             //
@@ -515,15 +539,36 @@ fun HomeScreenContent(
                     // L'amorce sous lui n'est pas décorative : sans elle, rien
                     // ne dit qu'il y a des rangées plus bas, et l'accueil
                     // ressemble à une affiche.
-                    if (!auDoigt) {
-                        item(key = "heros") {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(hauteurHeros),
-                            ) {
-                                Hero(featured, modifier = Modifier.align(Alignment.BottomStart))
-                            }
+                    item(key = "heros") {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(hauteurHeros),
+                        ) {
+                            // **Le héros descend au doigt, et devient cliquable.**
+                            //
+                            // Il en était absent parce qu'il décrivait l'élément
+                            // *focalisé* — et il n'y a pas de focus au tactile :
+                            // il restait figé sur le premier titre, à décrire
+                            // quelque chose que personne n'avait désigné. On
+                            // l'avait donc retiré, et l'accueil s'ouvrait
+                            // directement sur une rangée d'affiches.
+                            //
+                            // Ce n'est plus vrai depuis qu'il porte une action :
+                            // il ne décrit plus une visée, il **propose** un
+                            // titre, et l'on tape dessus pour l'ouvrir. C'est ce
+                            // que fait toute application de streaming sur
+                            // téléphone, et c'est ce qui donne à l'accueil un
+                            // sujet au lieu d'une liste.
+                            Hero(
+                                featured,
+                                modifier = Modifier.align(Alignment.BottomStart),
+                                onOpen = if (auDoigt) {
+                                    { cible -> ouvrirCible(cible) }
+                                } else {
+                                    null
+                                },
+                            )
                         }
                     }
                     itemsIndexed(slots, key = { _, slot -> slot.id }) { index, slot ->
@@ -662,6 +707,17 @@ private val HERO_HEIGHT = 148.dp
 private val BLOC_RANGEE = 310.dp
 
 /**
+ * Place du titre, de la méta et du bouton sous l'image du héros, en portrait.
+ *
+ * En paysage le texte se pose **sur** l'image, qui est large et dont la moitié
+ * gauche est libre. En portrait il n'y a pas de moitié libre : l'image est un
+ * 16:9 pleine largeur, et lui superposer trois lignes plus un bouton la
+ * couvrirait aux deux tiers. Le texte passe donc dessous, et cette valeur est
+ * la hauteur qu'il réclame.
+ */
+private val BLOC_TEXTE_HEROS = 150.dp
+
+/**
  * Cale une rangée en haut de la liste dès qu'elle prend le focus.
  *
  * Le défilement automatique du focus se contente d'amener la rangée *quelque
@@ -723,18 +779,32 @@ private val POSTER_WIDTH = 138.dp
 private const val LARGEUR_HEROS = 0.55f
 
 @Composable
-private fun Hero(target: HeroTarget?, modifier: Modifier = Modifier) {
+private fun Hero(
+    target: HeroTarget?,
+    modifier: Modifier = Modifier,
+    /** Non nul au doigt : le héros y est une proposition sur laquelle on tape. */
+    onOpen: ((HeroTarget) -> Unit)? = null,
+) {
+    val auDoigt = useBottomNav
     Box(
         modifier = modifier
-            // **Borné à la moitié gauche, désormais.**
+            // **Borné à la moitié gauche en paysage, pleine largeur en portrait.**
             //
-            // Le héros prenait toute la largeur, ce qui se tenait sur un fond
-            // flouté et uniforme : il n'y avait rien derrière. Maintenant que
-            // l'image est nette, la moitié droite est claire une fois sur deux,
-            // et un synopsis blanc y disparaissait. Le dégradé latéral protège
-            // jusqu'à 55 % ; le texte s'arrête donc avant.
-            .fillMaxWidth(if (useBottomNav) 1f else LARGEUR_HEROS)
-            .height(HERO_HEIGHT)
+            // Le héros prenait toute la largeur partout, ce qui se tenait sur un
+            // fond flouté et uniforme : il n'y avait rien derrière. Sur une
+            // image nette, la moitié droite d'un écran large est claire une fois
+            // sur deux et un synopsis blanc y disparaît — d'où la borne. En
+            // portrait la question ne se pose pas : le texte est **sous**
+            // l'image, pas dessus, et il a droit à toute la largeur.
+            .fillMaxWidth(if (auDoigt) 1f else LARGEUR_HEROS)
+            .then(if (auDoigt) Modifier else Modifier.height(HERO_HEIGHT))
+            .then(
+                if (onOpen != null && target != null) {
+                    Modifier.clickable { onOpen(target) }
+                } else {
+                    Modifier
+                },
+            )
             .padding(horizontal = margePage(), vertical = 8.dp),
     ) {
         when (target) {
