@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -239,13 +240,52 @@ fun HomeScreenContent(
                     model = url,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize().blur(28.dp),
+                    // **Nette, et seulement en haut.**
+                    //
+                    // Elle était floutée à 28 points sur toute la page, puis
+                    // noyée sous un aplat à 60 % : autant dire une texture. La
+                    // fiche de détails a montré l'inverse — une image qu'on
+                    // voit vaut mieux qu'une ambiance qu'on devine —, et la
+                    // même image sert ici de fond au titre mis en avant.
+                    //
+                    // Elle ne couvre plus que la moitié haute : en dessous
+                    // commencent les rangées d'affiches, et une image derrière
+                    // des affiches, c'est deux images l'une sur l'autre.
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .fillMaxHeight(HAUTEUR_FOND)
+                        .align(Alignment.TopCenter),
                 )
             }
         }
+        // **Deux dégradés, comme sur la fiche.**
+        //
+        // Le latéral protège la colonne de gauche, celle qui porte le titre :
+        // sans lui, un backdrop clair de ce côté rend un titre blanc illisible.
+        // Le vertical raccorde l'image aux rangées et l'éteint avant qu'elles ne
+        // commencent — c'est ce qui évite qu'une affiche se découpe sur un ciel.
         Box(
             modifier = Modifier.fillMaxSize().background(
-                Brush.verticalGradient(listOf(Color(0x990A0A0A), Color(0xF20A0A0A))),
+                Brush.horizontalGradient(
+                    0f to MOOVIE_BG,
+                    0.55f to Color(0x000A0A0A),
+                ),
+            ),
+        )
+        Box(
+            modifier = Modifier.fillMaxSize().background(
+                Brush.verticalGradient(
+                    // Le tout premier palier ne sert qu'à la rangée d'icônes du
+                    // coin haut droit. Elle est posée sur l'image, hors de la
+                    // zone que le dégradé latéral protège, et une icône blanche
+                    // sur un plateau de télévision éclairé ne se voit pas. Il
+                    // s'éteint vite : au-dessous commence la partie de l'image
+                    // qu'on veut effectivement regarder.
+                    0f to Color(0xB30A0A0A),
+                    0.16f to Color(0x260A0A0A),
+                    HAUTEUR_FOND * 0.6f to Color(0x800A0A0A),
+                    HAUTEUR_FOND to MOOVIE_BG,
+                ),
             ),
         )
 
@@ -537,6 +577,16 @@ private sealed interface HeroTarget {
 private val HERO_HEIGHT = 148.dp
 
 /**
+ * Part de la hauteur que l'image de fond occupe.
+ *
+ * En dessous commencent les rangées d'affiches. Une image qui descendrait plus
+ * bas se retrouverait derrière elles — deux images l'une sur l'autre, dont
+ * aucune ne se lit. La valeur cadre le héros et la première rangée, ce qui est
+ * exactement la zone qu'on regarde en arrivant.
+ */
+private const val HAUTEUR_FOND = 0.52f
+
+/**
  * Cale une rangée en haut de la liste dès qu'elle prend le focus.
  *
  * Le défilement automatique du focus se contente d'amener la rangée *quelque
@@ -585,28 +635,30 @@ private fun RowSlot(
 private val POSTER_WIDTH = 138.dp
 
 /**
- * Place réservée au coin haut droit, où les boutons de la barre sont posés en
- * surimpression du héros depuis le retrait du wordmark. Sans elle, un titre
- * long passe **dessous** — constaté sur « Star Wars, épisode III - La Revanche
- * des Sith ». Ne s'applique qu'au titre : le synopsis, plus bas, garde toute la
- * largeur, qu'on était justement allé chercher.
+ * Part de la largeur que le héros occupe.
+ *
+ * Elle correspond à la zone que le dégradé latéral protège. Au-delà, le fond
+ * est l'image elle-même, et rien ne garantit qu'elle soit sombre.
+ *
+ * Le retrait de 250 dp qui réservait le coin haut droit aux boutons de la barre
+ * disparaît avec ça : le titre ne va plus jusque-là, et un titre long — « Star
+ * Wars, épisode III - La Revanche des Sith » — cesse d'être amputé de moitié
+ * pour une collision qui ne peut plus se produire.
  */
-private val HERO_TITLE_END_INSET = 250.dp
-
-/**
- * Le retrait ne vaut que là où les boutons sont réellement posés sur le héros.
- * Sur tactile ils sont partis dans la barre basse, et réserver 250 dp sur les
- * 448 dp d'un téléphone en portrait — plus de la moitié de l'écran — ne laissait
- * lire que « Spider… » d'un titre pourtant court.
- */
-private val heroTitleEndInset: Dp
-    @Composable get() = if (useBottomNav) 0.dp else HERO_TITLE_END_INSET
+private const val LARGEUR_HEROS = 0.55f
 
 @Composable
 private fun Hero(target: HeroTarget?, modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
-            .fillMaxWidth()
+            // **Borné à la moitié gauche, désormais.**
+            //
+            // Le héros prenait toute la largeur, ce qui se tenait sur un fond
+            // flouté et uniforme : il n'y avait rien derrière. Maintenant que
+            // l'image est nette, la moitié droite est claire une fois sur deux,
+            // et un synopsis blanc y disparaissait. Le dégradé latéral protège
+            // jusqu'à 55 % ; le texte s'arrête donc avant.
+            .fillMaxWidth(if (useBottomNav) 1f else LARGEUR_HEROS)
             .height(HERO_HEIGHT)
             .padding(horizontal = margePage(), vertical = 8.dp),
     ) {
@@ -627,7 +679,6 @@ private fun CatalogHero(item: TmdbItem) {
             style = MaterialTheme.typography.displaySmall,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(end = heroTitleEndInset),
         )
         Spacer(Modifier.height(6.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -685,7 +736,7 @@ private fun ResumeHero(entry: ResumeEntry) {
             style = MaterialTheme.typography.displaySmall,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(end = heroTitleEndInset),
+
         )
         Spacer(Modifier.height(6.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -736,7 +787,7 @@ private fun WatchlistHero(entry: WatchlistEntry) {
             style = MaterialTheme.typography.displaySmall,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(end = heroTitleEndInset),
+
         )
         Spacer(Modifier.height(6.dp))
         Text(
