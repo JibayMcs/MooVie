@@ -121,6 +121,9 @@ val LocalHeightClass = staticCompositionLocalOf { HeightClass.MEDIUM }
  */
 val LocalWindowWidth = compositionLocalOf { 960.dp }
 
+/** La hauteur de la fenêtre, même raison : un héros plein écran a besoin du nombre. */
+val LocalWindowHeight = compositionLocalOf { 540.dp }
+
 /** Vrai sur un appareil piloté au doigt — téléphone ou tablette. */
 val isTouchUi: Boolean
     @Composable get() = LocalUiFlavor.current == UiFlavor.TOUCH
@@ -181,6 +184,7 @@ fun AdaptiveRoot(
             LocalWidthClass provides widthClassOf(maxWidth),
             LocalHeightClass provides heightClassOf(maxHeight),
             LocalWindowWidth provides maxWidth,
+            LocalWindowHeight provides maxHeight,
             content = content,
         )
     }
