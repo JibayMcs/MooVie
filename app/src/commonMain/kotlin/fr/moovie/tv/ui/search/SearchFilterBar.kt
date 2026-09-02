@@ -36,6 +36,7 @@ import fr.moovie.tv.resources.search_sort_rating
 import fr.moovie.tv.resources.search_sort_relevance
 import fr.moovie.tv.resources.search_sort_title
 import fr.moovie.tv.resources.search_sort_year
+import fr.moovie.tv.ui.components.BarreDefilante
 import fr.moovie.tv.ui.components.MoovieButton
 import org.jetbrains.compose.resources.stringResource
 import fr.moovie.tv.ui.theme.MOOVIE_WARN
@@ -73,103 +74,96 @@ fun SearchFilterBar(
      */
     allowRelevance: Boolean = true,
 ) {
-    Row(
-        modifier = modifier.horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        // Marges dans le contenu et non autour : la barre défile, et une marge
-        // extérieure rognerait le bouton agrandi au focus (voir Gotchas).
-    ) {
-        Row(
-            modifier = Modifier.padding(PaddingValues(horizontal = hPad)),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
+    // Quatre à six filtres : ils tiennent sur un téléviseur et débordent en
+    // portrait, où le dernier sortait de l'écran sans que rien ne le dise. La
+    // barre porte désormais ses propres repères — voir [BarreDefilante], qui
+    // gère aussi la marge de page dans le défilement (le rembourrage extérieur
+    // rognait le bouton agrandi au focus).
+    BarreDefilante(modifier = modifier, marge = hPad) {
+        MoovieButton(
+            onClick = { onChange(filters.copy(sortBy = filters.sortBy.next(allowRelevance))) },
+            selected = filters.sortBy != SearchFilters.DEFAULT.sortBy,
         ) {
+            Text(sortLabel(filters.sortBy), style = MaterialTheme.typography.labelMedium)
+        }
+
+        if (filters.sortBy != SortBy.RELEVANCE) {
             MoovieButton(
-                onClick = { onChange(filters.copy(sortBy = filters.sortBy.next(allowRelevance))) },
-                selected = filters.sortBy != SearchFilters.DEFAULT.sortBy,
-            ) {
-                Text(sortLabel(filters.sortBy), style = MaterialTheme.typography.labelMedium)
-            }
-
-            if (filters.sortBy != SortBy.RELEVANCE) {
-                MoovieButton(
-                    onClick = { onChange(filters.copy(ascending = !filters.ascending)) },
-                ) {
-                    Text(
-                        stringResource(
-                            if (filters.ascending) Res.string.search_sort_asc
-                            else Res.string.search_sort_desc,
-                        ),
-                        style = MaterialTheme.typography.labelMedium,
-                    )
-                }
-            }
-
-            if (showMedia) {
-                MoovieButton(
-                    onClick = { onChange(filters.copy(media = filters.media.next())) },
-                    selected = filters.media != SearchFilters.DEFAULT.media,
-                ) {
-                    Text(
-                        stringResource(
-                            when (filters.media) {
-                                MediaFilter.ALL -> Res.string.search_media_all
-                                MediaFilter.MOVIE -> Res.string.search_media_movies
-                                MediaFilter.TV -> Res.string.search_media_shows
-                            },
-                        ),
-                        style = MaterialTheme.typography.labelMedium,
-                    )
-                }
-            }
-
-            MoovieButton(
-                onClick = { onChange(filters.copy(minRating = nextRating(filters.minRating))) },
-                selected = filters.minRating > 0.0,
-            ) {
-                Text(
-                    if (filters.minRating <= 0.0) {
-                        stringResource(Res.string.search_rating_any)
-                    } else {
-                        // Sans décimale : les paliers sont entiers, et « 7,0 »
-                        // laisserait croire qu'on peut demander 7,5.
-                        stringResource(Res.string.search_rating_min, filters.minRating.toInt().toString())
-                    },
-                    style = MaterialTheme.typography.labelMedium,
-                )
-            }
-
-            MoovieButton(
-                onClick = { onChange(filters.withDecade(nextDecade(filters))) },
-                selected = filters.minYear != null || filters.maxYear != null,
-            ) {
-                Text(decadeLabel(filters), style = MaterialTheme.typography.labelMedium)
-            }
-
-            MoovieButton(
-                onClick = { onChange(filters.copy(includeAdult = !filters.includeAdult)) },
-                selected = filters.includeAdult,
+                onClick = { onChange(filters.copy(ascending = !filters.ascending)) },
             ) {
                 Text(
                     stringResource(
-                        if (filters.includeAdult) Res.string.search_adult_shown
-                        else Res.string.search_adult_hidden,
+                        if (filters.ascending) Res.string.search_sort_asc
+                        else Res.string.search_sort_desc,
                     ),
                     style = MaterialTheme.typography.labelMedium,
                 )
             }
+        }
 
-            // Seulement quand il y a quelque chose à effacer : autrement il
-            // occupe une place et un cran de focus pour rien.
-            if (filters.isActive) {
-                MoovieButton(onClick = { onChange(SearchFilters.DEFAULT) }) {
-                    Text(
-                        stringResource(Res.string.search_filters_reset),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MOOVIE_WARN,
-                    )
-                }
+        if (showMedia) {
+            MoovieButton(
+                onClick = { onChange(filters.copy(media = filters.media.next())) },
+                selected = filters.media != SearchFilters.DEFAULT.media,
+            ) {
+                Text(
+                    stringResource(
+                        when (filters.media) {
+                            MediaFilter.ALL -> Res.string.search_media_all
+                            MediaFilter.MOVIE -> Res.string.search_media_movies
+                            MediaFilter.TV -> Res.string.search_media_shows
+                        },
+                    ),
+                    style = MaterialTheme.typography.labelMedium,
+                )
+            }
+        }
+
+        MoovieButton(
+            onClick = { onChange(filters.copy(minRating = nextRating(filters.minRating))) },
+            selected = filters.minRating > 0.0,
+        ) {
+            Text(
+                if (filters.minRating <= 0.0) {
+                    stringResource(Res.string.search_rating_any)
+                } else {
+                    // Sans décimale : les paliers sont entiers, et « 7,0 »
+                    // laisserait croire qu'on peut demander 7,5.
+                    stringResource(Res.string.search_rating_min, filters.minRating.toInt().toString())
+                },
+                style = MaterialTheme.typography.labelMedium,
+            )
+        }
+
+        MoovieButton(
+            onClick = { onChange(filters.withDecade(nextDecade(filters))) },
+            selected = filters.minYear != null || filters.maxYear != null,
+        ) {
+            Text(decadeLabel(filters), style = MaterialTheme.typography.labelMedium)
+        }
+
+        MoovieButton(
+            onClick = { onChange(filters.copy(includeAdult = !filters.includeAdult)) },
+            selected = filters.includeAdult,
+        ) {
+            Text(
+                stringResource(
+                    if (filters.includeAdult) Res.string.search_adult_shown
+                    else Res.string.search_adult_hidden,
+                ),
+                style = MaterialTheme.typography.labelMedium,
+            )
+        }
+
+        // Seulement quand il y a quelque chose à effacer : autrement il
+        // occupe une place et un cran de focus pour rien.
+        if (filters.isActive) {
+            MoovieButton(onClick = { onChange(SearchFilters.DEFAULT) }) {
+                Text(
+                    stringResource(Res.string.search_filters_reset),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MOOVIE_WARN,
+                )
             }
         }
     }

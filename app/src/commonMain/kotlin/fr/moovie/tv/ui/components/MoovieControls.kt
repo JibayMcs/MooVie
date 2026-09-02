@@ -536,12 +536,21 @@ fun MoovieMarqueeText(
     style: TextStyle = LocalTextStyle.current,
     color: Color = Color.Unspecified,
 ) {
-    // Le défilement était réservé à la carte focalisée ou survolée. **Au doigt,
-    // rien n'est jamais actif** : un titre trop long y restait tronqué pour
-    // toujours, sans aucun moyen de le lire en entier. Il défile donc en
-    // permanence sur écran tactile — `basicMarquee` ne s'anime que si le texte
-    // déborde réellement, une carte au titre court ne coûte rien.
-    val active = LocalMoovieCardActive.current || isTouchUi
+    // **Le défilement suit le focus, et rien d'autre.**
+    //
+    // Au doigt, rien n'est jamais actif : le titre a d'abord défilé en
+    // permanence, pour qu'un titre long reste lisible en entier. Dans une
+    // grille, cela met neuf titres en mouvement à la fois, chacun sur son
+    // propre cycle — et chaque regard porté sur la page en attrape trois au
+    // milieu d'un mot. « y Tale for Grown-u » ne se lit pas comme un titre qui
+    // défile, mais comme un titre cassé.
+    //
+    // L'ellipse est ce que fait tout catalogue sur téléphone : elle dit qu'il
+    // manque quelque chose sans le prendre en otage, et la fiche du titre est à
+    // un doigt de là. Le défilement reste sur les appareils qui ont un focus,
+    // où une seule carte à la fois s'anime — et où l'on ne peut pas ouvrir la
+    // fiche aussi vite pour lever le doute.
+    val active = LocalMoovieCardActive.current
     Text(
         text = text,
         style = style,
