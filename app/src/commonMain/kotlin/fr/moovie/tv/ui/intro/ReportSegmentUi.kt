@@ -50,6 +50,7 @@ import fr.moovie.tv.ui.components.MoovieButton
 import fr.moovie.tv.ui.player.PlayerOption
 import fr.moovie.tv.ui.player.PlayerOptionSection
 import org.jetbrains.compose.resources.stringResource
+import fr.moovie.tv.ui.theme.MOOVIE_TEXT_DIM
 
 /**
  * Modale de signalement, montée sur le même modèle d'options que le reste du
@@ -173,13 +174,13 @@ fun ReportMarkingBanner(
             Text(
                 stringResource(Res.string.report_seek_hint),
                 style = MaterialTheme.typography.bodySmall,
-                color = Color(0xFF9A9A9A),
+                color = MOOVIE_TEXT_DIM,
                 textAlign = TextAlign.Center,
             )
             Text(
                 stringResource(Res.string.report_cancel_hint),
                 style = MaterialTheme.typography.bodySmall,
-                color = Color(0xFF9A9A9A),
+                color = MOOVIE_TEXT_DIM,
             )
         }
     }

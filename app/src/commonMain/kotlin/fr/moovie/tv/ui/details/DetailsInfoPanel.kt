@@ -56,6 +56,7 @@ import fr.moovie.tv.resources.status_returning
 import fr.moovie.tv.ui.adaptive.useBottomNav
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
+import fr.moovie.tv.ui.theme.MOOVIE_TEXT_DIM
 
 /**
  * Le panneau « En savoir plus » : ce que la fiche sait du titre et n'affiche
@@ -251,5 +252,5 @@ private fun String.translatedStatus(): String? = when (lowercase()) {
     else -> takeIf { it.isNotBlank() }
 }
 
-private val LABEL_COLOR = Color(0xFF9A9A9A)
+private val LABEL_COLOR = MOOVIE_TEXT_DIM
 private val VALUE_COLOR = Color(0xFFE8E8E8)

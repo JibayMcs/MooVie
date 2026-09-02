@@ -98,8 +98,13 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.text.style.TextAlign
 import org.jetbrains.compose.resources.stringResource
+import fr.moovie.tv.ui.theme.MOOVIE_SURFACE
+import fr.moovie.tv.ui.theme.MOOVIE_SURFACE_HIGH
+import fr.moovie.tv.ui.theme.MOOVIE_TEXT_DIM
+import fr.moovie.tv.ui.theme.MOOVIE_TEXT_FAINT
+import fr.moovie.tv.ui.theme.MOOVIE_WARN
 
-private val DIM = Color(0xFF9A9A9A)
+private val DIM = MOOVIE_TEXT_DIM
 
 /**
  * Section « Sous-titres » des réglages : compte OpenSubtitles et quota.
@@ -267,7 +272,7 @@ private fun SubtitlePreview(style: SubtitleStyle) {
             .clip(MoovieShape)
             .background(
                 Brush.horizontalGradient(
-                    listOf(Color(0xFF1A1A1A), Color(0xFF8A8A8A), Color(0xFF2A2A2A)),
+                    listOf(MOOVIE_SURFACE, MOOVIE_TEXT_DIM, MOOVIE_SURFACE_HIGH),
                 ),
             ),
         contentAlignment = Alignment.Center,
@@ -395,7 +400,7 @@ private fun Help(text: String) = Text(
 private fun Warning(text: String) = Text(
     text,
     style = MaterialTheme.typography.bodySmall,
-    color = Color(0xFFE0B057),
+    color = MOOVIE_WARN,
     modifier = Modifier
         .fillMaxWidth()
         .border(1.dp, Color(0xFF7A5E22), MoovieShape)
@@ -428,7 +433,7 @@ private fun LabelledField(
             modifier = Modifier
                 .widthIn(max = 520.dp)
                 .fillMaxWidth()
-                .border(1.dp, Color(0xFF555555), MoovieShape)
+                .border(1.dp, MOOVIE_TEXT_FAINT, MoovieShape)
                 .padding(horizontal = 12.dp, vertical = 10.dp),
         ) {
             BasicTextField(

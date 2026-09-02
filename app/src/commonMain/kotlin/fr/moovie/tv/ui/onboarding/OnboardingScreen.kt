@@ -66,8 +66,10 @@ import fr.moovie.tv.ui.theme.MoovieShape
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
+import fr.moovie.tv.ui.theme.MOOVIE_TEXT_DIM
+import fr.moovie.tv.ui.theme.MOOVIE_WARN
 
-internal val DIM = Color(0xFF9A9A9A)
+internal val DIM = MOOVIE_TEXT_DIM
 
 /**
  * Les questions de l'installation, dans l'ordre où elles sont posées.
@@ -461,7 +463,7 @@ private fun Bienvenue(
         Text(
             stringResource(Res.string.onboarding_no_key),
             style = MaterialTheme.typography.bodyMedium,
-            color = Color(0xFFE0B057),
+            color = MOOVIE_WARN,
             modifier = Modifier.widthIn(max = 760.dp),
         )
     }

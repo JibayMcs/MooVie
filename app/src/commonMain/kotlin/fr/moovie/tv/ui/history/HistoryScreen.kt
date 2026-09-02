@@ -77,6 +77,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
+import fr.moovie.tv.ui.theme.MOOVIE_BG
+import fr.moovie.tv.ui.theme.MOOVIE_SURFACE
+import fr.moovie.tv.ui.theme.MOOVIE_SURFACE_HIGH
+import fr.moovie.tv.ui.theme.MOOVIE_TEXT_DIM
 
 /** Colonnes de la grille. Six tient en 1080p sans réduire les vignettes à rien. */
 private const val COLUMNS = 6
@@ -135,7 +139,7 @@ fun HistoryScreenContent(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize().background(Color(0xFF0A0A0A))) {
+    Box(modifier = Modifier.fillMaxSize().background(MOOVIE_BG)) {
         Column(modifier = Modifier.fillMaxSize().padding(vertical = 32.dp)) {
             Row(
                 modifier = Modifier.padding(horizontal = historyHPad()),
@@ -165,7 +169,7 @@ fun HistoryScreenContent(
                 Text(
                     stringResource(Res.string.history_empty),
                     style = MaterialTheme.typography.bodyLarge,
-                    color = Color(0xFF9A9A9A),
+                    color = MOOVIE_TEXT_DIM,
                     modifier = Modifier.padding(horizontal = historyHPad()),
                 )
                 return@Column
@@ -257,7 +261,7 @@ private fun DayHeader(day: HistoryDay) {
             // `contentPadding` de la liste réserve. Les deux doivent coïncider,
             // sinon l'en-tête déborde sur les vignettes ou laisse un trou.
             .height(DAY_HEADER_HEIGHT)
-            .background(Color(0xFF0A0A0A)),
+            .background(MOOVIE_BG),
         contentAlignment = Alignment.CenterStart,
     ) {
         Text(dayLabel(day), style = MaterialTheme.typography.titleLarge, color = MOOVIE_ACCENT)
@@ -330,7 +334,7 @@ private fun HistoryCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(16f / 9f)
-                    .background(Color(0xFF222222)),
+                    .background(MOOVIE_SURFACE_HIGH),
             ) {
                 MoovieAsyncImage(
                     model = entry.imageUrl,
@@ -347,7 +351,7 @@ private fun HistoryCard(
                     style = MaterialTheme.typography.bodySmall,
                 )
                 entry.episodeLabel?.let {
-                    Text(it, style = MaterialTheme.typography.labelSmall, color = Color(0xFF9A9A9A))
+                    Text(it, style = MaterialTheme.typography.labelSmall, color = MOOVIE_TEXT_DIM)
                 }
             }
         }
@@ -439,7 +443,7 @@ private fun StatCard(
     Row(
         modifier = modifier
             .clip(MoovieShape)
-            .background(Color(0xFF161616))
+            .background(MOOVIE_SURFACE)
             .padding(14.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -456,7 +460,7 @@ private fun StatCard(
             )
         }
         Column {
-            Text(title, style = MaterialTheme.typography.labelMedium, color = Color(0xFF9A9A9A))
+            Text(title, style = MaterialTheme.typography.labelMedium, color = MOOVIE_TEXT_DIM)
             Spacer(Modifier.height(4.dp))
             Text(
                 value,
@@ -465,7 +469,7 @@ private fun StatCard(
                 overflow = TextOverflow.Ellipsis,
             )
             if (detail != null) {
-                Text(detail, style = MaterialTheme.typography.labelSmall, color = Color(0xFF9A9A9A))
+                Text(detail, style = MaterialTheme.typography.labelSmall, color = MOOVIE_TEXT_DIM)
             }
         }
     }

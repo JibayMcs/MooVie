@@ -29,6 +29,7 @@ import fr.moovie.tv.ui.theme.MoovieGradient
 import org.jetbrains.compose.resources.stringResource
 import fr.moovie.tv.shared.espaceLibre
 import fr.moovie.tv.shared.espaceTotal
+import fr.moovie.tv.ui.theme.MOOVIE_TEXT_DIM
 
 /** Ce qu'occupe le volume qui porte les téléchargements. */
 data class StorageUsage(
@@ -206,4 +207,4 @@ private val AUTRE = Color(0xFF7C8AA6)
 private val LIBRE = Color(0xFF121216)
 private val CONTOUR = Color(0xFF3A3A45)
 private val CONTOUR_POINT = Color(0xFF6A6A78)
-private val DIM_LEGENDE = Color(0xFF9A9A9A)
+private val DIM_LEGENDE = MOOVIE_TEXT_DIM

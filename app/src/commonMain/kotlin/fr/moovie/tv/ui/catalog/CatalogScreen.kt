@@ -84,6 +84,11 @@ import org.jetbrains.compose.resources.stringResource
 import fr.moovie.tv.ui.search.SearchFilterBar
 import fr.moovie.tv.data.search.SearchFilters
 import androidx.compose.foundation.lazy.grid.GridItemSpan
+import fr.moovie.tv.ui.theme.MOOVIE_BG
+import fr.moovie.tv.ui.theme.MOOVIE_SCRIM
+import fr.moovie.tv.ui.theme.MOOVIE_SURFACE
+import fr.moovie.tv.ui.theme.MOOVIE_SURFACE_HIGH
+import fr.moovie.tv.ui.theme.MOOVIE_TEXT_DIM
 
 /**
  * Largeur du volet des genres. Reprend celle des réglages : en 1080p l'écran ne
@@ -227,7 +232,7 @@ fun CatalogScreenContent(
     }
 
     if (useBottomNav) {
-        Column(modifier = Modifier.fillMaxSize().background(Color(0xFF0A0A0A))) {
+        Column(modifier = Modifier.fillMaxSize().background(MOOVIE_BG)) {
             GenreChipRow(
                 entries = entries,
                 selection = selection,
@@ -242,7 +247,7 @@ fun CatalogScreenContent(
         return
     }
 
-    Row(modifier = Modifier.fillMaxSize().background(Color(0xFF0A0A0A))) {
+    Row(modifier = Modifier.fillMaxSize().background(MOOVIE_BG)) {
         GenrePane(
             entries = entries,
             selection = selection,
@@ -358,7 +363,7 @@ private fun GenrePane(
         modifier = Modifier
             .width(NAV_WIDTH)
             .fillMaxHeight()
-            .background(Color(0xFF141414)),
+            .background(MOOVIE_SURFACE),
         contentPadding = PaddingValues(vertical = 40.dp, horizontal = 20.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
@@ -569,7 +574,7 @@ private fun PosterCard(
                     modifier = Modifier
                         .fillMaxWidth()
                         .aspectRatio(2f / 3f)
-                        .background(Color(0xFF222222)),
+                        .background(MOOVIE_SURFACE_HIGH),
                 )
                 if (inWatchlist || isWatched) {
                     Box(
@@ -578,7 +583,7 @@ private fun PosterCard(
                             .padding(6.dp)
                             .size(24.dp)
                             .clip(CircleShape)
-                            .background(Color(0xCC0A0A0A)),
+                            .background(MOOVIE_SCRIM),
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(
@@ -605,7 +610,7 @@ private fun Message(text: String) {
     Text(
         text,
         style = MaterialTheme.typography.bodyLarge,
-        color = Color(0xFF9A9A9A),
+        color = MOOVIE_TEXT_DIM,
         modifier = Modifier.padding(horizontal = 40.dp),
     )
 }

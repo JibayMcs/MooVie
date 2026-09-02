@@ -41,9 +41,13 @@ import fr.moovie.tv.ui.adaptive.LocalHeightClass
 import fr.moovie.tv.ui.components.MoovieAsyncImage
 import fr.moovie.tv.ui.theme.MoovieShape
 import org.jetbrains.compose.resources.stringResource
+import fr.moovie.tv.ui.theme.MOOVIE_BG
+import fr.moovie.tv.ui.theme.MOOVIE_SURFACE_HIGH
+import fr.moovie.tv.ui.theme.MOOVIE_TEXT_DIM
+import fr.moovie.tv.ui.theme.MOOVIE_TEXT_MUTED
 
 /** Le gris des lignes secondaires du hero — celui du reste de la fiche. */
-private val HERO_DIM = Color(0xFF9A9A9A)
+private val HERO_DIM = MOOVIE_TEXT_DIM
 
 /**
  * La hauteur que le voile couvre, mesurée depuis le bas du cadre.
@@ -195,7 +199,7 @@ internal fun DetailsHero(
                     // moitié du voile : au-dessus, le texte n'a pas encore
                     // commencé et l'image n'a aucune raison de payer pour lui.
                     (debutVoile + (1f - debutVoile) * 0.45f) to Color(0x800A0A0A),
-                    1f to Color(0xFF0A0A0A),
+                    1f to MOOVIE_BG,
                 ),
             ),
         )
@@ -268,7 +272,7 @@ internal fun DetailsHero(
                         .width(150.dp)
                         .aspectRatio(2f / 3f)
                         .clip(MoovieShape)
-                        .background(Color(0xFF222222)),
+                        .background(MOOVIE_SURFACE_HIGH),
                 ) {
                     MoovieAsyncImage(
                         model = afficheUrl,
@@ -319,7 +323,7 @@ internal fun DetailsHero(
                     Text(
                         synopsis,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = Color(0xFFDDDDDD),
+                        color = MOOVIE_TEXT_MUTED,
                         maxLines = if (court) 3 else 4,
                         overflow = TextOverflow.Ellipsis,
                     )

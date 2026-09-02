@@ -63,8 +63,11 @@ import fr.moovie.tv.ui.theme.MOOVIE_VIOLET
 import fr.moovie.tv.ui.theme.MoovieShape
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
+import fr.moovie.tv.ui.theme.MOOVIE_BG
+import fr.moovie.tv.ui.theme.MOOVIE_TEXT_DIM
+import fr.moovie.tv.ui.theme.MOOVIE_TEXT_FAINT
 
-private val DIM = Color(0xFF9A9A9A)
+private val DIM = MOOVIE_TEXT_DIM
 
 /**
  * Palette des profils. Six couleurs franches, lisibles à trois mètres : sur une
@@ -107,7 +110,7 @@ fun ProfileGate(onPicked: (String) -> Unit) {
     var confirmDelete by remember { mutableStateOf<Profile?>(null) }
 
     Column(
-        modifier = Modifier.fillMaxSize().background(Color(0xFF0A0A0A))
+        modifier = Modifier.fillMaxSize().background(MOOVIE_BG)
             .padding(vertical = 32.dp),
         verticalArrangement = Arrangement.spacedBy(24.dp, Alignment.CenterVertically),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -225,7 +228,7 @@ private fun ProfileTile(
                 Text(
                     profile.initial(),
                     style = MaterialTheme.typography.headlineMedium,
-                    color = Color(0xFF0A0A0A),
+                    color = MOOVIE_BG,
                 )
             }
         }
@@ -272,10 +275,10 @@ private fun NameForm(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .border(1.dp, Color(0xFF555555), MoovieShape)
+                .border(1.dp, MOOVIE_TEXT_FAINT, MoovieShape)
                 .padding(horizontal = 12.dp, vertical = 10.dp),
         ) {
-            if (draft.isEmpty()) Text(stringResource(Res.string.profile_name_hint), color = Color(0xFF888888))
+            if (draft.isEmpty()) Text(stringResource(Res.string.profile_name_hint), color = MOOVIE_TEXT_DIM)
             BasicTextField(
                 value = draft,
                 onValueChange = { draft = it },

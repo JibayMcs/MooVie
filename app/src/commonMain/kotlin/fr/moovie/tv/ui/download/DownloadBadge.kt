@@ -38,9 +38,10 @@ import fr.moovie.tv.resources.settings_cat_downloads
 import fr.moovie.tv.ui.components.MoovieProgressBar
 import fr.moovie.tv.ui.theme.MOOVIE_ACCENT
 import org.jetbrains.compose.resources.stringResource
+import fr.moovie.tv.ui.theme.MOOVIE_READY
 
 /** Vert de « prêt hors ligne », le même que partout ailleurs. */
-private val READY = Color(0xFF7DDC7D)
+private val READY = MOOVIE_READY
 
 /**
  * L'état de téléchargement d'un titre, posé sur son affiche.

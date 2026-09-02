@@ -25,8 +25,9 @@ import fr.moovie.tv.ui.adaptive.useBottomNav
 import fr.moovie.tv.ui.download.DownloadsSection
 import fr.moovie.tv.ui.search.SearchField
 import org.jetbrains.compose.resources.stringResource
+import fr.moovie.tv.ui.theme.MOOVIE_TEXT_DIM
 
-private val DIM = Color(0xFF9A9A9A)
+private val DIM = MOOVIE_TEXT_DIM
 
 /**
  * Chercher, quand il n'y a que ses propres fichiers.

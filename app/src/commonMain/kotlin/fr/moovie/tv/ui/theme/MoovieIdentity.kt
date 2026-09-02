@@ -41,6 +41,55 @@ val MOOVIE_ACCENT = MOOVIE_MAGENTA
 val MOOVIE_READY = Color(0xFF5FD98A)
 val MOOVIE_RATING = Color(0xFFE6B800)
 
+/** Ce qui demande une décision sans être une panne : un téléchargement partiel. */
+val MOOVIE_WARN = Color(0xFFE0B057)
+
+/** Ce qui a échoué. Rouge désaturé : l'écran est sombre, un rouge pur y vibre. */
+val MOOVIE_ERROR = Color(0xFFE08585)
+
+/**
+ * ## L'échelle de gris, et pourquoi il en fallait une
+ *
+ * L'interface en comptait **six pour le texte** — `CCCCCC`, `DDDDDD`, `BBBBBB`,
+ * `9A9A9A`, `888888`, `777777` — et autant pour les fonds. Aucun de ces écarts
+ * n'était une décision : chacun est né sur un écran, à un moment, sans savoir
+ * ce que le voisin avait choisi. À l'usage, deux textes de même rang y prennent
+ * deux gris différents, et l'œil lit une hiérarchie là où il n'y en a pas.
+ *
+ * Quatre valeurs suffisent, et quatre valeurs se retiennent :
+ *
+ * - [MOOVIE_TEXT] — ce qu'on lit. Titres, libellés, contenu.
+ * - [MOOVIE_TEXT_MUTED] — ce qui accompagne. Synopsis, descriptions, aide.
+ * - [MOOVIE_TEXT_DIM] — ce qui qualifie. Métadonnées, rôles, unités.
+ * - [MOOVIE_TEXT_FAINT] — ce qui est indisponible. Rien d'autre.
+ *
+ * Le pas entre deux niveaux est net (environ 25 % de luminance) : c'est ce qui
+ * permet de les distinguer à trois mètres, là où six gris rapprochés se
+ * ressemblaient tous.
+ */
+val MOOVIE_TEXT = Color(0xFFF2F2F2)
+val MOOVIE_TEXT_MUTED = Color(0xFFB8B8B8)
+val MOOVIE_TEXT_DIM = Color(0xFF8C8C8C)
+val MOOVIE_TEXT_FAINT = Color(0xFF5E5E5E)
+
+/**
+ * Les fonds, même raisonnement.
+ *
+ * [MOOVIE_BG] est celui de la page — la même valeur que `background` du thème,
+ * nommée ici parce que des dizaines d'appels la réécrivaient à la main.
+ * [MOOVIE_SURFACE] est celui d'un bloc posé dessus, [MOOVIE_SURFACE_HIGH] celui
+ * d'un bloc posé sur un bloc. Au-delà de trois niveaux, on n'empile plus, on
+ * s'égare.
+ *
+ * [MOOVIE_SCRIM] est le voile qu'on passe **sur une image** pour y poser du
+ * texte. Il est noir et opaque à 80 % : moins, le texte devient illisible sur
+ * une affiche claire ; plus, l'image ne sert plus à rien.
+ */
+val MOOVIE_BG = Color(0xFF0A0A0A)
+val MOOVIE_SURFACE = Color(0xFF161616)
+val MOOVIE_SURFACE_HIGH = Color(0xFF232323)
+val MOOVIE_SCRIM = Color(0xCC0A0A0A)
+
 /** Le dégradé identité, dans le sens de lecture. */
 val MoovieGradient = Brush.horizontalGradient(
     listOf(MOOVIE_ORANGE, MOOVIE_MAGENTA, MOOVIE_VIOLET),

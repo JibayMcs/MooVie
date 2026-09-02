@@ -45,6 +45,7 @@ import fr.moovie.tv.ui.components.MoovieProgressBar
 import fr.moovie.tv.ui.player.MooviePlayerController
 import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.stringResource
+import fr.moovie.tv.ui.theme.MOOVIE_TEXT_MUTED
 
 /**
  * Les contrôles de la bande-annonce, posés sur l'aperçu qui joue déjà.
@@ -151,7 +152,7 @@ fun TrailerControls(
             Text(
                 "${formatClock(positionMs)} / ${formatClock(durationMs)}",
                 style = MaterialTheme.typography.labelMedium,
-                color = Color(0xFFBBBBBB),
+                color = MOOVIE_TEXT_MUTED,
             )
             Box(Modifier.weight(1f))
             MoovieIconButton(

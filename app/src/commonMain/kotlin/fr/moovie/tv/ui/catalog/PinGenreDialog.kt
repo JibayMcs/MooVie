@@ -43,6 +43,7 @@ import fr.moovie.tv.ui.components.MoovieButton
 import fr.moovie.tv.ui.home.homeRowLabel
 import fr.moovie.tv.ui.theme.MoovieShape
 import org.jetbrains.compose.resources.stringResource
+import fr.moovie.tv.ui.theme.MOOVIE_TEXT_DIM
 
 /**
  * Modale d'épinglage d'un genre, ouverte à l'appui long (TV, doigt) ou au clic
@@ -109,7 +110,7 @@ fun PinGenreDialog(
                 Text(
                     stringResource(Res.string.pin_position),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = Color(0xFF9A9A9A),
+                    color = MOOVIE_TEXT_DIM,
                 )
                 // Défilante, et **bornée bas** : la liste grandit à chaque
                 // épinglage, et une modale qui déborde de l'écran n'a plus de

@@ -68,9 +68,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.jetbrains.compose.resources.stringResource
+import fr.moovie.tv.ui.theme.MOOVIE_ERROR
+import fr.moovie.tv.ui.theme.MOOVIE_SURFACE
+import fr.moovie.tv.ui.theme.MOOVIE_SURFACE_HIGH
+import fr.moovie.tv.ui.theme.MOOVIE_TEXT_DIM
 
-private val DIM = Color(0xFF9A9A9A)
-private val PANEL = Color(0xFF1A1A1A)
+private val DIM = MOOVIE_TEXT_DIM
+private val PANEL = MOOVIE_SURFACE
 
 /**
  * Les téléchargements : ce qu'ils occupent, et de quoi les lire.
@@ -297,13 +301,13 @@ private fun DownloadRow(
             LinearProgressIndicator(
                 progress = { download.progress },
                 color = MOOVIE_ACCENT,
-                trackColor = Color(0xFF2A2A2A),
+                trackColor = MOOVIE_SURFACE_HIGH,
                 modifier = Modifier.fillMaxWidth(),
             )
         }
 
         download.error?.let {
-            Text(it, style = MaterialTheme.typography.labelSmall, color = Color(0xFFE06A6A))
+            Text(it, style = MaterialTheme.typography.labelSmall, color = MOOVIE_ERROR)
         }
 
         Row(

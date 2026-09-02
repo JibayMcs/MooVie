@@ -114,6 +114,8 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.abs
+import fr.moovie.tv.ui.theme.MOOVIE_BG
+import fr.moovie.tv.ui.theme.MOOVIE_TEXT_DIM
 
 /**
  * Page Découverte : des mains de cartes, une par recette.
@@ -163,7 +165,7 @@ fun DiscoveryScreenContent(
     // ne doit pas dépiler l'écran ni perdre les groupes déjà calculés.
     var quiz by remember { mutableStateOf<MoodQuestion?>(null) }
 
-    Box(modifier = modifier.fillMaxSize().background(Color(0xFF0A0A0A))) {
+    Box(modifier = modifier.fillMaxSize().background(MOOVIE_BG)) {
         Column(Modifier.fillMaxSize()) {
             EnTete(
                 showBackButton = showBackButton,
@@ -692,7 +694,7 @@ private fun VoirPlusCard(
                 }
                 .background(
                     Brush.verticalGradient(
-                        listOf(teinte.copy(alpha = 0.34f), Color(0xFF15151B), Color(0xFF0A0A0A)),
+                        listOf(teinte.copy(alpha = 0.34f), Color(0xFF15151B), MOOVIE_BG),
                     ),
                 )
                 .border(
@@ -860,7 +862,7 @@ private fun Carte(
                         text = "${carte.seen}/${carte.total}",
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF0A0A0A),
+                        color = MOOVIE_BG,
                         modifier = Modifier
                             .align(Alignment.TopStart)
                             .background(MoovieGradient)
@@ -997,7 +999,7 @@ private fun Contexte(
 }
 
 @Composable
-private fun Puce(texte: String, couleur: Color = Color(0xFF9A9AA5)) {
+private fun Puce(texte: String, couleur: Color = MOOVIE_TEXT_DIM) {
     Text(
         texte,
         style = MaterialTheme.typography.labelSmall,
@@ -1029,7 +1031,7 @@ private fun DemarrageAFroid(onStart: () -> Unit) {
         Text(
             stringResource(Res.string.discovery_cold_body),
             style = MaterialTheme.typography.bodyMedium,
-            color = Color(0xFF9A9AA5),
+            color = MOOVIE_TEXT_DIM,
         )
         Spacer(Modifier.height(20.dp))
         MoovieButton(onClick = onStart) {
@@ -1043,7 +1045,7 @@ private fun Message(texte: String) {
     Text(
         texte,
         style = MaterialTheme.typography.bodyMedium,
-        color = Color(0xFF9A9AA5),
+        color = MOOVIE_TEXT_DIM,
         modifier = Modifier.padding(horizontal = hPad(), vertical = 24.dp),
     )
 }
