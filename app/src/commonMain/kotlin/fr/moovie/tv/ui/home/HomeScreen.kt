@@ -543,7 +543,22 @@ fun HomeScreenContent(
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(hauteurHeros),
+                                .height(hauteurHeros)
+                                // **Tout le cadre, image comprise.**
+                                //
+                                // L'image est peinte à la racine de la page, en
+                                // fond ; seul le bloc de texte est un enfant du
+                                // héros. Poser l'appui sur ce bloc ne rendait
+                                // donc cliquable que les trois lignes de texte,
+                                // et taper l'affiche — le geste évident — ne
+                                // faisait rien.
+                                .then(
+                                    if (auDoigt && featured != null) {
+                                        Modifier.clickable { ouvrirCible(featured) }
+                                    } else {
+                                        Modifier
+                                    },
+                                ),
                         ) {
                             // **Le héros descend au doigt, et devient cliquable.**
                             //
@@ -560,15 +575,7 @@ fun HomeScreenContent(
                             // que fait toute application de streaming sur
                             // téléphone, et c'est ce qui donne à l'accueil un
                             // sujet au lieu d'une liste.
-                            Hero(
-                                featured,
-                                modifier = Modifier.align(Alignment.BottomStart),
-                                onOpen = if (auDoigt) {
-                                    { cible -> ouvrirCible(cible) }
-                                } else {
-                                    null
-                                },
-                            )
+                            Hero(featured, modifier = Modifier.align(Alignment.BottomStart))
                         }
                     }
                     itemsIndexed(slots, key = { _, slot -> slot.id }) { index, slot ->
@@ -779,12 +786,7 @@ private val POSTER_WIDTH = 138.dp
 private const val LARGEUR_HEROS = 0.55f
 
 @Composable
-private fun Hero(
-    target: HeroTarget?,
-    modifier: Modifier = Modifier,
-    /** Non nul au doigt : le héros y est une proposition sur laquelle on tape. */
-    onOpen: ((HeroTarget) -> Unit)? = null,
-) {
+private fun Hero(target: HeroTarget?, modifier: Modifier = Modifier) {
     val auDoigt = useBottomNav
     Box(
         modifier = modifier
@@ -798,13 +800,6 @@ private fun Hero(
             // l'image, pas dessus, et il a droit à toute la largeur.
             .fillMaxWidth(if (auDoigt) 1f else LARGEUR_HEROS)
             .then(if (auDoigt) Modifier else Modifier.height(HERO_HEIGHT))
-            .then(
-                if (onOpen != null && target != null) {
-                    Modifier.clickable { onOpen(target) }
-                } else {
-                    Modifier
-                },
-            )
             .padding(horizontal = margePage(), vertical = 8.dp),
     ) {
         when (target) {

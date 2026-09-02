@@ -142,6 +142,14 @@ internal fun DetailsHero(
     aside: (@Composable () -> Unit)? = null,
     imageMasquee: Boolean = false,
     controles: (@Composable () -> Unit)? = null,
+    /**
+     * Empile au lieu de juxtaposer : l'image en haut, tout le texte dessous.
+     *
+     * C'est la forme du portrait. Les deux colonnes supposent une largeur qu'un
+     * téléphone n'a pas, et le texte posé **sur** l'image suppose une moitié
+     * libre qui n'existe pas non plus quand l'image est un 16:9 pleine largeur.
+     */
+    enColonne: Boolean = false,
 ) {
     Box(modifier = Modifier.fillMaxWidth().height(hauteur)) {
         // **Une image, quelle qu'elle soit.** Le backdrop d'abord, c'est le seul
@@ -155,9 +163,25 @@ internal fun DetailsHero(
                 model = fond,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize().then(
-                    if (backdropUrl == null) Modifier.blur(48.dp) else Modifier,
-                ),
+                modifier = Modifier
+                    // **En colonne, l'image garde son format.**
+                    //
+                    // Étirée sur tout le cadre — image plus bloc de texte — un
+                    // 16:9 se retrouvait recadré en portrait : on n'en voyait
+                    // plus qu'une bande centrale très agrandie. Elle occupe
+                    // donc sa propre hauteur, en haut, et le texte prend le
+                    // reste.
+                    .then(
+                        if (enColonne) {
+                            Modifier
+                                .fillMaxWidth()
+                                .aspectRatio(16f / 9f)
+                                .align(Alignment.TopCenter)
+                        } else {
+                            Modifier.fillMaxSize()
+                        },
+                    )
+                    .then(if (backdropUrl == null) Modifier.blur(48.dp) else Modifier),
             )
         }
 
@@ -184,10 +208,13 @@ internal fun DetailsHero(
         // cadre se lisait comme une bande d'image posée sur un bloc noir —
         // exactement ce qu'on nous a remonté d'un salon. Ancré en points, le
         // voile couvre le texte et rien de plus, quelle que soit la hauteur.
-        val voile = if (LocalHeightClass.current != HeightClass.EXPANDED) {
-            HAUTEUR_VOILE_COURT
-        } else {
-            HAUTEUR_VOILE
+        val voile = when {
+            // En colonne, le texte occupe tout ce qui suit l'image : le voile
+            // doit couvrir cette part-là, pas une hauteur de bloc calibrée pour
+            // du texte posé sur l'image.
+            enColonne -> hauteur - hauteur / 16f * 9f
+            LocalHeightClass.current != HeightClass.EXPANDED -> HAUTEUR_VOILE_COURT
+            else -> HAUTEUR_VOILE
         }
         val debutVoile = ((hauteur - voile) / hauteur).coerceIn(0.05f, 0.75f)
         Box(
@@ -252,6 +279,44 @@ internal fun DetailsHero(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.widthIn(max = LARGEUR_MAX_TITRE),
         )
+        // **En portrait, une seule colonne.**
+        //
+        // Les deux colonnes supposent une largeur : sur 413 points, un tiers
+        // pour le titre et ses boutons en laisse cent quarante — de quoi couper
+        // « Whisper » en deux et empiler les icônes. Le portrait déroule donc
+        // tout sous l'image : méta, actions, synopsis, crédits, dans l'ordre où
+        // on les lit.
+        if (enColonne) {
+            val ligne = meta.filter { it.isNotBlank() }
+            if (ligne.isNotEmpty()) {
+                Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    ligne.forEach {
+                        Text(it, style = MaterialTheme.typography.labelLarge, color = HERO_DIM)
+                    }
+                }
+            }
+            actions()
+            if (synopsis.isNotBlank()) {
+                Text(
+                    synopsis,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MOOVIE_TEXT_MUTED,
+                    maxLines = 4,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            credits.forEach {
+                Text(
+                    it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = HERO_DIM,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            return@Column
+        }
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(40.dp),
