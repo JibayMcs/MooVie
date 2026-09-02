@@ -129,6 +129,7 @@ import fr.moovie.tv.ui.theme.MOOVIE_SURFACE
 import fr.moovie.tv.ui.theme.margePage
 import fr.moovie.tv.ui.components.MooviePageHeader
 import fr.moovie.tv.ui.theme.ESPACE_SECTION
+import fr.moovie.tv.ui.components.MooviePosterCard
 
 /** Résultats rapportés avant tri, à garder aligné sur `SearchViewModel.DEEP_PAGES`. */
 private const val SEARCH_SCOPE = 60
@@ -654,64 +655,17 @@ private fun ResultsGrid(
         ),
     ) {
         itemsIndexed(items, key = { _, it -> "${it.id}_${it.isTv}" }) { index, item ->
-            ResultCard(
-                inWatchlist = (if (item.isTv) "tv:${item.id}" else "movie:${item.id}") in watchlistKeys,
-                downloads = downloadsByTitle[if (item.isTv) "tv:${item.id}" else "movie:${item.id}"],
-                onLongClick = { onMenu(item) },
-                item = item,
+            val cle = if (item.isTv) "tv:${item.id}" else "movie:${item.id}"
+            MooviePosterCard(
+                posterUrl = item.posterUrl(),
+                titre = item.displayTitle,
+                note = item.voteAverage,
+                annee = item.year,
+                inWatchlist = cle in watchlistKeys,
                 onClick = { onOpen(item) },
+                onLongClick = { onMenu(item) },
+                surAffiche = { DownloadPosterBadge(downloadsByTitle[cle]) },
                 modifier = if (index == 0) Modifier.focusRequester(firstFocus) else Modifier,
-            )
-        }
-    }
-}
-
-@Composable
-private fun ResultCard(
-    item: TmdbItem,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    inWatchlist: Boolean = false,
-    /** Ce que ce titre a hors ligne : la question qu'on se pose sans réseau. */
-    downloads: TitleDownloads? = null,
-    onLongClick: (() -> Unit)? = null,
-) {
-    MoovieCard(onClick = onClick, onLongClick = onLongClick, modifier = modifier.fillMaxWidth()) {
-        Column {
-            Box {
-                MoovieAsyncImage(
-                    model = item.posterUrl(),
-                    contentDescription = item.displayTitle,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxWidth().aspectRatio(2f / 3f).background(MOOVIE_SURFACE_HIGH),
-                )
-                // Sans ce repère, rien ne distingue un titre déjà mis de côté :
-                // on le rajoutait sans le savoir, autant de fois qu'on retombait
-                // dessus dans les résultats.
-                if (inWatchlist) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(6.dp)
-                            .size(24.dp)
-                            .clip(CircleShape)
-                            .background(MOOVIE_SCRIM),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            Icons.Default.Bookmark,
-                            contentDescription = stringResource(Res.string.watchlist_added),
-                            tint = MOOVIE_ACCENT,
-                            modifier = Modifier.size(14.dp),
-                        )
-                    }
-                }
-                DownloadPosterBadge(downloads)
-            }
-            MoovieMarqueeText(
-                text = item.displayTitle,
-                modifier = Modifier.padding(8.dp),
-                style = MaterialTheme.typography.bodySmall,
             )
         }
     }
