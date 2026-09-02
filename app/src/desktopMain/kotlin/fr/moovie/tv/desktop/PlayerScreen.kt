@@ -235,6 +235,13 @@ internal fun DesktopPlayerScreen(
     onPrefetchNext: () -> Unit = {},
     /** Le flux a cassé en lecture : rend la main à la cascade de sources. */
     onPlaybackFailed: () -> Unit = onBack,
+    /**
+     * Déclare ce qu'Échap doit refermer **avant** de quitter le lecteur, ou
+     * null quand il n'y a rien à refermer. Même mécanisme que la fiche : la
+     * fenêtre est seule à recevoir Échap, et sans cette déclaration le panneau
+     * des épisodes restait ouvert pendant qu'on sortait du lecteur.
+     */
+    onRegisterBack: ((() -> Unit)?) -> Unit = {},
 ) {
     val progress = remember { WatchProgressRepository() }
     val settings = remember { SettingsRepository() }
@@ -735,6 +742,13 @@ internal fun DesktopPlayerScreen(
                     return@onPreviewKeyEvent true
                 }
                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                // **Le panneau des épisodes a la main.** Les autres menus sont
+                // des `Dialog`, qui prennent le focus dans leur propre fenêtre ;
+                // celui-ci glisse dans la page, donc les touches arrivent encore
+                // ici. Sans ce retrait, Haut et Bas réglaient le volume au lieu
+                // de parcourir la liste, et Espace mettait en pause : le panneau
+                // s'affichait sans qu'on puisse s'en servir au clavier.
+                if (dialog == PlayerDialogKind.EPISODES) return@onPreviewKeyEvent false
                 // Décompte en cours : la 1re touche l'interrompt, quelle qu'elle soit.
                 if (autoNextSeconds != null) {
                     cancelAutoNext()
@@ -1102,6 +1116,15 @@ internal fun DesktopPlayerScreen(
             if (dialog == PlayerDialogKind.SUBTITLES && subsState.candidates.isEmpty()) {
                 subsViewModel.load(mediaKey, title, controller.videoFps())
             }
+        }
+
+        // Échap referme le panneau au lieu de quitter le lecteur. C'est la
+        // fenêtre qui reçoit la touche — voir `Main.kt` — donc c'est à elle
+        // qu'il faut le dire, exactement comme le fait la fiche de détails.
+        val panneauEpisodes = dialog == PlayerDialogKind.EPISODES
+        DisposableEffect(panneauEpisodes) {
+            onRegisterBack(if (panneauEpisodes) ({ dialog = null }) else null)
+            onDispose { onRegisterBack(null) }
         }
 
         // La liste des épisodes, en panneau glissant plutôt qu'en modale

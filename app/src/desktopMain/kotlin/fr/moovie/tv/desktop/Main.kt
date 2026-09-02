@@ -198,14 +198,22 @@ fun main() {
             state = windowState,
             onPreviewKeyEvent = { event ->
                 if (event.type != KeyEventType.KeyDown || event.key != Key.Escape) return@Window false
-                // Échap quitte d'abord le plein écran, puis fait retour.
+                // Échap referme d'abord ce que l'écran a ouvert, puis quitte le
+                // plein écran, puis fait retour.
+                //
+                // Le retour interne passe **avant** le plein écran, et non
+                // après. Un écran n'en déclare un que lorsqu'il a réellement
+                // quelque chose par-dessus lui — une bande-annonce, un panneau
+                // de sources, la liste des épisodes du lecteur. Sortir du plein
+                // écran en laissant ce quelque chose ouvert répondait à côté :
+                // on avait appuyé sur Échap pour refermer ce qu'on voyait.
                 when {
-                    isFullscreen -> {
-                        wantsFullscreen = false
-                        true
-                    }
                     innerBack != null -> {
                         innerBack?.invoke()
+                        true
+                    }
+                    isFullscreen -> {
+                        wantsFullscreen = false
                         true
                     }
                     nav.canGoBack -> {
@@ -553,6 +561,7 @@ private fun DesktopApp(
                         // celui-ci joue : le ViewModel de fiche vit à l'échelle
                         // de la fenêtre, il connaît donc encore la série.
                         onPrefetchNext = { Vm.details.prefetchEpisodeSources(s.nextSeason, s.nextEpisode) },
+                        onRegisterBack = onRegisterBack,
                         onNextEpisode = { season, episode ->
                             // `previous`, et non `current` : `current` **est** le
                             // lecteur, le transtypage échouait donc toujours et
