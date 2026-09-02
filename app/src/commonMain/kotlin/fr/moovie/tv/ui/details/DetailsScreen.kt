@@ -1302,6 +1302,22 @@ fun DetailsScreenContent(
                             marge = hPadDp,
                             actions = actionsFilm,
                             enColonne = true,
+                            imageMasquee = apercuDansHero,
+                            controles = if (apercuDansHero) {
+                                {
+                                    ApercuControles(
+                                        controller = trailerController,
+                                        muet = apercuMuet,
+                                        onCoupeLeSon = { apercuMuet = !apercuMuet },
+                                        onAgrandir = onPlayTrailer,
+                                        onRedescend = {
+                                            runCatching { primaryFocus.requestFocus() }.isSuccess
+                                        },
+                                    )
+                                }
+                            } else {
+                                null
+                            },
                         )
                     } else {
                         DetailsHero(
@@ -1336,24 +1352,11 @@ fun DetailsScreenContent(
                     }
                     // Le synopsis est dans le hero, y compris en portrait : le
                     // répéter ici l'affichait deux fois de suite.
-                    if (compact) {
-                        // « En savoir plus » prend la place du casting plutôt que de
-                        // s'ajouter sous lui : c'est ce qui rend le retour immédiat.
-                        if (infoVisible) {
-                            MovieInfoPanel(
-                                details = s.details,
-                                country = country,
-                                modifier = hPad.fillMaxWidth(),
-                                // La page du film défile déjà en bloc.
-                                scrollable = false,
-                            )
-                        } else {
-                            // Casting sous les boutons, comme sur la fiche d'épisode :
-                            // la descente au D-pad atteint d'abord Lire, pas une
-                            // vignette d'acteur.
-                            CastRow(s.details.credits?.cast.orEmpty(), hPadDp, onOpenPerson)
-                        }
-                    } else {
+                    run {
+                        // La barre d'onglets vaut aussi en portrait : c'est elle
+                        // qui porte « en savoir plus », et le téléphone n'avait
+                        // pour cela qu'une icône ⓘ dans un coin, qui basculait
+                        // le casting en panneau technique sans rien annoncer.
                         barreOnglets()
                         when (ongletActif) {
                             // Un film n'a pas d'épisodes : l'onglet n'est pas
@@ -1884,34 +1887,11 @@ fun DetailsScreenContent(
         // les garder ici en aurait fait deux chemins vers le même contenu, dont
         // celui-ci se serait de surcroît superposé aux commandes de la
         // bande-annonce, qui occupent le même coin du hero.
-        if (compact && !trailerExpanded && !panelVisible && state !is DetailsState.Loading) {
-            Row(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(horizontal = hPadDp, vertical = 24.dp)
-                    .graphicsLayer { alpha = uiAlpha }
-                    // Redescendre, explicitement.
-                    //
-                    // Ces boutons sont seuls en haut à droite : sous eux, le
-                    // faisceau vertical de la recherche de focus ne rencontre
-                    // rien — le contenu de la fiche est à gauche. Compose ne
-                    // trouve donc aucune cible et le focus reste coincé là,
-                    // sans aucun moyen de revenir à la télécommande.
-                    //
-                    // C'est le même piège que la descente en-tête → contenu
-                    // déjà câblée sur les rangées : quand la géométrie ne
-                    // porte pas le chemin, il faut l'écrire.
-                    .onPreviewKeyEvent { event ->
-                        event.type == KeyEventType.KeyDown &&
-                            event.key == Key.DirectionDown &&
-                            runCatching { primaryFocus.requestFocus() }.isSuccess
-                    },
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                TrailerButton(trailer, onPlayTrailer)
-                InfoToggleButton(infoVisible) { infoVisible = !infoVisible }
-            }
-        }
+        // Les deux icônes qui vivaient en haut à droite — bande-annonce et
+        // « à propos » — ont disparu de tous les appareils : ce sont désormais
+        // deux onglets, atteignables et nommés. Sur téléphone elles se
+        // superposaient en prime aux commandes de la bande-annonce, qui
+        // occupent le même coin du cadre.
 
         // Bouton retour desktop, en overlay haut-gauche (masqué quand le panneau
         // des sources est ouvert : Échap/clic-extérieur le ferme d'abord).
