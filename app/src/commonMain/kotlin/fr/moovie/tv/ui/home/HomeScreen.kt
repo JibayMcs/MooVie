@@ -245,8 +245,8 @@ fun HomeScreenContent(
         // bandeau, et mangeait exactement l'amorce censée montrer la première
         // rangée : on arrivait sur une image pleine page sans rien dessous.
         val hauteurDispo = maxHeight
-        val hauteurHeros = (hauteurDispo - HAUTEUR_NAV - AMORCE_RANGEES)
-            .coerceAtLeast(240.dp)
+        val hauteurHeros = (hauteurDispo - HAUTEUR_NAV - BLOC_RANGEE)
+            .coerceIn(200.dp, 620.dp)
         // La boîte que l'image et le voile doivent couvrir : le héros, barre
         // comprise. Le dégradé la reçoit en fraction, un `Brush` ne connaissant
         // que des fractions de la surface qu'il peint.
@@ -604,14 +604,24 @@ private val HERO_HEIGHT = 148.dp
  * exactement la zone qu'on regarde en arrivant.
  */
 /**
- * Ce qu'on laisse voir des rangées sous le héros plein écran.
+ * La hauteur d'une rangée complète : son titre, ses affiches, leurs libellés.
  *
- * Le titre de la première rangée et le haut de ses affiches. Sans cette
- * amorce, l'accueil s'ouvre sur une image pleine page et rien n'invite à
- * descendre — c'est le même défaut que la barre d'onglets d'une fiche posée
- * pile sur le bord de l'écran.
+ * C'est **elle** qui dimensionne le héros, et non l'inverse. Un héros pleine
+ * hauteur laissait sous lui une amorce de quelques points : l'accueil
+ * s'ouvrait sur une affiche géante, et il fallait descendre pour découvrir
+ * qu'il y avait un catalogue derrière. Trop d'image tue l'image — on venait
+ * chercher quoi regarder, on tombait sur un seul titre.
+ *
+ * En réservant une rangée entière, la première est lisible d'emblée, et le
+ * héros prend tout ce qui reste. La conséquence est juste sur les deux
+ * appareils : une fenêtre de bureau haute de 1 045 points lui en laisse près de
+ * sept cents, un téléviseur 1080p — 540 points en tout — beaucoup moins, ce qui
+ * est exactement ce que ce téléviseur peut se permettre.
+ *
+ * La valeur vient du relevé fait pour [POSTER_WIDTH] : 310 points pour le bloc
+ * complet en 1080p.
  */
-private val AMORCE_RANGEES = 76.dp
+private val BLOC_RANGEE = 310.dp
 
 /**
  * Cale une rangée en haut de la liste dès qu'elle prend le focus.
