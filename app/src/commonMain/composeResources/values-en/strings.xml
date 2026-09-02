@@ -87,8 +87,8 @@
     <string name="remote_play_busy_body">“%1$s” is playing. Replace it with this title?</string>
     <string name="remote_play_busy_confirm">Replace</string>
     <string name="remote_play_failed">The television did not take the request.</string>
-    <string name="details_play">▶  Play</string>
-    <string name="details_resume">▶  Resume</string>
+    <string name="details_play">Play</string>
+    <string name="details_resume">Resume</string>
     <string name="details_searching">Searching %1$s…</string>
     <string name="details_playing">Playing…</string>
     <string name="details_lang_unavailable">%1$s unavailable</string>

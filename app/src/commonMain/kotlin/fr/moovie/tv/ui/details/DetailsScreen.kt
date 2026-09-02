@@ -57,9 +57,11 @@ import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Theaters
 import androidx.compose.material.icons.filled.VolumeOff
 import androidx.compose.material.icons.filled.VolumeUp
@@ -175,6 +177,8 @@ import fr.moovie.tv.core.format.formatDuration
 import fr.moovie.tv.ui.format.formatMediaDate
 import fr.moovie.tv.ui.components.LocalMoovieCardActive
 import fr.moovie.tv.ui.theme.MOOVIE_ACCENT
+import fr.moovie.tv.ui.theme.MOOVIE_RATING
+import fr.moovie.tv.ui.theme.MOOVIE_READY
 import fr.moovie.tv.ui.adaptive.useBottomNav
 import fr.moovie.tv.ui.components.MoovieButton
 import fr.moovie.tv.ui.components.MoovieAsyncImage
@@ -293,6 +297,55 @@ private const val QUICKPLAY_BANNER_MS = 4_000L
  * l'information elle-même, qui est tout l'objet de cette ligne.
  */
 private const val QUICKPLAY_BANNER_WITH_REASON_MS = 8_000L
+
+/**
+ * Le triangle de lecture, dessiné.
+ *
+ * Il était un caractère — « ▶ » collé devant le libellé, dans la ressource de
+ * traduction. Ça paraît économique et ça ne l'est pas : le glyphe vient de la
+ * police du système, il change de dessin et d'alignement d'un appareil à
+ * l'autre, il ne s'aligne pas sur la ligne de base du texte qu'il précède, et
+ * il traverse les trois fichiers de traduction où personne ne s'attend à
+ * trouver un pictogramme. Une icône se dessine, se teinte et se mesure.
+ */
+@Composable
+private fun RowScope.IconeLecture() {
+    Icon(
+        Icons.Default.PlayArrow,
+        contentDescription = null,
+        // Alignée sur la hauteur d'x du libellé plutôt que sur sa taille
+        // nominale : à taille égale, un pictogramme plein pèse plus qu'une
+        // lettre et paraîtrait deux fois trop gros.
+        modifier = Modifier.size(20.dp),
+    )
+    Spacer(Modifier.width(8.dp))
+}
+
+/**
+ * La note TMDB : une étoile et un nombre.
+ *
+ * L'étoile était elle aussi un caractère, et le même dessin variait d'un écran
+ * à l'autre — pleine ici, creuse là, décalée sous la ligne ailleurs.
+ */
+@Composable
+private fun Note(valeur: Double) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            Icons.Default.Star,
+            contentDescription = null,
+            tint = MOOVIE_RATING,
+            modifier = Modifier.size(15.dp),
+        )
+        Text(
+            formaterDecimal(valeur, 1),
+            style = MaterialTheme.typography.titleSmall,
+            color = MOOVIE_RATING,
+        )
+    }
+}
 
 /**
  * Largeur d'une vignette du casting.
@@ -1146,15 +1199,18 @@ fun DetailsScreenContent(
                                             Spacer(Modifier.width(8.dp))
                                             Text(stringResource(Res.string.details_playing))
                                         }
-                                        prefReady -> Text(
-                                            (
-                                                if (resume.containsKey(movieKey)) {
-                                                    stringResource(Res.string.details_resume)
-                                                } else {
-                                                    stringResource(Res.string.details_play)
-                                                }
-                                                ).let { if (compact) it else it.uppercase() },
-                                        )
+                                        prefReady -> {
+                                            IconeLecture()
+                                            Text(
+                                                (
+                                                    if (resume.containsKey(movieKey)) {
+                                                        stringResource(Res.string.details_resume)
+                                                    } else {
+                                                        stringResource(Res.string.details_play)
+                                                    }
+                                                    ).let { if (compact) it else it.uppercase() },
+                                            )
+                                        }
                                         loadingSources -> {
                                             CircularProgressIndicator(
                                                 color = MOOVIE_ACCENT,
@@ -1533,13 +1589,22 @@ fun DetailsScreenContent(
                                                 // faire, alors qu'une pastille
                                                 // verte sur une saison incomplète
                                                 // serait un mensonge. Complète, on
-                                                // ne compte plus, le vert suffit.
-                                                if (ready > 0 && total > 0) {
-                                                    append(if (complete) "  ✓" else "  $ready/$total")
+                                                // ne compte plus, la coche suffit.
+                                                if (ready > 0 && total > 0 && !complete) {
+                                                    append("  $ready/$total")
                                                 }
                                             },
-                                            color = if (complete) Color(0xFF7DDC7D) else Color.Unspecified,
+                                            color = if (complete) MOOVIE_READY else Color.Unspecified,
                                         )
+                                        if (complete) {
+                                            Spacer(Modifier.width(6.dp))
+                                            Icon(
+                                                Icons.Default.Check,
+                                                contentDescription = null,
+                                                tint = MOOVIE_READY,
+                                                modifier = Modifier.size(14.dp),
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -2479,7 +2544,7 @@ private fun SourcesSummary(
         }
         if (failed.isNotEmpty()) {
             Text(
-                failed.joinToString(", ") { "✕ ${it.name}" },
+                failed.joinToString(", ") { it.name },
                 style = MaterialTheme.typography.labelMedium,
                 color = Color(0xFFE06A6A),
             )
@@ -2556,7 +2621,12 @@ private fun WatchedBadge(modifier: Modifier = Modifier) {
             .background(Color(0xCC0A0A0A)),
         contentAlignment = Alignment.Center,
     ) {
-        Text("✓", color = Color(0xFF5FD98A), style = MaterialTheme.typography.labelMedium)
+        Icon(
+            Icons.Default.Check,
+            contentDescription = null,
+            tint = MOOVIE_READY,
+            modifier = Modifier.size(14.dp),
+        )
     }
 }
 
@@ -2837,11 +2907,7 @@ private fun MovieMeta(
                     )
                 }
                 if (details.voteAverage > 0) {
-                    Text(
-                        "★ " + formaterDecimal(details.voteAverage, 1),
-                        style = MaterialTheme.typography.titleSmall,
-                        color = Color(0xFFE6B800),
-                    )
+                    Note(details.voteAverage)
                 }
             }
             if (showOverview && details.overview.isNotBlank()) {
@@ -2946,11 +3012,7 @@ private fun EpisodeDetail(
                     )
                 }
                 if (ep.voteAverage > 0) {
-                    Text(
-                        "★ " + formaterDecimal(ep.voteAverage, 1),
-                        style = MaterialTheme.typography.titleSmall,
-                        color = Color(0xFFE6B800),
-                    )
+                    Note(ep.voteAverage)
                 }
             }
             // Sur téléphone le synopsis passe après les boutons, comme sur la
@@ -2994,6 +3056,7 @@ private fun EpisodeDetail(
                 Spacer(Modifier.width(8.dp))
                 Text(stringResource(Res.string.details_playing))
             } else {
+                IconeLecture()
                 Text(if (hasResume) stringResource(Res.string.details_resume) else stringResource(Res.string.details_play))
             }
         }
@@ -3364,6 +3427,7 @@ private fun BoutonLireEpisode(
                 Spacer(Modifier.width(8.dp))
                 Text(stringResource(Res.string.details_playing))
             } else {
+                IconeLecture()
                 Text(
                     buildString {
                         append(

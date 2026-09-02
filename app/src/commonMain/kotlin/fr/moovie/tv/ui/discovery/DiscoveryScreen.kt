@@ -42,6 +42,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -884,15 +885,15 @@ private fun Carte(
                 // les cartes se chevauchent, le bord droit de chacune est
                 // caché par la suivante et une marque y serait invisible.
                 if (dansLaListe) {
-                    Text(
-                        text = "✓",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MOOVIE_ORANGE,
+                    Icon(
+                        Icons.Default.Check,
+                        contentDescription = null,
+                        tint = MOOVIE_ORANGE,
                         modifier = Modifier
                             .align(Alignment.BottomStart)
                             .background(Color(0xE60A0A0A))
-                            .padding(horizontal = 6.dp, vertical = 3.dp),
+                            .padding(horizontal = 6.dp, vertical = 4.dp)
+                            .size(14.dp),
                     )
                 }
                 if (active) {
