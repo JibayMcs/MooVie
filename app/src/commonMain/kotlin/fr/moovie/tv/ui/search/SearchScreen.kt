@@ -123,6 +123,10 @@ import fr.moovie.tv.ui.theme.MOOVIE_SURFACE_HIGH
 import fr.moovie.tv.ui.theme.MOOVIE_TEXT_DIM
 import fr.moovie.tv.ui.theme.MOOVIE_TEXT_FAINT
 import fr.moovie.tv.ui.theme.MOOVIE_TEXT_MUTED
+import fr.moovie.tv.ui.theme.MOOVIE_TEXT
+import androidx.compose.material.icons.filled.Search
+import fr.moovie.tv.ui.theme.MOOVIE_SURFACE
+import fr.moovie.tv.ui.theme.margePage
 
 /** Résultats rapportés avant tri, à garder aligné sur `SearchViewModel.DEEP_PAGES`. */
 private const val SEARCH_SCOPE = 60
@@ -132,7 +136,7 @@ private const val SEARCH_SCOPE = 60
  * d'un téléphone, les deux côtés réunis mangeaient un cinquième de la largeur.
  */
 @Composable
-private fun searchHPad(): Dp = if (useBottomNav) 16.dp else 40.dp
+private fun searchHPad(): Dp = margePage()
 
 /**
  * Écran de recherche partagé TV + desktop : état hoisté (le ViewModel reste
@@ -357,11 +361,30 @@ internal fun SearchField(
     modifier: Modifier = Modifier,
 ) {
     val focusManager = LocalFocusManager.current
-    Box(
+    Row(
         modifier = modifier
+            // **Une surface, pas seulement un contour.**
+            //
+            // Le champ n'était qu'un rectangle tracé au trait sur le fond de la
+            // page : sur un écran noir, un liseré gris est le contraire d'une
+            // invitation à écrire. Un fond légèrement plus clair dit qu'il y a
+            // là quelque chose à remplir, et c'est le même niveau de surface
+            // que partout ailleurs dans l'application.
+            .background(MOOVIE_SURFACE)
             .border(1.5.dp, MOOVIE_TEXT_FAINT, MoovieShape)
-            .padding(horizontal = 16.dp, vertical = 14.dp),
+            .padding(horizontal = 18.dp, vertical = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
+        // La loupe **dans** le champ. Elle était au-dessus, dans le titre de la
+        // page, où elle nommait l'écran sans désigner l'endroit où l'on tape.
+        Icon(
+            Icons.Default.Search,
+            contentDescription = null,
+            tint = MOOVIE_TEXT_DIM,
+            modifier = Modifier.size(22.dp),
+        )
+    Box(modifier = Modifier.weight(1f)) {
         if (value.isEmpty()) {
             Text(
                 // Invite courte sur téléphone : la longue se repliait sur deux
@@ -371,7 +394,11 @@ internal fun SearchField(
                     if (useBottomNav) Res.string.search_hint_short else Res.string.search_hint,
                 ),
                 color = MOOVIE_TEXT_DIM,
-                fontSize = 18.sp,
+                // L'échelle du thème plutôt qu'un nombre : le champ de
+                // recherche est un texte qu'on lit et qu'on saisit, donc du
+                // corps, et il doit se resserrer sur un téléviseur comme le
+                // reste. Dix-huit points en dur y étaient un cran trop gros.
+                style = MaterialTheme.typography.bodyLarge,
                 // Garde-fou : quelle que soit la traduction, le champ reste haut
                 // d'une ligne.
                 maxLines = 1,
@@ -382,7 +409,9 @@ internal fun SearchField(
             value = value,
             onValueChange = onValueChange,
             singleLine = true,
-            textStyle = TextStyle(color = Color.White, fontSize = 18.sp),
+            // Le champ et son texte d'invite partagent forcément le même
+            // dessin : sinon le texte saute au premier caractère saisi.
+            textStyle = MaterialTheme.typography.bodyLarge.copy(color = MOOVIE_TEXT),
             cursorBrush = SolidColor(MOOVIE_ACCENT),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
             keyboardActions = KeyboardActions(onSearch = { onSubmit() }),
@@ -417,6 +446,7 @@ internal fun SearchField(
                     }
                 },
         )
+    }
     }
 }
 
