@@ -262,7 +262,19 @@ fun PlayerControlBar(
                 contentDescription = stringResource(Res.string.player_seek_forward),
                 mirrored = true,
             )
-            if (showEpisodeButtons && onOpenEpisodes == null) {
+            // **Gardées même quand le panneau existe.**
+            //
+            // Elles disparaissaient dès qu'un panneau d'épisodes était offert,
+            // au motif que celui-ci fait mieux. Il ne fait mieux que quand il a
+            // quelque chose à lister : il tire sa liste de TMDB à l'ouverture,
+            // donc hors ligne — ou sans clé d'API — il s'ouvre vide. Le seul
+            // moyen de passer à l'épisode suivant avait alors disparu avec les
+            // flèches, sur un fichier téléchargé qui, lui, se lit très bien.
+            //
+            // Les deux ne font d'ailleurs pas le même geste : la flèche avance
+            // d'un cran sans quitter l'image, le panneau sert à viser un épisode
+            // précis. C'est le partage transport / options de cette rangée.
+            if (showEpisodeButtons) {
                 MoovieIconButton(
                     onClick = onPreviousEpisode,
                     icon = Icons.Default.SkipPrevious,
