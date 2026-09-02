@@ -93,6 +93,7 @@ import androidx.compose.ui.text.style.TextAlign
 import fr.moovie.tv.ui.theme.ESPACE_SECTION
 import fr.moovie.tv.ui.theme.margePage
 import fr.moovie.tv.ui.components.MooviePosterCard
+import fr.moovie.tv.ui.components.CadreDefilant
 import fr.moovie.tv.ui.components.MooviePageHeader
 import fr.moovie.tv.ui.theme.ESPACE_LARGE
 import fr.moovie.tv.resources.media_movie
@@ -339,6 +340,9 @@ private fun GenreChipRow(
         }
     }
 
+    // Une quarantaine de genres pour quatre visibles en portrait : sans repère,
+    // la rangée se lit comme la liste entière. Voir [CadreDefilant].
+    CadreDefilant(etat = chipsState, modifier = Modifier.fillMaxWidth()) {
     LazyRow(
         state = chipsState,
         modifier = Modifier.fillMaxWidth(),
@@ -376,6 +380,7 @@ private fun GenreChipRow(
                 }
             }
         }
+    }
     }
 }
 

@@ -1,17 +1,9 @@
 package fr.moovie.tv.ui.search
 
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import fr.moovie.tv.data.search.MediaFilter
@@ -37,6 +29,11 @@ import fr.moovie.tv.resources.search_sort_relevance
 import fr.moovie.tv.resources.search_sort_title
 import fr.moovie.tv.resources.search_sort_year
 import fr.moovie.tv.ui.components.BarreDefilante
+import fr.moovie.tv.resources.search_filter_sort
+import fr.moovie.tv.resources.search_filter_media
+import fr.moovie.tv.resources.search_filter_rating
+import fr.moovie.tv.resources.search_filter_period
+import fr.moovie.tv.ui.components.MoovieSelect
 import fr.moovie.tv.ui.components.MoovieButton
 import org.jetbrains.compose.resources.stringResource
 import fr.moovie.tv.ui.theme.MOOVIE_WARN
@@ -44,13 +41,24 @@ import fr.moovie.tv.ui.theme.MOOVIE_WARN
 /**
  * Barre de tri et de filtres de la recherche.
  *
- * **Des boutons qui font défiler leurs valeurs, pas des menus.** Un menu
- * déroulant demande d'ouvrir, de descendre dans une liste et de valider : trois
- * gestes à la télécommande, et un survol de plus au doigt. Ici chaque critère
- * est un bouton qui passe à la valeur suivante, donc un seul appui, et la
- * valeur courante est son libellé — rien à ouvrir pour savoir où l'on en est.
- * C'est aussi ce qui la rend franchissable d'un coup de flèche vers les
- * résultats, au lieu de piéger le focus dans une liste.
+ * ## Des menus, et non des boutons qui cyclent
+ *
+ * Chaque critère a longtemps été un bouton qui passait à la valeur suivante :
+ * un seul appui, la valeur courante pour libellé, rien à ouvrir. C'était vrai,
+ * et c'était insuffisant. Un bouton qui cycle **ne montre jamais ses options** :
+ * on apprend qu'il existe une note minimale de 7 en tombant dessus, après avoir
+ * appuyé trois fois sur un bouton qui disait « Toute note ». On ne sait pas
+ * combien de valeurs il reste, ni comment revenir à celle qu'on vient de
+ * dépasser autrement qu'en faisant le tour. Et rien ne dit à quoi sert un
+ * bouton nommé « Popularité » tant qu'on ne l'a pas essayé.
+ *
+ * Un menu répond aux trois : la flèche annonce qu'il y a un choix, la liste le
+ * montre en entier, et son titre nomme le critère. Le coût — un geste de plus —
+ * se paie une fois, là où le cycle se paie à chaque valeur dépassée.
+ *
+ * Restent en bascule les deux critères **binaires**, ordre et contenu adulte :
+ * ouvrir une liste de deux entrées pour choisir celle qui n'est pas affichée
+ * serait une cérémonie pour rien.
  *
  * Le sens de tri disparaît sur la pertinence : elle n'a pas d'inverse qui veuille
  * dire quelque chose, et un bouton qui ne fait rien est pire qu'un bouton absent.
@@ -80,13 +88,20 @@ fun SearchFilterBar(
     // gère aussi la marge de page dans le défilement (le rembourrage extérieur
     // rognait le bouton agrandi au focus).
     BarreDefilante(modifier = modifier, marge = hPad) {
-        MoovieButton(
-            onClick = { onChange(filters.copy(sortBy = filters.sortBy.next(allowRelevance))) },
-            selected = filters.sortBy != SearchFilters.DEFAULT.sortBy,
-        ) {
-            Text(sortLabel(filters.sortBy), style = MaterialTheme.typography.labelMedium)
-        }
+        // Le critère est nommé dans le libellé, pas seulement dans le titre du
+        // menu : « Popularité » seul ne dit pas qu'il s'agit d'un tri, et c'est
+        // la première question qu'on se pose devant la barre.
+        MoovieSelect(
+            title = stringResource(Res.string.search_filter_sort),
+            options = SortBy.entries.filter { allowRelevance || it != SortBy.RELEVANCE },
+            selected = filters.sortBy,
+            label = { sortLabel(it) },
+            libelleBouton = { "${stringResource(Res.string.search_filter_sort)} · ${sortLabel(it)}" },
+            onSelect = { onChange(filters.copy(sortBy = it)) },
+            actif = filters.sortBy != SearchFilters.DEFAULT.sortBy,
+        )
 
+        // Binaire : une bascule, pas une liste de deux entrées.
         if (filters.sortBy != SortBy.RELEVANCE) {
             MoovieButton(
                 onClick = { onChange(filters.copy(ascending = !filters.ascending)) },
@@ -102,45 +117,33 @@ fun SearchFilterBar(
         }
 
         if (showMedia) {
-            MoovieButton(
-                onClick = { onChange(filters.copy(media = filters.media.next())) },
-                selected = filters.media != SearchFilters.DEFAULT.media,
-            ) {
-                Text(
-                    stringResource(
-                        when (filters.media) {
-                            MediaFilter.ALL -> Res.string.search_media_all
-                            MediaFilter.MOVIE -> Res.string.search_media_movies
-                            MediaFilter.TV -> Res.string.search_media_shows
-                        },
-                    ),
-                    style = MaterialTheme.typography.labelMedium,
-                )
-            }
-        }
-
-        MoovieButton(
-            onClick = { onChange(filters.copy(minRating = nextRating(filters.minRating))) },
-            selected = filters.minRating > 0.0,
-        ) {
-            Text(
-                if (filters.minRating <= 0.0) {
-                    stringResource(Res.string.search_rating_any)
-                } else {
-                    // Sans décimale : les paliers sont entiers, et « 7,0 »
-                    // laisserait croire qu'on peut demander 7,5.
-                    stringResource(Res.string.search_rating_min, filters.minRating.toInt().toString())
-                },
-                style = MaterialTheme.typography.labelMedium,
+            MoovieSelect(
+                title = stringResource(Res.string.search_filter_media),
+                options = MediaFilter.entries,
+                selected = filters.media,
+                label = { mediaLabel(it) },
+                onSelect = { onChange(filters.copy(media = it)) },
+                actif = filters.media != SearchFilters.DEFAULT.media,
             )
         }
 
-        MoovieButton(
-            onClick = { onChange(filters.withDecade(nextDecade(filters))) },
-            selected = filters.minYear != null || filters.maxYear != null,
-        ) {
-            Text(decadeLabel(filters), style = MaterialTheme.typography.labelMedium)
-        }
+        MoovieSelect(
+            title = stringResource(Res.string.search_filter_rating),
+            options = NOTES,
+            selected = NOTES.lastOrNull { it <= filters.minRating } ?: 0.0,
+            label = { ratingLabel(it) },
+            onSelect = { onChange(filters.copy(minRating = it)) },
+            actif = filters.minRating > 0.0,
+        )
+
+        MoovieSelect(
+            title = stringResource(Res.string.search_filter_period),
+            options = EPOQUES,
+            selected = filters.decade(),
+            label = { decadeOptionLabel(it) },
+            onSelect = { onChange(filters.withDecade(it)) },
+            actif = filters.minYear != null || filters.maxYear != null,
+        )
 
         MoovieButton(
             onClick = { onChange(filters.copy(includeAdult = !filters.includeAdult)) },
@@ -170,6 +173,42 @@ fun SearchFilterBar(
 }
 
 @Composable
+private fun mediaLabel(media: MediaFilter): String = stringResource(
+    when (media) {
+        MediaFilter.ALL -> Res.string.search_media_all
+        MediaFilter.MOVIE -> Res.string.search_media_movies
+        MediaFilter.TV -> Res.string.search_media_shows
+    },
+)
+
+/** Paliers de note : entiers, et assez espacés pour tenir dans une liste courte. */
+private val NOTES = listOf(0.0, 6.0, 7.0, 8.0)
+
+@Composable
+private fun ratingLabel(note: Double): String = if (note <= 0.0) {
+    stringResource(Res.string.search_rating_any)
+} else {
+    // Sans décimale : les paliers sont entiers, et « 7,0 » laisserait croire
+    // qu'on peut demander 7,5.
+    stringResource(Res.string.search_rating_min, note.toInt().toString())
+}
+
+
+@Composable
+private fun decadeOptionLabel(decade: Int?): String = when (decade) {
+    null -> stringResource(Res.string.search_decade_any)
+    BEFORE -> stringResource(Res.string.search_decade_before, DECADES.last())
+    else -> stringResource(Res.string.search_decade, decade)
+}
+
+/** L'époque courante, sous la forme d'une des entrées de [EPOQUES]. */
+private fun SearchFilters.decade(): Int? = when {
+    minYear != null -> minYear
+    maxYear != null -> BEFORE
+    else -> null
+}
+
+@Composable
 private fun sortLabel(sort: SortBy) = stringResource(
     when (sort) {
         SortBy.RELEVANCE -> Res.string.search_sort_relevance
@@ -180,64 +219,17 @@ private fun sortLabel(sort: SortBy) = stringResource(
     },
 )
 
-@Composable
-private fun decadeLabel(filters: SearchFilters): String = when {
-    filters.minYear == null && filters.maxYear == null ->
-        stringResource(Res.string.search_decade_any)
-    filters.minYear == null && filters.maxYear != null ->
-        stringResource(Res.string.search_decade_before, filters.maxYear!! + 1)
-    else -> stringResource(Res.string.search_decade, filters.minYear!!)
-}
-
 /** Décennies proposées, de la plus récente à la plus ancienne. */
 private val DECADES = listOf(2020, 2010, 2000, 1990, 1980)
 
-/**
- * Décennie suivante du cycle, `null` pour « toute époque ».
- *
- * La dernière entrée devient « avant 1980 » plutôt qu'une décennie de plus :
- * en dessous, le catalogue est trop clairsemé pour que décennie par décennie
- * ait un sens, et le cycle deviendrait interminable à la télécommande.
- */
-private fun nextDecade(filters: SearchFilters): Int? {
-    val current = filters.minYear
-    // « Avant 1980 » : pas de borne basse, une borne haute. C'est la fin du
-    // cycle, on repart sur « toute époque ».
-    if (current == null && filters.maxYear != null) return null
-    if (current == null) return DECADES.first()
-    val index = DECADES.indexOf(current)
-    return if (index < 0 || index == DECADES.lastIndex) BEFORE else DECADES[index + 1]
-}
-
 /** Repère du palier « avant la plus ancienne décennie ». */
 private const val BEFORE = -1
+
+/** Époques proposées : « toute époque », les décennies, puis « avant 1980 ». */
+private val EPOQUES: List<Int?> = listOf(null) + DECADES + listOf(BEFORE)
 
 private fun SearchFilters.withDecade(decade: Int?): SearchFilters = when (decade) {
     null -> copy(minYear = null, maxYear = null)
     BEFORE -> copy(minYear = null, maxYear = DECADES.last() - 1)
     else -> copy(minYear = decade, maxYear = decade + 9)
 }
-
-/** Paliers de note : entiers, et assez espacés pour se parcourir en trois appuis. */
-private fun nextRating(current: Double): Double = when {
-    current < 6.0 -> 6.0
-    current < 7.0 -> 7.0
-    current < 8.0 -> 8.0
-    else -> 0.0
-}
-
-/**
- * Valeur suivante du cycle, en sautant la pertinence là où elle ne veut rien
- * dire. La laisser dans le cycle du catalogue ferait passer par un tri que le
- * service n'applique pas — un appui pour rien, et un libellé qui ment.
- */
-private fun SortBy.next(allowRelevance: Boolean): SortBy {
-    var candidate = SortBy.entries[(ordinal + 1) % SortBy.entries.size]
-    if (!allowRelevance && candidate == SortBy.RELEVANCE) {
-        candidate = SortBy.entries[(candidate.ordinal + 1) % SortBy.entries.size]
-    }
-    return candidate
-}
-
-private fun MediaFilter.next(): MediaFilter =
-    MediaFilter.entries[(ordinal + 1) % MediaFilter.entries.size]

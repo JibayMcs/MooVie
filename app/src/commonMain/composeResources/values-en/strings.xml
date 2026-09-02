@@ -544,6 +544,11 @@
     <string name="search_sort_title">Title</string>
     <string name="search_sort_desc">Descending</string>
     <string name="search_sort_asc">Ascending</string>
+    <string name="search_filter_sort">Sort by</string>
+    <string name="search_filter_media">Type</string>
+    <string name="search_filter_rating">Minimum rating</string>
+    <string name="search_filter_period">Period</string>
+    <string name="search_filter_order">Order</string>
     <string name="search_media_all">All</string>
     <string name="search_media_movies">Movies</string>
     <string name="search_media_shows">Shows</string>

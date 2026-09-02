@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
@@ -73,8 +74,52 @@ fun BarreDefilante(
     contenu: @Composable RowScope.() -> Unit,
 ) {
     val defilement = rememberScrollState()
-    val versLaGauche = defilement.value > 0
-    val versLaDroite = defilement.value < defilement.maxValue
+    CadreDefilant(
+        versLaGauche = defilement.value > 0,
+        versLaDroite = defilement.value < defilement.maxValue,
+        modifier = modifier,
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().horizontalScroll(defilement),
+            horizontalArrangement = Arrangement.spacedBy(espacement),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Spacer(Modifier.width(marge))
+            contenu()
+            Spacer(Modifier.width(marge))
+        }
+    }
+}
+
+/**
+ * Les mêmes repères, autour d'une liste paresseuse déjà écrite.
+ *
+ * [BarreDefilante] compose sa propre rangée ; une `LazyRow` — main de cartes de
+ * la découverte, puces de genres du catalogue, choix d'humeur — ne peut pas s'y
+ * couler sans perdre sa paresse et ses clés. Elle passe donc par ici, où elle ne
+ * cède que le cadre.
+ */
+@Composable
+fun CadreDefilant(
+    etat: LazyListState,
+    modifier: Modifier = Modifier,
+    contenu: @Composable BoxScope.() -> Unit,
+) {
+    CadreDefilant(
+        versLaGauche = etat.canScrollBackward,
+        versLaDroite = etat.canScrollForward,
+        modifier = modifier,
+        contenu = contenu,
+    )
+}
+
+@Composable
+private fun CadreDefilant(
+    versLaGauche: Boolean,
+    versLaDroite: Boolean,
+    modifier: Modifier = Modifier,
+    contenu: @Composable BoxScope.() -> Unit,
+) {
     Box(
         modifier = modifier.drawWithContent {
             drawContent()
@@ -105,15 +150,7 @@ fun BarreDefilante(
             }
         },
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().horizontalScroll(defilement),
-            horizontalArrangement = Arrangement.spacedBy(espacement),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Spacer(Modifier.width(marge))
-            contenu()
-            Spacer(Modifier.width(marge))
-        }
+        contenu()
         Chevron(Icons.AutoMirrored.Filled.KeyboardArrowLeft, versLaGauche, Alignment.CenterStart)
         Chevron(Icons.AutoMirrored.Filled.KeyboardArrowRight, versLaDroite, Alignment.CenterEnd)
     }

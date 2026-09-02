@@ -546,6 +546,11 @@
     <string name="search_sort_title">Titre</string>
     <string name="search_sort_desc">Décroissant</string>
     <string name="search_sort_asc">Croissant</string>
+    <string name="search_filter_sort">Trier par</string>
+    <string name="search_filter_media">Type</string>
+    <string name="search_filter_rating">Note minimale</string>
+    <string name="search_filter_period">Époque</string>
+    <string name="search_filter_order">Ordre</string>
     <string name="search_media_all">Tout</string>
     <string name="search_media_movies">Films</string>
     <string name="search_media_shows">Séries</string>

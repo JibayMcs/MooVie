@@ -118,6 +118,7 @@ import kotlin.math.abs
 import fr.moovie.tv.ui.theme.MOOVIE_BG
 import fr.moovie.tv.ui.theme.MOOVIE_TEXT_DIM
 import fr.moovie.tv.ui.theme.margePage
+import fr.moovie.tv.ui.components.CadreDefilant
 import fr.moovie.tv.ui.components.MooviePageHeader
 import fr.moovie.tv.ui.theme.ESPACE
 import fr.moovie.tv.ui.theme.ESPACE_SERRE
@@ -520,6 +521,11 @@ private fun Main(
                     },
                 )
 
+                // La main déborde toujours : c'est ce qui fait qu'on la lit
+                // comme une main. Encore faut-il savoir de quel côté elle
+                // continue — la carte « voir plus » vit en bout de course, et
+                // sur un téléphone elle est hors de l'écran d'entrée de jeu.
+                CadreDefilant(etat = listState, modifier = Modifier.fillMaxWidth()) {
                 MoovieRail(
                     state = listState,
                     firstFocus = entryFocus,
@@ -613,6 +619,7 @@ private fun Main(
                             }
                         }
                     }
+                }
                 }
             }
 

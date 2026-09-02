@@ -19,6 +19,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
+import fr.moovie.tv.ui.components.CadreDefilant
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
@@ -154,9 +156,17 @@ fun MoodQuizContent(
         )
         Spacer(Modifier.height(if (useBottomNav) 20.dp else 28.dp))
 
+        // **La main dit qu'elle continue.** Six ou sept humeurs, dont trois
+        // tiennent en portrait : les autres attendaient hors de l'écran sans que
+        // rien ne le laisse deviner, et la question se répondait donc au tiers
+        // des choix. Le cadre porte les mêmes repères que les barres d'onglets
+        // et de filtres — un seul endroit décide de leur allure.
+        val mainState = rememberLazyListState()
+        CadreDefilant(etat = mainState, modifier = Modifier.fillMaxWidth()) {
         // Marges dans le contentPadding, jamais autour : la carte grandit au
         // focus et se ferait rogner par le bord du conteneur défilant.
         LazyRow(
+            state = mainState,
             contentPadding = PaddingValues(horizontal = hPad, vertical = 14.dp),
             horizontalArrangement = Arrangement.spacedBy(if (useBottomNav) 10.dp else 16.dp),
             modifier = Modifier.fillMaxWidth(),
@@ -175,6 +185,7 @@ fun MoodQuizContent(
             // sous la ligne de flottaison. Une sortie qu'on ne peut pas
             // atteindre n'est pas une sortie.
             item(key = "passer") { PasserCard(onClick = onSkip) }
+        }
         }
 
         // Effacer les réponses reste un bouton, et reste en bas : c'est le seul
