@@ -2852,7 +2852,7 @@ private fun MovieHeader(
     }
 
     Row(
-        modifier = Modifier.padding(horizontal = 48.dp).fillMaxWidth(),
+        modifier = Modifier.padding(horizontal = margePage()).fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(28.dp),
     ) {
         header()

@@ -660,7 +660,7 @@ private fun ResultsGrid(
         // agrandies au focus, et il n'y a pas de focus au doigt. Sur un portrait
         // elle ne faisait que rétrécir les affiches et tronquer les titres.
         contentPadding = PaddingValues(
-            horizontal = if (useBottomNav) 16.dp else 40.dp,
+            horizontal = margePage(),
             vertical = 12.dp,
         ),
     ) {

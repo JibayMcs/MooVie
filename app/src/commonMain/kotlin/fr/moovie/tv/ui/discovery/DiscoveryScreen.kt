@@ -116,6 +116,7 @@ import org.jetbrains.compose.resources.stringResource
 import kotlin.math.abs
 import fr.moovie.tv.ui.theme.MOOVIE_BG
 import fr.moovie.tv.ui.theme.MOOVIE_TEXT_DIM
+import fr.moovie.tv.ui.theme.margePage
 
 /**
  * Page Découverte : des mains de cartes, une par recette.
@@ -1092,7 +1093,7 @@ private fun teinteDe(kind: DiscoveryKind): Color = when (kind) {
 
 /** Marge horizontale : 40 dp est un recul de salon, trop sur un téléphone. */
 @Composable
-private fun hPad(): Dp = if (useBottomNav) 16.dp else 40.dp
+private fun hPad(): Dp = margePage()
 
 /**
  * Largeur d'affiche.

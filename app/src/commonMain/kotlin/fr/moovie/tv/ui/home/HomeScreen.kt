@@ -359,7 +359,7 @@ fun HomeScreenContent(
                 // tout en volant la largeur du titre.
                 if (!useBottomNav) {
                 Row(
-                    modifier = Modifier.align(Alignment.TopEnd).padding(horizontal = 32.dp),
+                    modifier = Modifier.align(Alignment.TopEnd).padding(horizontal = margePage()),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     MoovieFocusLabel(stringResource(Res.string.home_search)) {
@@ -457,7 +457,7 @@ fun HomeScreenContent(
                 // ne se réorganise quand les vraies affiches arrivent. C'est ce
                 // qu'un « Chargement… » centré ne peut pas faire.
                 HomeState.Loading -> Column(
-                    modifier = Modifier.padding(horizontal = if (useBottomNav) 16.dp else 32.dp),
+                    modifier = Modifier.padding(horizontal = margePage()),
                     verticalArrangement = Arrangement.spacedBy(24.dp),
                 ) {
                     repeat(2) { SkeletonRail(posterWidth = POSTER_WIDTH) }
