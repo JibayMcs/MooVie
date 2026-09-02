@@ -73,6 +73,15 @@ private val HAUTEUR_VOILE_COURT = 210.dp
 private val LARGEUR_MAX_TITRE = 1100.dp
 
 /**
+ * Part de l'image que le fondu couvre, en portrait.
+ *
+ * Zéro raccorderait le texte à une arête franche ; un noircirait l'image
+ * entière. Les deux tiers laissent voir ce qu'on montre et éteignent le bas
+ * assez tôt pour que personne ne voie où l'image s'arrête.
+ */
+private const val FONDU_IMAGE = 0.66f
+
+/**
  * L'en-tête d'une fiche, sur les écrans qu'on regarde de loin ou en grand.
  *
  * ## Ce qu'il change
@@ -209,10 +218,17 @@ internal fun DetailsHero(
         // exactement ce qu'on nous a remonté d'un salon. Ancré en points, le
         // voile couvre le texte et rien de plus, quelle que soit la hauteur.
         val voile = when {
-            // En colonne, le texte occupe tout ce qui suit l'image : le voile
-            // doit couvrir cette part-là, pas une hauteur de bloc calibrée pour
-            // du texte posé sur l'image.
-            enColonne -> hauteur - hauteur / 16f * 9f
+            // **Le voile mord dans l'image, il ne commence pas après elle.**
+            //
+            // Calé sur le bas exact de l'image, il n'assombrissait que le texte
+            // — qui est déjà sur le fond de la page — et l'image se terminait
+            // par une arête franche au milieu de l'écran. C'est précisément ce
+            // qu'un dégradé existe pour éviter : une image qui s'arrête net se
+            // lit comme une bannière posée là, pas comme le haut d'une page.
+            //
+            // Il commence donc dans son dernier tiers, et le raccord se fait
+            // dans l'image elle-même.
+            enColonne -> hauteur - hauteur / 16f * 9f * FONDU_IMAGE
             LocalHeightClass.current != HeightClass.EXPANDED -> HAUTEUR_VOILE_COURT
             else -> HAUTEUR_VOILE
         }
