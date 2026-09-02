@@ -507,11 +507,12 @@ fun DetailsScreenContent(
     // aux épisodes.
     val compact = useBottomNav
     val resumeEpisodeFocus = remember { FocusRequester() }
-    // Hissé jusqu'ici parce que le placement du focus de reprise en a besoin :
-    // dans une LazyColumn, un épisode hors écran n'est pas composé du tout, donc
-    // son FocusRequester n'existe pas. Il faut défiler jusqu'à lui d'abord.
-    val episodesState = rememberLazyListState()
-
+    // Il n'y a plus d'état de liste à hisser ici. La liste des épisodes était
+    // une `LazyColumn`, où un épisode hors écran n'est pas composé du tout :
+    // viser son `FocusRequester` supposait d'avoir défilé jusqu'à lui. Depuis
+    // que la page défile en bloc, la saison entière est composée d'un coup — la
+    // demande de focus aboutit directement, et c'est `bringIntoView` qui amène
+    // l'épisode à l'écran.
 
     // Série reprise en cours : le focus descend sur l'épisode à suivre plutôt
     // que de rester sur la rangée des saisons — sinon on arrive avec « S1 »
@@ -572,8 +573,6 @@ fun DetailsScreenContent(
         val wantsEpisode = compact && tv != null && tv.resumeEpisode > 0 &&
             selectedEpisode == null && !autoFocusDone
         if (wantsEpisode) {
-            val index = tv.episodes.indexOfFirst { it.episodeNumber == tv.resumeEpisode }
-            if (index >= 0) runCatching { episodesState.scrollToItem(index) }
             // La liste d'épisodes n'est pas encore posée au moment où l'état
             // change : on retente le temps qu'elle le soit.
             repeat(10) {
@@ -1395,6 +1394,7 @@ fun DetailsScreenContent(
                         val key = episodeKey(selected.season, ep.episodeNumber)
                         EpisodeDetail(
                             infoVisible = infoVisible,
+                            onToggleInfo = { infoVisible = !infoVisible },
                             infoPanel = {
                                 TvInfoPanel(
                                     details = s.details,
@@ -2820,6 +2820,12 @@ private fun EpisodeDetail(
      * personne ne lisait, et paraissait mort.
      */
     infoVisible: Boolean = false,
+    /**
+     * Bascule le panneau. Sans elle, [infoVisible] n'avait plus aucun écrivain
+     * depuis que le bouton a disparu de la rangée : l'état restait faux pour
+     * toujours et le panneau était inatteignable.
+     */
+    onToggleInfo: () -> Unit = {},
     infoPanel: @Composable () -> Unit = {},
     onDownloadBest: () -> Unit = {},
     downloadSearching: Boolean = false,
@@ -2912,6 +2918,12 @@ private fun EpisodeDetail(
             )
         }
         DownloadBestButton(downloadSearching, onDownloadBest)
+        // « En savoir plus » : les métadonnées de la série, dont la fiche
+        // d'épisode est le seul endroit qui les montre encore. Le bouton avait
+        // disparu de cette rangée avec le passage aux onglets, alors que
+        // l'épisode, lui, n'a pas d'onglets — le panneau est resté dans le code
+        // sans plus rien pour l'ouvrir.
+        InfoToggleButton(infoVisible, onToggleInfo)
         MoovieIconButton(
             onClick = onToggleWatched,
             icon = if (isWatched) Icons.Default.VisibilityOff else Icons.Default.Visibility,
