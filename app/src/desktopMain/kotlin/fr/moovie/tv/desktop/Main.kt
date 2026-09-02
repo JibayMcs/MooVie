@@ -247,6 +247,16 @@ fun main() {
             // chaînes jusqu'au prochain redessin — un réglage qui a l'air de ne
             // pas marcher.
             key(DesktopLocale.generation.value) {
+            // Souris et clavier, et une fenêtre librement redimensionnable : les
+            // classes de taille sont recalculées à chaque redimensionnement, pas
+            // seulement à la rotation.
+            //
+            // **Au-dessus du thème**, et c'est le bureau qui en souffrait le
+            // plus : `moovieTypography()` lit la classe de hauteur pour
+            // resserrer les grandes tailles sur les écrans courts. Composée
+            // sous la racine, elle lisait la valeur par défaut et resserrait
+            // donc une fenêtre de mille points de haut comme un téléviseur.
+            AdaptiveRoot(flavor = UiFlavor.POINTER, modifier = Modifier.fillMaxSize()) {
             MooVieTheme {
                 RemoteFocus.Register()
                 // L'animation se pose au-dessus de l'app, comme sur Android :
@@ -257,10 +267,6 @@ fun main() {
                 val splashEnabled by remember { SettingsRepository().splashAnimation }
                     .collectAsState(initial = null)
                 LaunchedEffect(splashEnabled) { if (splashEnabled == false) splashDone = true }
-                // Souris et clavier, et une fenêtre librement redimensionnable :
-                // les classes de taille sont donc recalculées à chaque
-                // redimensionnement, pas seulement à la rotation.
-                AdaptiveRoot(flavor = UiFlavor.POINTER, modifier = Modifier.fillMaxSize()) {
                 ProfileHost { profileId ->
                 // La pile naît hors de l'enveloppe — elle est capturée par la
                 // fenêtre, dont le clavier s'en sert. On la ramène donc à sa

@@ -6,6 +6,8 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
@@ -171,6 +173,18 @@ internal fun heightClassOf(height: Dp): HeightClass = when {
  * mesure la place réellement offerte aux enfants, ce qui est de toute façon la
  * bonne question — en écran partagé ou en fenêtre desktop redimensionnée, la
  * taille de l'écran ne dit rien.
+ *
+ * ## Elle fournit aussi la densité
+ *
+ * Sur téléviseur, et là seulement : la densité qu'une box déclare est un
+ * réglage d'usine sans rapport avec sa dalle, et c'est ce qui faisait paraître
+ * l'application grossie sur certains appareils. Voir [echelleTv]. Les classes
+ * et les dimensions publiées ci-dessous sont celles de l'arbre **après**
+ * correction — c'est-à-dire toujours 960 points de large sur un téléviseur.
+ *
+ * Poser la densité ici plutôt que dans le thème n'est pas un détail : c'est
+ * l'unique endroit où l'on connaît à la fois la nature de l'appareil et la
+ * place qu'il offre.
  */
 @Composable
 fun AdaptiveRoot(
@@ -179,13 +193,82 @@ fun AdaptiveRoot(
     content: @Composable () -> Unit,
 ) {
     BoxWithConstraints(modifier = modifier) {
+        val densiteReelle = LocalDensity.current
+        val echelle = echelleTv(flavor, maxWidth)
+        // Les dimensions **logiques** : ce que l'arbre croira mesurer une fois
+        // la densité corrigée. Sur tout ce qui n'est pas un téléviseur,
+        // `echelle` vaut 1 et ce sont les dimensions réelles.
+        val largeur = maxWidth / echelle
+        val hauteur = maxHeight / echelle
         CompositionLocalProvider(
+            LocalDensity provides Density(densiteReelle.density * echelle, densiteReelle.fontScale),
             LocalUiFlavor provides flavor,
-            LocalWidthClass provides widthClassOf(maxWidth),
-            LocalHeightClass provides heightClassOf(maxHeight),
-            LocalWindowWidth provides maxWidth,
-            LocalWindowHeight provides maxHeight,
+            LocalWidthClass provides widthClassOf(largeur),
+            LocalHeightClass provides heightClassOf(hauteur),
+            LocalWindowWidth provides largeur,
+            LocalWindowHeight provides hauteur,
             content = content,
         )
     }
 }
+
+/**
+ * Largeur logique du téléviseur de référence.
+ *
+ * La Xiaomi Mi Box 4 du projet : 1920 × 1080 pixels à 320 dpi, soit 960 × 540
+ * points. C'est sur elle que toutes les dimensions fixes de l'application ont
+ * été relevées — la largeur d'une affiche, la hauteur de la barre, le bloc
+ * d'une rangée.
+ */
+private val TV_REFERENCE: Dp = 960.dp
+
+/**
+ * ## Pourquoi un téléviseur a besoin d'être remis à l'échelle
+ *
+ * Sur un téléphone, le point est une unité **physique** : le constructeur
+ * déclare une densité qui correspond à peu près à la réalité, et 48 points font
+ * à peu près la même trace du pouce sur tous les appareils. C'est ce qui rend
+ * les dimensions en dur légitimes.
+ *
+ * Sur un téléviseur, rien de tout cela n'est vrai. La densité déclarée est un
+ * réglage du fabricant, sans rapport avec la taille de la dalle ni avec la
+ * distance de lecture : deux téléviseurs de 55 pouces posés côte à côte
+ * annoncent 960 points de large chez l'un et 640 chez l'autre — le second
+ * rend simplement son interface en 1280 pixels au lieu de 1920. Une affiche de
+ * 138 points y occupe alors **une fois et demie** la place prévue, et une
+ * rangée qui montrait cinq titres n'en montre plus que trois.
+ *
+ * C'est exactement ce qu'on observait : l'accueil, calibré sur la box de
+ * référence, paraissait grossi sur un téléviseur qui déclare moins de points
+ * pour la même dalle.
+ *
+ * ## Ce que corrige cette fonction
+ *
+ * Plutôt que de rendre adaptative chacune des dimensions de l'application —
+ * il y en a des centaines, et il en naîtra d'autres — on corrige **l'unité**.
+ * La densité fournie à l'arbre est multipliée par le rapport entre la largeur
+ * annoncée et celle de la référence, si bien que l'arbre mesure toujours
+ * [TV_REFERENCE] points de large. Tout ce qui est exprimé en points ou en `sp`
+ * suit sans le savoir, y compris le code qui n'existe pas encore.
+ *
+ * Sur la box de référence le rapport vaut exactement 1 : la correction est
+ * alors l'identité, et ne peut rien changer à ce qui a été réglé dessus.
+ *
+ * ## Les bornes
+ *
+ * Elles ne servent pas la mise en page mais la survie : un téléviseur qui
+ * annoncerait une largeur aberrante — un mode d'affichage exotique, une
+ * surcharge `wm density` posée à la main — donnerait une échelle absurde, et
+ * mieux vaut alors une interface un peu trop grande qu'une interface
+ * illisible. Elles couvrent de 480 à 2 400 points annoncés, ce qui déborde
+ * largement tout ce qui existe.
+ *
+ * Hors téléviseur la fonction rend 1 sans rien mesurer : sur un téléphone, un
+ * point est un point, et le nombre annoncé veut dire quelque chose.
+ */
+internal fun echelleTv(flavor: UiFlavor, largeurReelle: Dp): Float =
+    if (flavor != UiFlavor.TV || largeurReelle <= 0.dp) {
+        1f
+    } else {
+        (largeurReelle / TV_REFERENCE).coerceIn(0.5f, 2.5f)
+    }
