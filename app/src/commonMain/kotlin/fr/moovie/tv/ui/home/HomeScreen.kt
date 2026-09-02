@@ -354,9 +354,15 @@ fun HomeScreenContent(
             // Hissé : `useBottomNav` est un accesseur composable, et le corps
             // d'une liste paresseuse ne l'est pas.
             val auDoigt = useBottomNav
-            // Le héros est un élément de la liste sur grand écran, et pas au
-            // doigt : tout ce qui raisonne en indices de liste doit le savoir.
-            val decalageHeros = if (auDoigt) 0 else 1
+            // Le héros est l'élément 0 de la liste : tout ce qui raisonne en
+            // indices de liste doit le savoir.
+            //
+            // **Sur les deux appareils.** Ce décalage valait zéro au doigt, du
+            // temps où le héros n'existait que sur grand écran. Il est descendu
+            // sur le téléphone depuis, sans condition (`item(key = "heros")`
+            // plus bas), et les indices de `RowSlot` se sont retrouvés décalés
+            // d'un cran là où justement ils ne l'étaient plus.
+            val decalageHeros = 1
 
             // **Descente depuis la barre, avec un filet.**
             //
