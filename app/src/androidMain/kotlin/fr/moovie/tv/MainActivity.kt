@@ -163,6 +163,17 @@ class MainActivity : ComponentActivity() {
 
             // Thème tv-material (PlayerScreen) autour du thème material3 partagé.
             MooVieTvMaterialTheme {
+            // **La racine adaptative enveloppe le thème, et non l'inverse.**
+            //
+            // `moovieTypography()` lit la classe de hauteur pour resserrer les
+            // grandes tailles. Composée sous le thème, elle la lisait au-dessus
+            // du seul fournisseur qui existe — `AdaptiveRoot` — donc toujours la
+            // valeur par défaut : la réduction s'appliquait partout, tout le
+            // temps, y compris sur une fenêtre de bureau haute de mille points.
+            //
+            // C'est aussi cette racine qui corrige la densité sur téléviseur, et
+            // le thème exprime ses tailles en `sp` : il doit en hériter.
+            AdaptiveRoot(flavor = uiFlavor, modifier = Modifier.fillMaxSize()) {
             MooVieTheme {
                 // Repli de focus de la télécommande : le FocusManager appartient à
                 // cette composition, il ne peut être capté qu'ici.
@@ -170,7 +181,6 @@ class MainActivity : ComponentActivity() {
                 // Fixe la couleur de contenu par défaut (sinon les Text libres
                 // héritent d'une couleur sombre sans Surface parent → invisibles).
                 CompositionLocalProvider(LocalContentColor provides Color.White) {
-                    AdaptiveRoot(flavor = uiFlavor, modifier = Modifier.fillMaxSize()) {
                     // Le profil est tranché avant que la pile n'existe : les
                     // dépôts lisent le profil actif à leur construction.
                     ProfileHost { _ ->

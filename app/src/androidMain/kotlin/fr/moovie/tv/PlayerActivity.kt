@@ -74,12 +74,14 @@ class PlayerActivity : ComponentActivity() {
 
         setContent {
             MooVieTvMaterialTheme {
+                // Toujours TOUCH : cette Activity n'existe pas sur téléviseur, et
+                // le lecteur lit ce drapeau pour choisir ses gestes tactiles.
+                //
+                // Au-dessus du thème : `moovieTypography()` lit la classe de
+                // hauteur que cette racine est seule à fournir. Voir MainActivity.
+                AdaptiveRoot(flavor = UiFlavor.TOUCH, modifier = Modifier.fillMaxSize()) {
                 MooVieTheme {
                     CompositionLocalProvider(LocalContentColor provides Color.White) {
-                        // Toujours TOUCH : cette Activity n'existe pas sur
-                        // téléviseur, et le lecteur lit ce drapeau pour choisir
-                        // ses gestes tactiles.
-                        AdaptiveRoot(flavor = UiFlavor.TOUCH, modifier = Modifier.fillMaxSize()) {
                             // Paysage et plein écran immersif, comme le faisait
                             // MainActivity autour de ce même écran. Posé une fois :
                             // ici, il n'y a que le lecteur, donc rien à restaurer.

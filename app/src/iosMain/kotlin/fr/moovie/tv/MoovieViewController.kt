@@ -98,8 +98,10 @@ private fun RacineMoovie() {
     // partir d'un état inconnu ferait clignoter l'écran au lancement.
     LaunchedEffect(Unit) { Connectivity.start() }
 
-    MooVieTheme {
-        AdaptiveRoot(flavor = UiFlavor.TOUCH) {
+    // Au-dessus du thème, et non dessous : `moovieTypography()` lit la classe
+    // de hauteur, dont cette racine est le seul fournisseur. Voir MainActivity.
+    AdaptiveRoot(flavor = UiFlavor.TOUCH) {
+        MooVieTheme {
             // **Le fond, puis le retrait des encoches, dans cet ordre.**
             //
             // `MooVieTheme` ne peint rien : `MaterialTheme` déclare une palette,
