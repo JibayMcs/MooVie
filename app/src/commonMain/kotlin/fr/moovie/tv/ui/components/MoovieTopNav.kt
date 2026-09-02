@@ -18,6 +18,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import fr.moovie.tv.ui.theme.ESPACE_SERRE
@@ -60,10 +62,26 @@ fun MoovieTopNav(
         modifier = modifier
             .fillMaxWidth()
             .height(HAUTEUR_NAV)
-            // Opaque, et c'est le point : posée sur l'image elle en dépendait
-            // pour être lisible, ce qui n'est jamais vrai deux affiches de
-            // suite. Séparée du contenu, elle ne dépend plus de rien.
-            .background(MOOVIE_BG)
+            // **Opaque là où l'on lit, éteinte sur son bord bas.**
+            //
+            // Elle a d'abord été unie sur toute sa hauteur, et pour une bonne
+            // raison : posée sur une affiche, sa lisibilité dépendait de
+            // l'affiche — ce qui n'est jamais vrai deux titres de suite.
+            //
+            // Mais unie jusqu'au bord, elle se termine par une arête franche en
+            // travers de l'image de fond, et l'accueil se lit alors comme un
+            // bandeau collé sur une image plutôt que comme une page. Les deux
+            // exigences ne se contredisent pas : les libellés sont centrés
+            // verticalement, il suffit que le noir tienne jusque sous eux et ne
+            // lâche que dans le dernier tiers. Le raccord se fait dans le vide
+            // de la barre, pas sous son texte.
+            .background(
+                Brush.verticalGradient(
+                    0f to MOOVIE_BG,
+                    FONDU_BAS to MOOVIE_BG,
+                    1f to Color.Transparent,
+                ),
+            )
             .padding(horizontal = margePage()),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(ESPACE_SERRE),
@@ -139,3 +157,12 @@ fun MoovieNavItem(
  * est la ressource rare.
  */
 val HAUTEUR_NAV: Dp = 56.dp
+
+/**
+ * Hauteur, en fraction de la barre, où le fond commence à s'éteindre.
+ *
+ * Deux tiers : au-dessous, le texte des libellés est déjà passé. Plus haut, le
+ * dégradé mordrait dessus ; plus bas, il n'aurait pas la place de se faire et
+ * l'on retrouverait l'arête qu'il est là pour effacer.
+ */
+private const val FONDU_BAS = 0.66f
