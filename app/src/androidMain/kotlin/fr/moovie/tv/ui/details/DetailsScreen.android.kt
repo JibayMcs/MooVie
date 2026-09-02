@@ -30,6 +30,7 @@ import fr.moovie.tv.resources.Res
 import fr.moovie.tv.resources.cast_failed
 import fr.moovie.tv.resources.cast_searching
 import fr.moovie.tv.resources.common_cancel
+import fr.moovie.tv.ui.adaptive.useBottomNav
 import fr.moovie.tv.ui.components.MoovieButton
 import fr.moovie.tv.ui.theme.MoovieShape
 import org.jetbrains.compose.resources.stringResource
@@ -312,6 +313,16 @@ fun DetailsScreen(
     }
 
     DetailsScreenContent(
+        // **Au doigt, la fiche n'a aucune autre sortie visible.**
+        //
+        // Le paramètre existait et personne ne le passait : le bouton n'a donc
+        // jamais été rendu sur Android. Sur un téléviseur c'est sans
+        // conséquence — la télécommande a sa touche Retour — mais sur un
+        // téléphone la barre du bas ne referme pas un épisode (elle change
+        // d'onglet) et le geste système ne s'affiche nulle part. La fiche d'un
+        // épisode était le seul écran de l'app dont on ne pouvait pas sortir
+        // en le voyant.
+        showBackButton = useBottomNav,
         state = state,
         sources = sources,
         resolveError = resolveError,

@@ -1,6 +1,8 @@
 package fr.moovie.tv.ui.details
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -77,7 +79,18 @@ internal fun DetailsTabs(
     premierFocus: Modifier = Modifier,
 ) {
     Row(
-        modifier = modifier,
+        // **La barre défile quand elle ne tient pas.**
+        //
+        // Quatre onglets réclament près de six cents points ; un téléphone en
+        // portrait en offre quatre cents. Le dernier — « En savoir plus » —
+        // sortait donc simplement de l'écran, sans rien pour le laisser
+        // deviner : sur une série, la fiche n'avait plus de casting ni de
+        // fiche technique du tout. Un `Row` ne déborde pas, il tronque.
+        //
+        // Rogner les libellés ou empiler sur deux lignes coûterait à tous les
+        // écrans ce qu'un seul ne peut pas payer. Sur un téléviseur, les
+        // quatre tiennent et rien ne défile.
+        modifier = modifier.horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
