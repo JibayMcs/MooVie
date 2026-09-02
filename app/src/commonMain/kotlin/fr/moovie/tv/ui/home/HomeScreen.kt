@@ -140,6 +140,12 @@ import fr.moovie.tv.ui.theme.MOOVIE_SURFACE_HIGH
 import fr.moovie.tv.ui.theme.MOOVIE_TEXT_DIM
 import fr.moovie.tv.ui.theme.MOOVIE_TEXT_MUTED
 import fr.moovie.tv.ui.theme.margePage
+import fr.moovie.tv.ui.components.MoovieTopNav
+import fr.moovie.tv.ui.components.MoovieNavItem
+import fr.moovie.tv.ui.components.MoovieNavSpacer
+import fr.moovie.tv.ui.adaptive.LocalWindowHeight
+import fr.moovie.tv.ui.components.HAUTEUR_NAV
+import androidx.compose.foundation.layout.BoxWithConstraints
 
 /**
  * Écran d'accueil partagé TV + desktop : état hoisté (le ViewModel reste
@@ -227,8 +233,25 @@ fun HomeScreenContent(
 
     // Abonnement unique de l'écran : les trois sortes de cartes y puisent
     // leur pastille « hors ligne » sans que les rangées aient à la convoyer.
+    // La boîte du héros, barre comprise : c'est elle que l'image et le voile
+    // doivent couvrir. Le dégradé la reçoit en fraction de la page parce qu'un
+    // `Brush` ne connaît que des fractions de la surface qu'il peint.
     ProvideTitleDownloads {
-    Box(modifier = Modifier.fillMaxSize().background(MOOVIE_BG)) {
+    BoxWithConstraints(modifier = Modifier.fillMaxSize().background(MOOVIE_BG)) {
+        // **La place réellement offerte, pas la fenêtre.**
+        //
+        // `LocalWindowHeight` mesure la fenêtre entière, bandeau de mise à jour
+        // compris. Le héros calé dessus débordait donc de la hauteur du
+        // bandeau, et mangeait exactement l'amorce censée montrer la première
+        // rangée : on arrivait sur une image pleine page sans rien dessous.
+        val hauteurDispo = maxHeight
+        val hauteurHeros = (hauteurDispo - HAUTEUR_NAV - AMORCE_RANGEES)
+            .coerceAtLeast(240.dp)
+        // La boîte que l'image et le voile doivent couvrir : le héros, barre
+        // comprise. Le dégradé la reçoit en fraction, un `Brush` ne connaissant
+        // que des fractions de la surface qu'il peint.
+        val hauteurFond = HAUTEUR_NAV + hauteurHeros
+        val fondFrac = (hauteurFond / hauteurDispo).coerceIn(0.05f, 1f)
         // Backdrop dynamique avec fondu enchaîné quand l'élément focalisé change.
         Crossfade(
             targetState = featured?.backdropUrl(),
@@ -253,7 +276,12 @@ fun HomeScreenContent(
                     // des affiches, c'est deux images l'une sur l'autre.
                     modifier = Modifier
                         .fillMaxWidth()
-                        .fillMaxHeight(HAUTEUR_FOND)
+                        // Exactement la boîte du héros, barre comprise. Une
+                        // fraction de la page ne marche plus depuis que le
+                        // héros prend l'écran entier : l'image s'arrêtait au
+                        // milieu de lui, et sa moitié basse — celle qui porte
+                        // le titre — retombait sur du noir.
+                        .height(hauteurFond)
                         .align(Alignment.TopCenter),
                 )
             }
@@ -275,16 +303,14 @@ fun HomeScreenContent(
         Box(
             modifier = Modifier.fillMaxSize().background(
                 Brush.verticalGradient(
-                    // Le tout premier palier ne sert qu'à la rangée d'icônes du
-                    // coin haut droit. Elle est posée sur l'image, hors de la
-                    // zone que le dégradé latéral protège, et une icône blanche
-                    // sur un plateau de télévision éclairé ne se voit pas. Il
-                    // s'éteint vite : au-dessous commence la partie de l'image
-                    // qu'on veut effectivement regarder.
-                    0f to Color(0xB30A0A0A),
-                    0.16f to Color(0x260A0A0A),
-                    HAUTEUR_FOND * 0.6f to Color(0x800A0A0A),
-                    HAUTEUR_FOND to MOOVIE_BG,
+                    // Le voile s'ancre sur le bas de l'image, comme sur la
+                    // fiche : le bloc de texte du héros y a la même hauteur
+                    // physique quel que soit l'écran, et une fraction le
+                    // couvrirait trop ou pas assez selon la taille.
+                    0f to Color(0x000A0A0A),
+                    (fondFrac - 0.30f).coerceAtLeast(0.05f) to Color(0x1A0A0A0A),
+                    (fondFrac - 0.12f).coerceAtLeast(0.10f) to Color(0x990A0A0A),
+                    fondFrac to MOOVIE_BG,
                 ),
             ),
         )
@@ -297,8 +323,21 @@ fun HomeScreenContent(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = 32.dp, bottom = 16.dp),
+                .padding(top = 0.dp, bottom = 16.dp),
         ) {
+            // Hissé : `useBottomNav` est un accesseur composable, et le corps
+            // d'une liste paresseuse ne l'est pas.
+            val auDoigt = useBottomNav
+
+            // Descente explicite depuis la barre : la 1re carte est hors de son
+            // faisceau vertical, et la recherche de focus native y échoue.
+            val navDown = Modifier.onPreviewKeyEvent { event ->
+                if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionDown) {
+                    runCatching { firstContentFocus.requestFocus() }.isSuccess
+                } else {
+                    false
+                }
+            }
             // **Le logo, et seulement au doigt.**
             //
             // Le wordmark a été retiré pour rendre ~56 dp à une rangée
@@ -330,6 +369,65 @@ fun HomeScreenContent(
                         style = MaterialTheme.typography.titleLarge,
                     )
                 }
+            } else {
+                // **La barre de navigation, en haut et pleine largeur.**
+                //
+                // Elle était six icônes muettes dans le coin droit du héros. À
+                // la télécommande, y aller demandait de remonter d'une rangée
+                // puis de traverser l'écran — le geste le plus fréquent de
+                // l'accueil était le plus long. Ici, elle est sur le trajet
+                // naturel du Haut, elle ne recouvre plus l'image, et chaque
+                // destination porte son nom.
+                MoovieTopNav {
+                    MoovieNavItem(
+                        icone = Icons.Default.Search,
+                        libelle = stringResource(Res.string.home_search),
+                        onClick = onOpenSearch,
+                        modifier = navDown,
+                    )
+                    MoovieNavItem(
+                        icone = Icons.Default.AutoAwesome,
+                        libelle = stringResource(Res.string.discovery_open),
+                        onClick = onOpenDiscovery,
+                        modifier = navDown,
+                    )
+                    MoovieNavItem(
+                        icone = Icons.Default.GridView,
+                        libelle = stringResource(Res.string.catalog_open),
+                        onClick = onOpenCatalog,
+                        modifier = navDown,
+                    )
+                    MoovieNavItem(
+                        icone = Icons.Default.History,
+                        libelle = stringResource(Res.string.history_title),
+                        onClick = onOpenHistory,
+                        modifier = navDown,
+                    )
+                    MoovieNavItem(
+                        icone = Icons.Default.Download,
+                        libelle = stringResource(Res.string.settings_cat_downloads),
+                        onClick = onOpenDownloads,
+                        badge = rememberActiveDownloadCount(),
+                        modifier = navDown,
+                    )
+                    // Les réglages au bout, séparés des destinations : on n'y
+                    // va pas pour regarder quelque chose.
+                    MoovieNavSpacer()
+                    if (onOpenRemote != null) {
+                        MoovieNavItem(
+                            icone = Icons.Default.SettingsRemote,
+                            libelle = stringResource(Res.string.remote_title),
+                            onClick = onOpenRemote,
+                            modifier = navDown,
+                        )
+                    }
+                    MoovieNavItem(
+                        icone = Icons.Default.Settings,
+                        libelle = stringResource(Res.string.home_settings),
+                        onClick = onOpenSettings,
+                        modifier = navDown,
+                    )
+                }
             }
             // Le wordmark « Moo-vie » et sa rangée dédiée sont partis : ils
             // coûtaient ~56 dp de haut pour une information qu'on connaît déjà
@@ -342,115 +440,9 @@ fun HomeScreenContent(
             // figé sur le premier titre, à décrire quelque chose que personne
             // n'avait désigné. Sa hauteur revient aux rangées, qui en manquent.
             // Le fond flou, lui, reste : il ne prétend rien, il habille.
-            if (!useBottomNav) {
-            Box(modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
-                if (state is HomeState.Ready) Hero(featured)
-                // Descente explicite depuis l'en-tête : la 1re carte est hors du
-                // faisceau vertical du D-pad, la recherche de focus native échoue.
-                val headerDown = Modifier.onPreviewKeyEvent { event ->
-                    if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionDown) {
-                        runCatching { firstContentFocus.requestFocus() }.isSuccess
-                    } else {
-                        false
-                    }
-                }
-                // Sur tactile, ces quatre icônes vivent dans la barre basse : les
-                // répéter en haut du héros les mettrait hors de portée du pouce
-                // tout en volant la largeur du titre.
-                if (!useBottomNav) {
-                Row(
-                    modifier = Modifier.align(Alignment.TopEnd).padding(horizontal = margePage()),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    MoovieFocusLabel(stringResource(Res.string.home_search)) {
-                        MoovieIconButton(
-                            onClick = onOpenSearch,
-                            icon = Icons.Default.Search,
-                            contentDescription = stringResource(Res.string.home_search),
-                            modifier = headerDown,
-                        )
-                    }
-                    // Découverte : troisième geste, encore différent des deux
-                    // autres. La recherche répond à « je cherche ce titre », le
-                    // catalogue à « montre-moi de la science-fiction », et
-                    // celui-ci à « je ne sais pas quoi regarder » — la seule
-                    // question qui n'a rien à formuler.
-                    MoovieFocusLabel(stringResource(Res.string.discovery_open)) {
-                        MoovieIconButton(
-                            onClick = onOpenDiscovery,
-                            icon = Icons.Default.AutoAwesome,
-                            contentDescription = stringResource(Res.string.discovery_open),
-                            modifier = headerDown,
-                        )
-                    }
-                    // Parcourir par genre : geste distinct de la recherche par
-                    // titre, d'où un bouton à part plutôt qu'un onglet caché
-                    // derrière le champ de saisie.
-                    MoovieFocusLabel(stringResource(Res.string.catalog_open)) {
-                        MoovieIconButton(
-                            onClick = onOpenCatalog,
-                            icon = Icons.Default.GridView,
-                            contentDescription = stringResource(Res.string.catalog_open),
-                            modifier = headerDown,
-                        )
-                    }
-                    // Entre la loupe et l'engrenage : le focus par défaut de la
-                    // barre reste sur la recherche, l'historique est à un cran.
-                    MoovieFocusLabel(stringResource(Res.string.history_title)) {
-                        MoovieIconButton(
-                            onClick = onOpenHistory,
-                            icon = Icons.Default.History,
-                            contentDescription = stringResource(Res.string.history_title),
-                            modifier = headerDown,
-                        )
-                    }
-                    // Les téléchargements se surveillent, ils ne se règlent
-                    // pas : leur place est ici, à côté de l'historique, et non
-                    // à trois niveaux dans les réglages. Toujours visible même
-                    // à vide — la faire apparaître déplacerait le focus des
-                    // voisines au moment le plus inattendu.
-                    // La pastille du nombre de téléchargements en cours, comme
-                    // sur la barre basse : c'est la même icône, elle doit dire
-                    // la même chose. Sans elle, un téléchargement lancé depuis
-                    // la fiche ne se voyait nulle part sur cet écran.
-                    MoovieFocusLabel(stringResource(Res.string.settings_cat_downloads)) {
-                        DownloadCountBadge(rememberActiveDownloadCount()) {
-                            MoovieIconButton(
-                                onClick = onOpenDownloads,
-                                icon = Icons.Default.Download,
-                                contentDescription = stringResource(Res.string.settings_cat_downloads),
-                                modifier = headerDown,
-                            )
-                        }
-                    }
-                    // Télécommande : **seulement au doigt, et seulement si un
-                    // téléviseur a été appairé**. Sur un téléviseur, se piloter
-                    // soi-même n'a pas de sens ; sans cible, le bouton ouvrirait
-                    // un écran vide. Les deux conditions valent mieux qu'un
-                    // bouton qui explique pourquoi il ne sert à rien.
-                    if (onOpenRemote != null) {
-                        MoovieFocusLabel(stringResource(Res.string.remote_title)) {
-                            MoovieIconButton(
-                                onClick = onOpenRemote,
-                                icon = Icons.Default.SettingsRemote,
-                                contentDescription = stringResource(Res.string.remote_title),
-                                modifier = headerDown,
-                            )
-                        }
-                    }
-                    MoovieFocusLabel(stringResource(Res.string.home_settings)) {
-                        MoovieIconButton(
-                            onClick = onOpenSettings,
-                            icon = Icons.Default.Settings,
-                            contentDescription = stringResource(Res.string.home_settings),
-                            modifier = headerDown,
-                        )
-                    }
-                }
-                }
-            }
-            }
-            Spacer(Modifier.height(if (state is HomeState.Ready) 12.dp else 16.dp))
+            // Le héros ne vit plus ici : il est devenu le premier élément de
+            // la liste défilante, en pleine hauteur. Voir plus bas.
+            if (useBottomNav) Spacer(Modifier.height(16.dp))
 
             when (val s = state) {
                 // Deux rangées fantômes, à la largeur réelle des cartes : rien
@@ -475,6 +467,33 @@ fun HomeScreenContent(
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                     contentPadding = PaddingValues(bottom = 48.dp),
                 ) {
+                    // **Le héros prend l'écran, et les rangées commencent
+                    // dessous.**
+                    //
+                    // Il faisait 148 points — un quart d'un téléviseur — pour
+                    // porter l'image la plus forte de l'application, pendant
+                    // que la fiche de détails, elle, allait jusqu'au bord. Deux
+                    // langages pour la même chose dans la même application.
+                    //
+                    // En premier élément de la liste plutôt qu'en bloc fixe :
+                    // c'est ce qui lui permet de prendre toute la hauteur sans
+                    // condamner les rangées. On le quitte en descendant, comme
+                    // on quitte le hero d'une fiche.
+                    //
+                    // L'amorce sous lui n'est pas décorative : sans elle, rien
+                    // ne dit qu'il y a des rangées plus bas, et l'accueil
+                    // ressemble à une affiche.
+                    if (!auDoigt) {
+                        item(key = "heros") {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(hauteurHeros),
+                            ) {
+                                Hero(featured, modifier = Modifier.align(Alignment.BottomStart))
+                            }
+                        }
+                    }
                     itemsIndexed(slots, key = { _, slot -> slot.id }) { index, slot ->
                         // La cible de descente depuis l'en-tête est toujours le
                         // premier créneau affiché, quel qu'il soit : la 1re carte
@@ -584,7 +603,15 @@ private val HERO_HEIGHT = 148.dp
  * aucune ne se lit. La valeur cadre le héros et la première rangée, ce qui est
  * exactement la zone qu'on regarde en arrivant.
  */
-private const val HAUTEUR_FOND = 0.52f
+/**
+ * Ce qu'on laisse voir des rangées sous le héros plein écran.
+ *
+ * Le titre de la première rangée et le haut de ses affiches. Sans cette
+ * amorce, l'accueil s'ouvre sur une image pleine page et rien n'invite à
+ * descendre — c'est le même défaut que la barre d'onglets d'une fiche posée
+ * pile sur le bord de l'écran.
+ */
+private val AMORCE_RANGEES = 76.dp
 
 /**
  * Cale une rangée en haut de la liste dès qu'elle prend le focus.
