@@ -141,6 +141,12 @@ fun PersonScreenContent(
                             annee = item.year,
                             isWatched = key in watched,
                             inWatchlist = key in watchlistKeys,
+                            // Une filmographie est pleine de titres qui se
+                            // ressemblent — remakes, suites, séries et films du
+                            // même nom. L'année est ce qui les sépare, et au
+                            // doigt elle n'apparaîtrait jamais : il n'y a pas de
+                            // focus pour la révéler.
+                            metaToujours = useBottomNav,
                             onClick = { onOpenTitle(item.id, item.isTv) },
                             modifier = if (item == state.credits.firstOrNull()) {
                                 Modifier.focusRequester(firstCard)

@@ -84,6 +84,16 @@ fun MooviePosterCard(
     annee: String? = null,
     inWatchlist: Boolean = false,
     isWatched: Boolean = false,
+    /**
+     * Affiche la note et l'année en permanence, sans attendre la visée.
+     *
+     * Le dépliage au focus suppose qu'il existe un focus. Au doigt il n'y en a
+     * pas, et les deux lignes ne s'affichaient donc **jamais** — ce qui est
+     * sans conséquence sur une rangée de l'accueil, mais pas dans une
+     * filmographie : c'est l'année qui y distingue deux titres homonymes, et
+     * c'est justement pour elle qu'on ouvre la page d'un acteur.
+     */
+    metaToujours: Boolean = false,
     surAffiche: (@Composable BoxScope.() -> Unit)? = null,
 ) {
     MoovieCard(onClick = onClick, onLongClick = onLongClick, modifier = modifier.fillMaxWidth()) {
@@ -121,7 +131,8 @@ fun MooviePosterCard(
             // carte doit **grandir**, sinon les deux lignes se superposeraient
             // au titre ou déborderaient hors du cadre.
             AnimatedVisibility(
-                visible = LocalMoovieCardActive.current && (note > 0 || annee != null),
+                visible = (metaToujours || LocalMoovieCardActive.current) &&
+                    (note > 0 || annee != null),
                 enter = fadeIn() + expandVertically(),
                 exit = fadeOut() + shrinkVertically(),
             ) {
