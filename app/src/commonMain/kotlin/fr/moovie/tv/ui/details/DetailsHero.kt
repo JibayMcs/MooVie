@@ -3,6 +3,7 @@ package fr.moovie.tv.ui.details
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -160,7 +161,14 @@ internal fun DetailsHero(
      */
     enColonne: Boolean = false,
 ) {
-    Box(modifier = Modifier.fillMaxWidth().height(hauteur)) {
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth().height(hauteur)) {
+        // La hauteur réelle de l'image en colonne : elle se déduit de la
+        // **largeur** du cadre, pas de sa hauteur. Le calcul d'avant prenait la
+        // seconde pour la première et surestimait l'image de trente pour cent,
+        // si bien que le fondu n'avait pas fini de noircir quand elle
+        // s'arrêtait : la bande-annonce se terminait par une arête franche dès
+        // que son image était claire à cet endroit.
+        val hauteurImage = maxWidth / 16f * 9f
         // **Une image, quelle qu'elle soit.** Le backdrop d'abord, c'est le seul
         // cadré pour cette place. À défaut l'affiche, floutée : recadrer un 2:3
         // en bandeau en perd la moitié, mais floutée elle ne prétend plus être
@@ -184,7 +192,7 @@ internal fun DetailsHero(
                         if (enColonne) {
                             Modifier
                                 .fillMaxWidth()
-                                .aspectRatio(16f / 9f)
+                                .height(hauteurImage)
                                 .align(Alignment.TopCenter)
                         } else {
                             Modifier.fillMaxSize()
@@ -217,35 +225,40 @@ internal fun DetailsHero(
         // cadre se lisait comme une bande d'image posée sur un bloc noir —
         // exactement ce qu'on nous a remonté d'un salon. Ancré en points, le
         // voile couvre le texte et rien de plus, quelle que soit la hauteur.
-        val voile = when {
-            // **Le voile mord dans l'image, il ne commence pas après elle.**
-            //
-            // Calé sur le bas exact de l'image, il n'assombrissait que le texte
-            // — qui est déjà sur le fond de la page — et l'image se terminait
-            // par une arête franche au milieu de l'écran. C'est précisément ce
-            // qu'un dégradé existe pour éviter : une image qui s'arrête net se
-            // lit comme une bannière posée là, pas comme le haut d'une page.
-            //
-            // Il commence donc dans son dernier tiers, et le raccord se fait
-            // dans l'image elle-même.
-            enColonne -> hauteur - hauteur / 16f * 9f * FONDU_IMAGE
-            LocalHeightClass.current != HeightClass.EXPANDED -> HAUTEUR_VOILE_COURT
-            else -> HAUTEUR_VOILE
+        // **En colonne, le fondu s'achève au bas de l'image.**
+        //
+        // C'est là qu'elle s'arrête : au-delà, il n'y a que le fond de la page,
+        // que le voile ne peut plus assombrir. Un dégradé qui continue jusqu'au
+        // bas du cadre ne fait donc que la moitié du chemin sur l'image
+        // elle-même, et la laisse se couper net — visible dès que la
+        // bande-annonce est claire à cet instant.
+        val degrade = if (enColonne) {
+            val bas = (hauteurImage / hauteur).coerceIn(0.1f, 1f)
+            Brush.verticalGradient(
+                0f to Color(0x000A0A0A),
+                bas * (1f - FONDU_IMAGE) to Color(0x000A0A0A),
+                bas * (1f - FONDU_IMAGE * 0.45f) to Color(0x800A0A0A),
+                bas to MOOVIE_BG,
+                1f to MOOVIE_BG,
+            )
+        } else {
+            val voile = if (LocalHeightClass.current != HeightClass.EXPANDED) {
+                HAUTEUR_VOILE_COURT
+            } else {
+                HAUTEUR_VOILE
+            }
+            val debutVoile = ((hauteur - voile) / hauteur).coerceIn(0.05f, 0.75f)
+            Brush.verticalGradient(
+                0f to Color(0x000A0A0A),
+                debutVoile to Color(0x000A0A0A),
+                // Le gros de l'assombrissement se fait sur la seconde moitié du
+                // voile : au-dessus, le texte n'a pas encore commencé et l'image
+                // n'a aucune raison de payer pour lui.
+                (debutVoile + (1f - debutVoile) * 0.45f) to Color(0x800A0A0A),
+                1f to MOOVIE_BG,
+            )
         }
-        val debutVoile = ((hauteur - voile) / hauteur).coerceIn(0.05f, 0.75f)
-        Box(
-            modifier = Modifier.fillMaxSize().background(
-                Brush.verticalGradient(
-                    0f to Color(0x000A0A0A),
-                    debutVoile to Color(0x000A0A0A),
-                    // Le gros de l'assombrissement se fait sur la seconde
-                    // moitié du voile : au-dessus, le texte n'a pas encore
-                    // commencé et l'image n'a aucune raison de payer pour lui.
-                    (debutVoile + (1f - debutVoile) * 0.45f) to Color(0x800A0A0A),
-                    1f to MOOVIE_BG,
-                ),
-            ),
-        )
+        Box(modifier = Modifier.fillMaxSize().background(degrade))
         Box(
             modifier = Modifier.fillMaxSize().background(
                 Brush.horizontalGradient(
