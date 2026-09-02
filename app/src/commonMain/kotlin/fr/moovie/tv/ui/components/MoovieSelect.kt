@@ -46,11 +46,27 @@ fun <T> MoovieSelect(
     label: @Composable (T) -> String,
     onSelect: (T) -> Unit,
     modifier: Modifier = Modifier,
+    /**
+     * Le critère est-il réglé sur autre chose que son défaut. Le liseré du thème
+     * le marque alors, comme sur les boutons que ce composant a remplacés dans
+     * la barre de filtres : sans lui, rien ne distingue une barre au repos d'une
+     * barre qui filtre déjà — et l'on cherche pourquoi la liste est courte.
+     */
+    actif: Boolean = false,
+    /**
+     * Libellé du bouton, quand il doit dire plus que celui des options.
+     *
+     * Dans une barre de filtres, « Popularité » seul ne dit pas de quoi il est
+     * le tri : le bouton porte donc « Trier par · Popularité ». Répéter ce
+     * préfixe sur chaque ligne du menu, en dessous d'un titre qui l'annonce
+     * déjà, ne fait que rallonger quatre lignes de la même chose.
+     */
+    libelleBouton: (@Composable (T) -> String)? = null,
 ) {
     var open by remember { mutableStateOf(false) }
 
-    MoovieButton(onClick = { open = true }, modifier = modifier) {
-        Text(label(selected))
+    MoovieButton(onClick = { open = true }, modifier = modifier, selected = actif) {
+        Text((libelleBouton ?: label)(selected))
         Spacer(Modifier.width(8.dp))
         Icon(Icons.Default.ArrowDropDown, contentDescription = null, modifier = Modifier.size(20.dp))
     }
