@@ -22,6 +22,9 @@ import fr.moovie.tv.resources.settings_cat_downloads
 import fr.moovie.tv.ui.adaptive.useBottomNav
 import fr.moovie.tv.ui.components.MoovieIconButton
 import org.jetbrains.compose.resources.stringResource
+import fr.moovie.tv.ui.components.MooviePageHeader
+import fr.moovie.tv.ui.theme.ESPACE_LARGE
+import fr.moovie.tv.ui.theme.margePage
 
 /**
  * Les téléchargements, en écran de plein droit.
@@ -48,26 +51,21 @@ fun DownloadsScreen(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = if (useBottomNav) 20.dp else 56.dp, vertical = 28.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp),
+            .padding(vertical = 28.dp),
+        verticalArrangement = Arrangement.spacedBy(ESPACE_LARGE),
     ) {
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            if (showBackButton) {
-                MoovieIconButton(
-                    onClick = onBack,
-                    icon = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = stringResource(Res.string.common_back),
-                )
-            }
-            Text(
-                stringResource(Res.string.settings_cat_downloads),
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.primary,
-            )
+        // L'en-tête commun. Cette page avait le sien : titre en `headlineSmall`
+        // et rose, marge de 56 points — trois écarts par rapport à ses voisines
+        // pour un bloc qui fait exactement la même chose.
+        MooviePageHeader(
+            titre = stringResource(Res.string.settings_cat_downloads),
+            onBack = onBack.takeIf { showBackButton },
+        )
+        // La marge de page passe aux enfants : l'en-tête porte déjà la sienne,
+        // et la section défilante a besoin de déborder dedans pour que ses
+        // éléments agrandis au focus ne soient pas rognés.
+        Column(modifier = Modifier.padding(horizontal = margePage())) {
+            DownloadsSection(onPlay = onPlay)
         }
-        DownloadsSection(onPlay = onPlay)
     }
 }
