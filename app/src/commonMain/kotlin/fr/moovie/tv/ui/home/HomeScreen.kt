@@ -57,6 +57,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.ui.text.font.FontWeight
 import fr.moovie.tv.ui.theme.MoovieShape
 import androidx.compose.ui.draw.blur
@@ -419,13 +421,49 @@ fun HomeScreenContent(
             // Le dégradé de l'identité passe donc dans les lettres elles-mêmes.
             // Il dit ce que l'icône disait — orange, magenta, violet — sans
             // rapporter la tuile avec lui.
+            //
+            // **Le bandeau se remplit quand la page défile.**
+            //
+            // Le nom est posé au-dessus de la liste, donc fixe, et ce qu'on
+            // voyait derrière lui était l'affiche floutée du héros. Tant qu'on
+            // est en haut de page c'est ce qu'il faut — l'image monte jusqu'au
+            // bord et le nom s'y pose. Mais une fois descendu, les rangées
+            // passaient sous une bande restée translucide : un rectangle du
+            // haut de l'écran où le fond n'était pas celui de la page et où les
+            // affiches défilaient à moitié effacées.
+            //
+            // Il prend donc le fond de la page dès le premier point de
+            // défilement, et le rend dès qu'on revient en haut. En fondu, parce
+            // que c'est un fond qui change, pas un élément qui apparaît.
             if (useBottomNav) {
-                Text(
-                    stringResource(Res.string.app_name),
-                    style = MaterialTheme.typography.headlineSmall.copy(brush = MoovieGradient),
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = margePage(), vertical = 6.dp),
+                val defile by remember {
+                    derivedStateOf {
+                        rowsState.firstVisibleItemIndex > 0 ||
+                            rowsState.firstVisibleItemScrollOffset > 0
+                    }
+                }
+                val fondBandeau by animateColorAsState(
+                    if (defile) MOOVIE_BG else Color.Transparent,
+                    label = "fondNom",
                 )
+                // Le fond au conteneur, le dégradé au texte. Posés sur le même
+                // nœud, `fillMaxWidth` étirait le dégradé sur toute la largeur
+                // de l'écran : les lettres, qui n'en occupent qu'un cinquième,
+                // n'attrapaient plus que son orange, et l'identité à trois
+                // teintes se lisait comme une teinte unique.
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(fondBandeau)
+                        .padding(horizontal = margePage(), vertical = 6.dp),
+                ) {
+                    Text(
+                        stringResource(Res.string.app_name),
+                        style = MaterialTheme.typography.headlineSmall
+                            .copy(brush = MoovieGradient),
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
             } else {
                 // **La barre de navigation, en haut et pleine largeur.**
                 //
