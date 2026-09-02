@@ -82,6 +82,8 @@ import fr.moovie.tv.ui.theme.MOOVIE_SURFACE
 import fr.moovie.tv.ui.theme.MOOVIE_SURFACE_HIGH
 import fr.moovie.tv.ui.theme.MOOVIE_TEXT_DIM
 import fr.moovie.tv.ui.theme.margePage
+import fr.moovie.tv.ui.components.MooviePageHeader
+import fr.moovie.tv.ui.theme.ESPACE_SECTION
 
 /** Colonnes de la grille. Six tient en 1080p sans réduire les vignettes à rien. */
 private const val COLUMNS = 6
@@ -142,24 +144,11 @@ fun HistoryScreenContent(
 
     Box(modifier = Modifier.fillMaxSize().background(MOOVIE_BG)) {
         Column(modifier = Modifier.fillMaxSize().padding(vertical = 32.dp)) {
-            Row(
-                modifier = Modifier.padding(horizontal = historyHPad()),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                if (showBackButton) {
-                    MoovieIconButton(
-                        onClick = onBack,
-                        icon = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = stringResource(Res.string.common_back),
-                    )
-                }
-                Text(
-                    stringResource(Res.string.history_title),
-                    style = MaterialTheme.typography.headlineMedium,
-                )
-            }
-            Spacer(Modifier.height(24.dp))
+            MooviePageHeader(
+                titre = stringResource(Res.string.history_title),
+                onBack = onBack.takeIf { showBackButton },
+            )
+            Spacer(Modifier.height(ESPACE_SECTION))
 
             // Hors de la liste défilante, volontairement : ces tuiles résument
             // toute la page, et un résumé qui disparaît au premier appui sur Bas
