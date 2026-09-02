@@ -375,62 +375,6 @@ private fun Note(valeur: Double) {
 private val CAST_CARD_WIDTH = 96.dp
 
 /**
- * Dispose la fiche d'une série **au doigt** : en-tête et épisodes dans un seul
- * défilement.
- *
- * ## Pourquoi l'en-tête et les épisodes arrivent séparément
- *
- * La page ne défilait pas, seule la liste le faisait, si bien que le titre, le
- * résumé, la rangée des saisons et les actions occupaient à demeure la moitié
- * haute d'un écran de téléphone — il restait une fenêtre de deux épisodes pour
- * parcourir la saison, et un geste sur l'en-tête ne faisait rien du tout. Ce
- * n'est pas ainsi qu'une page se lit sur un téléphone : elle défile en entier.
- *
- * D'où ces deux paramètres plutôt qu'un `content` unique. Pour que l'en-tête
- * défile *avec* les épisodes, il doit être un élément de leur liste — et un
- * élément de liste paresseuse ne peut être posé que depuis un `LazyListScope`,
- * que le point d'appel n'a pas. C'est aussi ce qui garde la paresse : on aurait
- * pu rendre la page défilante et poser les épisodes dans une `Column`
- * ordinaire, au prix de composer les vingt-cinq d'un coup, images comprises.
- *
- * ## Ce qui a disparu
- *
- * Il y avait ici un second cas, deux volets côte à côte pour le grand écran,
- * avec un en-tête posé hors du défilement. La refonte du hero l'a remplacé : la
- * fiche série défile désormais en entier comme celle d'un film, et la liste
- * d'épisodes vit sous un onglet. Le paramètre `compact` avec lui — cette
- * fonction n'est plus appelée que pour le tactile, et un booléen dont une seule
- * valeur est atteignable ne décrit plus rien.
- */
-@Composable
-private fun SeriesPanes(
-    episodesState: LazyListState,
-    modifier: Modifier = Modifier,
-    /** Titre, résumé de saison, rangée des saisons et actions. */
-    header: @Composable (Modifier) -> Unit,
-    /** « En savoir plus », qui prend la place des épisodes, ou null s'il est fermé. */
-    infoPanel: (@Composable (Modifier) -> Unit)?,
-    /** Les épisodes, posés en éléments de liste paresseuse. */
-    episodes: LazyListScope.() -> Unit,
-) {
-    LazyColumn(
-        state = episodesState,
-        modifier = modifier,
-        // Les marges de la page passent par le `contentPadding` de la liste,
-        // qui les porte maintenant pour tout le monde — en-tête compris.
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        item { header(Modifier.fillMaxWidth()) }
-        if (infoPanel != null) {
-            item { infoPanel(Modifier.fillMaxWidth()) }
-        } else {
-            episodes()
-        }
-    }
-}
-
-/**
  * Fiche film/série partagée TV + desktop : état hoisté (le ViewModel reste côté
  * plateforme — chargement TMDB, résolution de sources, suivi de lecture).
  */
@@ -568,15 +512,6 @@ fun DetailsScreenContent(
     // son FocusRequester n'existe pas. Il faut défiler jusqu'à lui d'abord.
     val episodesState = rememberLazyListState()
 
-    /**
-     * Écart entre le rang d'un épisode dans la saison et son index dans la liste
-     * paresseuse.
-     *
-     * Le titre « Épisodes (saison N) » occupe toujours le premier élément. Au
-     * doigt, l'en-tête de la série en occupe un de plus : il défile avec les
-     * épisodes au lieu de rester posé au-dessus — voir [SeriesPanes].
-     */
-    val episodeItemOffset = if (compact) 2 else 1
 
     // Série reprise en cours : le focus descend sur l'épisode à suivre plutôt
     // que de rester sur la rangée des saisons — sinon on arrive avec « S1 »
@@ -637,10 +572,8 @@ fun DetailsScreenContent(
         val wantsEpisode = compact && tv != null && tv.resumeEpisode > 0 &&
             selectedEpisode == null && !autoFocusDone
         if (wantsEpisode) {
-            // Le décalage compte les éléments posés avant les épisodes : voir
-            // [episodeItemOffset].
             val index = tv.episodes.indexOfFirst { it.episodeNumber == tv.resumeEpisode }
-            if (index >= 0) runCatching { episodesState.scrollToItem(index + episodeItemOffset) }
+            if (index >= 0) runCatching { episodesState.scrollToItem(index) }
             // La liste d'épisodes n'est pas encore posée au moment où l'état
             // change : on retente le temps qu'elle le soit.
             repeat(10) {
@@ -871,10 +804,9 @@ fun DetailsScreenContent(
     // plus le fond flouté de la page derrière.
     val heroPleinCadre = when {
         state is DetailsState.Loading || state is DetailsState.Error -> false
-        // Le film a son cadre partout, portrait compris.
+        // Le film et la série ont leur cadre partout, portrait compris.
         state is DetailsState.Movie -> true
-        // La série et l'épisode ne l'ont encore qu'en paysage : au doigt, la
-        // première garde ses volets et le second son empilement.
+        state is DetailsState.Tv -> true
         else -> !compact
     }
     BoxWithConstraints(
@@ -969,16 +901,10 @@ fun DetailsScreenContent(
             else -> 48.dp
         }
         val pageScope = rememberCoroutineScope()
-        // **La page ne porte pas son propre défilement quand un enfant le
-        // porte déjà.** C'est le cas de la fiche série au doigt, dont
-        // `SeriesPanes` est une `LazyColumn`.
-        //
-        // Sur grand écran, ce n'était pas une question de conteneur mais de
-        // parti pris : l'en-tête restait posé et seuls les épisodes défilaient,
-        // pour ne pas perdre de vue ce qu'on parcourait. Le hero plein cadre le
-        // rend intenable — il ne resterait rien à la liste — et la maquette
-        // tranche dans l'autre sens : la page défile en entier, hero compris.
-        val seriesList = compact && state is DetailsState.Tv && selectedEpisode == null
+        // Toutes les fiches défilent en bloc, hero compris. L'en-tête posé
+        // hors du défilement et les deux volets ont disparu avec la seconde
+        // mise en page de la série.
+        val seriesList = false
 
         // **Un seul lecteur, et il ne bouge pas de l'arbre.**
         //
@@ -1711,10 +1637,10 @@ fun DetailsScreenContent(
                                     // passer le `bringIntoView` du système, qui
                                     // part sur la même prise de focus et
                                     // écraserait l'alignement.
-                                    if (it.isFocused && compact) pageScope.launch {
-                                        delay(80)
-                                        episodesState.animateScrollToItem(index + episodeItemOffset)
-                                    }
+                                    // La page défile désormais en bloc partout :
+                                    // c'est `bringIntoView` qui recentre, il n'y
+                                    // a plus de liste paresseuse à caler.
+                                    Unit
                                 },
                             ) {
                                 EpisodeRow(
@@ -1737,202 +1663,130 @@ fun DetailsScreenContent(
                             }
                         }
 
-                        if (compact) {
-                        // Deux volets plutôt qu'un empilement : l'écran fait
-                        // 960 × 540 dp, et un synopsis qui occupe toute la
-                        // largeur pour trois lignes prend à la liste la hauteur
-                        // de trois épisodes. Côte à côte, la description garde
-                        // sa place et la liste récupère toute la colonne.
-                        SeriesPanes(
-                            episodesState = episodesState,
-                            modifier = Modifier.weight(1f).fillMaxWidth(),
-                            header = { headerModifier ->
-                        Column(
-                            modifier = headerModifier,
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
-                        ) {
-                        // En-tête posé hors du défilement : il décrit ce qu'on
-                        // est en train de parcourir, et le perdre au premier
-                        // appui vers le bas revenait à naviguer à l'aveugle
-                        // dans une liste de vingt épisodes.
-                        Text(s.details.name, style = MaterialTheme.typography.headlineSmall)
-                        // Année et résumé **de la saison** quand TMDB les donne.
-                        // Ils ne l'étaient jamais : le parseur ignorait les deux
-                        // champs, si bien que les vingt-deux saisons d'une série
-                        // affichaient le même texte et la même année.
-                        if (seasonUpcoming != null) {
-                            Text(
-                                stringResource(Res.string.details_episode_upcoming, seasonUpcoming),
-                                color = MOOVIE_ACCENT,
-                            )
-                        } else (s.seasonYear ?: s.details.year)?.let { Text(it) }
-                        ScrollingSynopsis(
-                            text = s.seasonOverview.ifBlank { s.details.overview },
-                            // Empilé sur téléphone, il mange la liste
-                            // d'épisodes — on le resserre.
-                            lines = 3,
-                            style = MaterialTheme.typography.bodyMedium,
-                            // Déroulé en continu : dans l'en-tête il n'y a pas
-                            // de carte à focaliser pour déclencher la lecture,
-                            // et un résumé tronqué net serait inatteignable.
-                            active = true,
-                        )
-                        // Bloc de commande resserré : titre, saisons et actions
-                        // se suivent de près pour rendre à la liste la hauteur
-                        // de deux épisodes. L'espacement de 16 dp de la colonne
-                        // parente, appliqué entre chacun, la lui prenait.
-                        selecteurSaisons()
-                        actionsSerie()
-                        }
+                        // ── La fiche série, sur tous les appareils ──────
+                        //
+                        // Elle en avait deux : deux volets au doigt, hero et
+                        // onglets ailleurs. Le tactile y perdait doublement —
+                        // l'image de la série réduite à rien, et une liste
+                        // d'épisodes sous un en-tête fixe qui lui prenait la
+                        // moitié de l'écran. C'est la même page partout
+                        // désormais, en colonne sur un téléphone.
+                        //
+                        // Même hero, même barre d'onglets, et la liste des
+                        // épisodes sous le premier d'entre eux. Les deux
+                        // fiches du catalogue se ressemblent enfin, ce que
+                        // ni l'ancien en-tête ni les deux volets ne
+                        // permettaient.
+                        DetailsHero(
+                            backdropUrl = s.details.backdropUrl(),
+                            afficheUrl = s.details.posterUrl(),
+                            titre = s.details.name,
+                            meta = metaSerie(s.details),
+                            // Le résumé **de la saison** quand TMDB le
+                            // donne : c'est celle qu'on est venu voir.
+                            synopsis = s.seasonOverview.ifBlank { s.details.overview },
+                            // Les crédits passent sous l'onglet « En savoir
+                            // plus » en portrait : quatre lignes de plus sous
+                            // le synopsis y repousseraient les onglets hors de
+                            // l'écran.
+                            credits = if (compact) {
+                                emptyList()
+                            } else {
+                                creditsSerie(s.details.credits, s.details.createdBy.map { it.name })
                             },
-                        // « En savoir plus » prend la place de la liste des
-                        // épisodes. C'est le cas qui a dicté la conception — on
-                        // consulte la date du prochain épisode, puis on veut ses
-                        // épisodes, sans avoir à défiler.
-                            infoPanel = if (infoVisible) {
-                                { modifierPanneau ->
-                                    TvInfoPanel(
-                                        details = s.details,
-                                        country = country,
-                                        // Au doigt il est un élément d'une liste
-                                        // qui porte déjà le défilement de la page :
-                                        // lui en donner un second l'imbriquerait.
-                                        scrollable = false,
-                                        modifier = modifierPanneau,
+                            hauteur = hauteurHero,
+                            marge = margeHero,
+                            enColonne = compact,
+                            actions = {
+                                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    // Une saison annoncée n'a rien à lire :
+                                    // le bouton disparaît plutôt que de
+                                    // rester inerte, comme celui du
+                                    // téléchargement de saison juste à côté.
+                                    if (episodeAReprendre != null && seasonUpcoming == null) {
+                                        BoutonLireEpisode(
+                                            season = s.season,
+                                            episode = episodeAReprendre,
+                                            searching = quickPlay is QuickPlayState.Searching,
+                                            aReprendre = resume.containsKey(
+                                                episodeKey(s.season, episodeAReprendre.episodeNumber),
+                                            ),
+                                            modifier = primaryModifier,
+                                            onClick = {
+                                                onQuickPlayEpisode(
+                                                    s.season,
+                                                    episodeAReprendre.episodeNumber,
+                                                )
+                                            },
+                                        )
+                                    }
+                                    actionsSerie()
+                                }
+                            },
+                            // La bande-annonce joue derrière, dans ce cadre
+                            // exact : l'image la masquerait.
+                            imageMasquee = apercuDansHero,
+                            controles = if (apercuDansHero) {
+                                {
+                                    ApercuControles(
+                                        controller = trailerController,
+                                        muet = apercuMuet,
+                                        onCoupeLeSon = { apercuMuet = !apercuMuet },
+                                        onAgrandir = onPlayTrailer,
+                                        onRedescend = {
+                                            runCatching { primaryFocus.requestFocus() }.isSuccess
+                                        },
                                     )
                                 }
                             } else {
                                 null
                             },
-                            episodes = {
-                        item {
-                            Text(stringResource(Res.string.details_episodes_season, s.season), style = MaterialTheme.typography.titleMedium)
-                        }
-                        itemsIndexed(s.episodes) { index, ep -> ligneEpisode(index, ep) }
-                        // Casting **dans** le défilement, en queue de liste.
-                        // Posé sous les volets, c'était un bloc fixe d'environ
-                        // 190 dp pris à une liste qui n'a déjà que ce qui reste
-                        // sous l'en-tête : il restait une fenêtre d'un épisode
-                        // et demi pour parcourir la saison.
-                        //
-                        // hPad nul : la marge de 16 dp vient déjà du
-                        // contentPadding de la liste. La cumuler décalerait la
-                        // rangée par rapport aux épisodes qu'elle suit.
-                        item {
-                            CastRow(s.details.credits?.cast.orEmpty(), 0.dp, onOpenPerson)
-                        }
-                            },
                         )
-                        } else {
-                            // ── La fiche série, comme la fiche film ─────────
-                            //
-                            // Même hero, même barre d'onglets, et la liste des
-                            // épisodes sous le premier d'entre eux. Les deux
-                            // fiches du catalogue se ressemblent enfin, ce que
-                            // ni l'ancien en-tête ni les deux volets ne
-                            // permettaient.
-                            DetailsHero(
-                                backdropUrl = s.details.backdropUrl(),
-                                afficheUrl = s.details.posterUrl(),
-                                titre = s.details.name,
-                                meta = metaSerie(s.details),
-                                // Le résumé **de la saison** quand TMDB le
-                                // donne : c'est celle qu'on est venu voir.
-                                synopsis = s.seasonOverview.ifBlank { s.details.overview },
-                                credits = creditsSerie(s.details.credits, s.details.createdBy.map { it.name }),
-                                hauteur = hauteurHero,
-                                marge = margeHero,
-                                actions = {
-                                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                        // Une saison annoncée n'a rien à lire :
-                                        // le bouton disparaît plutôt que de
-                                        // rester inerte, comme celui du
-                                        // téléchargement de saison juste à côté.
-                                        if (episodeAReprendre != null && seasonUpcoming == null) {
-                                            BoutonLireEpisode(
-                                                season = s.season,
-                                                episode = episodeAReprendre,
-                                                searching = quickPlay is QuickPlayState.Searching,
-                                                aReprendre = resume.containsKey(
-                                                    episodeKey(s.season, episodeAReprendre.episodeNumber),
-                                                ),
-                                                modifier = primaryModifier,
-                                                onClick = {
-                                                    onQuickPlayEpisode(
-                                                        s.season,
-                                                        episodeAReprendre.episodeNumber,
-                                                    )
-                                                },
-                                            )
-                                        }
-                                        actionsSerie()
-                                    }
-                                },
-                                // La bande-annonce joue derrière, dans ce cadre
-                                // exact : l'image la masquerait.
-                                imageMasquee = apercuDansHero,
-                                controles = if (apercuDansHero) {
-                                    {
-                                        ApercuControles(
-                                            controller = trailerController,
-                                            muet = apercuMuet,
-                                            onCoupeLeSon = { apercuMuet = !apercuMuet },
-                                            onAgrandir = onPlayTrailer,
-                                            onRedescend = {
-                                                runCatching { primaryFocus.requestFocus() }.isSuccess
-                                            },
-                                        )
-                                    }
-                                } else {
-                                    null
-                                },
-                            )
-                            barreOnglets()
-                            when (ongletActif) {
-                                DetailsTab.EPISODES -> Column(
-                                    modifier = hPadHero.fillMaxWidth(),
-                                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                                ) {
-                                    selecteurSaisons()
-                                    if (seasonUpcoming != null) {
-                                        Text(
-                                            stringResource(
-                                                Res.string.details_episode_upcoming,
-                                                seasonUpcoming,
-                                            ),
-                                            color = MOOVIE_ACCENT,
-                                        )
-                                    }
+                        barreOnglets()
+                        when (ongletActif) {
+                            DetailsTab.EPISODES -> Column(
+                                modifier = hPadHero.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(12.dp),
+                            ) {
+                                selecteurSaisons()
+                                if (seasonUpcoming != null) {
                                     Text(
-                                        stringResource(Res.string.details_episodes_season, s.season),
-                                        style = MaterialTheme.typography.titleMedium,
+                                        stringResource(
+                                            Res.string.details_episode_upcoming,
+                                            seasonUpcoming,
+                                        ),
+                                        color = MOOVIE_ACCENT,
                                     )
-                                    // Composés tous à la fois, et non
-                                    // paresseusement : la page entière défile
-                                    // désormais, et une liste paresseuse à
-                                    // hauteur infinie dans un défilement
-                                    // vertical n'est pas mesurable. Une saison
-                                    // en compte vingt-cinq au pire — c'est le
-                                    // prix du défilement continu qu'exige la
-                                    // maquette, et il se paie une fois.
-                                    s.episodes.forEachIndexed { index, ep ->
-                                        ligneEpisode(index, ep)
-                                    }
                                 }
-                                DetailsTab.SIMILAIRES ->
-                                    SimilarRow(recommendations, margeHero, onOpenTitle)
-                                DetailsTab.BANDES_ANNONCES ->
-                                    ready?.let { TrailerTab(it, onPlayTrailer, hPadHero) }
-                                DetailsTab.INFOS -> {
-                                    TvInfoPanel(
-                                        details = s.details,
-                                        country = country,
-                                        // La page défile déjà en bloc.
-                                        scrollable = false,
-                                        modifier = hPadHero.fillMaxWidth(),
-                                    )
-                                    CastRow(s.details.credits?.cast.orEmpty(), margeHero, onOpenPerson)
+                                Text(
+                                    stringResource(Res.string.details_episodes_season, s.season),
+                                    style = MaterialTheme.typography.titleMedium,
+                                )
+                                // Composés tous à la fois, et non
+                                // paresseusement : la page entière défile
+                                // désormais, et une liste paresseuse à
+                                // hauteur infinie dans un défilement
+                                // vertical n'est pas mesurable. Une saison
+                                // en compte vingt-cinq au pire — c'est le
+                                // prix du défilement continu qu'exige la
+                                // maquette, et il se paie une fois.
+                                s.episodes.forEachIndexed { index, ep ->
+                                    ligneEpisode(index, ep)
                                 }
+                            }
+                            DetailsTab.SIMILAIRES ->
+                                SimilarRow(recommendations, margeHero, onOpenTitle)
+                            DetailsTab.BANDES_ANNONCES ->
+                                ready?.let { TrailerTab(it, onPlayTrailer, hPadHero) }
+                            DetailsTab.INFOS -> {
+                                TvInfoPanel(
+                                    details = s.details,
+                                    country = country,
+                                    // La page défile déjà en bloc.
+                                    scrollable = false,
+                                    modifier = hPadHero.fillMaxWidth(),
+                                )
+                                CastRow(s.details.credits?.cast.orEmpty(), margeHero, onOpenPerson)
                             }
                         }
                     }
@@ -2991,66 +2845,6 @@ private fun EpisodeDetail(
     // La marge de page partagée. C'était le dernier écran à garder la sienne.
     val hPadDp = margePage()
     val hPad = Modifier.padding(horizontal = hPadDp)
-    // La vignette fait 420 dp de large. Sur les 448 dp d'un téléphone en
-    // portrait il ne restait que 28 dp à la colonne de texte : titre, synopsis
-    // et boutons étaient bien composés, mais écrasés à néant — d'où une page qui
-    // semblait ne contenir qu'une image.
-    val still = @Composable { modifier: Modifier ->
-        Box(
-            modifier = modifier
-                .aspectRatio(16f / 9f)
-                .clip(MoovieShape)
-                .background(MOOVIE_SURFACE_HIGH),
-        ) {
-            MoovieAsyncImage(
-                model = ep.stillUrlLarge(),
-                contentDescription = ep.name,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
-                fallback = fallbackArt,
-            )
-        }
-    }
-    val meta = @Composable {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(
-                stringResource(Res.string.details_episode_header, showName, season),
-                style = MaterialTheme.typography.labelLarge,
-                color = MOOVIE_ACCENT,
-            )
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Text(
-                    "${ep.episodeNumber}. ${ep.name}",
-                    style = MaterialTheme.typography.headlineSmall,
-                )
-                if (isWatched) WatchedBadge()
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                formatMediaDate(ep.airDate)?.let {
-                    Text(it, style = MaterialTheme.typography.titleSmall, color = MOOVIE_TEXT_MUTED)
-                }
-                formatDuration(ep.runtime)?.let {
-                    Text(
-                        it,
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MOOVIE_TEXT_MUTED,
-                    )
-                }
-                if (ep.voteAverage > 0) {
-                    Note(ep.voteAverage)
-                }
-            }
-            // Sur téléphone le synopsis passe après les boutons, comme sur la
-            // fiche d'un film : sinon « Lire » se retrouve sous le résumé.
-            if (!compact && ep.overview.isNotBlank()) {
-                Text(ep.overview, style = MaterialTheme.typography.bodyMedium, color = MOOVIE_TEXT_MUTED)
-            }
-        }
-    }
-
     // Les actions, hissées : sur grand écran elles se posent dans le hero, sous
     // le titre, exactement comme sur un film. Une seule définition pour les deux
     // mises en page.
@@ -3061,22 +2855,15 @@ private fun EpisodeDetail(
         // discret des trois.
         MoovieButton(
             onClick = onPlay,
-            modifier = primaryModifier.then(
-                if (compact) {
-                    Modifier
-                } else {
-                    Modifier
-                        .fillMaxWidth()
-                        .widthIn(max = LARGEUR_MAX_BOUTON_PRINCIPAL)
-                },
+            modifier = primaryModifier
+                .fillMaxWidth()
+                .widthIn(max = LARGEUR_MAX_BOUTON_PRINCIPAL),
+            remplissage = MOOVIE_ACCENT,
+            selected = true,
+            contentPadding = PaddingValues(
+                horizontal = 24.dp,
+                vertical = if (compact) 16.dp else 20.dp,
             ),
-            remplissage = if (compact) null else MOOVIE_ACCENT,
-            selected = !compact,
-            contentPadding = if (compact) {
-                PaddingValues(horizontal = 16.dp, vertical = 10.dp)
-            } else {
-                PaddingValues(horizontal = 24.dp, vertical = 20.dp)
-            },
         ) {
             val libelle: @Composable RowScope.() -> Unit = {
                 if (searching) {
@@ -3096,11 +2883,11 @@ private fun EpisodeDetail(
                             } else {
                                 stringResource(Res.string.details_play)
                             }
-                            ).let { if (compact) it else it.uppercase() },
+                            ).uppercase(),
                     )
                 }
             }
-            if (compact) libelle() else LibellePrincipal(libelle)
+            LibellePrincipal(libelle)
         }
     }
 
@@ -3136,38 +2923,18 @@ private fun EpisodeDetail(
     // côté ou consulter ses sources dès son annonce.
     val aVenir = upcomingDate(ep.airDate) != null
     val actionsEpisode: @Composable () -> Unit = {
-        if (compact) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (!aVenir) boutonLireEpisode()
             Row(
-                modifier = hPad,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (!aVenir) boutonLireEpisode()
                 actionsSecondairesEpisode()
-            }
-        } else {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                if (!aVenir) boutonLireEpisode()
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    actionsSecondairesEpisode()
-                }
             }
         }
     }
 
-    if (compact) {
-        Column(
-            modifier = hPad.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            still(Modifier.fillMaxWidth())
-            meta()
-        }
-        actionsEpisode()
-    } else {
+    run {
         // **Le même cadre que le film et la série.**
         //
         // C'était le dernier écran à l'ancienne mise en page : une vignette de
@@ -3198,17 +2965,10 @@ private fun EpisodeDetail(
             hauteur = hauteurHero,
             marge = hPadDp,
             actions = actionsEpisode,
+            enColonne = compact,
         )
     }
 
-    if (compact && ep.overview.isNotBlank()) {
-        Text(
-            ep.overview,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MOOVIE_TEXT_MUTED,
-            modifier = hPad,
-        )
-    }
     if (infoVisible) {
         infoPanel()
     } else {
