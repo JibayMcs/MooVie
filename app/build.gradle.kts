@@ -355,6 +355,18 @@ android {
         compose = true
         buildConfig = true
     }
+
+    testOptions {
+        unitTests {
+            // Le `android.jar` des tests JVM ne porte que des stubs qui lèvent.
+            // Les types de Media3 en traversent quelques-uns au passage —
+            // `TextUtils.isEmpty` dans `MimeTypes.getTrackType` — et un
+            // `TrackGroup` devenait impossible à construire hors appareil,
+            // c'est-à-dire impossible à tester. Rendre la valeur par défaut
+            // plutôt que lever suffit : ces stubs sont traversés, pas mesurés.
+            isReturnDefaultValues = true
+        }
+    }
 }
 
 tasks.withType<Test>().configureEach {
