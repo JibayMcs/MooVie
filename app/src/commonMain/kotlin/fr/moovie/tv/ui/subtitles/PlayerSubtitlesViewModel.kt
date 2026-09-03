@@ -181,6 +181,31 @@ class PlayerSubtitlesViewModel : ViewModel() {
         files.clearDerived(mediaKey)
     }
 
+    /**
+     * Change de média **sans** quitter le lecteur.
+     *
+     * L'enchaînement d'épisodes garde désormais le lecteur monté — c'est tout
+     * l'objet du remplacement sur place — et donc ce ViewModel avec lui. Sans
+     * cette remise à zéro, l'épisode suivant héritait de trois choses du
+     * précédent : les candidats déjà listés (le menu ne cherchait donc plus,
+     * `load` ne s'exécutant que sur une liste vide), le fichier recalé publié
+     * dans [file], et la clé de média sous laquelle les téléchargements se
+     * rangent — un sous-titre payé pour l'épisode 3 aurait été classé sous
+     * l'épisode 2, et repayé à la prochaine écoute.
+     *
+     * Les fichiers d'origine restent sur disque : c'est [onLeave] qui ne
+     * balaie que les versions dérivées, et un sous-titre déjà payé ne doit pas
+     * disparaître parce qu'on a changé d'épisode.
+     */
+    fun reset() {
+        onLeave()
+        original = null
+        mediaKey = ""
+        streamFps = null
+        _state.value = PlayerSubtitlesState(available = openSubtitlesApiKey.isNotBlank())
+        _file.value = null
+    }
+
     private fun apply(timing: SubtitleTiming) = io {
         if (original == null) return@io
         _state.value = _state.value.copy(timing = timing)

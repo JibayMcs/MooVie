@@ -183,6 +183,13 @@ internal class MpvEngine(
         termine = false
         charge = false
         ouvertureReussie = false
+        // Les pistes ajoutées par `sub-add` appartiennent au fichier chargé :
+        // `loadfile … replace` les emporte. Garder l'identifiant du précédent
+        // ferait viser par `sub-remove` une piste qui n'existe plus — bruit dans
+        // le journal, et surtout un `null` qui ne retire rien alors qu'il en a
+        // l'air. L'enchaînement d'épisodes passe désormais par ici sans démonter
+        // le moteur, donc ce cas est atteint pour de bon.
+        idSousTitreExterne = null
         val attente = CountDownLatch(1)
         ouverture = attente
 
