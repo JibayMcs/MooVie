@@ -104,7 +104,7 @@ import fr.moovie.tv.ui.components.MoovieIconButton
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.roundToInt
 import fr.moovie.tv.ui.theme.MOOVIE_TEXT_MUTED
-import fr.moovie.tv.ui.theme.margePage
+import fr.moovie.tv.ui.theme.margeLecteur
 import fr.moovie.tv.ui.theme.ESPACE_LARGE
 
 // Chrome du lecteur partagée entre Android TV et desktop : barre de contrôles,
@@ -210,11 +210,12 @@ fun PlayerControlBar(
         modifier = Modifier
             .fillMaxWidth()
             .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xE6000000))))
-            // La marge de page vaut aussi ici. Un téléviseur rogne ses bords au
-            // sur-balayage, et une barre de lecture calée à trente-deux points
-            // du bord y passait partiellement sous le cadre du poste — c'est
-            // précisément le cas que la marge proportionnelle couvre.
-            .padding(horizontal = margePage(), vertical = 24.dp),
+            // La marge du *lecteur*, pas celle des pages : sur un téléviseur
+            // c'est la même — le sur-balayage rogne les bords, et une barre
+            // calée à trente-deux points passait sous le cadre du poste. Au
+            // pointeur, ce dixième de la largeur laissait deux bandes vides
+            // sur les côtés d'une fenêtre ouverte en grand.
+            .padding(horizontal = margeLecteur(), vertical = 24.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Row(
@@ -668,7 +669,9 @@ fun PlayerTitleOverlay(
         modifier = modifier
             .fillMaxWidth()
             .background(Brush.verticalGradient(listOf(Color(0xCC000000), Color.Transparent)))
-            .padding(horizontal = margePage(), vertical = 32.dp),
+            // Même bord que la barre de contrôles : les deux couches encadrent
+            // la même image, les désaligner se voit immédiatement.
+            .padding(horizontal = margeLecteur(), vertical = 32.dp),
     ) {
     Column {
         if (title.isNotBlank()) {
