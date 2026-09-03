@@ -630,15 +630,12 @@ internal class MpvEngine(
     }
 
     /**
-     * Charge un sous-titre externe, ou retire le précédent si [chemin] est nul.
-     *
-     * `sub-remove` sans identifiant retire la piste externe courante : un seul
-     * fichier externe vit à la fois, c'est le contrat de l'écran (le fichier
-     * recalé remplace le précédent).
+     * Identifiant de la piste que **nous** avons montée, ou null s'il n'y en a
+     * pas. Un seul fichier externe vit à la fois, c'est le contrat de l'écran
+     * (le fichier recalé remplace le précédent).
      */
-    /** Vrai quand un sous-titre externe est monté — il n'y en a qu'un à la fois. */
     @Volatile
-    private var sousTitreMonte = false
+    private var idSousTitreExterne: Long? = null
 
     /**
      * Applique l'apparence choisie par l'utilisateur.
@@ -652,16 +649,36 @@ internal class MpvEngine(
         mpvSubtitleProperties(style).forEach { (nom, valeur) -> poseTexte(nom, valeur) }
     }
 
+    /**
+     * Charge un sous-titre externe, ou retire le précédent si [chemin] est nul.
+     *
+     * ## Pourquoi `sub-remove` porte un identifiant
+     *
+     * Sans argument, `sub-remove` retire « la piste courante » — et elle n'est
+     * plus la nôtre dès que l'écran a sélectionné autre chose entre-temps. Or
+     * c'est exactement ce que fait le menu : choisir une piste du flux appelle
+     * `clear()` *puis* `selectSubtitle`, et le retrait qui découle du premier
+     * n'arrive qu'après le second, une recomposition plus tard. La piste que
+     * l'utilisateur venait de choisir était alors retirée du média — un
+     * sous-titre qui s'affiche, disparaît, et ne revient plus dans la liste.
+     *
+     * Viser notre propre identifiant rend l'ordre des deux appels indifférent,
+     * ce qui vaut mieux que de compter sur lui.
+     */
     fun sousTitreExterne(chemin: String?) {
+        val notre = idSousTitreExterne
         // Retirer ce qui n'existe pas n'est pas un ordre, c'est du bruit :
         // l'écran repasse par ici avec `null` au montage, et `sub-remove` sans
         // piste externe répond « error running command » dans le journal.
-        if (chemin == null && !sousTitreMonte) return
-        if (sousTitreMonte) commande("sub-remove")
-        sousTitreMonte = false
+        if (chemin == null && notre == null) return
+        if (notre != null) commande("sub-remove", notre.toString())
+        idSousTitreExterne = null
         if (chemin != null) {
             commande("sub-add", chemin, "select")
-            sousTitreMonte = true
+            // `sub-add … select` vient de sélectionner la piste ajoutée : `sid`
+            // *est* son identifiant. `mpv_command` est synchrone, la lecture
+            // qui suit voit donc bien la piste montée.
+            idSousTitreExterne = lisEntier("sid")
         }
     }
 
