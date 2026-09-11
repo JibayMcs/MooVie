@@ -44,7 +44,11 @@ class FrembedProvider(private val http: HttpGateway) : SourceProvider {
     private val json = Json { ignoreUnknownKeys = true }
 
     @Volatile private var cachedBase: String? = null
+    @Volatile private var cachedMirrors: List<String> = emptyList()
     @Volatile private var cachedAt = 0L
+
+    /** Durée de validité du domaine en cache : longue après un succès, courte après un échec. */
+    @Volatile private var cachedTtl = 0L
 
     override suspend fun sourcesFor(media: MediaRef): List<EmbedLink> {
         val base = resolveBase()
@@ -103,29 +107,97 @@ class FrembedProvider(private val http: HttpGateway) : SourceProvider {
     }
 
     /**
-     * Domaine courant, donné par le site lui-même : `/api/dns/domains` liste ses
-     * miroirs. Les sources FR changent de domaine en permanence ; ici le
-     * résolveur est fourni, inutile d'en reverser un.
+     * Domaine courant de l'API, **validé** avant d'être retenu.
      *
-     * En cas d'échec on garde le dernier domaine valide, et à défaut le domaine
-     * par défaut — une panne de cet appel ne doit pas emporter le provider.
+     * `/api/dns/domains` liste les miroirs du site : le résolveur est fourni,
+     * inutile d'en reverser un. Mais le lire naïvement a éteint ce catalogue
+     * entier, et de deux façons à la fois — mesuré le 11/09/2026, `frembed 0`
+     * sur tous les titres :
+     *
+     *  - **le domaine a déménagé** : `frembed.casa` répond 302 vers
+     *    `frembed.surf`. Suivre la redirection ne suffit pas, parce que l'API
+     *    refuse un `Referer` qui ne porte pas son propre domaine
+     *    (`{"error":"Access denied - Invalid Referer"}`) et qu'un client qui
+     *    suit tout seul conserve l'en-tête du domaine de départ. La chaîne est
+     *    donc déroulée à la main, en **reposant le Referer à chaque saut** ;
+     *  - **tous les miroirs ne sont pas l'API** : la liste annonce
+     *    `fanstream.buzz` *et* `frembed.surf`, les deux étiquetés `main`. Le
+     *    premier est la **vitrine** — `/api/films` y rend du HTML Next.js, pas
+     *    du JSON. Prendre « le premier main » suffisait à tout perdre.
+     *
+     * D'où la règle : un domaine n'est retenu que si `/api/dns/domains` y rend
+     * bien un tableau JSON. C'est l'appel le moins cher qui prouve qu'on parle
+     * à l'API et non au site, et il rapporte au passage la liste des miroirs à
+     * essayer au prochain déménagement.
      */
     private suspend fun resolveBase(): String {
         val known = cachedBase
-        if (known != null && maintenantMs() - cachedAt < BASE_TTL_MS) return known
+        if (known != null && maintenantMs() - cachedAt < cachedTtl) return known
 
-        val body = http.getBody("$DEFAULT_BASE/api/dns/domains", headers(DEFAULT_BASE))
-        val domain = runCatching {
-            json.parseToJsonElement(body.orEmpty()).jsonArray
-                .mapNotNull { it.jsonObject }
-                .firstOrNull { it["label"]?.jsonPrimitive?.contentOrNull() == "main" }
-                ?.get("domain")?.jsonPrimitive?.contentOrNull()
-        }.getOrNull()
+        // Dans l'ordre : le dernier domaine qui répondait, les domaines connus
+        // en dur, puis les miroirs annoncés par l'API la dernière fois.
+        val candidats = LinkedHashSet<String>().apply {
+            known?.let { add(it) }
+            addAll(BASES_CONNUES)
+            addAll(cachedMirrors)
+        }
 
-        val resolved = domain?.let { "https://$it" } ?: known ?: DEFAULT_BASE
-        cachedBase = resolved
+        for (candidat in candidats) {
+            val sonde = sonde(candidat) ?: continue
+            cachedBase = sonde.base
+            cachedMirrors = sonde.miroirs
+            cachedAt = maintenantMs()
+            cachedTtl = BASE_TTL_MS
+            return sonde.base
+        }
+
+        // Aucun candidat n'a répondu. On garde le dernier domaine valide plutôt
+        // que de rendre le catalogue muet — mais avec un TTL court : une panne
+        // passagère ne doit pas figer le mauvais domaine pour six heures, et
+        // réessayer à chaque titre relancerait une sonde par fiche ouverte.
+        val repli = known ?: DEFAULT_BASE
+        cachedBase = repli
         cachedAt = maintenantMs()
-        return resolved
+        cachedTtl = ECHEC_TTL_MS
+        return repli
+    }
+
+    private data class Sonde(val base: String, val miroirs: List<String>)
+
+    /**
+     * Déroule les redirections depuis [depart] en reposant le `Referer` à
+     * chaque saut, et ne rend un domaine que si `/api/dns/domains` y répond par
+     * un tableau JSON — la vitrine, elle, rend du HTML.
+     */
+    private suspend fun sonde(depart: String): Sonde? {
+        var base = depart
+        repeat(MAX_SAUTS) {
+            val resp = http.fetch(
+                HttpRequest(
+                    url = "$base/api/dns/domains",
+                    headers = headers(base),
+                    followRedirects = false,
+                ),
+            ) ?: return null
+
+            if (resp.isRedirect) {
+                val cible = resp.header("Location")?.takeIf { it.startsWith("http") } ?: return null
+                val suivant = originOf(cible, cible)
+                if (suivant == base) return null // redirection sur soi-même
+                base = suivant
+                return@repeat
+            }
+            if (!resp.isSuccessful) return null
+
+            val miroirs = runCatching {
+                json.parseToJsonElement(resp.body.orEmpty()).jsonArray
+                    .mapNotNull { it.jsonObject["domain"]?.jsonPrimitive?.contentOrNull() }
+                    .map { "https://$it" }
+            }.getOrNull() ?: return null // pas un tableau JSON : ce n'est pas l'API
+
+            return Sonde(base, miroirs)
+        }
+        return null // plafond de sauts atteint
     }
 
     private fun headers(base: String) = mapOf(
@@ -138,10 +210,28 @@ class FrembedProvider(private val http: HttpGateway) : SourceProvider {
         content.takeIf { it.isNotBlank() && it != "null" }
 
     companion object {
-        const val DEFAULT_BASE = "https://frembed.casa"
+        /** Domaine servant l'API au 11/09/2026, vérifié par sonde. */
+        const val DEFAULT_BASE = "https://frembed.surf"
+
+        /**
+         * Points d'entrée essayés dans l'ordre, avant les miroirs annoncés.
+         *
+         * `frembed.casa` est conservé **après** le domaine courant et non à sa
+         * place : il ne sert plus l'API mais redirige encore vers celui qui la
+         * sert, ce qui en fait un point de reprise utile le jour où `.surf`
+         * déménagera à son tour — [sonde] suit la redirection et retient la
+         * cible, sans mise à jour de l'app.
+         */
+        private val BASES_CONNUES = listOf(DEFAULT_BASE, "https://frembed.casa")
 
         /** Le domaine change rarement ; six heures suffisent et évitent un appel par titre. */
         private const val BASE_TTL_MS = 6L * 60 * 60 * 1000
+
+        /** Après un échec de sonde, on réessaie vite — sans relancer un appel par fiche. */
+        private const val ECHEC_TTL_MS = 60L * 1000
+
+        /** Assez pour la chaîne `.casa → .surf` et une rotation de plus. */
+        private const val MAX_SAUTS = 5
 
         /**
          * L'API étiquette « vf », « vostfr », « vo ». On aligne sur les libellés

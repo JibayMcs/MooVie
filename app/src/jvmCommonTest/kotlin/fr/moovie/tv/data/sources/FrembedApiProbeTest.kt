@@ -27,7 +27,9 @@ import kotlin.test.Test
 class FrembedApiProbeTest {
 
     private val json = Json { ignoreUnknownKeys = true }
-    private val base = "https://frembed.casa"
+    // Le domaine vit dans le provider : le figer ici a fait mentir cette sonde
+    // le jour où l'API a déménagé sur frembed.surf.
+    private val base = FrembedProvider.DEFAULT_BASE
 
     private val headers = mapOf(
         "User-Agent" to Ua.BROWSER,
