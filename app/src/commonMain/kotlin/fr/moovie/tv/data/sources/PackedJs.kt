@@ -72,12 +72,29 @@ object PackedJs {
      * Dé-obfusque le HTML d'un embed et en extrait l'URL m3u8, ou null.
      * @param embedUrl URL de la page d'embed, pour résoudre une URL relative.
      */
-    fun findM3u8(html: String, embedUrl: String): String? {
-        val script = (unpack(html) ?: html).replace("""\'""", "'").replace("""\"""", "\"")
-        return extractXor(script, embedUrl)
-            ?: extractRolling(script, embedUrl)
-            ?: extractLegacy(script, embedUrl)
-    }
+    fun findM3u8(html: String, embedUrl: String): String? =
+        // Le script dé-packé **puis** le HTML brut — et non l'un *ou* l'autre.
+        //
+        // Une page peut très bien porter les deux, et `unpack(html) ?: html` se
+        // condamnait alors au mauvais : dès qu'un `eval(function(p,a,c,k,e,d)`
+        // traînait quelque part, le HTML n'était plus jamais regardé. Mesuré sur
+        // vidmoly le 11/09/2026 — la page empaquette une régie publicitaire
+        // (1 006 caractères une fois dé-packée, aucune URL de média) et laisse
+        // son `sources: [{ file: '…/master.m3u8?…' }]` **en clair** juste à côté.
+        // Résultat : null sur une page dont l'URL se lit à l'œil nu.
+        //
+        // L'ordre compte et ne change rien aux cas qui marchaient : tant que le
+        // script dé-packé répond, il répond le premier, exactement comme avant.
+        // Le HTML brut n'est qu'un second essai, soumis aux mêmes garde-fous —
+        // `normalize` et [isDecoy] s'appliquent aux deux passes.
+        sequenceOf(unpack(html), html)
+            .filterNotNull()
+            .map { it.replace("""\'""", "'").replace("""\"""", "\"") }
+            .firstNotNullOfOrNull { script ->
+                extractXor(script, embedUrl)
+                    ?: extractRolling(script, embedUrl)
+                    ?: extractLegacy(script, embedUrl)
+            }
 
     /** Décode le format Base64/XOR. */
     private fun extractXor(script: String, embedUrl: String): String? {

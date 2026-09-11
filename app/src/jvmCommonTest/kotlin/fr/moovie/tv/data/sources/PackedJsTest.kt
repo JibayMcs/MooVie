@@ -101,4 +101,49 @@ class PackedJsTest {
         """.trimIndent()
         assertEquals(target, PackedJs.findM3u8(html, "https://vidzy.cc/embed-x.html"))
     }
+
+    /**
+     * Un script empaqueté **qui n'est pas le lecteur** ne doit pas masquer le
+     * HTML autour de lui.
+     *
+     * C'est la forme exacte de vidmoly, relevée le 11/09/2026 : la page
+     * empaquette sa régie publicitaire — un `eval(function(p,a,c,k,e,d)` qui
+     * dé-packe en un millier de caractères sans la moindre URL de média — et
+     * laisse son `sources: [{ file: '…' }]` en clair juste à côté. Le décodeur
+     * ne regardait que le premier paquet trouvé et rendait null sur une page
+     * dont l'URL se lisait à l'œil nu, ce qui a fait passer tout l'hébergeur
+     * pour « extracteur manquant ».
+     */
+    @Test
+    fun `un paquet sans media ne masque pas l URL en clair de la page`() {
+        val pub = """eval(function(p,a,c,k,e,d){while(c--)if(k[c])""" +
+            """p=p.replace(new RegExp('\b'+c.toString(a)+'\b','g'),k[c]);return p}""" +
+            """('0.1("2")',3,3,'console|log|pub'.split('|'),0,{}))"""
+        val html = """
+            <script>$pub</script>
+            <script>sources: [{ file: 'https://box.vmcld.space/hls2/02/master.m3u8?t=abc&s=1' }]</script>
+        """.trimIndent()
+
+        assertEquals(
+            "https://box.vmcld.space/hls2/02/master.m3u8?t=abc&s=1",
+            PackedJs.findM3u8(html, "https://vidmoly.biz/embed-x.html"),
+        )
+    }
+
+    /**
+     * La seconde passe hérite des mêmes garde-fous : élargir la recherche au
+     * HTML brut ne doit pas rouvrir la porte au leurre que [isDecoy] ferme.
+     */
+    @Test
+    fun `la passe sur le HTML brut rejette toujours le leurre`() {
+        val pub = """eval(function(p,a,c,k,e,d){while(c--)if(k[c])""" +
+            """p=p.replace(new RegExp('\b'+c.toString(a)+'\b','g'),k[c]);return p}""" +
+            """('0.1("2")',3,3,'console|log|pub'.split('|'),0,{}))"""
+        val html = """
+            <script>$pub</script>
+            <script>var _fsvHls="https://s1.fsvid.lol/troll/master.m3u8";</script>
+        """.trimIndent()
+
+        assertNull(PackedJs.findM3u8(html, "https://vidzy.cc/embed-x.html"))
+    }
 }
