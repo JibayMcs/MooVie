@@ -69,7 +69,7 @@ class AnimeSamaProvider(private val http: HttpGateway) : SourceProvider {
                 headers = mapOf("User-Agent" to Ua.BROWSER),
             ),
         )?.takeIf { it.isSuccessful }?.body ?: return null
-        val href = cataloguePath(html) ?: return null
+        val href = cataloguePath(html, title) ?: return null
         return "$BASE$href".let { if (it.endsWith("/")) it else "$it/" }
     }
 
@@ -85,16 +85,101 @@ class AnimeSamaProvider(private val http: HttpGateway) : SourceProvider {
         const val BASE = "https://anime-sama.to"
 
         /**
-         * Le chemin de la première fiche d'une page de résultats, ou null.
+         * Le chemin de la fiche qui porte **vraiment** [titre], ou null.
          *
-         * Isolée et visible pour être testable sans réseau : c'est la ligne qui
-         * a rendu tout le catalogue animé silencieux, et elle ne se voyait
-         * qu'en mesurant la couverture.
+         * ### Le défaut que cette vérification ferme
+         *
+         * `fetch.php` est une recherche *floue* : elle répond toujours quelque
+         * chose. Prendre son premier résultat, comme on le faisait, revenait à
+         * servir n'importe quel animé pour n'importe quel titre — et sans le
+         * moindre signe, puisqu'un lien valide sort d'un catalogue valide.
+         * Relevé le 11/09/2026, sur les titres mêmes de la sonde de santé :
+         *
+         * | demandé                  | servi                            |
+         * |--------------------------|----------------------------------|
+         * | Mentalist                | `medalist`                       |
+         * | Fight Club               | `rymans-club`                    |
+         * | Matrix                   | `ill-be-the-matriarch-in-this-life` |
+         * | Grey's Anatomy           | `sk8rs`                          |
+         * | Intouchables             | `anne-shirley`                   |
+         * | New York Unité Spéciale  | `new-game`                       |
+         *
+         * L'utilisateur lançait un épisode de série et tombait sur un animé sans
+         * rapport. Les films étaient largement épargnés par accident : leur
+         * chemin est `film/`, que la plupart des séries animées n'ont pas, donc
+         * le garde-fou de saison rejetait la fiche après coup. Les épisodes, eux,
+         * trouvaient presque toujours une `saison1/`.
+         *
+         * ### La règle, et pourquoi celle-là
+         *
+         * Égalité **exacte** entre le titre demandé et l'un des noms que la
+         * fiche déclare — son titre, ou l'un de ses titres alternatifs
+         * (`asn-search-result-subtitle`, qui liste le romaji et le titre
+         * français). Mesurée sur quatorze titres, elle garde les sept animés
+         * légitimes et rejette les sept intrus.
+         *
+         * On balaie **tous** les résultats, pas seulement le premier : pour
+         * « L'Attaque des Titans », la bonne fiche est la deuxième
+         * (`shingeki-no-kyojin`, dont les alternatives portent ce titre exact),
+         * la première étant le spin-off « Junior High School ».
+         *
+         * Le rapprochement approximatif est délibérément écarté : « Mentalist »
+         * et « Medalist » ne diffèrent que d'une lettre. En cas de doute on ne
+         * rend rien — l'absence de lien se voit et se contourne, un mauvais film
+         * se regarde.
          */
-        internal fun cataloguePath(html: String): String? =
-            CATALOGUE_HREF.find(html)?.groupValues?.get(1)
+        internal fun cataloguePath(html: String, titre: String): String? {
+            val vise = normalise(titre)
+            if (vise.isEmpty()) return null
+            return RESULTAT.findAll(html)
+                .firstOrNull { bloc -> nomsDe(bloc.value).any { normalise(it) == vise } }
+                ?.groupValues?.get(1)
+        }
+
+        /** Titre et titres alternatifs déclarés par une fiche de résultat. */
+        private fun nomsDe(bloc: String): List<String> = buildList {
+            TITRE.find(bloc)?.groupValues?.get(1)?.let { add(it) }
+            // Les alternatives sont listées séparées par des virgules.
+            SOUS_TITRE.find(bloc)?.groupValues?.get(1)?.split(',')?.forEach { add(it) }
+        }
+
         /**
-         * Le lien de la fiche, dans les résultats de recherche.
+         * Forme comparable d'un titre : sans balise, sans entité HTML, sans
+         * accent ni ponctuation.
+         *
+         * Les entités sont **retirées avant** la ponctuation, et non après : sur
+         * `L&#039;Attaque`, l'ordre inverse laisserait les chiffres de `&#039;`
+         * et produirait `l039attaque`, qui ne vaut plus `lattaque`. Le titre venu
+         * de TMDB, lui, n'a jamais d'entité — les deux côtés se rejoignent donc
+         * bien sur la même forme.
+         */
+        internal fun normalise(brut: String): String {
+            val sansBalise = Regex("<[^>]*>").replace(brut, " ")
+            val sansEntite = Regex("&(?:#\\d+|#x[0-9a-fA-F]+|[a-zA-Z]+);").replace(sansBalise, "")
+            return buildString {
+                for (c in sansEntite.lowercase()) {
+                    val plie = PLIAGE[c] ?: c
+                    if (plie.isLetterOrDigit()) append(plie)
+                }
+            }
+        }
+
+        /**
+         * Repli des diacritiques latins. `java.text.Normalizer` n'existe pas en
+         * commun ; la table couvre ce que portent les titres français et les
+         * translittérations romaji (« Shippûden »).
+         */
+        private val PLIAGE: Map<Char, Char> = buildMap {
+            fun ranger(source: String, cible: Char) = source.forEach { put(it, cible) }
+            ranger("àáâãäåāăą", 'a'); ranger("çćĉċč", 'c'); ranger("èéêëēĕėęě", 'e')
+            ranger("ìíîïĩīĭįı", 'i'); ranger("ñńņňŉ", 'n'); ranger("òóôõöøōŏő", 'o')
+            ranger("ùúûüũūŭůűų", 'u'); ranger("ýÿŷ", 'y'); ranger("śŝşš", 's'); ranger("ţťŧ", 't')
+        }
+
+        /**
+         * Un résultat entier — le lien **et** ce qu'il annonce. On capture le
+         * bloc complet parce que la décision se prend sur le titre, pas sur
+         * l'ordre d'apparition.
          *
          * Le domaine est **facultatif** : anime-sama rendait des liens relatifs
          * (`/catalogue/…`) et rend désormais des liens absolus
@@ -108,7 +193,11 @@ class AnimeSamaProvider(private val http: HttpGateway) : SourceProvider {
          * On ne capture que le chemin, pour que la reconstruction avec [BASE]
          * reste vraie quel que soit le domaine du jour.
          */
-        private val CATALOGUE_HREF = Regex("""href="(?:https?://[^"/]+)?(/catalogue/[^"]+)"""")
+        private val RESULTAT =
+            Regex("""<a[^>]+href="(?:https?://[^"/]+)?(/catalogue/[^"]+)"[\s\S]*?</a>""")
+        private val TITRE = Regex("""<h3[^>]*>([\s\S]*?)</h3>""")
+        private val SOUS_TITRE =
+            Regex("""<p[^>]*asn-search-result-subtitle[^>]*>([\s\S]*?)</p>""")
         /**
          * Les chemins de langue à sonder, et l'étiquette qu'ils portent.
          *
