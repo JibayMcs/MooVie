@@ -137,6 +137,7 @@
     <string name="player_prev_episode">Épisode précédent</string>
     <string name="player_progress">Barre de progression</string>
     <string name="player_buffering">Mise en mémoire tampon…  %1$d %</string>
+    <string name="player_chaining_next">Chargement de l'épisode suivant…</string>
     <string name="player_subtitles">Sous-titres</string>
     <string name="player_subtitles_off">Désactivés</string>
     <string name="player_audio">Piste audio</string>

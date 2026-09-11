@@ -90,6 +90,7 @@ import fr.moovie.tv.resources.Res
 import fr.moovie.tv.resources.common_back
 import fr.moovie.tv.resources.common_cancel
 import fr.moovie.tv.resources.player_buffering
+import fr.moovie.tv.resources.player_chaining_next
 import fr.moovie.tv.resources.player_mpv_help
 import fr.moovie.tv.resources.player_mpv_missing
 import fr.moovie.tv.resources.player_error
@@ -230,6 +231,16 @@ internal fun DesktopPlayerScreen(
     isFullscreen: Boolean,
     onToggleFullscreen: () -> Unit,
     onBack: () -> Unit,
+    /**
+     * Vrai pendant que la source de l'épisode suivant se résout.
+     *
+     * L'enchaînement ne quitte plus le lecteur : il reste à l'écran, sur la
+     * dernière image du générique, le temps que les extracteurs répondent et que
+     * la sonde de lisibilité tranche. Sans l'annoncer, ces quelques secondes se
+     * lisent comme une image figée — c'est-à-dire comme une panne, alors que
+     * c'est justement le moment où tout se passe bien.
+     */
+    chainingNext: Boolean = false,
     onNextEpisode: (season: Int, episode: Int) -> Unit,
     /** Appelé une fois quand l'épisode approche de sa fin (voir PREFETCH_AT). */
     onPrefetchNext: () -> Unit = {},
@@ -317,7 +328,15 @@ internal fun DesktopPlayerScreen(
     var everPlayed by remember(streamUrl) { mutableStateOf(false) }
     // Relais des en-têtes, vivant le temps du flux. Il tient un socket et un
     // vivier de fils : le laisser derrière soi en fuirait un par lecture.
-    var proxy by remember(streamUrl) { mutableStateOf<LocalStreamProxy?>(null) }
+    //
+    // Retenu pour toute la vie de l'écran et **non par flux** : c'est lui qu'il
+    // faut arrêter en changeant d'épisode, et un état recréé par flux serait
+    // reparti de `null` en perdant la référence au relais à arrêter. L'arrêt se
+    // fait donc à la main, à l'ouverture du flux suivant.
+    var proxy by remember { mutableStateOf<LocalStreamProxy?>(null) }
+    // Clé de média du flux en cours, pour savoir sous quel épisode ranger
+    // l'avancement au moment d'en ouvrir un autre — voir l'effet d'ouverture.
+    val mediaKeySortant = remember { mutableStateOf(mediaKey) }
     // Position en cours de drag sur la barre (null = pas de drag).
     var scrubbing by remember { mutableStateOf<Float?>(null) }
     // 0 à 200 : libVLC amplifie au-delà de 100 %, ce qui évite d'aller toucher
@@ -418,6 +437,46 @@ internal fun DesktopPlayerScreen(
     // imposait un `setTime` sur l'événement « prêt » — puis sous-titres
     // externes proposés sans en activer aucun.
     LaunchedEffect(streamUrl) {
+        // ── Ce que le changement de flux doit remettre à zéro ────────────────
+        //
+        // L'enchaînement d'épisodes remplace les paramètres du lecteur **sans le
+        // démonter** (voir `Main.kt`), et tout ce qui suit relève de ce seul
+        // fait : sans ce préambule, l'état de l'épisode précédent traversait le
+        // suivant. `finished` resté vrai ne rebasculait plus jamais, et
+        // l'épisode suivant n'enchaînait donc jamais le sien ; `playError` resté
+        // vrai renvoyait à la cascade un flux qui venait de s'ouvrir.
+        //
+        // Remis à zéro **ici** et non par `remember(streamUrl)`, et c'est le
+        // point à ne pas inverser : le moteur est retenu pour toute la vie de
+        // l'écran, et sa lambda `surFin` écrit dans *cet* état-ci. Un état
+        // recréé par flux l'aurait laissée écrire dans celui de l'épisode
+        // précédent — la fin de lecture n'arrivant alors plus jamais.
+        finished = false
+        playError = false
+
+        // Le relais du flux précédent tient un socket et un vivier de fils.
+        // Tant que quitter le lecteur était la seule façon de changer d'épisode,
+        // `onDispose` s'en chargeait ; il en fuirait un par épisode maintenant
+        // que l'écran survit au changement.
+        proxy?.shutdown()
+        proxy = null
+
+        // Avancement de l'épisode qu'on quitte, pour la même raison : `onDispose`
+        // n'arrive plus entre deux épisodes. Sans ça, un épisode quitté par le
+        // panneau des épisodes perdait le sien — la fin de lecture, elle, passe
+        // déjà par `markFinished`, et repasser ici n'écrit que la même chose.
+        //
+        // Lu **ici**, en tête de l'effet : le moteur joue encore l'ancien
+        // fichier à cet instant, la position relevée est donc bien la sienne. La
+        // clé, en revanche, a déjà changé — d'où celle qu'on retient à part.
+        val sortant = mediaKeySortant.value
+        if (sortant.isNotBlank() && sortant != mediaKey) {
+            val t = runCatching { controller.positionMs() }.getOrDefault(0L)
+            val d = runCatching { controller.durationMs() }.getOrDefault(0L)
+            if (t > 0) saveScope.launch { progress.save(sortant, t, d) }
+        }
+        mediaKeySortant.value = mediaKey
+
         val resumeAt = if (mediaKey.isNotBlank()) progress.position(mediaKey) else 0L
 
         fun header(name: String) = headers.entries.firstOrNull { it.key.equals(name, ignoreCase = true) }?.value
@@ -803,11 +862,30 @@ internal fun DesktopPlayerScreen(
             )
         }
 
+        // Résolution de l'épisode suivant : même place et même habillage que la
+        // mise en mémoire tampon, parce que c'est la même chose pour qui
+        // regarde — le lecteur attend le réseau. Prioritaire sur le tampon : les
+        // deux messages sont centrés, et le flux qui s'achève n'a plus rien à
+        // dire de son remplissage.
+        if (chainingNext) {
+            Text(
+                stringResource(Res.string.player_chaining_next),
+                style = MaterialTheme.typography.titleMedium,
+                color = Color(0xFFDDDDDD),
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .clip(MoovieShape)
+                    .background(Color(0xB3000000))
+                    .moovieSurface(active = false, selected = true)
+                    .padding(horizontal = 18.dp, vertical = 12.dp),
+            )
+        }
+
         // Mise en mémoire tampon : l'indicateur textuel hérité de l'époque
         // libVLC. mpv expose désormais une vraie plage tamponnée
         // (controller.bufferedMs) — la dessiner sur la barre comme Android TV
         // est un raffinement possible, l'indicateur reste juste en attendant.
-        if (bufferingVisible && !playError) {
+        if (bufferingVisible && !playError && !chainingNext) {
             Text(
                 stringResource(Res.string.player_buffering, bufferingPercent.toInt()),
                 style = MaterialTheme.typography.titleMedium,
@@ -1108,6 +1186,23 @@ internal fun DesktopPlayerScreen(
         // Le fichier arrive déjà recalé : le lecteur n'a rien à calculer.
         LaunchedEffect(subsFile) { controller.loadExternalSubtitle(subsFile) }
         DisposableEffect(Unit) { onDispose { subsViewModel.onLeave() } }
+
+        // Changement d'épisode sans quitter le lecteur : ce ViewModel reste
+        // monté avec lui, et il porte l'état d'un média précis. Sans cette
+        // remise à zéro, le menu de l'épisode suivant listait les candidats du
+        // précédent — `load` ne cherche que sur une liste vide, il ne cherchait
+        // donc plus — et son fichier recalé restait la piste externe demandée.
+        //
+        // Comparé à la clé retenue plutôt que déclenché sur `mediaKey` : un
+        // `LaunchedEffect(mediaKey)` part aussi à la première composition, où
+        // il n'y a rien à remettre à zéro et où `onLeave()` balaierait les
+        // dérivés d'une clé vide.
+        val subsBoundTo = remember { mutableStateOf(mediaKey) }
+        LaunchedEffect(mediaKey) {
+            if (subsBoundTo.value == mediaKey) return@LaunchedEffect
+            subsBoundTo.value = mediaKey
+            subsViewModel.reset()
+        }
 
         // Sous-titres en ligne : recherche à l'ouverture du menu seulement. Elle
         // est gratuite, mais inutile tant que personne ne la demande — et à ce

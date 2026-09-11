@@ -24,8 +24,19 @@ import androidx.media3.common.Tracks
  */
 internal class ExoPlayerController(private val player: Player) : MooviePlayerController {
 
-    /** Vrai tant que la piste externe attend d'être sélectionnée. */
-    private var awaitingExternal = false
+    /**
+     * Le sous-titre demandé, **réaffirmé à chaque republication des pistes**.
+     *
+     * Une sélection forcée Media3 est rangée sous une clé `TrackGroup`, dont
+     * l'égalité comprend l'identifiant préfixé par la période et le tableau de
+     * `Format`. ExoPlayer republie ses pistes en cours de lecture — après une
+     * re-préparation, ou quand un `Format` HLS se précise — et la clé cesse
+     * alors de correspondre : la sélection devient orpheline, ExoPlayer reprend
+     * la main, le sous-titre disparaît, puis revient à la publication suivante.
+     * Retenir l'intention plutôt que la piste permet de la reposer à chaque
+     * fois. Voir [SubtitleWish].
+     */
+    private var wish: SubtitleWish = SubtitleWish.Off
 
     /**
      * La vue qui dessine les sous-titres, fournie par l'écran.
@@ -47,27 +58,42 @@ internal class ExoPlayerController(private val player: Player) : MooviePlayerCon
     private var lastStyle: SubtitleStyle? = null
 
     init {
-        // Sélectionner la piste externe dès qu'elle apparaît. Sans ça, réactiver
-        // l'affichage laisse ExoPlayer choisir lui-même — et il retient la piste
-        // intégrée du flux, si bien que le sous-titre téléchargé est chargé,
-        // listé, et jamais montré.
+        // Reposer le souhait dès que les pistes changent. Sans ça, la sélection
+        // n'est faite qu'une fois : elle attrape bien la piste externe à son
+        // apparition, mais ne survit pas aux republications suivantes — et
+        // réactiver l'affichage laisse ExoPlayer choisir lui-même, qui retient
+        // la piste intégrée du flux quand il y en a une.
         player.addListener(object : Player.Listener {
-            override fun onTracksChanged(tracks: Tracks) {
-                if (!awaitingExternal) return
-                val group = tracks.groups.firstOrNull {
-                    it.type == C.TRACK_TYPE_TEXT &&
-                        it.length > 0 &&
-                        // ExoPlayer préfixe l'identifiant par l'index de la
-                        // période : « 1:moovie-external-subtitle ». D'où le
-                        // suffixe plutôt qu'une égalité.
-                        it.getTrackFormat(0).id?.endsWith(EXTERNAL_SUBTITLE_ID) == true
-                } ?: return
-                awaitingExternal = false
-                player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
-                    .setOverrideForType(TrackSelectionOverride(group.mediaTrackGroup, 0))
-                    .build()
-            }
+            override fun onTracksChanged(tracks: Tracks) = reaffirme(tracks)
         })
+    }
+
+    /**
+     * Remet la sélection de sous-titres en accord avec [wish].
+     *
+     * Ne fait rien quand le souhait est déjà tenu : réécrire les paramètres
+     * republie les pistes, et le faire sans condition tournerait en rond.
+     *
+     * Ne coupe rien non plus quand le souhait n'a pas encore de piste : le
+     * fichier externe n'apparaît qu'une fois le média monté, et couper en
+     * attendant ferait clignoter ce qu'on est justement en train d'installer.
+     */
+    private fun reaffirme(tracks: Tracks) {
+        val groupes = tracks.groups
+        if (groupes.satisfies(wish)) return
+        val cible = groupes.findSubtitle(wish)
+        if (wish !is SubtitleWish.Off && cible == null) return
+
+        val nouveaux = player.trackSelectionParameters.buildUpon()
+            .clearOverridesOfType(C.TRACK_TYPE_TEXT)
+            .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, cible == null)
+            .apply {
+                cible?.let { setOverrideForType(TrackSelectionOverride(it.first, it.second)) }
+            }
+            .build()
+        if (nouveaux != player.trackSelectionParameters) {
+            player.trackSelectionParameters = nouveaux
+        }
     }
 
     override val isPlaying: Boolean get() = player.isPlaying
@@ -189,19 +215,31 @@ internal class ExoPlayerController(private val player: Player) : MooviePlayerCon
 
         player.setMediaItem(current.buildUpon().setSubtitleConfigurations(configurations).build())
 
-        // **Indispensable** : le lecteur démarre avec les pistes texte coupées,
-        // pour qu'aucun sous-titre n'apparaisse sans qu'on l'ait demandé. Ajouter
-        // le fichier au média ne suffit donc pas — sans cette réactivation il est
-        // chargé puis ignoré, et l'utilisateur ne voit que ce que l'encodeur a
-        // gravé dans l'image.
+        // Retirer notre fichier ne veut pas dire couper les sous-titres. Le menu
+        // appelle `clear()` *puis* `selectSubtitle` pour passer à une piste du
+        // flux, et le retrait qui découle du premier n'arrive qu'après le
+        // second, une recomposition plus tard : écraser le souhait ici ferait
+        // disparaître la piste que l'utilisateur vient de choisir. Seul un
+        // souhait qui portait sur *notre* fichier retombe donc à Off.
+        wish = when {
+            path != null -> SubtitleWish.External
+            wish is SubtitleWish.External -> SubtitleWish.Off
+            else -> wish
+        }
+
+        // Les pistes texte restent **coupées** le temps que le fichier monte.
+        //
+        // Les réactiver ici sans pouvoir encore désigner la bonne piste — elle
+        // n'existe qu'une fois le média préparé — laisserait ExoPlayer choisir
+        // seul dans l'intervalle : il prend alors la piste intégrée du flux (du
+        // CEA-608, souvent), qu'on voit apparaître une seconde avant d'être
+        // remplacée. C'est [reaffirme] qui rallume, au moment où il a de quoi
+        // forcer le bon choix.
         player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
             .clearOverridesOfType(C.TRACK_TYPE_TEXT)
-            .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, path == null)
+            .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
             .build()
 
-        // Les pistes n'existent qu'une fois le média préparé : la sélection ne
-        // peut pas se faire ici, elle est différée à leur apparition.
-        awaitingExternal = path != null
         player.prepare()
         player.seekTo(position)
         player.playWhenReady = wasPlaying
@@ -226,19 +264,20 @@ internal class ExoPlayerController(private val player: Player) : MooviePlayerCon
         return if (fps == Format.NO_VALUE.toFloat() || fps <= 0f) 0.0 else fps.toDouble()
     }
 
+    /**
+     * L'identifiant vient du menu, donc de la publication courante : il est
+     * traduit **tout de suite** en souhait durable, avant que les index ne se
+     * périment. Un identifiant déjà obsolète laisse le souhait en place plutôt
+     * que de couper les sous-titres — l'utilisateur n'a rien demandé de tel.
+     */
     override fun selectSubtitle(trackId: String?) {
-        val target = trackId?.let { resolve(it) }
-        player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
-            .clearOverridesOfType(C.TRACK_TYPE_TEXT)
-            .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, target == null)
-            .apply {
-                if (target != null) {
-                    setOverrideForType(
-                        TrackSelectionOverride(target.first.mediaTrackGroup, target.second),
-                    )
-                }
-            }
-            .build()
+        if (trackId == null) {
+            wish = SubtitleWish.Off
+        } else {
+            val (group, index) = resolve(trackId) ?: return
+            wish = group.toWish(index)
+        }
+        reaffirme(player.currentTracks)
     }
 
     override fun selectAudio(trackId: String) {
@@ -285,6 +324,3 @@ internal class ExoPlayerController(private val player: Player) : MooviePlayerCon
             ?: "#${index + 1}"
     }
 }
-
-/** Identifie la piste de sous-titres que nous ajoutons nous-mêmes. */
-private const val EXTERNAL_SUBTITLE_ID = "moovie-external-subtitle"

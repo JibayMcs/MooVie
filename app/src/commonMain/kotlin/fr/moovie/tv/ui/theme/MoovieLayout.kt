@@ -3,7 +3,9 @@ package fr.moovie.tv.ui.theme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import fr.moovie.tv.ui.adaptive.LocalUiFlavor
 import fr.moovie.tv.ui.adaptive.LocalWindowWidth
+import fr.moovie.tv.ui.adaptive.UiFlavor
 import fr.moovie.tv.ui.adaptive.useBottomNav
 
 /**
@@ -36,6 +38,34 @@ fun margePage(): Dp = if (useBottomNav) {
     16.dp
 } else {
     (LocalWindowWidth.current * 0.09f).coerceAtLeast(32.dp)
+}
+
+/**
+ * ## La marge des couches du lecteur
+ *
+ * Le lecteur n'est pas une page. Ses couches — barre de contrôles, bandeau de
+ * titre — se posent **sur l'image**, et leur bord de référence est celui de la
+ * vidéo, pas celui d'une colonne de texte à centrer. Un dixième de la largeur y
+ * répond à une question que personne n'a posée.
+ *
+ * C'est visible sur une fenêtre de bureau ouverte en grand : à 1 920 points de
+ * large, [margePage] réserve cent soixante-treize points de chaque côté, et la
+ * barre de lecture flotte au milieu avec deux bandes vides sur les côtés. Elle
+ * est censée border l'image ; elle avait l'air d'un panneau mal dimensionné.
+ *
+ * **Le téléviseur garde la marge de page, et c'est tout l'intérêt de distinguer
+ * les deux.** Un poste rogne ses bords au sur-balayage : là, les points perdus
+ * ne sont pas une coquetterie de mise en page mais ce qui empêche la barre de
+ * passer sous le cadre. Le sur-balayage n'existe ni sur un moniteur ni sur un
+ * téléphone, et les deux suivent donc le bord de l'image.
+ */
+@Composable
+fun margeLecteur(): Dp = when (LocalUiFlavor.current) {
+    UiFlavor.TV -> margePage()
+    // Le doigt garde ses seize points : c'est déjà ce que rendait [margePage]
+    // au tactile, et l'écran est trop étroit pour davantage.
+    UiFlavor.TOUCH -> 16.dp
+    UiFlavor.POINTER -> 32.dp
 }
 
 /**

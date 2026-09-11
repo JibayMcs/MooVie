@@ -65,8 +65,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import fr.moovie.tv.data.net.Connectivity
 import fr.moovie.tv.ui.offline.OfflineScreen
 import fr.moovie.tv.ui.offline.OfflineSearchScreen
@@ -74,6 +76,17 @@ import fr.moovie.tv.ui.offline.playableFor
 import fr.moovie.tv.data.download.DownloadRepository
 import fr.moovie.tv.data.settings.DesktopLocale
 import androidx.compose.runtime.key
+
+/**
+ * Au-delà, l'enchaînement d'épisode rend la main à la fiche.
+ *
+ * Le préchargement de fin d'épisode a déjà réglé l'aller-retour aux catalogues,
+ * le plus lent ; il reste l'extraction du lien et la sonde qui vérifie que le
+ * flux se lit — de l'ordre de quelques secondes. Vingt laissent la marge d'une
+ * source récalcitrante sans transformer une panne en attente indéfinie devant
+ * une image figée, ce qui est le seul état dont on ne peut rien conclure.
+ */
+private const val CHAINAGE_MAX_MS = 20_000L
 
 /**
  * Point d'entrée desktop : mêmes écrans que la TV (jvmCommon), navigation par
@@ -375,6 +388,110 @@ private fun DesktopApp(
             if (!online && nav.current !is Screen.Player) nav.popToRoot()
         }
 
+        // ── Enchaînement d'épisode, sans quitter le lecteur ──────────────────
+        //
+        // L'enchaînement remplaçait le lecteur par la fiche, à qui il laissait le
+        // soin de résoudre la source puis de rempiler le lecteur. Trois
+        // conséquences, toutes visibles :
+        //
+        // - le lecteur **disparaissait** le temps de la résolution, et on
+        //   revoyait la fiche de la série entre deux épisodes ;
+        // - le moteur mpv était détruit puis reconstruit pour rien ;
+        // - la fenêtre **perdait son plein écran**. `inPlayer` repassait à faux,
+        //   et l'effet qui suit cet état rendait son cadre à la fenêtre. Le
+        //   plein écran revenait ensuite — l'intention lui survit — mais après un
+        //   aller-retour bien voyant, barre de titre comprise.
+        //
+        // On résout donc **depuis** le lecteur : il reste `nav.current`, donc à
+        // l'écran et en plein écran, et le flux obtenu ne fait que remplacer ses
+        // paramètres. `nav.replace` sur une entrée de même type garde le
+        // composable monté (même branche du `when`, même site d'appel), si bien
+        // que le moteur, le volume et le plein écran traversent l'épisode.
+        //
+        // La fiche reste sous le lecteur dans la pile : `replace` ne touche que
+        // l'entrée du dessus, et le retour ramène donc toujours à la série.
+        var chainingTo: Pair<Int, Int>? by remember { mutableStateOf(null) }
+
+        LaunchedEffect(chainingTo) {
+            val (season, episode) = chainingTo ?: return@LaunchedEffect
+            val details = Vm.details
+
+            // `try`/`finally`, et non une remise à zéro en fin de corps : la clé
+            // de cet effet **est** `chainingTo`, donc l'annuler depuis son propre
+            // corps le relance et annule la coroutine en cours. Tout ce qui
+            // suivrait la remise à zéro tiendrait alors d'une course avec la
+            // recomposition. Le `finally` est le seul endroit qui passe quoi
+            // qu'il arrive, cancellation comprise.
+            try {
+                // Un `resolved` resté d'un épisode précédent serait pris pour la
+                // réponse à cette demande-ci : `resolved` est un `StateFlow`, il
+                // rejoue sa valeur courante à qui le collecte. La fiche le
+                // consomme déjà en empilant le lecteur — on ne s'en remet pas à
+                // ce détail, qui vit dans un autre fichier.
+                details.consumeResolved()
+
+                // Même ordre que la fiche quand elle s'en chargeait (voir
+                // `DesktopDetailsScreen`) : la saison d'abord, sans quoi le titre
+                // et la durée de l'épisode manquent au `Screen.Player`.
+                details.selectSeason(season)
+                details.quickPlayEpisode(season, episode)
+
+                // Le préchargement lancé en fin d'épisode a déjà payé
+                // l'aller-retour aux catalogues ; il reste l'extraction du lien
+                // et la sonde de lisibilité, quelques secondes. Au-delà, on cesse
+                // de faire attendre devant une image figée et on repasse par la
+                // fiche : elle sait afficher l'erreur et proposer une autre
+                // source, ce que le lecteur ne sait pas faire. Le pire cas
+                // retombe ainsi exactement sur le comportement d'avant.
+                val stream = withTimeoutOrNull(CHAINAGE_MAX_MS) {
+                    details.resolved.filterNotNull().first { it.url.isNotBlank() }
+                }
+
+                // Quitté le lecteur entre-temps (retour, échec de flux) : la
+                // résolution ne s'adresse plus à personne, et remplacer l'entrée
+                // courante écraserait un écran qu'on n'a pas ouvert.
+                if (nav.current !is Screen.Player) return@LaunchedEffect
+
+                if (stream == null) {
+                    // `resolved` n'est **pas** consommé ici : une résolution qui
+                    // aboutit après le délai trouvera la fiche à l'écran, et
+                    // c'est elle qui empilera le lecteur. L'épisode part alors
+                    // avec un tour de retard plutôt que pas du tout.
+                    val fiche = nav.previous as? Screen.Details
+                    nav.replace(
+                        fiche?.copy(
+                            autoSources = true,
+                            resumeSeason = season,
+                            resumeEpisode = episode,
+                        ) ?: Screen.Home,
+                    )
+                    return@LaunchedEffect
+                }
+
+                details.consumeResolved()
+                nav.replace(
+                    Screen.Player(
+                        streamUrl = stream.url,
+                        headers = stream.headers,
+                        mediaKey = details.playbackKey,
+                        subtitles = stream.subtitleUrls,
+                        title = details.playbackTitle,
+                        subtitle = details.playbackSubtitle,
+                        nextSeason = details.playbackNext?.first ?: 0,
+                        nextEpisode = details.playbackNext?.second ?: 0,
+                        posterUrl = details.playbackPoster,
+                        expectedMinutes = details.playbackMinutes ?: 0,
+                        sourceUrl = details.playingLink?.url.orEmpty(),
+                        hoster = details.playingLink?.hoster.orEmpty(),
+                        language = details.playingLink?.language.orEmpty(),
+                        alternatives = details.playbackAlternatives(),
+                    ),
+                )
+            } finally {
+                chainingTo = null
+            }
+        }
+
         // Le contenu, et par-dessus l'accès à la télécommande.
         Box(modifier = Modifier.fillMaxSize()) {
             when (val s = nav.current) {
@@ -562,20 +679,15 @@ private fun DesktopApp(
                         // de la fenêtre, il connaît donc encore la série.
                         onPrefetchNext = { Vm.details.prefetchEpisodeSources(s.nextSeason, s.nextEpisode) },
                         onRegisterBack = onRegisterBack,
+                        // Le lecteur reste à l'écran pendant la résolution : il
+                        // l'annonce plutôt que de figer son image.
+                        chainingNext = chainingTo != null,
+                        // La résolution se fait dans l'effet ci-dessus, lecteur
+                        // monté. Ne rien empiler ici est tout l'objet du
+                        // changement : c'est le passage par la fiche qui faisait
+                        // clignoter le lecteur et la fenêtre.
                         onNextEpisode = { season, episode ->
-                            // `previous`, et non `current` : `current` **est** le
-                            // lecteur, le transtypage échouait donc toujours et
-                            // l'enchaînement retombait sur l'accueil. Passer le
-                            // générique renvoyait ainsi à la maison au lieu de
-                            // lancer l'épisode suivant.
-                            val details = nav.previous as? Screen.Details
-                            nav.replace(
-                                details?.copy(
-                                    autoSources = true,
-                                    resumeSeason = season,
-                                    resumeEpisode = episode,
-                                ) ?: Screen.Home,
-                            )
+                            chainingTo = season to episode
                         },
                     )
                 }

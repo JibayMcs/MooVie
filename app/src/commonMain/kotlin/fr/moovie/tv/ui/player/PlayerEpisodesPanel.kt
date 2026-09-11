@@ -76,6 +76,18 @@ import org.jetbrains.compose.resources.stringResource
  * Un panneau le peut : il montre la saison, la liste, et marque celui qui joue.
  * Un geste de plus pour l'épisode suivant, beaucoup moins pour tous les autres.
  *
+ * ## Ce qu'il ne montre pas
+ *
+ * Les épisodes déjà passés. La liste commence à celui qui joue et va vers
+ * l'avant, en franchissant les saisons.
+ *
+ * C'est le sens de l'objet : on l'ouvre **pendant** la lecture, pour choisir la
+ * suite. Revenir en arrière est une autre intention, et elle a déjà son écran —
+ * la fiche, qui porte les marques de vu et la reprise, et qui sait donc répondre
+ * à « où j'en étais ». Ici, le passé n'était que du défilement entre l'ouverture
+ * du panneau et son seul endroit utile ; à la huitième saison d'une série, il en
+ * faisait beaucoup.
+ *
  * ## Pourquoi il charge lui-même ses données
  *
  * On arrive au lecteur par cinq chemins — la fiche, la reprise de l'accueil, un
@@ -91,8 +103,9 @@ import org.jetbrains.compose.resources.stringResource
  *
  * ## Le focus
  *
- * Il va sur l'épisode en cours, pas en tête de liste : c'est de là qu'on veut
- * repartir. Même règle que le menu des filtres et que les options du lecteur.
+ * Il va sur l'épisode en cours, qui est aussi la tête de liste : c'est de là
+ * qu'on veut repartir. Même règle que le menu des filtres et que les options du
+ * lecteur.
  */
 @Composable
 fun BoxScope.PlayerEpisodesPanel(
@@ -173,43 +186,57 @@ private fun ContenuPanneau(
 
     // Aplatie dans l'ordre des saisons, quel que soit l'ordre d'arrivée des
     // réponses : la liste ne doit pas se réorganiser sous les yeux.
-    val lignes = remember(saisons, parSaison) {
+    //
+    // ## Et tronquée à l'épisode en cours
+    //
+    // La liste part de celui qui joue : ce qui est derrière n'y figure pas.
+    //
+    // On n'ouvre pas ce panneau pour revenir en arrière. On l'ouvre en regardant
+    // un épisode pour aller au suivant, ou pour sauter deux épisodes plus loin —
+    // « où j'en suis » est la question à laquelle la fiche répond, avec ses
+    // marques de vu et sa reprise. Ici, les épisodes déjà passés n'étaient que du
+    // défilement entre l'ouverture et le seul endroit intéressant de la liste, et
+    // sur une série arrivée à sa huitième saison ils en faisaient beaucoup.
+    //
+    // Comparaison lexicographique sur (saison, épisode), et non sur l'index
+    // aplati : l'épisode en cours peut appartenir à une saison qui n'est pas
+    // encore arrivée, et son index n'existerait alors pas.
+    //
+    // Une saison courante à zéro — clé de média illisible — laisse tout passer,
+    // ce qui vaut mieux qu'un panneau vide.
+    val lignes = remember(saisons, parSaison, saisonCourante, episodeCourant) {
         saisons.flatMap { numero ->
             parSaison[numero].orEmpty().map { numero to it }
+        }.filter { (saison, episode) ->
+            saison > saisonCourante ||
+                (saison == saisonCourante && episode.episodeNumber >= episodeCourant)
         }
     }
 
     val listeEtat = rememberLazyListState()
     val focusEntree = remember { FocusRequester() }
-    // Où le focus se pose en entrant : sur l'épisode qui joue. **Toujours
-    // quelque part** — la première version ne le demandait qu'au-delà du premier
-    // épisode, si bien qu'un pilote en cours ouvrait un panneau que la
-    // télécommande ne pouvait pas atteindre.
-    val indexEntree = lignes
-        .indexOfFirst { (saison, ep) ->
-            saison == saisonCourante && ep.episodeNumber == episodeCourant
-        }
-        .coerceAtLeast(0)
-    // On l'amène à l'écran **avant** de lui demander le focus : une cible qui
-    // n'est pas composée n'existe pas pour Compose, et la demande échouerait en
-    // silence sur une série de cent épisodes.
+    // Le focus entre sur la première ligne, qui **est** l'épisode en cours : la
+    // liste part de lui. C'était un `indexOfFirst` sur toute la série, du temps
+    // où les épisodes passés figuraient au-dessus ; le faire encore chercher
+    // entretiendrait l'idée que l'entrée peut être ailleurs qu'en tête.
     //
-    // **Une seule fois, à la première saison arrivée.** L'effet était keyé sur
-    // `lignes.size`, qui grandit à chaque saison reçue : il repartait donc à
-    // chaque réponse, recalait la liste et reprenait le focus pendant qu'on la
-    // parcourait — sur une série de dix saisons, dix fois. Le drapeau le
-    // ramène à ce qu'il est vraiment : le cadrage d'entrée, qui n'a lieu qu'à
-    // l'ouverture.
+    // **Toujours quelque part** — la première version ne demandait le focus
+    // qu'au-delà du premier épisode, si bien qu'un pilote en cours ouvrait un
+    // panneau que la télécommande ne pouvait pas atteindre.
+    //
+    // Il n'y a plus rien à recadrer non plus : la vue s'ouvre sur la bonne ligne.
+    // Reste à ne demander le focus qu'**une fois**, à la première saison
+    // arrivée. L'effet était keyé sur `lignes.size`, qui grandit à chaque saison
+    // reçue : il reprenait donc le focus pendant qu'on parcourait la liste — sur
+    // une série de dix saisons, dix fois.
     //
     // La saison en cours est demandée en premier (voir plus haut), donc la
-    // première fournée contient bien l'épisode visé. Les saisons qui arrivent
-    // ensuite s'insèrent **au-dessus** sans déplacer la vue : les lignes
-    // portent une clé, et la liste paresseuse s'ancre dessus.
+    // première fournée contient bien l'épisode visé ; les saisons suivantes
+    // s'ajoutent **en dessous**, sans déplacer la vue.
     var cadre by remember(tmdbId) { mutableStateOf(false) }
     LaunchedEffect(lignes.isEmpty()) {
         if (cadre || lignes.isEmpty()) return@LaunchedEffect
         cadre = true
-        if (indexEntree > 0) runCatching { listeEtat.scrollToItem(indexEntree) }
         runCatching { focusEntree.requestFocus() }
     }
 
@@ -243,7 +270,7 @@ private fun ContenuPanneau(
                     episode = episode,
                     enCours = saison == saisonCourante && episode.episodeNumber == episodeCourant,
                     onClick = { onJouer(saison, episode.episodeNumber) },
-                    modifier = if (index == indexEntree) {
+                    modifier = if (index == 0) {
                         Modifier.focusRequester(focusEntree)
                     } else {
                         Modifier
