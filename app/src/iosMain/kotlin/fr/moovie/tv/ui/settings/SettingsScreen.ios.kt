@@ -46,6 +46,7 @@ fun SettingsScreen(
 ) {
     val apiKey by viewModel.tmdbApiKey.collectAsState()
     val introDbKey by viewModel.introDbApiKey.collectAsState()
+    val stremioAddon by viewModel.stremioAddonUrl.collectAsState()
     val streamLang by viewModel.streamLanguage.collectAsState()
     val providers by viewModel.providers.collectAsState()
     val dohEnabled by viewModel.dohEnabled.collectAsState()
@@ -64,6 +65,7 @@ fun SettingsScreen(
     SettingsScreenContent(
         apiKey = apiKey,
         introDbKey = introDbKey,
+        stremioAddon = stremioAddon,
         streamLang = streamLang,
         skipIntroOutro = skipIntroOutro,
         autoPlayNext = autoPlayNext,
@@ -83,6 +85,7 @@ fun SettingsScreen(
         providers = providers,
         onSetApiKey = viewModel::setTmdbApiKey,
         onSetIntroDbKey = viewModel::setIntroDbApiKey,
+        onSetStremioAddon = viewModel::setStremioAddonUrl,
         onSetStreamLanguage = viewModel::setStreamLanguage,
         onSetSkipIntroOutro = viewModel::setSkipIntroOutro,
         onSetAutoPlayNext = viewModel::setAutoPlayNext,

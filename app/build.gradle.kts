@@ -394,6 +394,10 @@ tasks.withType<Test>().configureEach {
         // Dossier où les sondes déposent leur relevé JSON, lu par le tableau de
         // bord (tools/dashboard). Absent = rien n'est écrit.
         "moovie.report",
+        // Clé TMDB et URL d'addon de la sonde stremio : hors de l'application il
+        // n'existe aucun magasin de réglages où les lire — voir
+        // StremioEndToEndProbeTest.
+        "moovie.tmdb", "moovie.stremio",
     ).forEach { key ->
         System.getProperty(key)?.let { systemProperty(key, it) }
     }

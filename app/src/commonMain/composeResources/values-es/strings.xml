@@ -395,6 +395,13 @@
     <string name="player_subtitles_quota_left">%1$d restantes hoy</string>
     <string name="player_subtitles_downloaded">Descargado</string>
     <string name="settings_introdb_key">Clave de TheIntroDB</string>
+    <string name="settings_stremio_addon">Complemento Stremio (flujos)</string>
+    <string name="settings_stremio_addon_help">Opcional. Pega la URL del manifiesto de tu complemento de flujos de Stremio para que sus fuentes aparezcan en la aplicación. Lleva la clave de tu servicio de debrid: trátala como una contraseña. Vacío, este catálogo queda apagado.</string>
+    <string name="settings_stremio_addon_hint">https://…/manifest.json</string>
+    <string name="settings_link_tmdb">themoviedb.org/settings/api</string>
+    <string name="settings_link_introdb">theintrodb.org/account</string>
+    <string name="settings_link_stremio">web.stremio.com/#/addons</string>
+    <string name="settings_link_opensubtitles">opensubtitles.com</string>
     <string name="settings_introdb_hint">Pegar la clave de TheIntroDB aquí…</string>
     <string name="settings_introdb_help">Opcional. Sirve para informar de intros y créditos que faltan desde el reproductor — y los informes enviados surten efecto de inmediato en este dispositivo. Clave gratuita en theintrodb.org.</string>
     <string name="report_segment">Informar de un segmento</string>

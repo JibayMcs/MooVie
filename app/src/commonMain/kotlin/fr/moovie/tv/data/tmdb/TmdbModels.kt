@@ -67,3 +67,16 @@ data class TmdbItem(
     fun backdropUrl(size: String = "w1280"): String? =
         backdropPath?.let { "https://image.tmdb.org/t/p/$size$it" }
 }
+
+/**
+ * Réponse de `/{media}/{id}/external_ids`, réduite au seul identifiant IMDB.
+ *
+ * C'est le pont vers le monde Stremio, qui n'indexe rien d'autre : ses addons
+ * prennent `tt0113568`, jamais un identifiant TMDB. Le champ est **nullable
+ * pour de vrai** — TMDB le rend à `null` sur les titres qu'IMDB ne connaît pas,
+ * et sur les séries plus souvent que sur les films.
+ */
+@Serializable
+data class ExternalIds(
+    @SerialName("imdb_id") val imdbId: String? = null,
+)

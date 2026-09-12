@@ -58,6 +58,7 @@ import fr.moovie.tv.resources.subtitles_languages
 import fr.moovie.tv.resources.subtitles_languages_help
 import fr.moovie.tv.resources.subtitles_remember
 import fr.moovie.tv.resources.subtitles_remember_help
+import fr.moovie.tv.resources.settings_link_opensubtitles
 import fr.moovie.tv.resources.subtitles_username
 import fr.moovie.tv.resources.subtitles_appearance
 import fr.moovie.tv.resources.subtitles_appearance_help
@@ -154,6 +155,12 @@ fun SubtitlesSection(
                 Text(stringResource(Res.string.subtitles_logout))
             }
         } else {
+            // Où créer le compte, écrit en toutes lettres : sur un téléviseur on
+            // ne clique pas un lien, on recopie l'adresse sur un téléphone.
+            Text(
+                stringResource(Res.string.settings_link_opensubtitles),
+                style = MaterialTheme.typography.bodySmall,
+            )
             LabelledField(
                 label = stringResource(Res.string.subtitles_username),
                 value = username,

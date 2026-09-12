@@ -395,6 +395,13 @@
     <string name="player_subtitles_quota_left">%1$d left today</string>
     <string name="player_subtitles_downloaded">Downloaded</string>
     <string name="settings_introdb_key">TheIntroDB key</string>
+    <string name="settings_stremio_addon">Stremio addon (streams)</string>
+    <string name="settings_stremio_addon_help">Optional. Paste the manifest URL of your Stremio stream addon to surface its sources in the app. It carries your debrid key, so treat it as a password. Left empty, this catalogue stays off.</string>
+    <string name="settings_stremio_addon_hint">https://…/manifest.json</string>
+    <string name="settings_link_tmdb">themoviedb.org/settings/api</string>
+    <string name="settings_link_introdb">theintrodb.org/account</string>
+    <string name="settings_link_stremio">web.stremio.com/#/addons</string>
+    <string name="settings_link_opensubtitles">opensubtitles.com</string>
     <string name="settings_introdb_hint">Paste your TheIntroDB key here…</string>
     <string name="settings_introdb_help">Optional. It lets you report missing intros and credits from the player — and your own reports take effect for you straight away. Free key on theintrodb.org.</string>
     <string name="report_segment">Report a segment</string>

@@ -69,7 +69,14 @@ fun pairingPage(fields: List<PairingField>, texts: PairingTexts, action: String)
                 """<input id="${esc(field.id)}" name="${esc(field.id)}" """ +
                 """value="${esc(field.value)}" """ +
                 """autocapitalize="off" autocorrect="off" spellcheck="false" """ +
-                """autocomplete="off" enterkeyhint="next"></div>"""
+                """autocomplete="off" enterkeyhint="next">""" +
+                // `rel` et `target` sur un lien externe : sans `noopener`, la
+                // page ouverte garde une poignee sur celle-ci.
+                (field.link?.let {
+                    """<a class="source" href="https://${esc(it)}" target="_blank" """ +
+                        """rel="noopener noreferrer">${esc(it)}</a>"""
+                } ?: "") +
+                "</div>"
         }
         """<section><h2>${esc(group)}</h2>
 $rows
@@ -589,6 +596,7 @@ section+section{padding-top:26px;border-top:1px solid var(--line)}
 h2{margin:0 0 16px;font-size:.82rem;font-weight:700;letter-spacing:.09em;
    text-transform:uppercase;color:var(--accent)}
 .field{position:relative;margin:0 0 20px}
+.source{display:inline-block;margin-top:6px;font-size:13px;opacity:.7}
 label{display:block;margin:0 0 8px;font-weight:600}
 /* Cadre rectangulaire visible, comme les champs de l'écran de réglages : un
    champ n'est pas un bouton, il doit montrer où l'on tape avant qu'on y tape. */

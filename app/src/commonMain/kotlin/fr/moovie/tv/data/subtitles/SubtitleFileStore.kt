@@ -38,7 +38,43 @@ class SubtitleFileStore(
     /** Écrit le sous-titre brut tel que téléchargé, et rend son fichier. */
     fun storeOriginal(mediaKey: String, candidate: SubtitleCandidate, content: String): Path {
         fs.createDirectories(dir)
-        val fichier = dir / "${safe(mediaKey)}_${candidate.fileId}.srt"
+        // `fileId` passe par `safe` **lui aussi**, et ce n'est pas de la
+        // précaution gratuite : le port le declare opaque, « sa forme appartient
+        // au catalogue ». Un catalogue qui y met une URL — ce que fait
+        // StremioSubtitleCatalog — produisait un chemin avec des barres obliques
+        // vers des repertoires inexistants, et une FileNotFoundException non
+        // rattrapee qui fermait l'application au moment de choisir un
+        // sous-titre. Aucun appelant ne doit pouvoir faire tomber le lecteur en
+        // respectant le contrat.
+        val fichier = dir / "${safe(mediaKey)}_${safe(candidate.fileId)}.srt"
+        fs.write(fichier) { writeUtf8(content) }
+        return fichier
+    }
+
+    /**
+     * Relit un fichier déjà rangé, ou null s'il a disparu.
+     *
+     * Null et non une exception : le cache vit dans le répertoire que le système
+     * peut purger à tout moment, et un fichier absent est un cas normal.
+     */
+    fun read(fichier: Path): String? =
+        runCatching { fs.read(fichier) { readUtf8() } }.getOrNull()
+
+    /**
+     * Range la **traduction** d'un sous-titre, à côté de son original.
+     *
+     * Un nom distinct, et pas un écrasement : l'original reste la source de
+     * vérité, et c'est lui qu'on retraduit si la traduction est reprise ou
+     * relancée. Écraser rendrait la deuxième passe impossible — on traduirait du
+     * français vers du français.
+     *
+     * Réécrit à chaque lot, et c'est voulu : le fichier est complet et jouable à
+     * toutes les étapes, les répliques pas encore traduites y figurant dans leur
+     * langue d'origine.
+     */
+    fun storeTranslated(mediaKey: String, candidate: SubtitleCandidate, content: String): Path {
+        fs.createDirectories(dir)
+        val fichier = dir / "${safe(mediaKey)}_${safe(candidate.fileId)}_trad.srt"
         fs.write(fichier) { writeUtf8(content) }
         return fichier
     }
@@ -126,7 +162,11 @@ class SubtitleFileStore(
      */
     private fun contenu(): List<Path> = fs.listOrNull(dir).orEmpty()
 
-    /** `tv:1396:s1e1` porte des deux-points, que Windows refuse dans un nom. */
+    /**
+     * `tv:1396:s1e1` porte des deux-points, que Windows refuse dans un nom — et
+     * un `fileId` de catalogue peut porter n'importe quoi, barres obliques
+     * comprises.
+     */
     private fun safe(mediaKey: String): String =
         mediaKey.replace(Regex("""[^A-Za-z0-9_-]"""), "_")
 }

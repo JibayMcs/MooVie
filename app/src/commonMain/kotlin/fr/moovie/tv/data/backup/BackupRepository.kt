@@ -48,6 +48,8 @@ class BackupRepository(
         profilesRemovedAt = profileRepo.deletedAt.first(),
         tmdbApiKey = settingsRepo.tmdbApiKey.first().takeIf { includeApiKey && it.isNotBlank() },
         introDbApiKey = settingsRepo.introDbApiKey.first().takeIf { includeApiKey && it.isNotBlank() },
+        stremioAddonUrl = settingsRepo.stremioAddonUrl.first()
+            .takeIf { includeApiKey && it.isNotBlank() },
         settings = currentSettings(),
     )
 
@@ -99,6 +101,8 @@ class BackupRepository(
         backup.settings?.let { applySettings(it) }
         backup.tmdbApiKey?.takeIf { it.isNotBlank() }?.let { settingsRepo.setTmdbApiKey(it) }
         backup.introDbApiKey?.takeIf { it.isNotBlank() }?.let { settingsRepo.setIntroDbApiKey(it) }
+        backup.stremioAddonUrl?.takeIf { it.isNotBlank() }
+            ?.let { settingsRepo.setStremioAddonUrl(it) }
         return report
     }
 

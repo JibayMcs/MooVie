@@ -130,6 +130,12 @@ import fr.moovie.tv.resources.settings_history_help
 import fr.moovie.tv.resources.settings_introdb_help
 import fr.moovie.tv.resources.settings_introdb_hint
 import fr.moovie.tv.resources.settings_introdb_key
+import fr.moovie.tv.resources.settings_link_introdb
+import fr.moovie.tv.resources.settings_link_stremio
+import fr.moovie.tv.resources.settings_link_tmdb
+import fr.moovie.tv.resources.settings_stremio_addon
+import fr.moovie.tv.resources.settings_stremio_addon_help
+import fr.moovie.tv.resources.settings_stremio_addon_hint
 import fr.moovie.tv.resources.settings_intro_help
 import fr.moovie.tv.resources.settings_language
 import fr.moovie.tv.resources.settings_splash
@@ -325,6 +331,7 @@ private fun sectionLabel(section: SettingsSection): String = stringResource(
 fun SettingsScreenContent(
     apiKey: String,
     introDbKey: String,
+    stremioAddon: String,
     streamLang: StreamLanguage,
     skipIntroOutro: Boolean,
     autoPlayNext: Boolean,
@@ -345,6 +352,7 @@ fun SettingsScreenContent(
     providers: List<ProviderSetting>,
     onSetApiKey: (String) -> Unit,
     onSetIntroDbKey: (String) -> Unit,
+    onSetStremioAddon: (String) -> Unit,
     onSetStreamLanguage: (StreamLanguage) -> Unit,
     onSetSkipIntroOutro: (Boolean) -> Unit,
     onSetAutoPlayNext: (Boolean) -> Unit,
@@ -469,6 +477,7 @@ fun SettingsScreenContent(
                 SettingRow(
                     label = stringResource(Res.string.settings_tmdb_key),
                     help = stringResource(Res.string.settings_tmdb_help),
+                    link = stringResource(Res.string.settings_link_tmdb),
                 ) {
                     ApiKeyField(
                         value = apiKey,
@@ -482,11 +491,28 @@ fun SettingsScreenContent(
                 SettingRow(
                     label = stringResource(Res.string.settings_introdb_key),
                     help = stringResource(Res.string.settings_introdb_help),
+                    link = stringResource(Res.string.settings_link_introdb),
                 ) {
                     ApiKeyField(
                         value = introDbKey,
                         hint = stringResource(Res.string.settings_introdb_hint),
                         onValueChange = onSetIntroDbKey,
+                    )
+                }
+                // Ni une clé ni tout à fait une URL : le manifeste d'un addon
+                // Stremio, qui porte la clé du debrid dans son chemin. Même
+                // champ masqué que les deux au-dessus, et même section, parce
+                // que c'est la même chose du point de vue de l'utilisateur —
+                // un secret qu'on saisit une fois, depuis le téléphone.
+                SettingRow(
+                    label = stringResource(Res.string.settings_stremio_addon),
+                    help = stringResource(Res.string.settings_stremio_addon_help),
+                    link = stringResource(Res.string.settings_link_stremio),
+                ) {
+                    ApiKeyField(
+                        value = stremioAddon,
+                        hint = stringResource(Res.string.settings_stremio_addon_hint),
+                        onValueChange = onSetStremioAddon,
                     )
                 }
             }
@@ -1009,6 +1035,19 @@ private fun ProfilesSection() {
 internal fun SettingRow(
     label: String,
     help: String? = null,
+    /**
+     * Adresse où obtenir ce qu'on demande à l'utilisateur de saisir.
+     *
+     * Affichée en toutes lettres, et non cachée derrière un lien : sur un
+     * téléviseur on ne clique pas, on recopie sur un téléphone. Elle est donc
+     * traitée comme une donnée à lire — couleur du texte normal plutôt que du
+     * gris de l'aide, pour qu'elle se distingue de la phrase qui l'entoure.
+     *
+     * Sans elle, trouver où créer une clé TMDB ou un consumer OpenSubtitles
+     * demande de fouiller un site entier. C'est la marche la plus haute de
+     * l'installation, et elle n'a aucune raison de l'être.
+     */
+    link: String? = null,
     control: @Composable () -> Unit,
 ) {
     val texts = @Composable {
@@ -1018,6 +1057,13 @@ internal fun SettingRow(
                 help,
                 style = MaterialTheme.typography.bodySmall,
                 color = MOOVIE_TEXT_DIM,
+            )
+        }
+        if (link != null) {
+            Text(
+                link,
+                style = MaterialTheme.typography.bodySmall,
+                color = MOOVIE_TEXT,
             )
         }
     }

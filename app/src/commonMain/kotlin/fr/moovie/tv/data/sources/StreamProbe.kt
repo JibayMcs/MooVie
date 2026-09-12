@@ -214,7 +214,14 @@ private suspend fun probe(http: HttpGateway, stream: PlayableStream, head: Boole
         ?: return if (head) null else false
 
     // 405 / 501 : la méthode est refusée, pas la ressource.
-    if (head && (resp.status == 405 || resp.status == 501)) return null
+    //
+    // 403 aussi, et c'est contre-intuitif : les CDN des debrid (mesuré sur
+    // Real-Debrid) répondent 403 au HEAD et 206 au même GET avec un `Range`.
+    // Le lire comme un verdict écartait **tous** les liens du catalogue stremio
+    // en silence, sans qu'aucun n'ait jamais été essayé. Une ressource
+    // réellement interdite refusera aussi le GET, qui rendra false : on ne perd
+    // donc qu'une requête, et seulement sur les 403.
+    if (head && (resp.status == 405 || resp.status == 501 || resp.status == 403)) return null
     if (!resp.isSuccessful) return false
 
     // Un 200 ne suffit pas. Un extracteur peut produire une URL bien formée que

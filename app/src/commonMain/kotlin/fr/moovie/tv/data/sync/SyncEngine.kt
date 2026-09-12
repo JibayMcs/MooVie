@@ -60,6 +60,7 @@ class BackupSyncSubject(
         settings = null,
         tmdbApiKey = null,
         introDbApiKey = null,
+        stremioAddonUrl = null,
     )
 }
 

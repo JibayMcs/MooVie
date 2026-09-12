@@ -7,14 +7,23 @@ import fr.moovie.tv.core.sources.port.SourceProvider
  * timeout, fusion) est faite par l'appelant (DetailsViewModel) pour un
  * affichage en streaming.
  *
- * Commun depuis que les sept catalogues passent tous par le port `HttpGateway` :
+ * Commun depuis que les catalogues passent tous par le port `HttpGateway` :
  * plus aucun ne prend un `OkHttpClient` en direct, plus rien ne le cloue à la JVM.
  */
 object ProviderRegistry {
     val all: List<SourceProvider> = listOf(
-        // En tête : c'est le seul catalogue qui rend le fichier lui-même plutôt
-        // qu'un embed à désobfusquer. Rien à casser au prochain changement de
-        // format, donc le candidat le plus sûr à essayer en premier.
+        // En tête de tous, et ce n'est pas une préférence de goût : c'est le
+        // seul catalogue qui rend un **fichier chez un debrid** plutôt qu'une
+        // page d'hébergeur. Rien à désobfusquer, aucune rotation de domaine, un
+        // débit qui ne dépend pas d'un hébergeur gratuit. Inerte tant que
+        // l'utilisateur n'a pas collé son addon dans les réglages : sans URL il
+        // rend une liste vide sans émettre la moindre requête, et les sept
+        // autres travaillent comme avant.
+        StremioProvider(ExtractorRegistry.gateway),
+        // Premier des catalogues *scrapés* : le seul d'entre eux qui rende le
+        // fichier lui-même plutôt qu'un embed à désobfusquer. Rien à casser au
+        // prochain changement de format, donc le plus sûr à essayer en premier
+        // — et celui sur lequel on retombe quand stremio n'est pas configuré.
         SwiftFlowProvider(ExtractorRegistry.gateway),
         FstreamProvider(ExtractorRegistry.gateway),
         AnimeSamaProvider(ExtractorRegistry.gateway),
