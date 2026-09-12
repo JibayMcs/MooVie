@@ -75,6 +75,11 @@ import fr.moovie.tv.resources.pairing_scan
 import fr.moovie.tv.resources.pairing_title
 import fr.moovie.tv.resources.pairing_waiting
 import fr.moovie.tv.resources.settings_introdb_key
+import fr.moovie.tv.resources.settings_link_introdb
+import fr.moovie.tv.resources.settings_link_opensubtitles
+import fr.moovie.tv.resources.settings_link_stremio
+import fr.moovie.tv.resources.settings_link_tmdb
+import fr.moovie.tv.resources.settings_stremio_addon
 import fr.moovie.tv.resources.settings_tmdb_key
 import fr.moovie.tv.resources.subtitles_password
 import fr.moovie.tv.resources.subtitles_username
@@ -152,11 +157,21 @@ fun rememberPairingHost(): PairingServer? {
     val labels = mapOf(
         PairingFields.TMDB to stringResource(Res.string.settings_tmdb_key),
         PairingFields.INTRODB to stringResource(Res.string.settings_introdb_key),
+        PairingFields.STREMIO to stringResource(Res.string.settings_stremio_addon),
         PairingFields.OS_USER to stringResource(Res.string.subtitles_username),
         PairingFields.OS_PASS to stringResource(Res.string.subtitles_password),
         PairingFields.PASSPHRASE to stringResource(Res.string.sync_passphrase_hint),
         PairingFields.SYNC_PREFIX + B2_KEY_ID to stringResource(Res.string.sync_field_b2_key_id),
         PairingFields.SYNC_PREFIX + B2_APP_KEY to stringResource(Res.string.sync_field_b2_app_key),
+    )
+
+    // Où obtenir chaque valeur. Sur le téléphone le lien se touche, ce que le
+    // téléviseur ne permet pas : c'est donc ici que l'information vaut le plus.
+    val links = mapOf(
+        PairingFields.TMDB to stringResource(Res.string.settings_link_tmdb),
+        PairingFields.INTRODB to stringResource(Res.string.settings_link_introdb),
+        PairingFields.STREMIO to stringResource(Res.string.settings_link_stremio),
+        PairingFields.OS_USER to stringResource(Res.string.settings_link_opensubtitles),
     )
 
     // Titres de sections. Le service est nommé dans le titre plutôt que laissé
@@ -189,7 +204,7 @@ fun rememberPairingHost(): PairingServer? {
     LaunchedEffect(Unit) {
         PairingSession.start {
             PairingServer(
-                fields = { source.snapshot(labels, currentGroups) },
+                fields = { source.snapshot(labels, currentGroups, links) },
                 apply = { source.apply(it) },
                 texts = texts,
                 // Le jeton vient du disque et y reste : une télécommande

@@ -28,6 +28,11 @@ class SettingsViewModel : ViewModel() {
 
     fun setIntroDbApiKey(value: String) = viewModelScope.launch { repo.setIntroDbApiKey(value) }
 
+    val stremioAddonUrl: StateFlow<String> =
+        repo.stremioAddonUrl.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "")
+
+    fun setStremioAddonUrl(value: String) = viewModelScope.launch { repo.setStremioAddonUrl(value) }
+
     val streamLanguage: StateFlow<StreamLanguage> =
         repo.streamLanguage.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), StreamLanguage.VF)
 

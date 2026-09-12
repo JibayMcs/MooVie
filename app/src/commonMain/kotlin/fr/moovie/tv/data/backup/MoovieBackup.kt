@@ -83,6 +83,13 @@ data class MoovieBackup(
      * ses clés partent, pas une fois par service.
      */
     val introDbApiKey: String? = null,
+
+    /**
+     * URL de l'addon Stremio. Ni une clé ni tout à fait une URL, mais elle
+     * **contient** la clé du debrid dans son chemin : elle suit donc le même
+     * interrupteur que les deux ci-dessus, pour la même raison.
+     */
+    val stremioAddonUrl: String? = null,
     val settings: BackupSettings? = null,
 
     /**
@@ -283,7 +290,8 @@ fun MoovieBackup.summary() = BackupSummary(
     exportedAt = exportedAt,
     appVersion = appVersion,
     platform = platform,
-    hasApiKey = !tmdbApiKey.isNullOrBlank() || !introDbApiKey.isNullOrBlank(),
+    hasApiKey = !tmdbApiKey.isNullOrBlank() || !introDbApiKey.isNullOrBlank() ||
+        !stremioAddonUrl.isNullOrBlank(),
     hasSettings = settings != null,
     profiles = profiles.size,
 )

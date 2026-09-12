@@ -233,6 +233,24 @@ class SettingsRepository {
     suspend fun setIntroDbApiKey(value: String) =
         store.edit { it[INTRODB_API_KEY] = value }
 
+    /**
+     * URL du manifeste de l'addon Stremio qui sert les flux.
+     *
+     * Vide par défaut, et l'application n'en fournit aucune : ce catalogue ne
+     * sert que l'abonnement que l'utilisateur possède déjà. Vide = catalogue
+     * inerte, qui rend une liste vide sans émettre de requête.
+     *
+     * ⚠️ **À traiter comme un mot de passe.** Chez tous les addons qui passent
+     * par un debrid, la clé du service voyage **dans le chemin de l'URL** — c'est
+     * la forme que Stremio lui-même distribue, il n'en existe pas d'autre. D'où
+     * le champ masqué à l'écran, et l'exclusion des exports qui ne demandent pas
+     * explicitement les clés.
+     */
+    val stremioAddonUrl: Flow<String> = store.data.map { it[STREMIO_ADDON_URL].orEmpty() }
+
+    suspend fun setStremioAddonUrl(value: String) =
+        store.edit { it[STREMIO_ADDON_URL] = value.trim() }
+
     // ─── Compte OpenSubtitles ────────────────────────────────────────────────
     //
     // La *clé* d'API n'est pas ici : elle identifie l'application et vit dans le
@@ -381,6 +399,7 @@ class SettingsRepository {
 
     private companion object {
         val TMDB_API_KEY = stringPreferencesKey("tmdb_api_key")
+        val STREMIO_ADDON_URL = stringPreferencesKey("stremio_addon_url")
         val ONBOARDING_DONE = booleanPreferencesKey("onboarding_done")
         val STREAM_LANGUAGE = stringPreferencesKey("stream_language")
         val DISABLED_PROVIDERS = stringPreferencesKey("disabled_providers")

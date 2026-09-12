@@ -397,6 +397,13 @@
     <string name="player_subtitles_quota_left">%1$d restants aujourd'hui</string>
     <string name="player_subtitles_downloaded">Téléchargé</string>
     <string name="settings_introdb_key">Clé TheIntroDB</string>
+    <string name="settings_stremio_addon">Addon Stremio (flux)</string>
+    <string name="settings_stremio_addon_help">Facultatif. Colle l'URL du manifeste de ton addon de flux Stremio pour que ses sources apparaissent dans l'application. Elle contient la clé de ton service de débridage : traite-la comme un mot de passe. Vide, ce catalogue reste éteint.</string>
+    <string name="settings_stremio_addon_hint">https://…/manifest.json</string>
+    <string name="settings_link_tmdb">themoviedb.org/settings/api</string>
+    <string name="settings_link_introdb">theintrodb.org/account</string>
+    <string name="settings_link_stremio">web.stremio.com/#/addons</string>
+    <string name="settings_link_opensubtitles">opensubtitles.com</string>
     <string name="settings_introdb_hint">Coller la clé TheIntroDB ici…</string>
     <string name="settings_introdb_help">Facultative. Elle sert à signaler les intros et génériques manquants depuis le lecteur — et les signalements envoyés prennent effet immédiatement sur cet appareil. Clé gratuite sur theintrodb.org.</string>
     <string name="report_segment">Signaler un segment</string>

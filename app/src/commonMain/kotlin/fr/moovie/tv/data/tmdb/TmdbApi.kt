@@ -254,6 +254,20 @@ class TmdbApi(private val client: HttpClient) {
         parameter("language", language)
     }.body()
 
+    /**
+     * Identifiants du titre chez les autres bases — on n'en lit que l'IMDB.
+     *
+     * Sans `language` : ce sont des identifiants, pas du texte traduit, et le
+     * paramètre ne ferait que salir le cache HTTP d'une variante par langue.
+     */
+    suspend fun externalIds(
+        media: String, // "movie" | "tv"
+        id: Int,
+        apiKey: String,
+    ): ExternalIds = client.get("${BASE_URL}$media/$id/external_ids") {
+        parameter("api_key", apiKey)
+    }.body()
+
     companion object {
         const val BASE_URL = "https://api.themoviedb.org/3/"
     }

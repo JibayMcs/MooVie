@@ -114,7 +114,7 @@ class BackupViewModel : ViewModel() {
             backup = if (step.includeApiKey) {
                 backup
             } else {
-                backup.copy(tmdbApiKey = null, introDbApiKey = null)
+                backup.copy(tmdbApiKey = null, introDbApiKey = null, stremioAddonUrl = null)
             },
             fileName = fileName(now),
         )

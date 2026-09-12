@@ -31,6 +31,15 @@ data class PairingField(
      */
     val group: String,
     val value: String,
+    /**
+     * Adresse où obtenir cette valeur, ou null s'il n'y en a pas.
+     *
+     * C'est **ici** qu'elle sert le plus : la page est ouverte sur un téléphone,
+     * donc le lien se touche, là où le téléviseur ne peut que l'afficher en
+     * toutes lettres. Aller créer la clé et revenir la coller ne demande alors
+     * pas de quitter le formulaire.
+     */
+    val link: String? = null,
 )
 
 /**
@@ -55,6 +64,13 @@ class PairingFields(
     companion object {
         const val TMDB = "tmdb"
         const val INTRODB = "introdb"
+
+        /**
+         * URL de l'addon Stremio. C'est le champ qui a le plus besoin de ce
+         * formulaire : une centaine de caractères, avec une clé de debrid au
+         * milieu, qu'aucun clavier de télécommande ne rend saisissable.
+         */
+        const val STREMIO = "stremio"
         const val OS_USER = "os_user"
         const val OS_PASS = "os_pass"
         const val PASSPHRASE = "passphrase"
@@ -84,14 +100,16 @@ class PairingFields(
     suspend fun snapshot(
         labels: Map<String, String>,
         groups: Map<String, String>,
+        links: Map<String, String> = emptyMap(),
     ): List<PairingField> {
         val out = mutableListOf<PairingField>()
         fun add(group: String, id: String, value: String) {
-            out += PairingField(id, labels[id] ?: id, groups[group] ?: group, value)
+            out += PairingField(id, labels[id] ?: id, groups[group] ?: group, value, links[id])
         }
 
         add(GROUP_API, TMDB, settings.tmdbApiKey.first())
         add(GROUP_API, INTRODB, settings.introDbApiKey.first())
+        add(GROUP_API, STREMIO, settings.stremioAddonUrl.first())
         add(GROUP_SUBTITLES, OS_USER, settings.osUsername.first())
         add(GROUP_SUBTITLES, OS_PASS, settings.osPassword.first())
 
@@ -134,6 +152,9 @@ class PairingFields(
         }
         given[INTRODB]?.let { v ->
             if (v != settings.introDbApiKey.first()) { settings.setIntroDbApiKey(v); changed++ }
+        }
+        given[STREMIO]?.let { v ->
+            if (v != settings.stremioAddonUrl.first()) { settings.setStremioAddonUrl(v); changed++ }
         }
 
         // Les identifiants OpenSubtitles s'écrivent d'un bloc : n'en renvoyer

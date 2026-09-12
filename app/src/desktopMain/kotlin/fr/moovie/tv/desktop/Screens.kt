@@ -200,6 +200,7 @@ internal fun DesktopSettingsScreen(
     val vm = Vm.settings
     val apiKey by vm.tmdbApiKey.collectAsState()
     val introDbKey by vm.introDbApiKey.collectAsState()
+    val stremioAddon by vm.stremioAddonUrl.collectAsState()
     val streamLang by vm.streamLanguage.collectAsState()
     val providers by vm.providers.collectAsState()
     val dohEnabled by vm.dohEnabled.collectAsState()
@@ -219,6 +220,7 @@ internal fun DesktopSettingsScreen(
     SettingsScreenContent(
         apiKey = apiKey,
         introDbKey = introDbKey,
+        stremioAddon = stremioAddon,
         streamLang = streamLang,
         skipIntroOutro = skipIntroOutro,
         autoPlayNext = autoPlayNext,
@@ -235,6 +237,7 @@ internal fun DesktopSettingsScreen(
         providers = providers,
         onSetApiKey = vm::setTmdbApiKey,
         onSetIntroDbKey = vm::setIntroDbApiKey,
+        onSetStremioAddon = vm::setStremioAddonUrl,
         onSetStreamLanguage = vm::setStreamLanguage,
         onSetSkipIntroOutro = vm::setSkipIntroOutro,
         onSetAutoPlayNext = vm::setAutoPlayNext,
