@@ -140,7 +140,21 @@ class SwiftFlowProvider(private val http: HttpGateway) : SourceProvider {
     }
 
     private companion object {
-        const val API_BASE = "https://blinkflux.lol"
+        /**
+         * Domaine du partenaire — **il tourne, et c'est déjà la troisième fois**.
+         *
+         * `deliciouss` → `blinkflux.lol` → `swiftflow.lol`. L'ancien ne répond
+         * plus sur aucun port : son IP est partagée avec `falzey.lol`, l'autre
+         * domaine de leur CDN, et `blinkflux.com` redirige vers atom.com, le nom
+         * étant en vente. Le nouveau vient du `.env.example` de l'amont
+         * (movixcorp/MovixOpenSource), qui ne mentionne plus blinkflux nulle part.
+         *
+         * Les routes, elles, n'ont pas changé : `movies/{id}` et `series/{id}`
+         * rendent toujours le JSON des sources. Les variantes `/player` que
+         * l'amont documente à côté ne servent qu'à fabriquer une iframe pour son
+         * frontend — nous lisons le catalogue directement.
+         */
+        const val API_BASE = "https://swiftflow.lol"
 
         /**
          * Clé du lecteur SwiftFlow. Non secrète — elle circule en clair dans

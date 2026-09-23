@@ -65,7 +65,7 @@ class SwiftFlowExtractor : SourceExtractor {
          * chemins qui ne passent pas par un lien nommé.
          */
         val HOST = Regex(
-            """deliciouss|blinkflux|edge-n\d|falzey""",
+            """deliciouss|blinkflux|swiftflow|edge-n\d|falzey""",
             RegexOption.IGNORE_CASE,
         )
 
@@ -87,8 +87,10 @@ class SwiftFlowExtractor : SourceExtractor {
          * passée pour bonne et aurait ouvert le lecteur sur une page web.
          *
          * Doit rester l'origine de `SwiftFlowProvider.API_BASE` : c'est le site
-         * qui sert le lecteur, donc celui que le CDN attend.
+         * qui sert le lecteur, donc celui que le CDN attend. Suit donc la
+         * rotation vers `swiftflow.lol` — le tableau ci-dessus reste le relevé
+         * du domaine d'alors, pas une valeur à restaurer.
          */
-        const val REFERER = "https://blinkflux.lol/"
+        const val REFERER = "https://swiftflow.lol/"
     }
 }
