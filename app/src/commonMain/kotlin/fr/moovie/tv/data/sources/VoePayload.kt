@@ -14,7 +14,8 @@ import kotlin.io.encoding.ExperimentalEncodingApi
  * transformations empilées :
  *
  *   1. ROT13
- *   2. retrait de séquences de bruit (`@$`, `^^`, `~@`, `%?`, `*~`, `!!`, `#&`)
+ *   2. retrait de séquences de bruit — la table vient du **bundle JS de la
+ *      page**, VOE la régénérant à chaque déploiement (voir [LEGACY_MARKERS])
  *   3. décodage Base64
  *   4. décalage de chaque code de caractère de −3
  *   5. inversion de la chaîne
@@ -32,23 +33,83 @@ object VoePayload {
         """<script[^>]+type=["']application/json["'][^>]*>\s*\[\s*"([\s\S]*?)"\s*]\s*</script>""",
     )
 
-    private val JUNK = listOf("@$", "^^", "~@", "%?", "*~", "!!", "#&")
+    /**
+     * La charge chiffrée **et le bundle qui la suit** : ils sont adjacents dans
+     * la page, et c'est ce second script qui porte la table des marqueurs.
+     */
+    private val PAYLOAD_AND_BUNDLE = Regex(
+        """<script[^>]+type=["']application/json["'][^>]*>\s*\[\s*"[\s\S]*?"\s*]\s*</script>""" +
+            """\s*<script[^>]*src=["']([^"']+)["']""",
+    )
+
+    /**
+     * La table dans le bundle : `['@$','^^','~@',…]`, chaque entrée faisant
+     * exactement deux caractères non alphanumériques. Un `]` isolé dans une
+     * classe est échappé — le moteur ICU d'Android le refuse, là où la JVM
+     * desktop l'accepte (même piège que dans PackedJs et CinestreamProvider).
+     */
+    private val MARKER_TABLE = Regex("""\[(?:'\W{2}'[,\]]){1,9}""")
+    private val MARKER = Regex("""'(\W{2})'""")
+
+    /**
+     * Repli « sources en clair », pour les pages qui n'utilisent pas la pile
+     * chiffrée du tout.
+     */
+    private val PLAIN_SOURCE = listOf(
+        Regex("""["']hls["']\s*:\s*["']([^"']+)["']""", RegexOption.IGNORE_CASE),
+        Regex("""["']mp4["']\s*:\s*["']([^"']+)["']""", RegexOption.IGNORE_CASE),
+    )
+
+    /**
+     * Les marqueurs de l'ancien déploiement, **désormais un simple repli**.
+     *
+     * VOE régénère cette liste à chaque mise en production et la publie dans le
+     * bundle JS de la page. La figer, c'est casser l'extraction à chaque
+     * rotation — et sans le moindre signe, puisqu'une charge mal débruitée
+     * échoue au Base64 suivant et ressort en `null`, exactement comme une page
+     * qui ne serait pas du VOE. Mesuré le 23/09/2026 : un lien résolu sur trois.
+     */
+    val LEGACY_MARKERS = listOf("@$", "^^", "~@", "%?", "*~", "!!", "#&")
+
+    /** VOE range son flux sous l'une de ces clés selon la version du lecteur. */
+    private val SOURCE_KEYS = listOf("source", "file", "direct_access_url")
 
     private val json = Json { ignoreUnknownKeys = true }
 
+    /** Cette page porte-t-elle une charge VOE ? (sans tenter de la décoder) */
+    fun hasPayload(html: String): Boolean = PAYLOAD.containsMatchIn(html)
+
+    /** URL du bundle JS adjacent à la charge, qui porte la table des marqueurs. */
+    fun bundleUrl(html: String): String? = PAYLOAD_AND_BUNDLE.find(html)?.groupValues?.get(1)
+
+    /** Table des marqueurs lue dans le bundle, ou null s'il ne la porte pas. */
+    fun markersFrom(bundleJs: String): List<String>? =
+        MARKER_TABLE.find(bundleJs)?.value
+            ?.let { table -> MARKER.findAll(table).map { it.groupValues[1] }.toList() }
+            ?.takeIf { it.isNotEmpty() }
+
+    /** Flux d'une page VOE servie sans chiffrement, ou null. */
+    fun plainSource(html: String): String? = PLAIN_SOURCE.firstNotNullOfOrNull { motif ->
+        motif.find(html)?.groupValues?.get(1)?.replace("""\/""", "/")?.takeIf { it.startsWith("http") }
+    }
+
     /** URL du flux VOE contenue dans cette page, ou null si ce n'est pas une page VOE. */
-    fun findSource(html: String): String? {
+    fun findSource(html: String, markers: List<String> = LEGACY_MARKERS): String? {
         val raw = PAYLOAD.find(html)?.groupValues?.get(1) ?: return null
-        val decoded = decode(raw) ?: return null
+        val decoded = decode(raw, markers) ?: return null
         val obj = runCatching { json.parseToJsonElement(decoded) as? JsonObject }.getOrNull() ?: return null
-        val source = (obj["source"] ?: obj["direct_access_url"])?.jsonPrimitive?.contentOrNull()
-        return source?.takeIf { it.startsWith("http") }
+        val candidats = SOURCE_KEYS
+            .mapNotNull { obj[it]?.jsonPrimitive?.contentOrNull() }
+            .filter { it.startsWith("http") }
+        // Le HLS d'abord : c'est la master playlist, le mp4 ne sert que de repli
+        // quand la page n'expose que lui.
+        return candidats.firstOrNull { it.contains(".m3u8") } ?: candidats.firstOrNull()
     }
 
     /** Applique les six couches. Retourne null dès qu'une étape échoue. */
-    fun decode(payload: String): String? {
+    fun decode(payload: String, markers: List<String> = LEGACY_MARKERS): String? {
         var step = rot13(payload)
-        JUNK.forEach { step = step.replace(it, "") }
+        markers.forEach { step = step.replace(it, "") }
 
         // Latin-1 et non UTF-8 : l'étape suivante décale des codes de caractères,
         // elle doit voir un octet = un caractère. Un décodage UTF-8 fusionnerait

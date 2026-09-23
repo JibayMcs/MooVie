@@ -394,6 +394,12 @@ tasks.withType<Test>().configureEach {
         // Dossier où les sondes déposent leur relevé JSON, lu par le tableau de
         // bord (tools/dashboard). Absent = rien n'est écrit.
         "moovie.report",
+        // Le titre à éprouver, pour les sondes qui tracent un hébergeur — sans
+        // ces quatre-là, on ne peut diagnostiquer que le panier figé de la
+        // sonde, jamais l'épisode sur lequel l'utilisateur est tombé.
+        // `moovie.title` compte autant que l'identifiant : les catalogues
+        // cherchent par titre, l'id TMDB ne servant qu'à confirmer.
+        "moovie.tmdb", "moovie.title", "moovie.season", "moovie.episode",
     ).forEach { key ->
         System.getProperty(key)?.let { systemProperty(key, it) }
     }

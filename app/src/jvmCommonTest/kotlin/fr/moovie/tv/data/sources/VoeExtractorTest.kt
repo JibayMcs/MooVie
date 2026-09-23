@@ -35,8 +35,14 @@ class VoeExtractorTest {
     /** Passerelle scriptée : à chaque URL sa réponse, et on compte les appels. */
     private class FakeGateway(private val routes: Map<String, HttpResponse>) : HttpGateway {
         val visited = mutableListOf<String>()
+
+        /** Ce que le client a renvoyé comme `Cookie`, saut par saut. */
+        val cookiesEnvoyes = mutableListOf<String?>()
+
         override suspend fun fetch(request: fr.moovie.tv.core.sources.port.HttpRequest): HttpResponse? {
             visited += request.url
+            cookiesEnvoyes += request.headers.entries
+                .firstOrNull { it.key.equals("Cookie", ignoreCase = true) }?.value
             return routes[request.url]
         }
     }
@@ -103,6 +109,76 @@ class VoeExtractorTest {
         assertNull(stream)
         // Le plafond doit avoir coupé : borné, et surtout terminé.
         assertTrue(gateway.visited.size <= 41, "sauts effectués : ${gateway.visited.size}")
+    }
+
+    @Test
+    fun `le saut par location-replace est suivi comme les autres`() = runTest {
+        // La page de 496 octets que VOE sert sur une partie de ses alias : un
+        // contrôle qui appose un jeton avant de rendre la vraie page. On ne
+        // reconnaissait que `location.href = …`, donc la marche s'arrêtait là —
+        // sur une source parfaitement vivante.
+        val jeton = "https://final.example/e/abc?ch=1&js=eyJhbGciOiJIUzI1NiJ9.eyJqcyI6MX0.sig"
+        val gateway = FakeGateway(
+            mapOf(
+                page(
+                    "https://alias1.example/e/abc",
+                    "<html><head><title>Loading...</title></head><body><script type='text/javascript'>" +
+                        "window.location.replace('$jeton')</script></body></html>",
+                ),
+                page(jeton, playerPage()),
+            ),
+        )
+
+        val stream = VoeExtractor(gateway).extract(link)
+
+        assertEquals(
+            "https://cdn.example/engine/hls2/01/1/abc_,l,.urlset/master.m3u8?t=tok",
+            stream?.url,
+        )
+    }
+
+    @Test
+    fun `le cookie posé en route est renvoyé aux sauts suivants`() = runTest {
+        // VOE pose un `sid` sur sa page de contrôle et l'attend ensuite. Sans
+        // lui, chaque saut se présente comme un client neuf au milieu d'une
+        // chaîne — le motif même que leur filtre anti-abus punit (429 mesuré,
+        // puis rebond vers une régie publicitaire).
+        val gateway = FakeGateway(
+            mapOf(
+                "https://alias1.example/e/abc" to HttpResponse(
+                    status = 302,
+                    url = "https://alias1.example/e/abc",
+                    headers = mapOf(
+                        "Location" to "https://final.example/e/abc",
+                        "Set-Cookie" to "sid=3248c2cc; path=/; domain=.alias1.example; secure; HttpOnly",
+                    ),
+                ),
+                page("https://final.example/e/abc", playerPage()),
+            ),
+        )
+
+        val stream = VoeExtractor(gateway).extract(link)
+
+        assertTrue(stream != null, "la chaîne doit aboutir")
+        assertNull(gateway.cookiesEnvoyes.first(), "rien à renvoyer au premier saut")
+        assertEquals("sid=3248c2cc", gateway.cookiesEnvoyes[1], "le sid doit repartir au saut suivant")
+    }
+
+    @Test
+    fun `un saut JS vers un chemin relatif est recollé à l'origine`() = runTest {
+        // Ces pages écrivent volontiers un chemin nu. Exiger `https?://`
+        // revenait à rater le saut sans rien dire.
+        val gateway = FakeGateway(
+            mapOf(
+                page(
+                    "https://alias1.example/e/abc",
+                    """<script>window.location.replace('/e/abc?ch=1')</script>""",
+                ),
+                page("https://alias1.example/e/abc?ch=1", playerPage()),
+            ),
+        )
+
+        assertTrue(VoeExtractor(gateway).extract(link) != null, "le chemin relatif doit être suivi")
     }
 
     @Test
