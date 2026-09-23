@@ -8,6 +8,7 @@ import fr.moovie.tv.core.sources.port.HttpRequest
 import fr.moovie.tv.core.sources.port.SourceProvider
 import fr.moovie.tv.shared.dispatcherEs
 import fr.moovie.tv.shared.enNfd
+import kotlin.concurrent.Volatile
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -34,7 +35,18 @@ class FstreamProvider(private val http: HttpGateway) : SourceProvider {
 
     // fstream ne connaît que son moteur de recherche interne : l'ID TMDB de
     // MediaRef ne lui sert à rien, il travaille sur le titre.
+
+    /**
+     * Le domaine servi. [BASE] tant que l'annuaire ne dit rien d'autre.
+     *
+     * Résolu à chaque entrée plutôt que figé à la construction : le provider
+     * vit aussi longtemps que l'application, et un domaine corrigé en cours de
+     * route doit s'appliquer sans redémarrage.
+     */
+    @Volatile private var baseCourante = BASE
+
     override suspend fun sourcesFor(media: MediaRef): List<EmbedLink> = withContext(dispatcherEs) {
+        baseCourante = DomainBook.base(http, name, BASE)
         val season = (media as? MediaRef.Episode)?.season
         val page = searchBestMatch(media.title, media.year, season) ?: return@withContext emptyList()
         val pageId = extractPageId(page.link) ?: return@withContext emptyList()
@@ -95,7 +107,7 @@ class FstreamProvider(private val http: HttpGateway) : SourceProvider {
     private suspend fun search(query: String): List<SearchResult> {
         val html = http.fetch(
             HttpRequest(
-                url = "$BASE/engine/ajax/search.php",
+                url = "$baseCourante/engine/ajax/search.php",
                 method = HttpMethod.POST,
                 form = mapOf("query" to query, "page" to "1"),
                 headers = baseHeaders() + ("X-Requested-With" to "XMLHttpRequest"),
@@ -121,7 +133,7 @@ class FstreamProvider(private val http: HttpGateway) : SourceProvider {
     private suspend fun filmPlayers(pageId: String, pageUrl: String): List<EmbedLink> {
         val payload = http.fetch(
             HttpRequest(
-                url = "$BASE/engine/ajax/film_api.php?id=$pageId",
+                url = "$baseCourante/engine/ajax/film_api.php?id=$pageId",
                 headers = baseHeaders() + mapOf(
                     "Referer" to pageUrl,
                     "Accept" to "application/json, text/plain, */*",
@@ -158,7 +170,7 @@ class FstreamProvider(private val http: HttpGateway) : SourceProvider {
     private suspend fun episodePlayers(pageId: String, pageUrl: String, episode: Int): List<EmbedLink> {
         val payload = http.fetch(
             HttpRequest(
-                url = "$BASE/engine/ajax/episodes_p.php?id=$pageId",
+                url = "$baseCourante/engine/ajax/episodes_p.php?id=$pageId",
                 headers = baseHeaders() + mapOf(
                     "Referer" to pageUrl,
                     "Accept" to "application/json, text/plain, */*",

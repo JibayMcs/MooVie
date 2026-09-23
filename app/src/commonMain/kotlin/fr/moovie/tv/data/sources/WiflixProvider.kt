@@ -5,6 +5,7 @@ import fr.moovie.tv.core.sources.model.MediaRef
 import fr.moovie.tv.core.sources.port.HttpGateway
 import fr.moovie.tv.core.sources.port.SourceProvider
 import fr.moovie.tv.core.sources.port.getBody
+import kotlin.concurrent.Volatile
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -57,13 +58,24 @@ class WiflixProvider(private val http: HttpGateway) : SourceProvider {
 
     private val json = Json { ignoreUnknownKeys = true }
 
+
+    /**
+     * Le domaine servi. [BASE] tant que l'annuaire ne dit rien d'autre.
+     *
+     * Résolu à chaque entrée plutôt que figé à la construction : le provider
+     * vit aussi longtemps que l'application, et un domaine corrigé en cours de
+     * route doit s'appliquer sans redémarrage.
+     */
+    @Volatile private var baseCourante = BASE
+
     override suspend fun sourcesFor(media: MediaRef): List<EmbedLink> {
+        baseCourante = DomainBook.base(http, name, BASE)
         val query = when (media) {
             is MediaRef.Movie -> "id=${media.tmdbId}"
             is MediaRef.Episode -> "id=${media.tmdbId}/${media.season}&episode=${media.episode}"
         }
 
-        val body = http.getBody("$BASE/apiwiflix.php?$query", headers()) ?: return emptyList()
+        val body = http.getBody("$baseCourante/apiwiflix.php?$query", headers()) ?: return emptyList()
         // Titre absent du catalogue : la page rend une phrase et pas de tableau.
         // Rien à signaler, la cascade passe au provider suivant.
         val raw = ALL_SOURCES.find(body)?.groupValues?.get(1) ?: return emptyList()

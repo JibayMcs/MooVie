@@ -135,7 +135,9 @@ class SwiftFlowProvider(private val http: HttpGateway) : SourceProvider {
 
         val candidats = LinkedHashSet<String>().apply {
             cachedBase?.let { add(it) }
-            addAll(BASES_CONNUES)
+            // L'annuaire avant les domaines compilés : c'est ce qu'on sait
+            // aujourd'hui, eux sont le plancher du jour de la compilation.
+            addAll(DomainBook.bases(http, name, BASES_CONNUES))
         }
 
         for (base in candidats) {

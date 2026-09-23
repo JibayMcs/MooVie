@@ -8,6 +8,7 @@ import fr.moovie.tv.core.sources.port.HttpRequest
 import fr.moovie.tv.core.sources.port.SourceProvider
 import fr.moovie.tv.core.sources.port.getBody
 import fr.moovie.tv.shared.dispatcherEs
+import kotlin.concurrent.Volatile
 import kotlinx.coroutines.withContext
 
 /**
@@ -22,7 +23,18 @@ class AnimeSamaProvider(private val http: HttpGateway) : SourceProvider {
 
     // anime-sama s'indexe par slug de catalogue, pas par TMDB : l'ID TMDB de
     // MediaRef ne lui sert à rien.
+
+    /**
+     * Le domaine servi. [BASE] tant que l'annuaire ne dit rien d'autre.
+     *
+     * Résolu à chaque entrée plutôt que figé à la construction : le provider
+     * vit aussi longtemps que l'application, et un domaine corrigé en cours de
+     * route doit s'appliquer sans redémarrage.
+     */
+    @Volatile private var baseCourante = BASE
+
     override suspend fun sourcesFor(media: MediaRef): List<EmbedLink> = withContext(dispatcherEs) {
+        baseCourante = DomainBook.base(http, name, BASE)
         when (media) {
             is MediaRef.Movie -> linksFor(media.title, seasonPrefix = "film", episode = 1)
             is MediaRef.Episode ->
@@ -63,14 +75,14 @@ class AnimeSamaProvider(private val http: HttpGateway) : SourceProvider {
     private suspend fun search(title: String): String? {
         val html = http.fetch(
             HttpRequest(
-                url = "$BASE/template-php/defaut/fetch.php",
+                url = "$baseCourante/template-php/defaut/fetch.php",
                 method = HttpMethod.POST,
                 form = mapOf("query" to title),
                 headers = mapOf("User-Agent" to Ua.BROWSER),
             ),
         )?.takeIf { it.isSuccessful }?.body ?: return null
         val href = cataloguePath(html, title) ?: return null
-        return "$BASE$href".let { if (it.endsWith("/")) it else "$it/" }
+        return "$baseCourante$href".let { if (it.endsWith("/")) it else "$it/" }
     }
 
     private fun parseEpsArrays(js: String): List<List<String>> =

@@ -6,6 +6,9 @@ import fr.moovie.tv.core.sources.port.HttpRequest
 import fr.moovie.tv.core.sources.port.HttpResponse
 import kotlinx.coroutines.test.runTest
 import kotlin.test.AfterTest
+import fr.moovie.tv.data.store.useFileStores
+import fr.moovie.tv.data.store.useInMemoryStores
+import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -25,6 +28,24 @@ import kotlin.test.assertTrue
  */
 class SwiftFlowBaseFallbackTest {
 
+    @BeforeTest
+    fun magasinsEnMemoire() {
+        // `DomainBook` est un objet de processus : sans remise à zéro, l'annuaire
+        // d'un test précédent décide des domaines de celui-ci. Et sans magasin en
+        // mémoire, sa copie persistée irait dans la vraie configuration.
+        useInMemoryStores()
+        DomainBook.oublie()
+    }
+
+    @AfterTest
+    fun magasinsSurFichier() {
+        DomainBook.oublie()
+        useFileStores()
+        // L'objet est global : sans remise à zéro, l'ordre des tests déciderait
+        // du Referer lu par les suivants.
+        SwiftFlowBase.courant = SwiftFlowProvider.API_BASE
+    }
+
     private val film = MediaRef.Movie(550, "Fight Club", "1999")
 
     private val jsonValide = """
@@ -37,6 +58,10 @@ class SwiftFlowBaseFallbackTest {
     private class Gateway(private val parBase: Map<String, HttpResponse?>) : HttpGateway {
         val visites = mutableListOf<String>()
         override suspend fun fetch(request: HttpRequest): HttpResponse? {
+            // L'annuaire n'est pas un domaine de catalogue : il ne compte pas
+            // dans la marche qu'on observe ici, et le servir vide est le cas
+            // nominal d'une application qui n'a encore rien appris.
+            if (request.url.endsWith("domains.json")) return null
             val base = Regex("""^https://[^/]+""").find(request.url)?.value.orEmpty()
             visites += base
             return parBase[base]
@@ -45,13 +70,6 @@ class SwiftFlowBaseFallbackTest {
 
     private fun ok(base: String, corps: String) =
         base to HttpResponse(status = 200, url = base, body = corps)
-
-    @AfterTest
-    fun apres() {
-        // L'objet est global : sans remise à zéro, l'ordre des tests déciderait
-        // du Referer lu par les suivants.
-        SwiftFlowBase.courant = SwiftFlowProvider.API_BASE
-    }
 
     @Test
     fun `le domaine courant sert, et on ne sonde pas le second`() = runTest {

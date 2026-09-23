@@ -5,6 +5,10 @@ import fr.moovie.tv.core.sources.port.HttpGateway
 import fr.moovie.tv.core.sources.port.HttpRequest
 import fr.moovie.tv.core.sources.port.HttpResponse
 import kotlinx.coroutines.test.runTest
+import fr.moovie.tv.data.store.useFileStores
+import fr.moovie.tv.data.store.useInMemoryStores
+import kotlin.test.AfterTest
+import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -23,6 +27,21 @@ import kotlin.test.assertTrue
  *    C'est le cas nominal le plus fréquent, il doit donner une liste vide.
  */
 class WiflixProviderTest {
+
+    @BeforeTest
+    fun magasinsEnMemoire() {
+        // `DomainBook` est un objet de processus : sans remise à zéro, l'annuaire
+        // d'un test précédent décide des domaines de celui-ci. Et sans magasin en
+        // mémoire, sa copie persistée irait dans la vraie configuration.
+        useInMemoryStores()
+        DomainBook.oublie()
+    }
+
+    @AfterTest
+    fun magasinsSurFichier() {
+        DomainBook.oublie()
+        useFileStores()
+    }
 
     private class FakeGateway(private val body: String?) : HttpGateway {
         var lastUrl: String? = null

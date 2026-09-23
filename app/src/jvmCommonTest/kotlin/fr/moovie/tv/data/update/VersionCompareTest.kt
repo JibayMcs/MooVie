@@ -93,4 +93,29 @@ class VersionCompareTest {
         assertFalse(repo.isNewer("nightly", "1.14.0"))
         assertFalse(repo.isNewer("v1.15.0", ""))
     }
+
+    /**
+     * L'annuaire des domaines est publié comme une release — et ne doit jamais
+     * être pris pour une version.
+     *
+     * Le dépôt porte un tag `v0.0.0-annuaire`, qui n'est pas une version de
+     * l'application mais le support d'un fichier de configuration (voir
+     * `DomainBook`). Deux protections se cumulent : la release est une
+     * préversion, donc `releases/latest` l'ignore, et son numéro est nul, donc
+     * le **canal de test** ne peut pas davantage la proposer.
+     *
+     * C'est la seconde que ce test verrouille, parce qu'elle tient au seul choix
+     * du tag. Le renommer en quelque chose de non numérique — `annuaire` tout
+     * court — rendrait `isNewer` faux dans les deux sens, et le comparateur de
+     * `latestIncludingPrereleases` n'est pas transitif dans ce cas : la release
+     * retenue dépendrait alors de sa position dans la liste. Une panne
+     * silencieuse, et seulement pour ceux qui ont activé les préversions.
+     */
+    @Test
+    fun `l'annuaire des domaines n'est jamais proposé comme mise à jour`() {
+        assertFalse(repo.isNewer("v0.0.0-annuaire", "1.24.3"))
+        // …et il ne doit pas non plus écraser une vraie version dans l'autre
+        // sens : une vraie version lui est bien postérieure.
+        assertTrue(repo.isNewer("v1.24.3", "0.0.0-annuaire"))
+    }
 }

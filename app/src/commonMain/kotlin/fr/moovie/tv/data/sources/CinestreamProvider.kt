@@ -7,6 +7,7 @@ import fr.moovie.tv.core.sources.port.SourceProvider
 import fr.moovie.tv.core.sources.port.getBody
 import io.ktor.http.encodeURLParameter
 import fr.moovie.tv.shared.dispatcherEs
+import kotlin.concurrent.Volatile
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
@@ -38,7 +39,18 @@ class CinestreamProvider(private val http: HttpGateway) : SourceProvider {
     override val name = "cinestream"
 
     /** cinestream est un catalogue de films uniquement : les séries rendent vide. */
+
+    /**
+     * Le domaine servi. [BASE] tant que l'annuaire ne dit rien d'autre.
+     *
+     * Résolu à chaque entrée plutôt que figé à la construction : le provider
+     * vit aussi longtemps que l'application, et un domaine corrigé en cours de
+     * route doit s'appliquer sans redémarrage.
+     */
+    @Volatile private var baseCourante = BASE
+
     override suspend fun sourcesFor(media: MediaRef): List<EmbedLink> {
+        baseCourante = DomainBook.base(http, name, BASE)
         if (media !is MediaRef.Movie) return emptyList()
         return withContext(dispatcherEs) {
             val film = findFilm(media.tmdbId, media.title, media.year) ?: return@withContext emptyList()
@@ -55,7 +67,7 @@ class CinestreamProvider(private val http: HttpGateway) : SourceProvider {
         // en application/x-www-form-urlencoded, où l'espace devient `+` et non
         // `%20` — c'est la forme que ce moteur de recherche attend.
         val q = title.encodeURLParameter(spaceToPlus = true)
-        val html = get("$BASE/search?q=$q") ?: return null
+        val html = get("$baseCourante/search?q=$q") ?: return null
 
         val slugs = SLUG.findAll(html).map { it.groupValues[1] }.distinct().toList()
         if (slugs.isEmpty()) return null
@@ -67,7 +79,7 @@ class CinestreamProvider(private val http: HttpGateway) : SourceProvider {
             slugs.sortedByDescending { YEAR.find(it)?.groupValues?.get(1) == year }
 
         for (slug in ranked.take(MAX_FILM_PAGES)) {
-            val page = get("$BASE/film/$slug") ?: continue
+            val page = get("$baseCourante/film/$slug") ?: continue
             val id = TMDB_ID.find(page)?.groupValues?.get(1)?.toIntOrNull() ?: continue
             if (id != tmdbId) continue
 
@@ -85,7 +97,7 @@ class CinestreamProvider(private val http: HttpGateway) : SourceProvider {
     private suspend fun embeds(tmdbId: Int, players: List<String>): List<EmbedLink> = coroutineScope {
         players.mapIndexed { index, name ->
             async {
-                val page = get("$BASE/player/$tmdbId/$index") ?: return@async null
+                val page = get("$baseCourante/player/$tmdbId/$index") ?: return@async null
                 val url = IFRAME_SRC.find(page)?.groupValues?.get(1)
                     ?.replace("&amp;", "&")
                     ?.takeIf { it.startsWith("http") } ?: return@async null
@@ -109,7 +121,7 @@ class CinestreamProvider(private val http: HttpGateway) : SourceProvider {
             // Sans cet Accept, /player/ renvoie la page sans son iframe.
             "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             "Accept-Language" to "fr-FR,fr;q=0.9,en;q=0.8",
-            "Referer" to "$BASE/",
+            "Referer" to "$baseCourante/",
         ),
     )
 
