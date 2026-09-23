@@ -62,8 +62,36 @@ private const val META_PREFIX = "meta:"
 private const val AUDIO_PREFIX = "audio:"
 
 /**
+ * Part du média au-delà de laquelle on le tient pour terminé.
+ *
+ * Le seuil était de **10 secondes** restantes, et c'est trop tard pour à peu
+ * près tout le monde : un film qu'on arrête au générique de fin, un épisode
+ * qu'on quitte pendant le résumé de la semaine prochaine, un flux d'hébergeur
+ * qui s'arrête deux secondes avant la fin — aucun n'atteignait ces dix
+ * secondes, et aucun n'était donc marqué vu. Le seul chemin qui fonctionnait
+ * était la fin de lecture atteinte pour de bon, ou le bouton « Suivant ».
+ *
+ * 8 % restants, c'est-à-dire les quatre dernières minutes d'un épisode de
+ * cinquante, ou les dix dernières d'un film de deux heures : la durée d'un
+ * générique de fin, précisément ce qu'on ne regarde pas.
+ */
+private const val FINISHED_AT = 0.92
+
+/** Plancher du seuil : sur un média court, 8 % ne font que quelques secondes. */
+private const val FINISHED_MARGIN_MS = 10_000
+
+/**
+ * Le média est-il terminé ? Voir [FINISHED_AT].
+ *
+ * `internal` pour que le seuil soit vérifiable sans passer par un magasin.
+ */
+internal fun isFinished(positionMs: Long, durationMs: Long): Boolean =
+    durationMs > 0 &&
+        (positionMs >= durationMs - FINISHED_MARGIN_MS || positionMs >= durationMs * FINISHED_AT)
+
+/**
  * Suivi de lecture : reprise (position + métadonnées) et statut vu/non vu.
- * Un contenu terminé (moins de 10 s restantes) quitte la reprise et passe
+ * Un contenu terminé (voir [isFinished]) quitte la reprise et passe
  * automatiquement en « vu ».
  */
 class WatchProgressRepository(
@@ -267,11 +295,6 @@ class WatchProgressRepository(
     }
 
     /**
-     * Met à jour la position de lecture. Dans les 10 dernières secondes, le
-     * contenu est considéré terminé : sortie de la reprise + marqué vu.
-     * Les positions < 5 s sont ignorées (générique, zapping).
-     */
-    /**
      * Pose l'épisode suivant en « à suivre », pour que la série reste dans
      * « Reprendre la lecture » une fois le précédent terminé.
      *
@@ -300,12 +323,24 @@ class WatchProgressRepository(
         }
     }
 
+    /**
+     * Met à jour la position de lecture. Un contenu [terminé][isFinished] sort
+     * de la reprise et passe en vu. Les positions < 5 s sont ignorées
+     * (générique de début, zapping).
+     *
+     * **L'entrée de reprise n'est exigée que pour la position.** Marquer vu s'en
+     * passe, et c'est le point : c'est `save` elle-même qui enterre l'entrée en
+     * marquant vu, si bien que tout « terminé » arrivant ensuite — la fin de
+     * lecture après un passage dans les derniers pourcents, un second appel de
+     * `markFinished` — tombait dans le vide. L'historique sait se passer de cette
+     * entrée (voir [recordHistory]), il ne manquait que la permission.
+     */
     suspend fun save(key: String, positionMs: Long, durationMs: Long) {
         store.edit { prefs ->
             val k = stringPreferencesKey(RESUME_PREFIX + key)
-            val existing = prefs[k]?.let { decode(it) } ?: return@edit
+            val existing = prefs[k]?.let { decode(it) }
             when {
-                durationMs > 0 && positionMs >= durationMs - 10_000 -> {
+                isFinished(positionMs, durationMs) -> {
                     // Avant le remove : c'est l'entrée de reprise qui porte le
                     // titre et l'affiche de la ligne d'historique.
                     val now = MoovieClock.now()
@@ -315,7 +350,7 @@ class WatchProgressRepository(
                     prefs[longPreferencesKey(SEEN_AT_PREFIX + key)] = now
                     prefs.pruneWatchlist(key, now)
                 }
-                positionMs > 5_000 -> prefs[k] = json.encodeToString(
+                existing != null && positionMs > 5_000 -> prefs[k] = json.encodeToString(
                     existing.copy(
                         positionMs = positionMs,
                         durationMs = durationMs,

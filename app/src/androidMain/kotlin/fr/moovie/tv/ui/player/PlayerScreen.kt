@@ -857,6 +857,23 @@ fun PlayerScreen(
 
     DisposableEffect(Unit) {
         onDispose {
+            // Avancement de sortie, **avant** de libérer le player : c'est la
+            // seule écriture qui couvre le lecteur quitté en pause, que la
+            // boucle périodique ignore (elle n'écrit que `if (isPlaying)`), et
+            // les quelques secondes gagnées depuis son dernier passage. Sans
+            // elle, Android était le seul des trois à ne rien retenir en
+            // sortant — desktop et iOS le font depuis toujours — et un média
+            // arrêté au générique n'avait aucun chemin vers « vu ».
+            //
+            // Sur `exitScope`, détaché de la composition : un
+            // `rememberCoroutineScope` serait annulé avant que DataStore ait
+            // écrit. `runCatching` parce que le player peut déjà être hors
+            // d'état de répondre.
+            val position = runCatching { controller.positionMs() }.getOrDefault(0L)
+            val duration = runCatching { controller.durationMs() }.getOrDefault(0L)
+            if (mediaKey.isNotBlank() && position > 0 && !RemoteCast.isEphemeral(mediaKey)) {
+                exitScope.launch { progress.save(mediaKey, position, duration) }
+            }
             playerView.player = null
             mediaSession.release()
             player.release()
