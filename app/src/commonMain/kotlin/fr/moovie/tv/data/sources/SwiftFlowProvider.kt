@@ -5,6 +5,8 @@ import fr.moovie.tv.core.sources.model.MediaRef
 import fr.moovie.tv.core.sources.port.HttpGateway
 import fr.moovie.tv.core.sources.port.SourceProvider
 import fr.moovie.tv.core.sources.port.getBody
+import fr.moovie.tv.shared.maintenantMs
+import kotlin.concurrent.Volatile
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -59,6 +61,12 @@ class SwiftFlowProvider(private val http: HttpGateway) : SourceProvider {
 
     private val json = Json { ignoreUnknownKeys = true }
 
+    /** Le dernier domaine qui a servi du JSON. Essayé en premier au suivant. */
+    @Volatile private var cachedBase: String? = null
+
+    /** Instant avant lequel on ne retente rien — voir [apiCall]. */
+    @Volatile private var panneJusqua = 0L
+
     override suspend fun sourcesFor(media: MediaRef): List<EmbedLink> {
         val route = when (media) {
             is MediaRef.Movie -> "movies/${media.tmdbId}"
@@ -68,10 +76,7 @@ class SwiftFlowProvider(private val http: HttpGateway) : SourceProvider {
             is MediaRef.Episode -> "series/${media.tmdbId}"
         }
 
-        val body = http.getBody(
-            "$API_BASE/api/v1/index.php?route=$route&api_key=$API_KEY",
-            mapOf("User-Agent" to Ua.BROWSER, "Accept" to "application/json"),
-        ) ?: return emptyList()
+        val body = apiCall(route) ?: return emptyList()
 
         val data = runCatching {
             val root = json.parseToJsonElement(body).jsonObject
@@ -97,6 +102,60 @@ class SwiftFlowProvider(private val http: HttpGateway) : SourceProvider {
                     ?: o["size"]?.str()?.takeIf { it.isNotBlank() },
             )
         }.distinctBy { it.url }
+    }
+
+    /**
+     * Appelle l'API sur le **premier domaine qui répond**, et retient lequel.
+     *
+     * ## Pourquoi ce n'est pas une constante
+     *
+     * Ce partenaire a déménagé trois fois — `deliciouss`, `blinkflux.lol`,
+     * `swiftflow.lol` — et chaque déménagement a coûté une release, donc une
+     * mise à jour à installer, pour une ligne. Entre les deux, la source rend
+     * zéro titre sans rien dire.
+     *
+     * ## Ce que la sonde doit prouver
+     *
+     * Qu'on parle bien à **l'API**, pas qu'un serveur a répondu. Un domaine
+     * revendu rend volontiers 200 avec une page de parking, et un `522`
+     * Cloudflare prouve seulement que le nom existe encore. On exige donc du
+     * JSON : c'est l'appel qu'on allait faire de toute façon, il sert de sonde
+     * sans coûter une requête de plus — contrairement à Frembed, qui doit
+     * interroger `/api/dns/domains` à part.
+     *
+     * ## Pourquoi un délai après un échec
+     *
+     * Sans lui, chaque fiche ouverte pendant une panne relancerait la marche
+     * complète : deux domaines injoignables à ~20 s de délai chacun, sur le
+     * chemin de la cascade. Une minute de silence coûte moins cher qu'une
+     * application qui rame à chaque titre.
+     */
+    private suspend fun apiCall(route: String): String? {
+        if (maintenantMs() < panneJusqua) return null
+
+        val candidats = LinkedHashSet<String>().apply {
+            cachedBase?.let { add(it) }
+            addAll(BASES_CONNUES)
+        }
+
+        for (base in candidats) {
+            val body = http.getBody(
+                "$base/api/v1/index.php?route=$route&api_key=$API_KEY",
+                mapOf("User-Agent" to Ua.BROWSER, "Accept" to "application/json"),
+            )
+            // Pas de corps (injoignable, 5xx), ou un corps qui n'est pas du
+            // JSON : dans les deux cas ce domaine ne sert pas l'API. On passe au
+            // suivant plutôt que de conclure que le catalogue est vide.
+            if (body == null || !body.trimStart().startsWith("{")) continue
+
+            cachedBase = base
+            SwiftFlowBase.courant = base
+            panneJusqua = 0L
+            return body
+        }
+
+        panneJusqua = maintenantMs() + ECHEC_TTL_MS
+        return null
     }
 
     /**
@@ -139,15 +198,14 @@ class SwiftFlowProvider(private val http: HttpGateway) : SourceProvider {
         else -> raw?.trim()?.uppercase()?.takeIf { it.isNotBlank() }
     }
 
-    private companion object {
+    /** `internal` : [SwiftFlowBase] lit [API_BASE] comme valeur par défaut. */
+    internal companion object {
         /**
          * Domaine du partenaire — **il tourne, et c'est déjà la troisième fois**.
          *
-         * `deliciouss` → `blinkflux.lol` → `swiftflow.lol`. L'ancien ne répond
-         * plus sur aucun port : son IP est partagée avec `falzey.lol`, l'autre
-         * domaine de leur CDN, et `blinkflux.com` redirige vers atom.com, le nom
-         * étant en vente. Le nouveau vient du `.env.example` de l'amont
-         * (movixcorp/MovixOpenSource), qui ne mentionne plus blinkflux nulle part.
+         * `deliciouss` → `blinkflux.lol` → `swiftflow.lol`. Le nouveau vient du
+         * `.env.example` de l'amont (movixcorp/MovixOpenSource), qui ne mentionne
+         * plus blinkflux nulle part.
          *
          * Les routes, elles, n'ont pas changé : `movies/{id}` et `series/{id}`
          * rendent toujours le JSON des sources. Les variantes `/player` que
@@ -155,6 +213,22 @@ class SwiftFlowProvider(private val http: HttpGateway) : SourceProvider {
          * frontend — nous lisons le catalogue directement.
          */
         const val API_BASE = "https://swiftflow.lol"
+
+        /**
+         * Les points d'entrée essayés dans l'ordre — voir [apiCall].
+         *
+         * `blinkflux.lol` est **conservé derrière** le domaine courant plutôt que
+         * supprimé, et ce n'est pas de la nostalgie : au 23/09/2026 les deux sont
+         * à terre — `swiftflow.lol` rend 522 depuis huit pays, `blinkflux.lol`
+         * n'accepte plus aucune connexion — et la production de l'amont pointe
+         * encore sur le second, qu'elle masque derrière un cache périmé. Nul ne
+         * sait donc lequel reviendra. Les garder tous les deux, c'est laisser
+         * l'application le découvrir elle-même, sans release.
+         */
+        private val BASES_CONNUES = listOf(API_BASE, "https://blinkflux.lol")
+
+        /** Après un échec des deux, on se tait une minute plutôt que de ramer. */
+        private const val ECHEC_TTL_MS = 60L * 1000
 
         /**
          * Clé du lecteur SwiftFlow. Non secrète — elle circule en clair dans

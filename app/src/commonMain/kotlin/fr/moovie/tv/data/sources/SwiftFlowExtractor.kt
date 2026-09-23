@@ -86,11 +86,12 @@ class SwiftFlowExtractor : SourceExtractor {
          * le contrôle de `isPlayableContentType`, sans lequel la source serait
          * passée pour bonne et aurait ouvert le lecteur sur une page web.
          *
-         * Doit rester l'origine de `SwiftFlowProvider.API_BASE` : c'est le site
-         * qui sert le lecteur, donc celui que le CDN attend. Suit donc la
-         * rotation vers `swiftflow.lol` — le tableau ci-dessus reste le relevé
-         * du domaine d'alors, pas une valeur à restaurer.
+         * Doit rester l'origine du domaine que le catalogue vient d'interroger :
+         * c'est le site qui sert le lecteur, donc celui que le CDN attend. D'où
+         * [SwiftFlowBase], que le provider met à jour en découvrant le domaine
+         * joignable — le tableau ci-dessus reste le relevé du domaine d'alors,
+         * pas une valeur à restaurer.
          */
-        const val REFERER = "https://swiftflow.lol/"
+        val REFERER: String get() = SwiftFlowBase.referer
     }
 }
