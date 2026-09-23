@@ -220,7 +220,23 @@ class FstreamProvider(private val http: HttpGateway) : SourceProvider {
 
 
     companion object {
-        const val BASE = "https://french-stream.one"
+        /**
+         * Domaine courant — il **tourne**, et c'est la seule chose qui a tué ce
+         * provider jusqu'ici.
+         *
+         * `.one` répond encore, mais en 301 vers `.net` : suffisant pour qu'un
+         * navigateur ne voie rien, fatal pour nous. La recherche est un POST, et
+         * une redirection de POST se rejoue en GET — le formulaire est perdu en
+         * route, la réponse arrive vide, et le provider rend zéro titre sans
+         * qu'aucune erreur ne soit levée. Relevé du 23/09/2026 : sept titres sur
+         * neuf perdus d'un coup, alors que le site marchait parfaitement au
+         * navigateur.
+         *
+         * Le HTML, lui, est intact (`div.search-item`, `.search-title`,
+         * `onclick="location.href='…'"`) : au prochain silence de fstream,
+         * vérifier le domaine **avant** de soupçonner les sélecteurs.
+         */
+        const val BASE = "https://french-stream.net"
         const val UA =
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
         const val COOKIE = "fsschal=1; dle_skin=VFV25; dle_newpm=0"
