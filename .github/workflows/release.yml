@@ -15,7 +15,23 @@ name: Release
 # la main depuis la page des releases.
 on:
   push:
-    tags: ['v*']
+    tags:
+      - 'v*'
+      # Les tags `v0.0.0-*` ne sont pas des versions : ils portent des données
+      # que l'application relit à l'exécution — l'annuaire des domaines
+      # (`DomainBook`), publié comme asset d'une release pour qu'un déménagement
+      # de catalogue cesse d'en coûter une vraie.
+      #
+      # Sans cette exclusion, créer ce tag lance la chaîne complète : mesuré le
+      # 23/09/2026, un `moovie-v0.0.0-annuaire.apk` et un `.msi` téléversés sur
+      # la release de données, et ses notes explicatives remplacées par un
+      # changelog. Rien d'irréparable, mais rien qui devrait arriver.
+      #
+      # Ne protège que la **création** du tag : re-téléverser `domains.json` avec
+      # `gh release upload --clobber` n'émet aucun événement `push` et n'a jamais
+      # rien déclenché. C'est bien la mise à jour courante de l'annuaire qui est
+      # gratuite.
+      - '!v0.0.0-*'
 
 permissions:
   contents: write
