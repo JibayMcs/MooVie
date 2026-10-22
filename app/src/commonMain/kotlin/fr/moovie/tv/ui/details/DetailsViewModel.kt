@@ -43,6 +43,7 @@ import fr.moovie.tv.data.tmdb.TvDetails
 import fr.moovie.tv.data.trailer.YoutubeTrailerExtractor
 import fr.moovie.tv.data.remote.RemoteCast
 import fr.moovie.tv.data.watch.ResumeEntry
+import fr.moovie.tv.data.watch.latestInProgress
 import fr.moovie.tv.data.watch.TitleMeta
 import fr.moovie.tv.data.watch.WatchProgressRepository
 import fr.moovie.tv.data.watch.WatchlistEntry
@@ -489,6 +490,10 @@ class DetailsViewModel : ViewModel() {
     fun movieKey() = "movie:$tmdbId"
     fun episodeKey(season: Int, episode: Int) = "tv:$tmdbId:s${season}e$episode"
 
+    /** Épisode précis demandé par l'appelant, ou null si saison/épisode absents. */
+    private fun demandedEpisode(season: Int, episode: Int): EpisodeRef? =
+        if (season > 0 && episode > 0) EpisodeRef(season, episode) else null
+
     /**
      * Ouvre une fiche.
      *
@@ -511,16 +516,24 @@ class DetailsViewModel : ViewModel() {
             // regardé, jamais la liste des épisodes qu'on venait chercher.
             _selectedEpisode.value = null
             _panelVisible.value = false
+            // Le repère de reprise n'est remplacé que par un épisode précis
+            // (carte « Reprendre ») : conservé d'une ouverture précédente
+            // (S1E9 déduit des épisodes vus), il écraserait l'épisode que la
+            // carte vient d'annoncer (S2E1). Sans épisode demandé, on garde le
+            // repère courant, comme avant.
+            val demande = demandedEpisode(resumeSeason, resumeEpisode)
+            if (demande != null) {
+                requestedResume = demande
+                resumeTarget = demande
+            } else {
+                requestedResume = null
+            }
             // Un épisode explicitement demandé (carte « Reprendre ») désigne
             // aussi sa saison : sans ça on rouvrait sur celle qui était affichée.
             if (resumeSeason > 0) selectSeason(resumeSeason)
             return
         }
-        requestedResume = if (resumeSeason > 0 && resumeEpisode > 0) {
-            EpisodeRef(resumeSeason, resumeEpisode)
-        } else {
-            null
-        }
+        requestedResume = demandedEpisode(resumeSeason, resumeEpisode)
         // Le ViewModel est partagé entre fiches (scope Activity) : purge l'état
         // de la fiche précédente (panneau sources, erreurs) avant de charger.
         quickPlayJob?.cancel()
@@ -571,9 +584,7 @@ class DetailsViewModel : ViewModel() {
                     // saison 1 : sur une série suivie depuis des semaines, c'est
                     // le seul endroit où l'on ne veut pas atterrir.
                     val target = requestedResume ?: episodeToResume(
-                        inProgress = watchRepo.continueWatching.first()
-                            .firstOrNull { it.isTv && it.tmdbId == tmdbId && it.season > 0 }
-                            ?.let { EpisodeRef(it.season, it.episode) },
+                        inProgress = latestInProgress(watchRepo.continueWatching.first(), tmdbId),
                         watched = watchRepo.watched.first()
                             .mapNotNull { key -> parseEpisodeKey(key, tmdbId) }
                             .toSet(),
