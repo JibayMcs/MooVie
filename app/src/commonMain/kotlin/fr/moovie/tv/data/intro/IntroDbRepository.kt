@@ -47,11 +47,21 @@ private data class SubmitBody(
     @SerialName("video_duration_ms") val videoDurationMs: Long? = null,
 )
 
+private const val BASE_URL = "https://api.theintrodb.org/v4"
+
+/** URL de lecture /media, adressée par tmdb_id (+ saison/épisode pour une série). */
+internal fun urlMedia(tmdbId: Int, isTv: Boolean, season: Int, episode: Int, durationMs: Long): String =
+    buildString {
+        append("$BASE_URL/media?tmdb_id=").append(tmdbId)
+        if (isTv) append("&season=").append(season).append("&episode=").append(episode)
+        if (durationMs > 0) append("&duration_ms=").append(durationMs)
+    }
+
 /** Pourquoi un envoi a échoué, en termes affichables. */
 enum class SubmitError { NO_KEY, UNAUTHORIZED, ALREADY_SUBMITTED, RATE_LIMITED, REJECTED, NETWORK }
 
 /**
- * Client TheIntroDB (`api.theintrodb.org/v3`). Fournit les horodatages d'intro
+ * Client TheIntroDB (`api.theintrodb.org/v4`). Fournit les horodatages d'intro
  * et de générique, et permet d'en signaler quand ils manquent.
  * API non bloquée par les FAI → DNS système (pas besoin du DoH).
  *
@@ -92,11 +102,7 @@ class IntroDbRepository(
     ): IntroMedia? = withContext(dispatcherEs) {
         val key = apiKey()
         runCatching {
-            val url = buildString {
-                append("$BASE_URL/media?tmdb_id=").append(tmdbId)
-                if (isTv) append("&season=").append(season).append("&episode=").append(episode)
-                if (durationMs > 0) append("&duration_ms=").append(durationMs)
-            }
+            val url = urlMedia(tmdbId, isTv, season, episode, durationMs)
             val reponse = client.get(url) {
                 header("Accept", "application/json")
                 authorize(key)
@@ -164,9 +170,5 @@ class IntroDbRepository(
 
     private fun HttpRequestBuilder.authorize(key: String) {
         if (key.isNotBlank()) header("Authorization", "Bearer $key")
-    }
-
-    private companion object {
-        const val BASE_URL = "https://api.theintrodb.org/v3"
     }
 }
