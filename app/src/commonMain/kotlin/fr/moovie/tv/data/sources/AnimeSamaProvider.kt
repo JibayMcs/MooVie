@@ -62,7 +62,8 @@ class AnimeSamaProvider(private val http: HttpGateway) : SourceProvider {
 
         val links = mutableListOf<EmbedLink>()
         for ((suffix, lang) in LANGS) {
-            val js = get("$catalogueUrl$seasonPrefix/$suffix/episodes.js") ?: continue
+            val dossier = "$catalogueUrl$seasonPrefix/$suffix/"
+            val js = get("${dossier}episodes.js", referer = dossier) ?: continue
             for (arr in parseEpsArrays(js)) {
                 arr.getOrNull(episode - 1)?.let { url ->
                     links += EmbedLink(url = url, hoster = hosterOf(url), language = lang)
@@ -90,8 +91,22 @@ class AnimeSamaProvider(private val http: HttpGateway) : SourceProvider {
             URL.findAll(m.groupValues[1]).map { it.groupValues[1] }.toList()
         }.toList()
 
-    private suspend fun get(url: String): String? =
-        http.getBody(url, mapOf("User-Agent" to Ua.BROWSER))
+    /**
+     * [referer] n'est pas décoratif pour `episodes.js` : depuis octobre 2026, le
+     * pare-feu Cloudflare d'anime-sama répond **403 « Attention Required »** à
+     * toute requête sur ce fichier qui n'annonce pas la page de saison comme
+     * origine. Le catalogue, la recherche et la fiche passaient toujours, donc
+     * le provider ne levait rien : il trouvait l'animé, puis rendait zéro lien
+     * sur chaque épisode. Relevé du 22/10/2026, `animesama 4 → 0`.
+     */
+    private suspend fun get(url: String, referer: String? = null): String? =
+        http.getBody(
+            url,
+            buildMap {
+                put("User-Agent", Ua.BROWSER)
+                referer?.let { put("Referer", it) }
+            },
+        )
 
     companion object {
         const val BASE = "https://anime-sama.to"
