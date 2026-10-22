@@ -14,6 +14,20 @@ expect val platformName: String
 expect val appVersionName: String
 
 /**
+ * Identité du build : « 1.25.0+103.3f2a9c1 » (version, code de version, hash
+ * court du commit). Contrairement à [appVersionName], deux builds de même
+ * version ont des identités différentes, ce qui permet de rejeter ce qu'un
+ * autre build a produit (cache des sources).
+ *
+ * Vide de hash si le build n'a pas git sous la main : l'identité se réduit
+ * alors à « version+code ». Ne contient jamais d'horodatage, pour que deux
+ * builds d'un même commit restent identiques.
+ *
+ * Ne sert pas aux updaters : ceux-ci comparent [appVersionName] aux tags.
+ */
+expect val appBuildId: String
+
+/**
  * Clé de consumer OpenSubtitles, injectée à la compilation. Vide si le build
  * n'en a pas — les sous-titres se désactivent alors proprement.
  *

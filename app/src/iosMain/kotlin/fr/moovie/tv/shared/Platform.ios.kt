@@ -12,6 +12,8 @@ actual val platformName: String =
  */
 actual val appVersionName: String = VERSION_GENEREE
 
+actual val appBuildId: String = BUILD_ID_GENERE
+
 actual val openSubtitlesApiKey: String = CLE_OPENSUBTITLES_GENEREE
 
 /**

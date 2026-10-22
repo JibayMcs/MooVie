@@ -9,7 +9,7 @@ import fr.moovie.tv.data.store.preferencesStore
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
-import fr.moovie.tv.shared.appVersionName
+import fr.moovie.tv.shared.appBuildId
 import kotlinx.serialization.json.Json
 
 private const val ENTRY_PREFIX = "sources:"
@@ -24,13 +24,18 @@ private const val ENTRY_PREFIX = "sources:"
 private const val TTL_MS = 6L * 60 * 60 * 1000
 
 /**
- * L'entrée vient-elle de la version qui tourne ?
+ * L'entrée vient-elle du build qui tourne ?
+ *
+ * Compare l'identité de build, pas le numéro de version : deux builds du même
+ * numéro (test local installé par-dessus la release) ne doivent pas se
+ * resservir leurs listes. Une entrée sans identité (vide) est toujours périmée.
  *
  * Isolée pour être vérifiable sans magasin — les tests unitaires Android n'ont
  * pas de DataStore, et l'invariant qui compte est cette comparaison, pas la
  * mécanique de lecture autour.
  */
-internal fun writtenByRunningVersion(version: String): Boolean = version == appVersionName
+internal fun writtenByRunningVersion(buildId: String): Boolean =
+    buildId.isNotEmpty() && buildId == appBuildId
 
 /** Nombre max d'entrées conservées (purge des plus anciennes au-delà). */
 private const val MAX_ENTRIES = 80
@@ -49,7 +54,8 @@ private data class CachedSources(
      */
     val providers: List<String> = emptyList(),
     /**
-     * Version de l'application qui a écrit l'entrée.
+     * Identité du build qui a écrit l'entrée ([appBuildId]), pas seulement son
+     * numéro de version.
      *
      * Le champ [providers] couvre le catalogue **ajouté** ; celui-ci couvre le
      * catalogue **corrigé**, qui est le cas le plus fréquent et que rien ne
@@ -62,11 +68,15 @@ private data class CachedSources(
      * fiches déjà visitées. Le correctif était bon, le cache le masquait — et
      * rien ne permettait de forcer la relecture.
      *
-     * Vide = entrée d'avant ce champ, à refaire. Une version qui change est un
-     * signal bien plus sûr qu'une durée : c'est exactement le moment où le code
-     * d'extraction a pu changer.
+     * Le numéro de version ne suffit pas : un test local installé par-dessus la
+     * release garde le même `versionName` et ressert pourtant les listes de
+     * l'ancien code. D'où l'identité de build, qui change à chaque commit.
+     *
+     * Vide = entrée d'avant ce champ (ou d'une version où il n'existait pas),
+     * à refaire. Une identité qui change est un signal bien plus sûr qu'une
+     * durée : c'est exactement le moment où le code d'extraction a pu changer.
      */
-    val version: String = "",
+    val buildId: String = "",
 )
 
 /**
@@ -95,9 +105,9 @@ class SourceCacheRepository {
         val raw = store.data.first()[stringPreferencesKey(ENTRY_PREFIX + key)] ?: return null
         val entry = runCatching { json.decodeFromString<CachedSources>(raw) }.getOrNull() ?: return null
         if (maintenantMs() - entry.savedAt > TTL_MS) return null
-        // Écrite par une autre version : le code qui a produit ces liens n'est
+        // Écrite par un autre build : le code qui a produit ces liens n'est
         // plus celui qui tourne.
-        if (!writtenByRunningVersion(entry.version)) return null
+        if (!writtenByRunningVersion(entry.buildId)) return null
         if (!isCacheComplete(entry.providers, expectedProviders)) return null
         return entry.links.ifEmpty { null }
     }
@@ -113,7 +123,7 @@ class SourceCacheRepository {
         if (key.isBlank() || links.isEmpty()) return
         store.edit { prefs ->
             prefs[stringPreferencesKey(ENTRY_PREFIX + key)] = json.encodeToString(
-                CachedSources(links, maintenantMs(), providers.sorted(), appVersionName),
+                CachedSources(links, maintenantMs(), providers.sorted(), appBuildId),
             )
             prune(prefs)
         }

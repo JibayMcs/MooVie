@@ -29,6 +29,37 @@ val appVersion = "1.25.0"
  */
 val jpackageVersion = appVersion.substringBefore('-')
 
+// Code de version Android : à incrémenter à chaque release, comme `appVersion`.
+val appVersionCode = 103
+
+/**
+ * Hash court du commit construit (« 3f2a9c1 »), vide si git est absent ou si le
+ * dossier n'est pas un dépôt (build CI sans `.git`, archive des sources).
+ *
+ * Lu à la configuration par `providers.exec`, compatible avec le configuration
+ * cache. Pas d'horodatage ici : il changerait à chaque build, régénérerait
+ * BuildConfig et casserait le cache Gradle.
+ */
+val gitCommit: String = runCatching {
+    providers.exec {
+        commandLine("git", "rev-parse", "--short", "HEAD")
+        workingDir(rootDir)
+    }.standardOutput.asText.get().trim()
+}.getOrDefault("")
+
+/**
+ * Identité du build : ce qui change d'un build à l'autre, même quand
+ * `appVersion` ne bouge pas (un test local installé par-dessus la release, par
+ * exemple). Le cache des sources s'en sert pour rejeter ce qu'un autre build a
+ * produit.
+ *
+ * Ne se confond pas avec `appVersion` : les updaters comparent ce dernier aux
+ * tags GitHub, et l'identité de build n'a rien à faire là.
+ */
+val appBuildId: String = listOf("$appVersion+$appVersionCode", gitCommit)
+    .filter { it.isNotEmpty() }
+    .joinToString(".")
+
 // Signature release : keystore.properties en local (gitignoré), variables
 // d'environnement en CI (KEYSTORE_FILE / KEYSTORE_PASSWORD / KEY_ALIAS).
 val keystoreProps = Properties().apply {
@@ -79,6 +110,7 @@ val genererBuildConfigIos by tasks.registering {
     // changement de version ou de clé, et le binaire iOS embarquerait
     // silencieusement les anciennes valeurs.
     inputs.property("version", appVersion)
+    inputs.property("buildId", appBuildId)
     inputs.property("cleOpenSubtitles", openSubtitlesApiKey)
     outputs.dir(sortie)
     doLast {
@@ -93,6 +125,7 @@ val genererBuildConfigIos by tasks.registering {
             package fr.moovie.tv.shared
 
             internal const val VERSION_GENEREE: String = "${litteral(appVersion)}"
+            internal const val BUILD_ID_GENERE: String = "${litteral(appBuildId)}"
             internal const val CLE_OPENSUBTITLES_GENEREE: String = "${litteral(openSubtitlesApiKey)}"
             """.trimIndent() + "\n",
         )
@@ -314,8 +347,9 @@ android {
         applicationId = "fr.moovie.tv"
         minSdk = 23
         targetSdk = 34
-        versionCode = 103
+        versionCode = appVersionCode
         versionName = appVersion
+        buildConfigField("String", "APP_BUILD_ID", "\"$appBuildId\"")
         buildConfigField("String", "OPENSUBTITLES_API_KEY", "\"$openSubtitlesApiKey\"")
     }
 
@@ -423,6 +457,9 @@ compose.desktop {
         mainClass = desktopMainClass
         // Version lue au runtime par l'updater desktop (bannière de mise à jour).
         jvmArgs += "-Dmoovie.version=$appVersion"
+        // Identité de build, lue par le cache des sources : même numéro de
+        // version, build différent, cache rejeté.
+        jvmArgs += "-Dmoovie.build=$appBuildId"
         // Pendant de BuildConfig côté Android : le desktop lit la clé en
         // propriété système, comme il lit déjà la version.
         jvmArgs += "-Dmoovie.opensubtitles.key=$openSubtitlesApiKey"
