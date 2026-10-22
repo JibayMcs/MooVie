@@ -4,7 +4,9 @@ import fr.moovie.tv.core.sources.model.MediaRef
 import fr.moovie.tv.core.sources.port.HttpGateway
 import fr.moovie.tv.core.sources.port.HttpRequest
 import fr.moovie.tv.core.sources.port.HttpResponse
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeout
 import kotlin.test.AfterTest
 import fr.moovie.tv.data.store.useFileStores
 import fr.moovie.tv.data.store.useInMemoryStores
@@ -54,9 +56,19 @@ class SwiftFlowBaseFallbackTest {
         ]}}
     """.trimIndent()
 
-    /** Passerelle scriptée par **domaine**, qui retient l'ordre des appels. */
-    private class Gateway(private val parBase: Map<String, HttpResponse?>) : HttpGateway {
+    /**
+     * Passerelle scriptée par **domaine**, qui retient l'ordre des appels.
+     *
+     * Un domaine de [muets] ne répond jamais : c'est ce que fait un domaine mort
+     * sur le réseau, qui laisse le client attendre son délai plutôt que de
+     * refuser.
+     */
+    private class Gateway(
+        private val parBase: Map<String, HttpResponse?>,
+        private val muets: Set<String> = emptySet(),
+    ) : HttpGateway {
         val visites = mutableListOf<String>()
+
         override suspend fun fetch(request: HttpRequest): HttpResponse? {
             // L'annuaire n'est pas un domaine de catalogue : il ne compte pas
             // dans la marche qu'on observe ici, et le servir vide est le cas
@@ -64,6 +76,7 @@ class SwiftFlowBaseFallbackTest {
             if (request.url.endsWith("domains.json")) return null
             val base = Regex("""^https://[^/]+""").find(request.url)?.value.orEmpty()
             visites += base
+            if (base in muets) awaitCancellation()
             return parBase[base]
         }
     }
@@ -72,28 +85,48 @@ class SwiftFlowBaseFallbackTest {
         base to HttpResponse(status = 200, url = base, body = corps)
 
     @Test
-    fun `le domaine courant sert, et on ne sonde pas le second`() = runTest {
-        val gateway = Gateway(mapOf(ok("https://swiftflow.lol", jsonValide)))
+    fun `le domaine courant sert, et lui seul est interrogé ensuite`() = runTest {
+        val gateway = Gateway(mapOf(ok("https://blinkflux.lol", jsonValide)))
+        val provider = SwiftFlowProvider(gateway)
 
-        val liens = SwiftFlowProvider(gateway).sourcesFor(film)
+        assertEquals(1, provider.sourcesFor(film).size)
+        gateway.visites.clear()
+        provider.sourcesFor(MediaRef.Movie(603, "Matrix", "1999"))
 
-        assertEquals(1, liens.size)
-        assertEquals(listOf("https://swiftflow.lol"), gateway.visites)
+        assertEquals(listOf("https://blinkflux.lol"), gateway.visites)
+    }
+
+    @Test
+    fun `un domaine muet en tête ne consomme pas le budget du suivant`() = runTest {
+        // La panne du 22/10/2026 : essayés l'un après l'autre, le premier
+        // domaine attendait son délai de connexion, la cascade annulait l'appel
+        // à douze secondes, et le domaine sain n'était jamais atteint.
+        val gateway = Gateway(
+            parBase = mapOf(ok("https://swiftflow.lol", jsonValide)),
+            muets = setOf("https://blinkflux.lol"),
+        )
+
+        // Bien sous les douze secondes de la cascade : le suivant part après
+        // l'échelon, sans attendre que le muet renonce.
+        val liens = withTimeout(3_000) { SwiftFlowProvider(gateway).sourcesFor(film) }
+
+        assertEquals("https://cdn.example/f.mp4", liens.single().url)
+        assertEquals("https://swiftflow.lol/", SwiftFlowBase.referer)
     }
 
     @Test
     fun `un domaine injoignable bascule sur le suivant`() = runTest {
         val gateway = Gateway(
             mapOf(
-                "https://swiftflow.lol" to null, // ce que rend un 522 ou un délai dépassé
-                ok("https://blinkflux.lol", jsonValide),
+                "https://blinkflux.lol" to null, // ce que rend un 522 ou un délai dépassé
+                ok("https://swiftflow.lol", jsonValide),
             ),
         )
 
         val liens = SwiftFlowProvider(gateway).sourcesFor(film)
 
         assertEquals("https://cdn.example/f.mp4", liens.single().url)
-        assertEquals(listOf("https://swiftflow.lol", "https://blinkflux.lol"), gateway.visites)
+        assertEquals(listOf("https://blinkflux.lol", "https://swiftflow.lol"), gateway.visites)
     }
 
     @Test
@@ -102,23 +135,23 @@ class SwiftFlowBaseFallbackTest {
         // « joignable », mais ce n'est pas du JSON. On continue.
         val gateway = Gateway(
             mapOf(
-                ok("https://swiftflow.lol", "<html><title>Domain for sale</title></html>"),
-                ok("https://blinkflux.lol", jsonValide),
+                ok("https://blinkflux.lol", "<html><title>Domain for sale</title></html>"),
+                ok("https://swiftflow.lol", jsonValide),
             ),
         )
 
         val liens = SwiftFlowProvider(gateway).sourcesFor(film)
 
         assertEquals(1, liens.size)
-        assertEquals(listOf("https://swiftflow.lol", "https://blinkflux.lol"), gateway.visites)
+        assertEquals(listOf("https://blinkflux.lol", "https://swiftflow.lol"), gateway.visites)
     }
 
     @Test
     fun `le domaine retenu est réutilisé au titre suivant`() = runTest {
         val gateway = Gateway(
             mapOf(
-                "https://swiftflow.lol" to null,
-                ok("https://blinkflux.lol", jsonValide),
+                "https://blinkflux.lol" to null,
+                ok("https://swiftflow.lol", jsonValide),
             ),
         )
         val provider = SwiftFlowProvider(gateway)
@@ -128,7 +161,7 @@ class SwiftFlowBaseFallbackTest {
         provider.sourcesFor(MediaRef.Movie(603, "Matrix", "1999"))
 
         assertEquals(
-            listOf("https://blinkflux.lol"),
+            listOf("https://swiftflow.lol"),
             gateway.visites,
             "le domaine mort ne doit pas être resondé à chaque fiche",
         )
@@ -141,14 +174,14 @@ class SwiftFlowBaseFallbackTest {
         // ce qui rend la panne incompréhensible.
         val gateway = Gateway(
             mapOf(
-                "https://swiftflow.lol" to null,
-                ok("https://blinkflux.lol", jsonValide),
+                "https://blinkflux.lol" to null,
+                ok("https://swiftflow.lol", jsonValide),
             ),
         )
 
         SwiftFlowProvider(gateway).sourcesFor(film)
 
-        assertEquals("https://blinkflux.lol/", SwiftFlowBase.referer)
+        assertEquals("https://swiftflow.lol/", SwiftFlowBase.referer)
     }
 
     @Test

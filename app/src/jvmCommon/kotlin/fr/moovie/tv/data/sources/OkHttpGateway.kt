@@ -5,8 +5,13 @@ import fr.moovie.tv.core.sources.port.HttpMethod
 import fr.moovie.tv.core.sources.port.HttpRequest
 import fr.moovie.tv.core.sources.port.HttpResponse
 import fr.moovie.tv.core.sources.port.NetworkProfile
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import java.io.IOException
+import kotlin.coroutines.resume
+import kotlinx.coroutines.suspendCancellableCoroutine
+import okhttp3.Call
+import okhttp3.Callback
+import okhttp3.Dispatcher
+import okhttp3.Response
 import okhttp3.FormBody
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -30,11 +35,44 @@ private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
  */
 class OkHttpGateway(private val client: OkHttpClient) : HttpGateway {
 
-    private val noRedirect: OkHttpClient by lazy {
-        client.newBuilder().followRedirects(false).followSslRedirects(false).build()
+    /**
+     * Le client tel quel, mais avec son propre `Dispatcher`.
+     *
+     * Les appels passent par `enqueue`, donc par la file d'OkHttp, plafonnée par
+     * défaut à **cinq requêtes simultanées par hôte**. Les `execute()` d'avant
+     * n'y étaient pas soumis, et la résolution sonde volontiers plusieurs liens
+     * d'un même hébergeur en parallèle : garder le plafond par défaut aurait
+     * mis en file ce qui partait jusque-là d'un coup. Un dispatcher dédié, pour
+     * ne pas changer les limites du client brut partagé avec le relais local.
+     */
+    private val asynchrone: OkHttpClient by lazy {
+        client.newBuilder()
+            .dispatcher(Dispatcher().apply { maxRequests = 128; maxRequestsPerHost = 32 })
+            .build()
     }
 
-    override suspend fun fetch(request: HttpRequest): HttpResponse? = withContext(Dispatchers.IO) {
+    private val noRedirect: OkHttpClient by lazy {
+        asynchrone.newBuilder().followRedirects(false).followSslRedirects(false).build()
+    }
+
+    /**
+     * **Annulable**, et c'est tout l'objet de `enqueue` plutôt que `execute`.
+     *
+     * Un `execute()` bloquant, même dans `withContext(IO)`, ne s'interrompt pas
+     * quand la coroutine est annulée : le fil reste pris jusqu'à la fin de
+     * l'appel. Aucun délai posé côté coroutines n'avait donc d'effet sur le
+     * réseau — ni les douze secondes de la cascade par catalogue, ni les trois
+     * de l'annuaire, ni l'échelon de SwiftFlow. Relevé le 22/10/2026 : un
+     * domaine mort en tête (`swiftflow.lol`) tenait l'appel jusqu'au délai de
+     * connexion du client, et la source la plus fiable passait « injoignable »
+     * sur la box à chaque fiche, alors que le domaine suivant répondait en une
+     * demi-seconde.
+     *
+     * Ici l'annulation de la coroutine appelle `call.cancel()`, qui coupe la
+     * connexion en cours comme la lecture du corps. Le corps est lu dans le
+     * rappel, sur le fil d'OkHttp, pour que cette coupure le couvre aussi.
+     */
+    override suspend fun fetch(request: HttpRequest): HttpResponse? {
         val builder = Request.Builder().url(request.url)
         request.headers.forEach { (name, value) -> builder.header(name, value) }
 
@@ -53,38 +91,53 @@ class OkHttpGateway(private val client: OkHttpClient) : HttpGateway {
             }
         }
 
-        val http = if (request.followRedirects) client else noRedirect
+        val http = if (request.followRedirects) asynchrone else noRedirect
+        val call = runCatching { http.newCall(builder.build()) }.getOrNull() ?: return null
 
-        runCatching {
-            http.newCall(builder.build()).execute().use { resp ->
-                HttpResponse(
-                    status = resp.code,
-                    // `resp.request.url` est l'URL finale après redirections :
-                    // c'est elle, et non celle demandée, qui doit servir de base
-                    // au Referer chez les hébergeurs à alias tournants.
-                    url = resp.request.url.toString(),
-                    headers = resp.headers.toMultimap()
-                        .mapValues { (_, v) -> v.firstOrNull().orEmpty() },
-                    // HEAD n'a pas de corps ; string() rendrait une chaîne vide,
-                    // ce qui est correct mais inutile à matérialiser.
-                    //
-                    // Texte **ou** octets, jamais les deux : `string()` et
-                    // `bytes()` consomment tous deux le flux, et le second appel
-                    // rendrait vide.
-                    body = when {
-                        request.method == HttpMethod.HEAD -> null
-                        request.binary -> null
-                        else -> resp.body?.string()
-                    },
-                    bytes = if (request.binary && request.method != HttpMethod.HEAD) {
-                        resp.body?.let(::litPlafonne)
-                    } else {
-                        null
-                    },
-                )
-            }
-        }.getOrNull()
+        return suspendCancellableCoroutine { cont ->
+            cont.invokeOnCancellation { call.cancel() }
+            call.enqueue(
+                object : Callback {
+                    override fun onFailure(call: Call, e: IOException) {
+                        // Après une annulation, la reprise est ignorée : la
+                        // coroutine est déjà partie.
+                        cont.resume(null)
+                    }
+
+                    override fun onResponse(call: Call, response: Response) {
+                        cont.resume(runCatching { response.use { resp -> versReponse(request, resp) } }.getOrNull())
+                    }
+                },
+            )
+        }
     }
+
+    private fun versReponse(request: HttpRequest, resp: Response): HttpResponse =
+        HttpResponse(
+            status = resp.code,
+            // `resp.request.url` est l'URL finale après redirections :
+            // c'est elle, et non celle demandée, qui doit servir de base
+            // au Referer chez les hébergeurs à alias tournants.
+            url = resp.request.url.toString(),
+            headers = resp.headers.toMultimap()
+                .mapValues { (_, v) -> v.firstOrNull().orEmpty() },
+            // HEAD n'a pas de corps ; string() rendrait une chaîne vide,
+            // ce qui est correct mais inutile à matérialiser.
+            //
+            // Texte **ou** octets, jamais les deux : `string()` et
+            // `bytes()` consomment tous deux le flux, et le second appel
+            // rendrait vide.
+            body = when {
+                request.method == HttpMethod.HEAD -> null
+                request.binary -> null
+                else -> resp.body?.string()
+            },
+            bytes = if (request.binary && request.method != HttpMethod.HEAD) {
+                resp.body?.let(::litPlafonne)
+            } else {
+                null
+            },
+        )
 
     /**
      * Lit un corps binaire, **borné**.

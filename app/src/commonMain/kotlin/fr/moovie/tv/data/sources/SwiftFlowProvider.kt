@@ -7,6 +7,13 @@ import fr.moovie.tv.core.sources.port.SourceProvider
 import fr.moovie.tv.core.sources.port.getBody
 import fr.moovie.tv.shared.maintenantMs
 import kotlin.concurrent.Volatile
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.cancelChildren
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.joinAll
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -123,42 +130,86 @@ class SwiftFlowProvider(private val http: HttpGateway) : SourceProvider {
      * sans coûter une requête de plus — contrairement à Frembed, qui doit
      * interroger `/api/dns/domains` à part.
      *
+     * ## Pourquoi en parallèle
+     *
+     * La cascade donne **douze secondes** à chaque catalogue, et un domaine mort
+     * ne répond pas « non » : il ne répond pas, et le client attend jusqu'à son
+     * délai de connexion. Essayés l'un après l'autre, un domaine mort en tête
+     * consommait tout le budget ; l'appel était annulé avant d'atteindre le bon,
+     * qui n'était donc **jamais retenu** — et tout recommençait à la fiche
+     * suivante. Relevé le 22/10/2026 sur la box : `swiftflow.lol` muet en tête de
+     * l'annuaire, `blinkflux.lol` sain derrière, et swiftflow « injoignable » sur
+     * tous les titres. Le desktop ne le voyait pas, sa sonde n'ayant pas de
+     * budget.
+     *
+     * Les candidats partent donc **en échelon** : le suivant n'attend pas que le
+     * précédent ait renoncé, seulement [ECHELON_MS] — ou moins, si tous ceux
+     * d'avant ont déjà échoué. Le premier qui rend du JSON gagne et les autres
+     * sont annulés. Dans le cas sain, le premier répond bien avant l'échelon et
+     * c'est **une seule requête**, comme avant ; un domaine muet ne coûte plus
+     * que l'échelon, au lieu du budget entier.
+     *
      * ## Pourquoi un délai après un échec
      *
      * Sans lui, chaque fiche ouverte pendant une panne relancerait la marche
-     * complète : deux domaines injoignables à ~20 s de délai chacun, sur le
-     * chemin de la cascade. Une minute de silence coûte moins cher qu'une
-     * application qui rame à chaque titre.
+     * complète. Une minute de silence coûte moins cher qu'une application qui
+     * rame à chaque titre.
      */
     private suspend fun apiCall(route: String): String? {
         if (maintenantMs() < panneJusqua) return null
 
-        val candidats = LinkedHashSet<String>().apply {
-            cachedBase?.let { add(it) }
-            // L'annuaire avant les domaines compilés : c'est ce qu'on sait
-            // aujourd'hui, eux sont le plancher du jour de la compilation.
-            addAll(DomainBook.bases(http, name, BASES_CONNUES))
+        // Le domaine retenu d'abord, seul : c'est le cas courant, et il ne doit
+        // pas payer la course. S'il ne répond plus, on l'oublie et on relance
+        // la découverte.
+        cachedBase?.let { base ->
+            appel(base, route)?.let { return it }
+            cachedBase = null
         }
 
-        for (base in candidats) {
-            val body = http.getBody(
-                "$base/api/v1/index.php?route=$route&api_key=$API_KEY",
-                mapOf("User-Agent" to Ua.BROWSER, "Accept" to "application/json"),
-            )
-            // Pas de corps (injoignable, 5xx), ou un corps qui n'est pas du
-            // JSON : dans les deux cas ce domaine ne sert pas l'API. On passe au
-            // suivant plutôt que de conclure que le catalogue est vide.
-            if (body == null || !body.trimStart().startsWith("{")) continue
-
-            cachedBase = base
-            SwiftFlowBase.courant = base
-            panneJusqua = 0L
-            return body
+        // L'annuaire avant les domaines compilés : c'est ce qu'on sait
+        // aujourd'hui, eux sont le plancher du jour de la compilation.
+        val candidats = DomainBook.bases(http, name, BASES_CONNUES)
+        val (base, body) = premierQuiRepond(candidats, route) ?: run {
+            panneJusqua = maintenantMs() + ECHEC_TTL_MS
+            return null
         }
-
-        panneJusqua = maintenantMs() + ECHEC_TTL_MS
-        return null
+        cachedBase = base
+        SwiftFlowBase.courant = base
+        panneJusqua = 0L
+        return body
     }
+
+    /** Le premier candidat à servir du JSON, avec son corps ; les autres sont annulés. */
+    private suspend fun premierQuiRepond(candidats: List<String>, route: String): Pair<String, String>? =
+        coroutineScope {
+            val gagnant = CompletableDeferred<Pair<String, String>?>()
+            // Complété quand le candidat de même rang a renoncé : c'est ce qui
+            // permet au suivant de partir sans attendre son échelon.
+            val renonces = candidats.map { CompletableDeferred<Unit>() }
+            val essais = candidats.mapIndexed { i, base ->
+                launch {
+                    withTimeoutOrNull(i * ECHELON_MS) { renonces.take(i).awaitAll() }
+                    val body = appel(base, route)
+                    if (body != null) gagnant.complete(base to body) else renonces[i].complete(Unit)
+                }
+            }
+            launch {
+                essais.joinAll()
+                gagnant.complete(null)
+            }
+            gagnant.await().also { coroutineContext.cancelChildren() }
+        }
+
+    /**
+     * Le corps rendu par [base], ou null s'il ne sert pas l'API : injoignable,
+     * 5xx, ou un corps qui n'est pas du JSON — une page de parking répond 200,
+     * et la prendre pour l'API arrêterait la bascule sur le mauvais domaine.
+     */
+    private suspend fun appel(base: String, route: String): String? =
+        http.getBody(
+            "$base/api/v1/index.php?route=$route&api_key=$API_KEY",
+            mapOf("User-Agent" to Ua.BROWSER, "Accept" to "application/json"),
+        )?.takeIf { it.trimStart().startsWith("{") }
 
     /**
      * L'épisode demandé, dans la saison demandée.
@@ -214,7 +265,7 @@ class SwiftFlowProvider(private val http: HttpGateway) : SourceProvider {
          * l'amont documente à côté ne servent qu'à fabriquer une iframe pour son
          * frontend — nous lisons le catalogue directement.
          */
-        const val API_BASE = "https://swiftflow.lol"
+        const val API_BASE = "https://blinkflux.lol"
 
         /**
          * Les points d'entrée essayés dans l'ordre — voir [apiCall].
@@ -226,8 +277,22 @@ class SwiftFlowProvider(private val http: HttpGateway) : SourceProvider {
          * encore sur le second, qu'elle masque derrière un cache périmé. Nul ne
          * sait donc lequel reviendra. Les garder tous les deux, c'est laisser
          * l'application le découvrir elle-même, sans release.
+         *
+         * Au 22/10/2026 c'est `blinkflux.lol` qui est revenu, et il passe donc
+         * **devant** : `swiftflow.lol` ne répond plus du tout, et le laisser en
+         * tête coûtait le délai d'attente complet du client (~15 s) à la
+         * première fiche de chaque lancement, avant que la cascade n'affiche
+         * quoi que ce soit.
          */
-        private val BASES_CONNUES = listOf(API_BASE, "https://blinkflux.lol")
+        private val BASES_CONNUES = listOf(API_BASE, "https://swiftflow.lol")
+
+        /**
+         * Délai avant de lancer le candidat suivant sans attendre que le
+         * précédent renonce. L'API répond en moins d'une demi-seconde ; trois
+         * candidats échelonnés tiennent largement dans les douze secondes que
+         * la cascade accorde au catalogue.
+         */
+        private const val ECHELON_MS = 1_500L
 
         /** Après un échec des deux, on se tait une minute plutôt que de ramer. */
         private const val ECHEC_TTL_MS = 60L * 1000
