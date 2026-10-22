@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -316,14 +318,7 @@ internal fun DetailsHero(
         // tout sous l'image : méta, actions, synopsis, crédits, dans l'ordre où
         // on les lit.
         if (enColonne) {
-            val ligne = meta.filter { it.isNotBlank() }
-            if (ligne.isNotEmpty()) {
-                Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                    ligne.forEach {
-                        Text(it, style = MaterialTheme.typography.labelLarge, color = HERO_DIM)
-                    }
-                }
-            }
+            LigneQualificatifs(meta.filter { it.isNotBlank() })
             actions()
             if (synopsis.isNotBlank()) {
                 Text(
@@ -391,18 +386,7 @@ internal fun DetailsHero(
                 modifier = Modifier.weight(0.34f),
                 verticalArrangement = Arrangement.spacedBy(if (court) 8.dp else 12.dp),
             ) {
-                val ligne = meta.filter { it.isNotBlank() }
-                if (ligne.isNotEmpty()) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                        ligne.forEach { element ->
-                            Text(
-                                element,
-                                style = MaterialTheme.typography.labelLarge,
-                                color = HERO_DIM,
-                            )
-                        }
-                    }
-                }
+                LigneQualificatifs(meta.filter { it.isNotBlank() })
                 actions()
             }
 
@@ -450,6 +434,33 @@ internal fun DetailsHero(
             ) {
                 controles.invoke()
             }
+        }
+    }
+}
+
+/**
+ * Les qualificatifs d'une fiche, en ligne. Le retour à la ligne se fait **entre**
+ * deux éléments, jamais dedans : un élément reste d'un seul tenant (« 25 min »
+ * ne se replie pas lettre à lettre quand la colonne est étroite), et la rangée
+ * passe à la ligne suivante quand elle ne tient plus.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun LigneQualificatifs(elements: List<String>) {
+    if (elements.isEmpty()) return
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        elements.forEach {
+            Text(
+                it,
+                style = MaterialTheme.typography.labelLarge,
+                color = HERO_DIM,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
