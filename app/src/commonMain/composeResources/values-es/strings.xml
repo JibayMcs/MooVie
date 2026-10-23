@@ -58,6 +58,7 @@
     <string name="search_recent">Búsquedas recientes</string>
     <string name="search_empty_hint">Escribir para buscar. El historial aparecerá aquí.</string>
     <string name="search_clear_history">Borrar historial</string>
+    <string name="search_filters_active">Filtros activos: %1$s</string>
     <string name="search_remove_query">Eliminar «%1$s»</string>
 
     <!-- Ficha -->

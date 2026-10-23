@@ -58,6 +58,7 @@
     <string name="search_recent">Recent searches</string>
     <string name="search_empty_hint">Type to search. Your history will appear here.</string>
     <string name="search_clear_history">Clear history</string>
+    <string name="search_filters_active">Filters on: %1$s</string>
     <string name="search_remove_query">Remove “%1$s”</string>
 
     <!-- Details -->

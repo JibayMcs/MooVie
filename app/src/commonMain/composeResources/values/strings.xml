@@ -60,6 +60,7 @@
     <string name="search_recent">Recherches récentes</string>
     <string name="search_empty_hint">Saisir une recherche. L'historique apparaîtra ici.</string>
     <string name="search_clear_history">Vider l'historique</string>
+    <string name="search_filters_active">Filtres posés : %1$s</string>
     <string name="search_remove_query">Supprimer « %1$s »</string>
 
     <!-- Fiche -->
