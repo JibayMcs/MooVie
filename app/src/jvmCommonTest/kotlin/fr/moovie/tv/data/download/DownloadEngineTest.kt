@@ -89,7 +89,21 @@ class DownloadEngineTest {
         resolver = resolver,
         dirFor = { root.toOkioPath() / safeName(it) },
         freeSpace = freeSpace,
+        // Pas d'affiche en test : la version de production écrirait dans le
+        // dossier réel des téléchargements et interrogerait TMDB.
+        posterFetcher = { _, _, _, _ -> null },
     )
+
+    /** Aucun temporaire de playlist ne doit survivre au téléchargement. */
+    private fun assertNoTempPlaylist() {
+        // Le dossier du titre *et* la racine : un temporaire écrit à la racine
+        // (l'ancien emplacement, dans les données réelles) doit aussi être vu.
+        val restants = (File(root, safeName(download.key)).listFiles().orEmpty().toList() + root.listFiles().orEmpty().toList())
+            .map { it.name }
+            ?.filter { it.startsWith("playlist-") && it.endsWith(".m3u8") }
+            .orEmpty()
+        assertTrue(restants.isEmpty(), "temporaires de playlist restés sur le disque : $restants")
+    }
 
     private val stream = PlayableStream(
         url = "https://cdn.example.com/v/stream.m3u8",
@@ -113,6 +127,7 @@ class DownloadEngineTest {
         // La playlist locale ne doit plus désigner l'extérieur, sinon le dossier
         // ne se lit qu'en ligne — c'est-à-dire pas du tout.
         assertFalse("cdn.example.com" in File(dir, "stream.m3u8").readText())
+        assertNoTempPlaylist()
     }
 
     /** Les en-têtes de la source suivent chaque segment, sinon l'hébergeur refuse. */
@@ -164,6 +179,29 @@ class DownloadEngineTest {
         assertTrue(fetcher.headersSeen.last()["Referer"] == "https://frais.example.com/")
     }
 
+    @Test
+    fun `une playlist refusee echoue sans laisser de temporaire`() = runTest {
+        val fetcher = FakeFetcher(mapOf(stream.url to playlist), failOn = setOf(stream.url))
+
+        val outcome = engine(fetcher).run(download, stream)
+
+        assertTrue(outcome is DownloadOutcome.Failed)
+        assertNoTempPlaylist()
+    }
+
+    @Test
+    fun `un temporaire orphelin est retire a la reprise`() = runTest {
+        val dir = File(root, safeName(download.key)).also { it.mkdirs() }
+        val orphelin = File(dir, "playlist-abc123.m3u8").also { it.writeText("reste") }
+        val fetcher = FakeFetcher(mapOf(stream.url to playlist))
+
+        val outcome = engine(fetcher).run(download, stream)
+
+        assertTrue(outcome is DownloadOutcome.Done)
+        assertFalse(orphelin.exists())
+        assertNoTempPlaylist()
+    }
+
     /** Sans source de repli, l'échec est rendu au lieu d'être avalé. */
     @Test
     fun `un refus sans re-resolution possible echoue proprement`() = runTest {
@@ -197,6 +235,7 @@ class DownloadEngineTest {
 
         assertTrue("https://cdn.example.com/v/haut/index.m3u8" in fetcher.calls)
         assertTrue("https://cdn.example.com/v/haut/seg0.ts" in fetcher.calls)
+        assertNoTempPlaylist()
     }
 
     /** Les trois sources MP4 : un fichier, pas de playlist à réécrire. */

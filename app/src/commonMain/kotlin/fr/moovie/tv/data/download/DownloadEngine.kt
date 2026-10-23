@@ -85,8 +85,10 @@ class DownloadEngine(
     private val progress: DownloadProgress,
     private val resolver: StreamResolver,
     /**
-     * Où poser les fichiers. Injecté pour que les tests n'écrivent pas dans le
-     * dossier de données de la personne qui lance la suite.
+     * Où poser les segments, la playlist et les temporaires d'un téléchargement.
+     * Injecté pour que les tests n'écrivent pas dans le dossier de données de la
+     * personne qui lance la suite. L'affiche n'y passe pas : elle a son propre
+     * injecteur, [posterFetcher].
      */
     private val dirFor: (String) -> Path = ::downloadDir,
     /**
@@ -94,10 +96,25 @@ class DownloadEngine(
      * raison que [dirFor] : un test ne peut pas remplir un vrai disque.
      */
     private val freeSpace: (Path) -> Long = ::espaceLibre,
+    /**
+     * Récupère l'affiche d'un titre (clé, id TMDB, série ou non, URL de repli).
+     * Injecté pour la même raison que [dirFor] : la version de production écrit
+     * dans le dossier réel des téléchargements et interroge TMDB.
+     */
+    private val posterFetcher: suspend (key: String, tmdbId: Int, isTv: Boolean, imageUrl: String?) -> Path? =
+        ::fetchDownloadPoster,
 ) {
 
     suspend fun run(download: Download, stream: PlayableStream): DownloadOutcome {
         val dir = dirFor(download.key).also(systemeFichiers::createDirectories)
+        // Une mort brutale du processus peut avoir laissé un temporaire de
+        // playlist dans le dossier du titre, visible de la bibliothèque : on le
+        // retire avant de recommencer.
+        runCatching {
+            systemeFichiers.list(dir)
+                .filter { it.name.startsWith("playlist-") && it.name.endsWith(".m3u8") }
+                .forEach(systemeFichiers::delete)
+        }
         // Avant d'ouvrir quoi que ce soit : commencer pour s'arrêter à mi-course
         // laisse des octets qui ne serviront jamais, sur un disque qui manque
         // déjà de place.
@@ -123,12 +140,7 @@ class DownloadEngine(
      */
     private suspend fun affiche(download: Download) {
         runCatching {
-            fetchDownloadPoster(
-                key = download.key,
-                tmdbId = download.tmdbId,
-                isTv = download.isTv,
-                imageUrl = download.imageUrl,
-            )
+            posterFetcher(download.key, download.tmdbId, download.isTv, download.imageUrl)
         }
     }
 
@@ -180,7 +192,7 @@ class DownloadEngine(
         dir: Path,
     ): DownloadOutcome {
         var source = stream
-        var playlistText = fetchText(source, source.url)
+        var playlistText = fetchText(source, source.url, dir)
 
         // Une master playlist ne contient aucun segment : il faut redescendre
         // d'un cran avant de pouvoir localiser quoi que ce soit.
@@ -188,7 +200,7 @@ class DownloadEngine(
         if (HlsPlaylist.isMaster(playlistText)) {
             playlistUrl = HlsPlaylist.pickVariant(playlistText, playlistUrl)
                 ?: return DownloadOutcome.Failed("Aucune variante lisible dans la playlist")
-            playlistText = fetchText(source, playlistUrl)
+            playlistText = fetchText(source, playlistUrl, dir)
         }
 
         val local = HlsPlaylist.localize(playlistText, playlistUrl)
@@ -283,15 +295,17 @@ class DownloadEngine(
     }
 
     /**
-     * Le fichier temporaire vit dans le répertoire des téléchargements et non
-     * dans celui du système : `File.createTempFile` n'a pas d'équivalent commun,
-     * et surtout le temporaire doit être sur **le même volume** que sa
-     * destination éventuelle — c'est ce qui rend un déplacement atomique
-     * possible plutôt qu'une recopie.
+     * Le fichier temporaire vit dans le dossier du téléchargement ([dir], celui
+     * que [dirFor] a donné) et non dans celui du système : `File.createTempFile`
+     * n'a pas d'équivalent commun, et le temporaire doit être sur **le même
+     * volume** que sa destination. Il ne passe jamais par la racine réelle des
+     * téléchargements, sans quoi l'injection de [dirFor] serait ignorée et un
+     * test écrirait dans les données de l'utilisateur (ou échouerait là où le
+     * contexte Android n'existe pas). Le temporaire est supprimé dans tous les
+     * cas, mais une mort brutale du processus peut en laisser un orphelin.
      */
-    private suspend fun fetchText(stream: PlayableStream, url: String): String {
-        val racine = moovieDownloadsDir().also(systemeFichiers::createDirectories)
-        val temp = racine / "playlist-${url.hashCode().toUInt().toString(16)}.m3u8"
+    private suspend fun fetchText(stream: PlayableStream, url: String, dir: Path): String {
+        val temp = dir / "playlist-${url.hashCode().toUInt().toString(16)}.m3u8"
         return try {
             fetcher.fetch(url, stream.headers, temp)
             systemeFichiers.read(temp) { readUtf8() }
