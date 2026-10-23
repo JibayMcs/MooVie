@@ -1187,6 +1187,11 @@ fun PlayerScreen(
                 // se traite donc **avant** la question de la barre. Elle réveille
                 // les contrôles au passage, parce qu'on veut voir ce qu'on vient
                 // de faire.
+                if (event.key == Key.MediaAudioTrack) {
+                    dialog = PlayerDialogKind.AUDIO
+                    wake()
+                    return@onPreviewKeyEvent true
+                }
                 if (event.key in MEDIA_TOGGLE_KEYS) {
                     controller.togglePause()
                     wake()
@@ -1538,11 +1543,31 @@ fun PlayerScreen(
             }
         }
 
+        // Le choix d'une piste audio, partagé entre les réglages et le dialogue
+        // ouvert par la touche Langue de la télécommande.
+        val choisirAudio: (String) -> Unit = { trackId ->
+            controller.selectAudio(trackId)
+            tracks = controller.tracks()
+            // Retenu au niveau du *titre* : on choisit une langue
+            // pour une série, pas pour un épisode.
+            titleKey?.let { key ->
+                tracks.audio.firstOrNull { it.id == trackId }?.label?.let { label ->
+                    exitScope.launch { progress.setAudioTrack(key, label) }
+                }
+            }
+            dialog = null
+        }
+
         // Le panneau des épisodes est rendu plus haut, dans la page : il n'a
         // rien à faire parmi les modales centrées.
         @Suppress("KotlinConstantConditions")
         when (dialog.takeIf { !enPip && it != PlayerDialogKind.EPISODES }) {
             PlayerDialogKind.EPISODES -> Unit
+            // Touche Langue de la télécommande : les pistes audio, rien d'autre.
+            PlayerDialogKind.AUDIO -> PlayerOptionsDialog(
+                sections = listOf(audioSection(tracks, choisirAudio)).filter { it.options.isNotEmpty() },
+                onDismiss = { dialog = null },
+            )
             PlayerDialogKind.SUBTITLES -> PlayerOptionsDialog(
                 sections = listOf(
                     subtitleSection(tracks) { trackId ->
@@ -1607,18 +1632,7 @@ fun PlayerScreen(
                         QualityChoice.parse(id)?.let { applyQuality(it) }
                         dialog = null
                     },
-                    audioSection(tracks) { trackId ->
-                        controller.selectAudio(trackId)
-                        tracks = controller.tracks()
-                        // Retenu au niveau du *titre* : on choisit une langue
-                        // pour une série, pas pour un épisode.
-                        titleKey?.let { key ->
-                            tracks.audio.firstOrNull { it.id == trackId }?.label?.let { label ->
-                                exitScope.launch { progress.setAudioTrack(key, label) }
-                            }
-                        }
-                        dialog = null
-                    },
+                    audioSection(tracks, choisirAudio),
                 ).filter { it.options.isNotEmpty() },
                 onDismiss = { dialog = null },
             )

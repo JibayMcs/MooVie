@@ -198,8 +198,11 @@ fun parseMediaKey(key: String): PlaybackId? {
     }
 }
 
-/** Menu ouvert par la barre de contrôles. */
-enum class PlayerDialogKind { SUBTITLES, SETTINGS, REPORT, EPISODES }
+/**
+ * Menu ouvert par la barre de contrôles. [AUDIO] : la seule section des pistes
+ * audio, ouverte par la touche Langue de la télécommande.
+ */
+enum class PlayerDialogKind { SUBTITLES, SETTINGS, REPORT, EPISODES, AUDIO }
 
 /** `1:23:45` au-delà d'une heure, `23:45` sinon. */
 fun formatPlayerTime(ms: Long): String {
