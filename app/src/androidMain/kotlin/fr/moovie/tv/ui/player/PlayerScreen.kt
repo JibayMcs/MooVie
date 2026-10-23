@@ -4,6 +4,7 @@ import fr.moovie.tv.data.download.DownloadQueue
 import fr.moovie.tv.data.download.Download
 import fr.moovie.tv.core.sources.model.StreamFormat
 import fr.moovie.tv.core.sources.model.PlayableStream
+import fr.moovie.tv.core.sources.usecase.isDurationAcceptable
 import fr.moovie.tv.data.cast.CastDevice
 import fr.moovie.tv.data.cast.CastNow
 import fr.moovie.tv.data.cast.CastPlayback
@@ -669,6 +670,11 @@ fun PlayerScreen(
      */
     fun markFinished() {
         val duration = controller.durationMs()
+        // Ce qui vient de finir n'était pas l'épisode : une vidéo de
+        // remplacement, un logo d'hébergeur. Le marquer vu le ferait sortir de
+        // « Reprendre » et mettrait le suivant en file comme si celui-ci avait
+        // été regardé.
+        if (expectedMinutes > 0 && duration > 0 && !isDurationAcceptable(duration / 1000.0, expectedMinutes)) return
         if (mediaKey.isNotBlank() && duration > 0) {
             // Rien n'est écrit pour une diffusion venue d'un autre compte : le
             // téléviseur n'est qu'un écran, l'historique appartient au téléphone.

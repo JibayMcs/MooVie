@@ -209,4 +209,23 @@ class StreamResolutionTest {
         assertEquals(1, nomme.calls)
         assertEquals(1, parDomaine.calls)
     }
+
+    /**
+     * Un délai posé par l'appelant annule la résolution : l'annulation traverse la
+     * chaîne au lieu d'être prise pour un échec de l'extracteur, sans quoi le
+     * renifleur suivant repartait pour un tour entier après le délai.
+     */
+    @Test
+    fun `l annulation arrete la chaine au lieu de passer au suivant`() = runTest {
+        val nomme = FakeExtractor("voe", onExtract = { throw kotlinx.coroutines.CancellationException("delai") })
+        val parDomaine = FakeExtractor("direct", claims = { true }, onExtract = { stream("https://cdn/f.mp4") })
+
+        val leve = runCatching {
+            StreamResolution(listOf(nomme, parDomaine))
+                .resolve(EmbedLink(url = "https://x.test/f.mp4", hoster = "voe"))
+        }.exceptionOrNull()
+
+        assertTrue(leve is kotlinx.coroutines.CancellationException)
+        assertEquals(0, parDomaine.calls)
+    }
 }

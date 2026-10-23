@@ -77,6 +77,13 @@ import fr.moovie.tv.data.sources.HosterTrustRepository
 private const val PROVIDER_TIMEOUT_MS = 12000L
 
 /**
+ * Plafond d'une résolution de lien, toutes requêtes comprises. Voir
+ * [DetailsViewModel.resoudre]. Au-dessus du délai de lecture de la passerelle,
+ * pour qu'une réponse lente mais réelle passe encore.
+ */
+private const val RESOLUTION_MAX_MS = 20_000L
+
+/**
  * Langue dans laquelle on interroge les catalogues.
  *
  * Constante et non paramétrable : elle décrit les sites visés — tous
@@ -211,7 +218,7 @@ class DetailsViewModel : ViewModel() {
 
             val outcome = runCatching {
                 qualitySlots.withPermit {
-                    val stream = ExtractorRegistry.resolve(link)
+                    val stream = resoudre(link)
                     // Le même verdict que celui de la lecture rapide, et pour
                     // la même raison : une URL bien formée ne veut pas dire un
                     // flux servi. Le mesurer ici plutôt qu'après le choix, c'est
@@ -354,6 +361,18 @@ class DetailsViewModel : ViewModel() {
     val selectedEpisode: StateFlow<EpisodeSelection?> = _selectedEpisode
 
     private var quickPlayJob: Job? = null
+
+    /**
+     * Résout un lien, **en temps borné**.
+     *
+     * La passerelle plafonne chaque requête, pas la résolution : un extracteur
+     * qui enchaîne deux ou trois requêtes lentes tenait la lecture rapide
+     * suspendue plus d'une minute avant que le lecteur ne s'ouvre. Au-delà de
+     * [RESOLUTION_MAX_MS], le lien est tenu pour mort et la cascade passe au
+     * suivant. L'annulation remonte jusqu'à la passerelle, qui coupe l'appel.
+     */
+    private suspend fun resoudre(link: EmbedLink): PlayableStream? =
+        withTimeoutOrNull(RESOLUTION_MAX_MS) { ExtractorRegistry.resolve(link) }
 
     /**
      * Liens écartés pour le contenu en cours : sonde négative, ou lecture qui a
@@ -1306,7 +1325,7 @@ class DetailsViewModel : ViewModel() {
                     // visible au lieu de laisser l'utilisateur devant un écran
                     // d'attente muet.
                     _quickPlay.value = QuickPlayState.Searching(hosterLabel(next), hoster = hosterLabel(next))
-                    val stream = runCatching { ExtractorRegistry.resolve(next) }.getOrNull()
+                    val stream = runCatching { resoudre(next) }.getOrNull()
                     if (gen != resolveGen) return@launch // titre changé entre-temps
                     // Une URL extraite ne suffit pas : ces hébergeurs signent des
                     // liens à durée de vie courte et répondent 403 derrière. Sans
@@ -1392,7 +1411,7 @@ class DetailsViewModel : ViewModel() {
         _resolving.value = link.url
         val gen = ++resolveGen
         viewModelScope.launch {
-            val stream = runCatching { ExtractorRegistry.resolve(link) }.getOrNull()
+            val stream = runCatching { resoudre(link) }.getOrNull()
                 // Une URL bien formée ne veut pas dire un flux servi. Vidzy rend
                 // par exemple une playlist signée que son CDN refuse ensuite en
                 // 403 : le lecteur s'ouvrait, échouait, et renvoyait aussitôt sur
@@ -1437,7 +1456,7 @@ class DetailsViewModel : ViewModel() {
         _resolveError.value = null
         _resolving.value = link.url
         viewModelScope.launch {
-            val stream = runCatching { ExtractorRegistry.resolve(link) }.getOrNull()
+            val stream = runCatching { resoudre(link) }.getOrNull()
             _resolving.value = null
             if (stream == null) {
                 _resolveError.value = getString(Res.string.details_resolve_error, hosterLabel(link))
@@ -1579,7 +1598,7 @@ class DetailsViewModel : ViewModel() {
             val next = nextLinkFor(links, preferred = lang, excluded = tried, heights = _heights.value)
                 ?: return@repeat
             tried += next.url
-            val stream = runCatching { ExtractorRegistry.resolve(next) }.getOrNull()
+            val stream = runCatching { resoudre(next) }.getOrNull()
             // Le même verdict que le lecteur, durée comprise.
             if (stream == null || stream.url.isBlank() || !isStreamPlayable(stream, expectedMinutes)) {
                 return@repeat

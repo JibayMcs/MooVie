@@ -81,12 +81,24 @@ private const val FINISHED_AT = 0.92
 private const val FINISHED_MARGIN_MS = 10_000
 
 /**
- * Le média est-il terminé ? Voir [FINISHED_AT].
+ * En dessous de cette durée, ce qui a joué n'était pas le média.
+ *
+ * Une source peut répondre par une courte vidéo de remplacement (un message
+ * d'erreur, un logo d'hébergeur, quelques dizaines de secondes). Jouée jusqu'au
+ * bout, elle passait ici pour un épisode terminé : l'épisode était marqué vu
+ * sans que personne ne l'ait regardé, et disparaissait de « Reprendre ».
+ *
+ * Deux minutes : aucune de ces vidéos n'y arrive, aucun épisode n'est en dessous.
+ */
+internal const val FINISHED_MIN_DURATION_MS = 2 * 60_000L
+
+/**
+ * Le média est-il terminé ? Voir [FINISHED_AT] et [FINISHED_MIN_DURATION_MS].
  *
  * `internal` pour que le seuil soit vérifiable sans passer par un magasin.
  */
 internal fun isFinished(positionMs: Long, durationMs: Long): Boolean =
-    durationMs > 0 &&
+    durationMs >= FINISHED_MIN_DURATION_MS &&
         (positionMs >= durationMs - FINISHED_MARGIN_MS || positionMs >= durationMs * FINISHED_AT)
 
 /**

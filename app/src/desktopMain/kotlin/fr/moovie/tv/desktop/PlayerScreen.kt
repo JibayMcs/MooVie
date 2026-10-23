@@ -104,6 +104,7 @@ import fr.moovie.tv.resources.player_unmute
 import fr.moovie.tv.resources.player_update_chip
 import fr.moovie.tv.core.sources.model.PlayableStream
 import fr.moovie.tv.core.sources.model.StreamFormat
+import fr.moovie.tv.core.sources.usecase.isDurationAcceptable
 import fr.moovie.tv.data.download.Download
 import fr.moovie.tv.data.download.DownloadQueue
 import fr.moovie.tv.ui.player.ApplySubtitleStyle
@@ -630,6 +631,9 @@ internal fun DesktopPlayerScreen(
      * lecteur, le temps que l'écriture aboutisse.
      */
     fun markFinished() {
+        // Ce qui vient de finir n'était pas l'épisode (vidéo de remplacement,
+        // logo d'hébergeur) : rien n'est marqué vu.
+        if (expectedMinutes > 0 && lengthMs > 0 && !isDurationAcceptable(lengthMs / 1000.0, expectedMinutes)) return
         if (mediaKey.isNotBlank() && lengthMs > 0) {
             saveScope.launch { progress.save(mediaKey, lengthMs, lengthMs) }
         }
