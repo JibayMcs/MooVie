@@ -10,6 +10,7 @@ import fr.moovie.tv.core.subtitles.usecase.rankSubtitles
 import fr.moovie.tv.core.subtitles.usecase.timingFor
 import fr.moovie.tv.data.settings.SettingsRepository
 import fr.moovie.tv.data.subtitles.StremioSubtitleCatalog
+import fr.moovie.tv.data.subtitles.SubtitleChoiceRepository
 import fr.moovie.tv.data.subtitles.SubtitleFileStore
 import fr.moovie.tv.ui.player.parseMediaKey
 import kotlinx.coroutines.Dispatchers
@@ -58,6 +59,7 @@ class PlayerSubtitlesViewModel : ViewModel() {
     /** L'addon Stremio public : aucune clé, aucun compte. */
     private val catalog = StremioSubtitleCatalog()
     private val files = SubtitleFileStore()
+    private val choices = SubtitleChoiceRepository()
 
     private val _state = MutableStateFlow(
         PlayerSubtitlesState(available = catalog.available),
@@ -127,6 +129,30 @@ class PlayerSubtitlesViewModel : ViewModel() {
             files.storeOriginal(mediaKey, candidate, downloaded.content)
         }
 
+        activate(candidate, source)
+        choices.remember(mediaKey, candidate)
+    }
+
+    /**
+     * Rejoue le sous-titre choisi la dernière fois sur ce média, au démarrage
+     * de la lecture (le flux est alors monté et sa cadence connue).
+     *
+     * **Uniquement depuis le disque** : rien n'est cherché ni téléchargé sans
+     * geste de l'utilisateur. Si le fichier a disparu (cache purgé), on ne fait
+     * rien et le menu reste tel quel.
+     */
+    fun restore(mediaKey: String, streamFps: Double) = io {
+        if (!_state.value.available || _state.value.active != null) return@io
+        val candidate = choices.get(mediaKey) ?: return@io
+        val source = files.existing(mediaKey, candidate) ?: return@io
+        // Le choix a pu être fait à la main pendant la lecture du disque.
+        if (_state.value.active != null) return@io
+        this.mediaKey = mediaKey
+        this.streamFps = streamFps.takeIf { it > 0 }
+        activate(candidate, source)
+    }
+
+    private fun activate(candidate: SubtitleCandidate, source: Path) {
         original = source
         // La correction de cadence s'applique d'emblée : c'est la dérive qu'un
         // curseur de décalage ne rattrape pas, autant partir juste.
@@ -155,6 +181,9 @@ class PlayerSubtitlesViewModel : ViewModel() {
 
     /** Retire le sous-titre externe sans oublier ce qui a été téléchargé. */
     fun clear() {
+        // Une piste du fichier prend la place du sous-titre en ligne : à la
+        // reprise, on ne le rejoue pas par-dessus.
+        viewModelScope.launch { choices.forget(mediaKey) }
         original = null
         _state.value = _state.value.copy(active = null, timing = SubtitleTiming.None)
         _file.value = null

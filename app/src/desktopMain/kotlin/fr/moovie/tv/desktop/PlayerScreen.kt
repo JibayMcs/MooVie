@@ -1186,6 +1186,15 @@ internal fun DesktopPlayerScreen(
         // Le fichier arrive déjà recalé : le lecteur n'a rien à calculer.
         LaunchedEffect(subsFile) { controller.loadExternalSubtitle(subsFile) }
         DisposableEffect(Unit) { onDispose { subsViewModel.onLeave() } }
+        // Le sous-titre choisi à la dernière lecture revient au premier passage
+        // en lecture, depuis le disque seulement (voir
+        // PlayerSubtitlesViewModel.restore).
+        var subsRestored by remember(mediaKey) { mutableStateOf(false) }
+        LaunchedEffect(mediaKey, isPlaying) {
+            if (subsRestored || !isPlaying) return@LaunchedEffect
+            subsRestored = true
+            subsViewModel.restore(mediaKey, controller.videoFps())
+        }
 
         // Changement d'épisode sans quitter le lecteur : ce ViewModel reste
         // monté avec lui, et il porte l'état d'un média précis. Sans cette

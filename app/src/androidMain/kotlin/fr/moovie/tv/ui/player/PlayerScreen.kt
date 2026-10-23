@@ -943,6 +943,15 @@ fun PlayerScreen(
         controller.loadExternalSubtitle(subsFile)
     }
     DisposableEffect(Unit) { onDispose { subsViewModel.onLeave() } }
+    // Le sous-titre choisi à la dernière lecture revient au premier passage en
+    // lecture : le flux est alors monté et sa cadence connue. Depuis le disque
+    // seulement, rien n'est téléchargé (voir PlayerSubtitlesViewModel.restore).
+    var subsRestored by remember(mediaKey) { mutableStateOf(false) }
+    LaunchedEffect(mediaKey, isPlaying) {
+        if (subsRestored || !isPlaying) return@LaunchedEffect
+        subsRestored = true
+        subsViewModel.restore(mediaKey, controller.videoFps())
+    }
 
     val chipVersion = updateVersion?.takeIf { updateChipFresh || controlsVisible }
 
