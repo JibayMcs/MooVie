@@ -90,9 +90,9 @@ L'extraction des sources se fait **on-device** : pas de backend, pas de compte, 
   de la barre de contrôles fait la même chose sans quitter l'application. La lecture arrive
   aussi dans le volet de notifications et sur l'écran verrouillé, avec pause, ±15 s et
   flèches d'épisode.
-- **Sous-titres** (OpenSubtitles) - cherchés depuis le lecteur, classés par langue,
-  cadence et release, et téléchargés uniquement sur un appui explicite, le quota
-  quotidien étant serré. Ceux déjà téléchargés sont marqués, pour ne jamais payer deux
+- **Sous-titres** (addon Stremio public, sans clé ni compte) - cherchés depuis le
+  lecteur, classés par langue, cadence et release, et téléchargés uniquement sur un appui
+  explicite. Ceux déjà téléchargés sont marqués, pour ne jamais les récupérer deux
   fois. Avec un réglage de décalage **et** une correction de cadence : l'appariement
   exact repose sur une empreinte du fichier vidéo, impossible sur des flux segmentés, si
   bien que le décalage est le cas normal et non un accident.
@@ -130,7 +130,7 @@ L'extraction des sources se fait **on-device** : pas de backend, pas de compte, 
 - **Saisie depuis le téléphone** (Android TV) - taper une clé d'API à la télécommande,
   lettre par lettre sur un clavier en grille, est le pire moment de l'application. La TV
   affiche un QR code, ton téléphone ouvre une page servie par l'app elle-même sur le réseau
-  local, et tu tapes au clavier tactile : clés TMDB et TheIntroDB, compte OpenSubtitles,
+  local, et tu tapes au clavier tactile : clés TMDB et TheIntroDB,
   identifiants de synchro et phrase secrète. Le serveur ne vit que pendant que le code est
   affiché, et son adresse porte un jeton tiré au hasard. Les valeurs en place sont
   pré-remplies : on relit ou on corrige une clé sans la retaper, et vider un champ
@@ -238,26 +238,8 @@ préconfiguré et ses scripts de test sont dans `emulator/`.
 
 Compiler pour iOS demande un Mac - voir [docs/ios.fr.md](docs/ios.fr.md).
 
-**Les sous-titres fonctionnent tels quels dans les versions publiées** - l'APK,
-l'AppImage, le MSI et le DMG des [Releases](https://github.com/JibayMcs/MooVie/releases)
-embarquent ce qu'il faut. Rien à créer, rien à coller. En option, connecter un compte
-OpenSubtitles dans les réglages relève la limite quotidienne de téléchargements et
-affiche le quota restant.
-
-Le paragraphe qui suit ne concerne que ceux qui **compilent depuis les sources**. Les
-sous-titres reposent sur une *clé de consumer* OpenSubtitles, qui identifie
-l'application ; OpenSubtitles impose une clé unique par application et bannit les comptes
-qui demandent la leur à leurs utilisateurs. Cette clé est injectée à la compilation et
-volontairement absente de ce dépôt : une compilation depuis les sources désactive donc
-simplement les sous-titres - le reste fonctionne. Pour les activer en développement, crée
-ton propre consumer sur [opensubtitles.com](https://www.opensubtitles.com/consumers) et
-dépose la clé dans un fichier `opensubtitles.properties` gitignoré, à la racine :
-
-```properties
-apiKey=TA_CLE_DE_CONSUMER
-```
-
-La variable d'environnement `OPENSUBTITLES_API_KEY` marche aussi, c'est ce qu'utilise la CI.
+**Les sous-titres n'ont besoin ni de clé ni de compte.** Ils viennent d'un addon Stremio
+public : les versions publiées et les compilations depuis les sources se comportent pareil.
 
 ## Contribuer
 

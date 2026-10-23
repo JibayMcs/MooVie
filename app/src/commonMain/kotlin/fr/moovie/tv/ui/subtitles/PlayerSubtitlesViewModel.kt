@@ -1,23 +1,16 @@
 package fr.moovie.tv.ui.subtitles
 
 import fr.moovie.tv.shared.dispatcherEs
-import fr.moovie.tv.shared.maintenantMs
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import fr.moovie.tv.core.sources.model.MediaRef
 import fr.moovie.tv.core.subtitles.model.SubtitleCandidate
-import fr.moovie.tv.core.subtitles.model.SubtitleQuota
 import fr.moovie.tv.core.subtitles.usecase.SubtitleTiming
 import fr.moovie.tv.core.subtitles.usecase.rankSubtitles
 import fr.moovie.tv.core.subtitles.usecase.timingFor
 import fr.moovie.tv.data.settings.SettingsRepository
-import fr.moovie.tv.data.subtitles.ChainedSubtitleCatalog
 import fr.moovie.tv.data.subtitles.StremioSubtitleCatalog
-import fr.moovie.tv.data.subtitles.OpenSubtitlesApi
-import fr.moovie.tv.data.subtitles.OpenSubtitlesCatalog
-import fr.moovie.tv.data.subtitles.OpenSubtitlesSession
 import fr.moovie.tv.data.subtitles.SubtitleFileStore
-import fr.moovie.tv.shared.openSubtitlesApiKey
 import fr.moovie.tv.ui.player.parseMediaKey
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,55 +24,39 @@ import okio.Path
 /**
  * Ce qui a empêché d'aboutir, en termes affichables.
  *
- * [DOWNLOAD_FAILED] est l'échec d'un téléchargement sans quota en cause : un
- * fichier vide, une URL refusée, une réponse trop lourde. Il ne doit jamais
- * s'afficher comme un quota épuisé.
+ * [DOWNLOAD_FAILED] est l'échec d'un téléchargement : un fichier vide, une URL
+ * refusée, une réponse trop lourde.
  */
-enum class SubtitleTrouble { QUOTA, NETWORK, NOTHING_FOUND, DOWNLOAD_FAILED }
+enum class SubtitleTrouble { NOTHING_FOUND, DOWNLOAD_FAILED }
 
 data class PlayerSubtitlesState(
     val available: Boolean = false,
     val loading: Boolean = false,
     val candidates: List<SubtitleCandidate> = emptyList(),
     val active: SubtitleCandidate? = null,
-    /** Identifiants déjà sur disque : les rejouer ne coûte rien. */
+    /** Identifiants déjà sur disque : les rejouer ne retélécharge rien. */
     val downloaded: Set<String> = emptySet(),
     val timing: SubtitleTiming = SubtitleTiming.None,
-    val quota: SubtitleQuota = SubtitleQuota.Unknown,
     val trouble: SubtitleTrouble? = null,
 )
 
 /**
  * Sous-titres en ligne, pendant la lecture.
  *
- * Deux principes gouvernent cette classe, et ils viennent tous deux de la
- * rareté du quota :
+ * Deux principes gouvernent cette classe :
  *
- * **La recherche est automatique, le téléchargement jamais.** Chercher ne coûte
- * rien et sans liste il n'y a rien à choisir ; télécharger coûte une unité d'un
- * quota qui se compte sur les doigts d'une main, et n'arrive donc que sur une
- * validation explicite.
+ * **La recherche est automatique, le téléchargement jamais.** Sans liste il n'y
+ * a rien à choisir ; télécharger n'arrive que sur une validation explicite.
  *
- * **Un sous-titre déjà payé ne se repaie pas.** Le fichier d'origine est gardé
+ * **Un sous-titre déjà téléchargé ne se retélécharge pas.** Le fichier d'origine est gardé
  * sur disque : changer de décalage, corriger la cadence ou revenir à ce
  * sous-titre après en avoir essayé un autre ne redéclenche aucun appel réseau.
  */
 class PlayerSubtitlesViewModel : ViewModel() {
 
     private val settings = SettingsRepository()
-    private val api = OpenSubtitlesApi(openSubtitlesApiKey)
-    private val session = OpenSubtitlesSession(api, settings)
-    /**
-     * OpenSubtitles d'abord, l'addon Stremio quand il ne rend rien.
-     *
-     * Deux cas où le second sert : une compilation depuis les sources, sans clé,
-     * où le premier se déclare indisponible et le lecteur annonçait « aucun
-     * sous-titre trouvé pour ce titre » sur des films qui en comptent des
-     * milliers ; et un titre pour lequel il ne trouve rien alors que l'autre
-     * fonds l'a. Voir [ChainedSubtitleCatalog].
-     */
-    private val catalog: ChainedSubtitleCatalog =
-        ChainedSubtitleCatalog(listOf(OpenSubtitlesCatalog(api), StremioSubtitleCatalog()))
+    /** L'addon Stremio public : aucune clé, aucun compte. */
+    private val catalog = StremioSubtitleCatalog()
     private val files = SubtitleFileStore()
 
     private val _state = MutableStateFlow(
@@ -116,8 +93,6 @@ class PlayerSubtitlesViewModel : ViewModel() {
         }
 
         _state.value = _state.value.copy(loading = true, trouble = null)
-        session.restore()
-        session.renewIfNeeded(maintenantMs())
 
         val languages = settings.subtitleLanguages.first()
         val found = catalog.search(media, languages)
@@ -125,8 +100,7 @@ class PlayerSubtitlesViewModel : ViewModel() {
             loading = false,
             // Les deux préférences de contenu passent ici, et nulle part
             // ailleurs : c'est le classement qui décide quel fichier l'utilisateur
-            // se verra proposer en premier, et à cinq téléchargements par jour ce
-            // premier rang est presque toute la fonctionnalité.
+            // se verra proposer en premier.
             candidates = rankSubtitles(
                 candidates = found,
                 preferredLanguages = languages,
@@ -135,14 +109,13 @@ class PlayerSubtitlesViewModel : ViewModel() {
                 preferForced = settings.subtitlePreferForced.first(),
             ),
             trouble = if (found.isEmpty()) SubtitleTrouble.NOTHING_FOUND else null,
-            quota = catalog.quota(),
             downloaded = files.storedIds(mediaKey, found),
         )
     }
 
     /**
-     * Active un sous-titre. Ne consomme le quota que si le fichier n'a pas déjà
-     * été téléchargé pour ce média.
+     * Active un sous-titre. Ne télécharge que si le fichier n'a pas déjà été
+     * récupéré pour ce média.
      */
     fun pick(candidate: SubtitleCandidate) = io {
         val cached = files.existing(mediaKey, candidate)
@@ -150,18 +123,12 @@ class PlayerSubtitlesViewModel : ViewModel() {
             _state.value = _state.value.copy(loading = true, trouble = null)
             val downloaded = catalog.download(candidate)
             if (downloaded == null) {
-                // « Quota épuisé » seulement si le catalogue d'où vient le candidat
-                // en compte un (OpenSubtitles). Chez l'addon Stremio, il n'y en a
-                // pas : un échec y est un échec de téléchargement, point.
-                val quotaEnCause = catalog.aUnQuota(candidate)
                 _state.value = _state.value.copy(
                     loading = false,
-                    trouble = if (quotaEnCause) SubtitleTrouble.QUOTA else SubtitleTrouble.DOWNLOAD_FAILED,
-                    quota = catalog.quota(),
+                    trouble = SubtitleTrouble.DOWNLOAD_FAILED,
                 )
                 return@io
             }
-            _state.value = _state.value.copy(quota = downloaded.quota)
             files.storeOriginal(mediaKey, candidate, downloaded.content)
         }
 
@@ -212,11 +179,11 @@ class PlayerSubtitlesViewModel : ViewModel() {
      * précédent : les candidats déjà listés (le menu ne cherchait donc plus,
      * `load` ne s'exécutant que sur une liste vide), le fichier recalé publié
      * dans [file], et la clé de média sous laquelle les téléchargements se
-     * rangent — un sous-titre payé pour l'épisode 3 aurait été classé sous
-     * l'épisode 2, et repayé à la prochaine écoute.
+     * rangent — un sous-titre téléchargé pour l'épisode 3 aurait été classé sous
+     * l'épisode 2, et retéléchargé à la prochaine écoute.
      *
      * Les fichiers d'origine restent sur disque : c'est [onLeave] qui ne
-     * balaie que les versions dérivées, et un sous-titre déjà payé ne doit pas
+     * balaie que les versions dérivées, et un sous-titre déjà téléchargé ne doit pas
      * disparaître parce qu'on a changé d'épisode.
      */
     fun reset() {
@@ -224,9 +191,7 @@ class PlayerSubtitlesViewModel : ViewModel() {
         original = null
         mediaKey = ""
         streamFps = null
-        // Même source que l'init : `load` sort si `available` est faux, donc la
-        // seule clé OpenSubtitles couperait la cascade Stremio après un passage
-        // d'épisode. Non testé : le ViewModel construit ses dépôts réels.
+        // Même source que l'init. Non testé : le ViewModel construit ses dépôts réels.
         _state.value = PlayerSubtitlesState(available = catalog.available)
         _file.value = null
     }

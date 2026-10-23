@@ -16,8 +16,10 @@ import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.viewmodel.CreationExtras
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
+import fr.moovie.tv.data.settings.SettingsRepository
 import fr.moovie.tv.data.profile.ProfileRepository
 import fr.moovie.tv.shared.fabriqueParDefaut
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 
 /**
@@ -56,6 +58,15 @@ fun ProfileHost(content: @Composable (profileId: String) -> Unit) {
     var session by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
+        // Retrait d'OpenSubtitles : on ne laisse pas dormir un mot de passe.
+        try {
+            SettingsRepository().purgeLegacyOsAccount()
+        } catch (annulation: CancellationException) {
+            throw annulation
+        } catch (e: Exception) {
+            // Sans trace, un échec ici laisserait le mot de passe en clair sans aucun signal.
+            println("[profil] purge des identifiants OpenSubtitles en échec : $e")
+        }
         val active = repo.restoreActive()
         session = if (repo.profiles.first().size > 1) null else active
         resolved = true

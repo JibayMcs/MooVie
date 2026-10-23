@@ -11,11 +11,8 @@ import fr.moovie.tv.resources.player_subtitles_earlier
 import fr.moovie.tv.resources.player_subtitles_fps
 import fr.moovie.tv.resources.player_subtitles_fps_auto
 import fr.moovie.tv.resources.player_subtitles_later
-import fr.moovie.tv.resources.player_subtitles_network
 import fr.moovie.tv.resources.player_subtitles_none_found
 import fr.moovie.tv.resources.player_subtitles_offset
-import fr.moovie.tv.resources.player_subtitles_quota_left
-import fr.moovie.tv.resources.player_subtitles_quota_out
 import fr.moovie.tv.resources.player_subtitles_searching
 import fr.moovie.tv.resources.player_subtitles_sync
 import fr.moovie.tv.resources.player_subtitles_sync_reset
@@ -39,27 +36,17 @@ import org.jetbrains.compose.resources.stringResource
  * Fight Club étaient des sous-titres d'une autre série, mal étiquetés sous le
  * même identifiant TMDB. Aucun critère automatique ne détecte ça — seul le nom
  * de la release trahit, et l'utilisateur doit l'avoir sous les yeux **avant** de
- * dépenser un téléchargement.
+ * télécharger.
  */
 @Composable
 fun onlineSubtitleSection(
     state: PlayerSubtitlesState,
     onPick: (SubtitleCandidate) -> Unit,
 ): PlayerOptionSection {
-    val title = buildString {
-        append(stringResource(Res.string.player_online_subtitles))
-        state.quota.remaining?.let {
-            append(" — ")
-            append(stringResource(Res.string.player_subtitles_quota_left, it))
-        }
-    }
+    val title = stringResource(Res.string.player_online_subtitles)
 
     val options = when {
         state.loading -> listOf(PlayerOption(stringResource(Res.string.player_subtitles_searching), false) {})
-        state.trouble == SubtitleTrouble.QUOTA ->
-            listOf(PlayerOption(stringResource(Res.string.player_subtitles_quota_out), false) {})
-        state.trouble == SubtitleTrouble.NETWORK ->
-            listOf(PlayerOption(stringResource(Res.string.player_subtitles_network), false) {})
         state.trouble == SubtitleTrouble.DOWNLOAD_FAILED ->
             listOf(PlayerOption(stringResource(Res.string.player_subtitles_download_failed), false) {})
         state.candidates.isEmpty() ->

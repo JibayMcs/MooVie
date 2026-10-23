@@ -55,8 +55,6 @@ class PairingFields(
     companion object {
         const val TMDB = "tmdb"
         const val INTRODB = "introdb"
-        const val OS_USER = "os_user"
-        const val OS_PASS = "os_pass"
         const val PASSPHRASE = "passphrase"
 
         /**
@@ -70,7 +68,6 @@ class PairingFields(
 
         /** Sections du formulaire, dans l'ordre où elles sont servies. */
         const val GROUP_API = "api"
-        const val GROUP_SUBTITLES = "subtitles"
         const val GROUP_SYNC = "sync"
     }
 
@@ -92,8 +89,6 @@ class PairingFields(
 
         add(GROUP_API, TMDB, settings.tmdbApiKey.first())
         add(GROUP_API, INTRODB, settings.introDbApiKey.first())
-        add(GROUP_SUBTITLES, OS_USER, settings.osUsername.first())
-        add(GROUP_SUBTITLES, OS_PASS, settings.osPassword.first())
 
         val provider = sync.provider.first()
         if (provider != SyncProvider.NONE) {
@@ -121,7 +116,7 @@ class PairingFields(
      * valoir effacement.
      *
      * On compare avant d'écrire pour ne compter que les vrais changements :
-     * renvoyer le formulaire sans rien toucher annoncerait sinon sept réglages
+     * renvoyer le formulaire sans rien toucher annoncerait sinon plusieurs réglages
      * enregistrés sur le téléviseur, ce qui est faux et inquiétant.
      */
     suspend fun apply(values: Map<String, String>): Int {
@@ -134,20 +129,6 @@ class PairingFields(
         }
         given[INTRODB]?.let { v ->
             if (v != settings.introDbApiKey.first()) { settings.setIntroDbApiKey(v); changed++ }
-        }
-
-        // Les identifiants OpenSubtitles s'écrivent d'un bloc : n'en renvoyer
-        // qu'un ne doit pas effacer l'autre.
-        if (given.containsKey(OS_USER) || given.containsKey(OS_PASS)) {
-            val user = settings.osUsername.first()
-            val pass = settings.osPassword.first()
-            val newUser = given[OS_USER] ?: user
-            val newPass = given[OS_PASS] ?: pass
-            if (newUser != user || newPass != pass) {
-                settings.setOsCredentials(newUser, newPass, settings.osRemember.first())
-                if (newUser != user) changed++
-                if (newPass != pass) changed++
-            }
         }
 
         given[PASSPHRASE]?.let { v ->

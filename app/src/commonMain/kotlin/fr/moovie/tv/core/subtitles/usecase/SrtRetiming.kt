@@ -9,11 +9,11 @@ package fr.moovie.tv.core.subtitles.usecase
  * dérive dominante (23,976 contre 25). Posséder le fichier est donc le seul
  * moyen d'obtenir le même comportement sur les deux lecteurs, avec un seul code.
  *
- * OpenSubtitles sait aussi convertir à la livraison (`in_fps` / `out_fps` /
- * `timeshift` sur `/download`) — **volontairement inutilisé** : chaque
- * ajustement repasserait alors par un téléchargement, donc par le quota, alors
- * que régler un décalage se fait par petites touches successives. Ici on
- * retravaille le fichier déjà payé, autant de fois qu'on veut, hors ligne.
+ * OpenSubtitles savait aussi convertir à la livraison (`in_fps` / `out_fps` /
+ * `timeshift` sur `/download`), option écartée à l'époque : chaque ajustement
+ * serait repassé par un téléchargement, alors que régler un décalage se fait par
+ * petites touches successives. Ici on retravaille le fichier déjà téléchargé,
+ * autant de fois qu'on veut, hors ligne.
  *
  * Tout ce qui n'est pas un horodatage est rendu **intact** : numérotation,
  * texte, balises, coordonnées de position en fin de ligne, fins de ligne

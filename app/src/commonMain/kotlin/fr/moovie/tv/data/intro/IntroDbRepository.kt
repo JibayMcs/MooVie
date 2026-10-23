@@ -65,8 +65,8 @@ enum class SubmitError { NO_KEY, UNAUTHORIZED, ALREADY_SUBMITTED, RATE_LIMITED, 
  * et de générique, et permet d'en signaler quand ils manquent.
  * API non bloquée par les FAI → DNS système (pas besoin du DoH).
  *
- * **La clé est celle de l'utilisateur, pas de l'application.** C'est l'inverse
- * d'OpenSubtitles : ici elle identifie un contributeur, et la sémantique de
+ * **La clé est celle de l'utilisateur, pas de l'application.** Elle identifie un
+ * contributeur, et la sémantique de
  * l'API le confirme — ses propres signalements comptent **dix fois plus** dans
  * la moyenne qui lui est servie. Elle se saisit donc dans les réglages, comme
  * celle de TMDB.

@@ -240,8 +240,6 @@ class BackupRepository(
         screensaverDelay = settingsRepo.screensaverDelay.first().name,
         splashAnimation = settingsRepo.splashAnimation.first(),
         subtitleLanguages = settingsRepo.subtitleLanguages.first(),
-        osUsername = settingsRepo.osUsername.first().takeIf { it.isNotBlank() },
-        osRemember = settingsRepo.osRemember.first(),
     )
 
     /**
@@ -279,9 +277,6 @@ class BackupRepository(
         // Vide = le fichier n'en parle pas. Écraser les langues de l'appareil par
         // une liste vide le laisserait sans aucun sous-titre à chercher.
         if (s.subtitleLanguages.isNotEmpty()) settingsRepo.setSubtitleLanguages(s.subtitleLanguages)
-        s.osUsername?.takeIf { it.isNotBlank() }?.let {
-            settingsRepo.restoreOsAccount(it, remember = s.osRemember ?: false)
-        }
         if (s.providerOrder.isNotEmpty()) settingsRepo.setProviderOrder(s.providerOrder)
         s.disabledProviders.forEach { settingsRepo.setProviderEnabled(it, enabled = false) }
     }

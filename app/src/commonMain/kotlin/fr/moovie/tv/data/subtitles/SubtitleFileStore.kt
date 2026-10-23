@@ -14,10 +14,10 @@ import okio.Path.Companion.toPath
  * recalées à la demande.
  *
  * **Le fichier d'origine n'est jamais réécrit.** Chaque réglage produit un
- * nouveau fichier dérivé, et l'original reste intact : un téléchargement coûte
- * une unité d'un quota qui se compte sur les doigts d'une main, le perdre parce
- * qu'un décalage a mal tourné serait inacceptable. Revenir en arrière ne coûte
- * donc rien.
+ * nouveau fichier dérivé, et l'original reste intact. Quand OpenSubtitles
+ * comptait les téléchargements sur un quota (service retiré depuis), perdre un
+ * original aurait coûté une unité de ce quota ; la règle reste la même, et
+ * revenir en arrière ne coûte donc rien.
  *
  * Chaque version recalée porte un **nom différent**. Ce n'est pas de la
  * cosmétique : Media3 met en cache par URI, et réécrire le même chemin
@@ -70,7 +70,7 @@ class SubtitleFileStore(
      *
      * Appelé en quittant la lecture : ajuster un décalage pendant un film peut
      * en produire une dizaine, et rien ne justifie de les garder — alors que
-     * l'original, lui, a été payé.
+     * l'original, lui, a coûté un téléchargement.
      */
     fun clearDerived(mediaKey: String) {
         val prefix = safe(mediaKey)
@@ -83,8 +83,8 @@ class SubtitleFileStore(
      * Identifiants, parmi [candidats], de ceux déjà téléchargés pour ce média.
      *
      * Sert à marquer la liste : sans ce repère, retrouver lequel des candidats
-     * a déjà été payé relève du pari, et se tromper coûte une unité d'un quota
-     * qui se compte sur les doigts d'une main.
+     * a déjà été téléchargé relevait du pari. Du temps d'OpenSubtitles, un
+     * téléchargement se comptait sur un quota, et se tromper coûtait une unité.
      *
      * Rend les `fileId` d'origine, et non leur forme sur disque : c'est eux que
      * l'écran compare. Le nom est reconstruit par le même [safe] que

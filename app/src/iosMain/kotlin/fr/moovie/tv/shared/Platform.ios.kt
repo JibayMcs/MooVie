@@ -14,8 +14,6 @@ actual val appVersionName: String = VERSION_GENEREE
 
 actual val appBuildId: String = BUILD_ID_GENERE
 
-actual val openSubtitlesApiKey: String = CLE_OPENSUBTITLES_GENEREE
-
 /**
  * Depuis iOS 16, `UIDevice.name` ne rend plus le nom donné par l'utilisateur
  * mais le modèle (« iPhone ») sauf entitlement dédié, que le sideload n'a pas.

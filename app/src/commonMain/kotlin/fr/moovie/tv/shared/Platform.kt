@@ -28,18 +28,6 @@ expect val appVersionName: String
 expect val appBuildId: String
 
 /**
- * Clé de consumer OpenSubtitles, injectée à la compilation. Vide si le build
- * n'en a pas — les sous-titres se désactivent alors proprement.
- *
- * Elle identifie **l'application**, jamais l'utilisateur : OpenSubtitles impose
- * une clé unique par application et bannit l'accès de ceux qui demandent la leur
- * à leurs utilisateurs. C'est l'inverse de TMDB, dont la clé est propre à chaque
- * personne et se saisit donc dans les réglages. Ce qui est propre à
- * l'utilisateur ici, c'est son compte, et lui seul.
- */
-expect val openSubtitlesApiKey: String
-
-/**
  * Nom de l'appareil tel qu'il s'annonce aux autres — « Mi Box 4 », « Pixel 8 ».
  *
  * Sert deux fois : à nommer le téléviseur dans l'annonce réseau, et à le nommer

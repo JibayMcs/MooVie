@@ -84,9 +84,9 @@ and **iOS**, built from a single Kotlin Multiplatform codebase. Source extractio
   in a corner, tap it to come back full screen. A button in the control bar does the same
   without leaving the app. Playback also reaches the notification shade and the lock
   screen, with pause, ±15 s and episode arrows.
-- **Subtitles** (OpenSubtitles) - searched from the player, ranked by language, frame
-  rate and release, and downloaded only on an explicit press since the daily allowance is
-  small. Already-downloaded ones are marked so you never spend twice. Comes with an offset
+- **Subtitles** (public Stremio addon, no key or account) - searched from the player,
+  ranked by language, frame rate and release, and downloaded only on an explicit press.
+  Already-downloaded ones are marked so you never fetch twice. Comes with an offset
   *and* a frame-rate correction: exact matching relies on hashing the video file, which
   segmented streams make impossible, so drift is the normal case rather than an accident.
 - **Skip intro & credits** (TheIntroDB) - skipping credits rolls into the next episode.
@@ -119,7 +119,7 @@ and **iOS**, built from a single Kotlin Multiplatform codebase. Source extractio
 - **Enter keys from your phone** (Android TV) - typing an API key on a remote, letter by
   letter on a grid keyboard, is the worst moment in the app. The TV shows a QR code, your
   phone opens a page served by the app itself over the local network, and you type on a
-  touch keyboard: TMDB and TheIntroDB keys, OpenSubtitles account, sync credentials and
+  touch keyboard: TMDB and TheIntroDB keys, sync credentials and
   passphrase. The server only lives while the code is on screen, and its address carries
   a random token. Existing values are prefilled, so you can reread or fix a key without
   retyping it, and clearing a field erases it. The page doubles as a **remote** - D-pad,
@@ -221,25 +221,8 @@ emulator and its test scripts live in `emulator/`.
 
 Building for iOS requires a Mac - see [docs/ios.md](docs/ios.md).
 
-**Subtitles work out of the box in the published builds** - the APK, AppImage, MSI and
-DMG from [Releases](https://github.com/JibayMcs/MooVie/releases) all ship with what they
-need. Nothing to create, nothing to paste. Optionally, connecting an OpenSubtitles
-account in the settings raises the daily download limit and shows the quota left.
-
-The rest of this paragraph only concerns people **building from source**. Subtitles rely
-on an OpenSubtitles *consumer key*, which identifies the application; OpenSubtitles
-mandates one key per app and bans accounts that ask their users to supply their own. That
-key is injected at build time and is deliberately absent from this repository, so a build
-from source simply turns subtitles off - everything else works. To enable them while
-developing, create your own consumer on
-[opensubtitles.com](https://www.opensubtitles.com/consumers) and drop the key in a
-gitignored `opensubtitles.properties` at the root:
-
-```properties
-apiKey=YOUR_CONSUMER_KEY
-```
-
-`OPENSUBTITLES_API_KEY` in the environment works too, which is what CI uses.
+**Subtitles need no key and no account.** They come from a public Stremio addon, so
+the published builds and builds from source behave the same.
 
 ## Contributing
 

@@ -30,8 +30,6 @@ class BackupJsonTest {
             dohEnabled = true,
             splashAnimation = false,
             subtitleLanguages = listOf("fr", "en"),
-            osUsername = "jb",
-            osRemember = true,
         ),
     )
 
@@ -92,7 +90,26 @@ class BackupJsonTest {
     }
 
     /**
-     * Le mot de passe OpenSubtitles ne doit jamais atteindre le fichier : le
+     * Une sauvegarde d'une ancienne version porte encore un compte OpenSubtitles :
+     * elle s'importe quand même, et seuls les réglages qui existent encore sont
+     * relus. Le compte est ignoré, le format n'ayant plus de champ pour lui.
+     */
+    @Test
+    fun `une sauvegarde d'une ancienne version avec un compte s'importe`() {
+        val raw = """
+            {"version":${MoovieBackup.FORMAT_VERSION},
+             "settings":{"streamLanguage":"VF","subtitleLanguages":["fr"],
+                         "osUsername":"jb","osRemember":true}}
+        """.trimIndent()
+
+        val backup = BackupJson.decode(raw)
+
+        assertEquals("VF", backup?.settings?.streamLanguage)
+        assertEquals(listOf("fr"), backup?.settings?.subtitleLanguages)
+    }
+
+    /**
+     * Aucun mot de passe ne doit atteindre le fichier : le
      * format ne lui offre aucun champ, et c'est délibéré. Ce test échoue le jour
      * où quelqu'un en ajoute un « pour être complet ».
      */

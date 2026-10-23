@@ -98,7 +98,7 @@ class PairingProtocolTest {
     /** Dans un formulaire, `+` est une espace — et pas dans une URL. */
     @Test
     fun `traite le plus comme une espace`() {
-        assertEquals("mot de passe", decodeForm("os_pass=mot+de+passe")["os_pass"])
+        assertEquals("mot de passe", decodeForm("passphrase=mot+de+passe")["passphrase"])
     }
 
     @Test
@@ -186,23 +186,22 @@ class PairingProtocolTest {
     /**
      * Les champs sont regroupés sous le service qui les réclame.
      *
-     * « Identifiant » et « Mot de passe » ne veulent rien dire seuls au milieu
-     * d'un formulaire : c'est le titre de section qui dit de quel compte il
-     * s'agit. Une section par service, dans l'ordre de saisie.
+     * « Identifiant de clé » ne veut rien dire seul au milieu d'un formulaire :
+     * c'est le titre de section qui dit de quel service il s'agit. Une section par service, dans l'ordre de saisie.
      */
     @Test
     fun `groupe les champs par service, sans dupliquer un titre`() {
         val html = pairingPage(
             listOf(
-                PairingField("os_user", "Identifiant", "Sous-titres · OpenSubtitles", ""),
-                PairingField("os_pass", "Mot de passe", "Sous-titres · OpenSubtitles", ""),
+                PairingField("tmdb", "Clé TMDB", "API", ""),
+                PairingField("introdb", "Clé TheIntroDB", "API", ""),
                 PairingField("sync.b2_key_id", "Identifiant de clé", "Synchro · Backblaze B2", ""),
             ),
             texts,
             "/t",
         )
         assertEquals(2, Regex("<section>").findAll(html).count(), html)
-        assertEquals(1, Regex("OpenSubtitles").findAll(html).count())
+        assertEquals(1, Regex("<h2>API</h2>").findAll(html).count())
         assertTrue("<h2>Synchro · Backblaze B2</h2>" in html)
     }
 

@@ -185,7 +185,7 @@ class AvPlayerController(
      *
      * AVPlayer ne sait pas charger une piste depuis un fichier à côté du flux :
      * il faut soit un HLS qui la déclare, soit un `AVMutableComposition`
-     * assemblé à la main. Les sous-titres téléchargés depuis OpenSubtitles sont
+     * assemblé à la main. Les sous-titres téléchargés depuis l'addon Stremio sont
      * déjà convertis en WebVTT par `SrtToVtt` — la voie propre sera de les
      * injecter dans une playlist HLS locale, comme le fait déjà le stockage des
      * manifestes de bandes-annonces.

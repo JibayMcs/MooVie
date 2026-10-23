@@ -3,7 +3,6 @@ package fr.moovie.tv.data.subtitles
 import fr.moovie.tv.core.sources.model.MediaRef
 import fr.moovie.tv.core.subtitles.model.DownloadedSubtitle
 import fr.moovie.tv.core.subtitles.model.SubtitleCandidate
-import fr.moovie.tv.core.subtitles.model.SubtitleQuota
 import fr.moovie.tv.core.subtitles.port.SubtitleCatalog
 import fr.moovie.tv.data.net.clientRest
 import fr.moovie.tv.data.settings.SettingsRepository
@@ -31,17 +30,10 @@ import kotlinx.serialization.json.jsonPrimitive
  *
  * ## Pourquoi il existe
  *
- * L'adaptateur OpenSubtitles a besoin d'une clé qui identifie *l'application* et
- * s'injecte à la compilation. Une construction depuis les sources n'en a pas :
- * `available` est alors faux, la recherche rend une liste vide sans appeler le
- * réseau, et le lecteur affiche « aucun sous-titre trouvé pour ce titre » —
- * y compris sur un film qui en compte des milliers. Le message est exact du
- * point de vue du code et trompeur du point de vue de l'utilisateur.
- *
- * L'addon `opensubtitles-v3.strem.io` sert **le même fonds** en accès libre :
- * pas de clé, pas de compte, pas de quota de cinq par jour. Sur un fork qui
- * parle déjà le protocole des addons et qui sait traduire un identifiant TMDB en
- * IMDB, c'est une pièce de plus, pas une architecture de plus.
+ * L'addon `opensubtitles-v3.strem.io` sert un très large fonds en accès libre :
+ * pas de clé, pas de compte, pas de quota. C'est le seul catalogue de
+ * l'application. Il parle le protocole des addons et traduit un identifiant
+ * TMDB en IMDB.
  *
  * ## Ce qu'il ne sait pas faire, et qu'il faut savoir
  *
@@ -51,9 +43,6 @@ import kotlinx.serialization.json.jsonPrimitive
  * une autre version que celle qu'on regarde, et décaler de plusieurs secondes.
  * Le réglage de décalage du lecteur reste la parade, et c'est la raison de
  * rendre **plusieurs candidats par langue** plutôt que le meilleur.
- *
- * Aucun quota : [quota] rend toujours `Unknown`, ce qui est la vérité et non un
- * aveu d'ignorance.
  */
 class StremioSubtitleCatalog(
     private val addonUrl: String = ADDON_PAR_DEFAUT,
@@ -186,9 +175,6 @@ class StremioSubtitleCatalog(
             fileName = url.substringAfterLast('/').substringBefore('?'),
         )
     }
-
-    /** Pas de quota du tout chez cet addon : l'inconnu serait un mensonge poli. */
-    override suspend fun quota(): SubtitleQuota = SubtitleQuota.Unknown
 
     internal companion object {
 

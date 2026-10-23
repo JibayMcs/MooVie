@@ -38,8 +38,6 @@ actual val appVersionName: String = BuildConfig.VERSION_NAME
 
 actual val appBuildId: String = BuildConfig.APP_BUILD_ID
 
-actual val openSubtitlesApiKey: String = BuildConfig.OPENSUBTITLES_API_KEY
-
 actual val deviceName: String
     get() = listOfNotNull(
         Build.MANUFACTURER?.takeIf { it.isNotBlank() }?.replaceFirstChar { it.uppercase() },

@@ -213,17 +213,6 @@ data class BackupSettings(
      * parle pas », et laisse alors celles de l'appareil tranquilles.
      */
     val subtitleLanguages: List<String> = emptyList(),
-
-    /**
-     * Compte OpenSubtitles, **sans le mot de passe**.
-     *
-     * Une clé d'API se révoque et ne vaut que pour un service ; un mot de passe
-     * se réessaie ailleurs. Le nom d'utilisateur épargne la saisie au clavier
-     * virtuel, et [osRemember] est une préférence — la case retrouvée cochée
-     * quand l'utilisateur ressaisit son mot de passe.
-     */
-    val osUsername: String? = null,
-    val osRemember: Boolean? = null,
 )
 
 /**

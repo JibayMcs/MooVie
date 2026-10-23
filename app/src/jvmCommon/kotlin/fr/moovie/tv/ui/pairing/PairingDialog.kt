@@ -26,7 +26,6 @@ import androidx.compose.ui.window.Dialog
 import fr.moovie.tv.data.pairing.PairingFields
 import fr.moovie.tv.ui.sync.providerLabel
 import fr.moovie.tv.resources.settings_cat_sync
-import fr.moovie.tv.resources.settings_cat_subtitles
 import fr.moovie.tv.resources.settings_cat_api
 import fr.moovie.tv.data.sync.SyncSettingsRepository
 import fr.moovie.tv.data.sync.SyncProvider
@@ -76,8 +75,6 @@ import fr.moovie.tv.resources.pairing_title
 import fr.moovie.tv.resources.pairing_waiting
 import fr.moovie.tv.resources.settings_introdb_key
 import fr.moovie.tv.resources.settings_tmdb_key
-import fr.moovie.tv.resources.subtitles_password
-import fr.moovie.tv.resources.subtitles_username
 import fr.moovie.tv.resources.sync_field_b2_app_key
 import fr.moovie.tv.resources.sync_field_b2_key_id
 import fr.moovie.tv.resources.sync_passphrase_hint
@@ -152,23 +149,19 @@ fun rememberPairingHost(): PairingServer? {
     val labels = mapOf(
         PairingFields.TMDB to stringResource(Res.string.settings_tmdb_key),
         PairingFields.INTRODB to stringResource(Res.string.settings_introdb_key),
-        PairingFields.OS_USER to stringResource(Res.string.subtitles_username),
-        PairingFields.OS_PASS to stringResource(Res.string.subtitles_password),
         PairingFields.PASSPHRASE to stringResource(Res.string.sync_passphrase_hint),
         PairingFields.SYNC_PREFIX + B2_KEY_ID to stringResource(Res.string.sync_field_b2_key_id),
         PairingFields.SYNC_PREFIX + B2_APP_KEY to stringResource(Res.string.sync_field_b2_app_key),
     )
 
     // Titres de sections. Le service est nommé dans le titre plutôt que laissé
-    // à deviner : « Identifiant » sous « Sous-titres · OpenSubtitles » se
+    // à deviner : « Identifiant » sous « Synchronisation · Backblaze B2 » se
     // comprend seul, isolé il ne veut rien dire. Les marques ne se traduisent
     // pas, d'où la composition avec la catégorie traduite.
     val provider by remember { SyncSettingsRepository().provider }
         .collectAsState(initial = SyncProvider.NONE)
     val groups = mapOf(
         PairingFields.GROUP_API to stringResource(Res.string.settings_cat_api),
-        PairingFields.GROUP_SUBTITLES to
-            "${stringResource(Res.string.settings_cat_subtitles)} · OpenSubtitles",
         PairingFields.GROUP_SYNC to
             "${stringResource(Res.string.settings_cat_sync)} · ${providerLabel(provider)}",
     )

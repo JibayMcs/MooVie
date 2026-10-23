@@ -22,7 +22,7 @@ class SettingsViewModel : ViewModel() {
     val tmdbApiKey: StateFlow<String> =
         repo.tmdbApiKey.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "")
 
-    /** Clé TheIntroDB : propre à l'utilisateur, contrairement à celle d'OpenSubtitles. */
+    /** Clé TheIntroDB : propre à l'utilisateur. */
     val introDbApiKey: StateFlow<String> =
         repo.introDbApiKey.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "")
 

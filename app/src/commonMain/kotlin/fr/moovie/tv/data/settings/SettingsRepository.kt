@@ -222,10 +222,9 @@ class SettingsRepository {
     /**
      * Clé TheIntroDB, propre à **l'utilisateur**.
      *
-     * Contrairement à celle d'OpenSubtitles, qui identifie l'application et vit
-     * dans le binaire, celle-ci identifie un contributeur : ses signalements
-     * comptent dix fois plus dans la moyenne qui lui est servie. Elle se saisit
-     * donc ici, comme celle de TMDB. Facultative — sans elle la lecture des
+     * Elle identifie un contributeur : ses signalements comptent dix fois plus
+     * dans la moyenne qui lui est servie. Elle se saisit donc ici, comme celle
+     * de TMDB. Facultative — sans elle la lecture des
      * segments fonctionne, seul le signalement est fermé.
      */
     val introDbApiKey: Flow<String> = store.data.map { it[INTRODB_API_KEY].orEmpty() }
@@ -233,70 +232,21 @@ class SettingsRepository {
     suspend fun setIntroDbApiKey(value: String) =
         store.edit { it[INTRODB_API_KEY] = value }
 
-    // ─── Compte OpenSubtitles ────────────────────────────────────────────────
-    //
-    // La *clé* d'API n'est pas ici : elle identifie l'application et vit dans le
-    // binaire. Ce qui est propre à l'utilisateur, c'est son compte, et lui seul.
-    // Sans compte, le téléchargement reste possible mais très plafonné.
-
-    val osUsername: Flow<String> = store.data.map { it[OS_USERNAME].orEmpty() }
-
     /**
-     * Mot de passe, conservé **uniquement si l'utilisateur l'a demandé**.
+     * Efface les identifiants OpenSubtitles d'une version précédente.
      *
-     * Il n'existe aucun endpoint de rafraîchissement chez OpenSubtitles : le
-     * jeton vaut 24 h et le renouveler impose de renvoyer les identifiants. Se
-     * souvenir de la connexion signifie donc mécaniquement garder le mot de
-     * passe — on le dit à l'utilisateur plutôt que de le cacher derrière une
-     * case à cocher anodine.
-     *
-     * Il ne part **jamais** dans une sauvegarde : une clé d'API se révoque et ne
-     * vaut que pour un service, un mot de passe se réutilise ailleurs.
+     * Le compte et la connexion ont disparu : plus rien ne les lit. Mais le
+     * magasin les garde tant qu'on ne les retire pas, mot de passe en clair
+     * compris si « rester connecté » était coché. Appelé au démarrage ; sans
+     * effet quand il n'y a rien à effacer.
      */
-    val osPassword: Flow<String> = store.data.map { it[OS_PASSWORD].orEmpty() }
-
-    val osRemember: Flow<Boolean> = store.data.map { it[OS_REMEMBER] ?: false }
-
-    /** Jeton de session. Vide = déconnecté. */
-    val osToken: Flow<String> = store.data.map { it[OS_TOKEN].orEmpty() }
-
-    /** Instant d'obtention du jeton, pour savoir quand il expire (24 h). */
-    val osTokenAt: Flow<Long> = store.data.map { it[OS_TOKEN_AT] ?: 0L }
-
-    suspend fun setOsCredentials(username: String, password: String, remember: Boolean) =
-        store.edit {
-            it[OS_USERNAME] = username
-            it[OS_REMEMBER] = remember
-            // Oublier, c'est effacer : garder le mot de passe d'un utilisateur
-            // qui vient de décocher la case serait le trahir.
-            if (remember) it[OS_PASSWORD] = password else it.remove(OS_PASSWORD)
-        }
-
-    /**
-     * Rétablit le compte depuis une sauvegarde : le nom et la préférence, **pas
-     * le mot de passe** — il n'a jamais quitté l'appareil d'origine. On ne passe
-     * donc pas par [setOsCredentials], qui écrirait un mot de passe vide et
-     * laisserait croire à une session réouvrable.
-     */
-    suspend fun restoreOsAccount(username: String, remember: Boolean) = store.edit {
-        it[OS_USERNAME] = username
-        it[OS_REMEMBER] = remember
-    }
-
-    suspend fun setOsSession(token: String, atMs: Long) = store.edit {
-        it[OS_TOKEN] = token
-        it[OS_TOKEN_AT] = atMs
-    }
-
-    suspend fun clearOsSession() = store.edit {
-        it.remove(OS_TOKEN)
-        it.remove(OS_TOKEN_AT)
-    }
-
-    /** Déconnexion complète : la session *et* ce qui permettait de la rouvrir. */
-    suspend fun forgetOsAccount() = store.edit {
-        listOf(OS_TOKEN, OS_TOKEN_AT, OS_USERNAME, OS_PASSWORD, OS_REMEMBER)
-            .forEach { key -> it.remove(key) }
+    suspend fun purgeLegacyOsAccount() = store.edit {
+        listOf("os_username", "os_password", "os_remember", "os_token", "os_token_at")
+            .forEach { name ->
+                it.remove(stringPreferencesKey(name))
+                it.remove(booleanPreferencesKey(name))
+                it.remove(longPreferencesKey(name))
+            }
     }
 
     /**
@@ -398,11 +348,6 @@ class SettingsRepository {
         val UPDATE_INTERVAL = stringPreferencesKey("update_interval")
         val SCREENSAVER_DELAY = stringPreferencesKey("screensaver_delay")
         val INTRODB_API_KEY = stringPreferencesKey("introdb_api_key")
-        val OS_USERNAME = stringPreferencesKey("os_username")
-        val OS_PASSWORD = stringPreferencesKey("os_password")
-        val OS_REMEMBER = booleanPreferencesKey("os_remember")
-        val OS_TOKEN = stringPreferencesKey("os_token")
-        val OS_TOKEN_AT = longPreferencesKey("os_token_at")
         val SUBTITLE_LANGUAGES = stringPreferencesKey("subtitle_languages")
         val SUBTITLE_PREFER_FORCED = booleanPreferencesKey("subtitle_prefer_forced")
         val SUBTITLE_PREFER_SDH = booleanPreferencesKey("subtitle_prefer_sdh")

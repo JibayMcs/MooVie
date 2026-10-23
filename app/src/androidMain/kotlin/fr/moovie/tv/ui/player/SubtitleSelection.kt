@@ -30,7 +30,7 @@ internal sealed interface SubtitleWish {
     /** Aucun sous-titre : c'est aussi l'état de départ du lecteur. */
     data object Off : SubtitleWish
 
-    /** Le fichier que nous avons monté nous-mêmes (OpenSubtitles). */
+    /** Le fichier que nous avons monté nous-mêmes (addon Stremio). */
     data object External : SubtitleWish
 
     /**

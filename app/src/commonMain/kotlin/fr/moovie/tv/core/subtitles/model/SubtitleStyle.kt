@@ -7,7 +7,7 @@ package fr.moovie.tv.core.subtitles.model
  *
  * Un sous-titre se lit à trois mètres, sur un écran qu'on ne choisit pas, dans
  * une pièce qu'on n'éclaire pas pour lire. Netflix, Plex et Jellyfin proposent
- * tous ce réglage ; ici il compte davantage, parce que **le fichier OpenSubtitles
+ * tous ce réglage ; ici il compte davantage, parce que **le sous-titre externe
  * est souvent le seul texte lisible du flux** — nos hébergeurs servent du
  * mono-piste sans sous-titre incrusté, la piste externe n'a donc pas de repli.
  *

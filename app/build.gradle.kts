@@ -70,52 +70,29 @@ val keystoreProps = Properties().apply {
 fun signingValue(propKey: String, envKey: String): String? =
     keystoreProps.getProperty(propKey) ?: System.getenv(envKey)
 
-// Clé de consumer OpenSubtitles. Même dispositif que le keystore : fichier
-// gitignoré en local, secret GitHub en CI, injectée à la compilation.
-//
-// Elle identifie *l'application*, pas l'utilisateur : OpenSubtitles impose une
-// clé unique par application et bannit l'accès de ceux qui demandent la leur à
-// leurs utilisateurs. Elle ne peut donc pas être saisie dans les réglages comme
-// celle de TMDB, et n'a rien à faire dans un dépôt public — d'où l'injection.
-//
-// Absente (build depuis les sources sans clé), les sous-titres se désactivent
-// proprement plutôt que de faire échouer la compilation.
-val openSubtitlesProps = Properties().apply {
-    val f = rootProject.file("opensubtitles.properties")
-    if (f.exists()) f.inputStream().use { load(it) }
-}
-
-val openSubtitlesApiKey: String =
-    openSubtitlesProps.getProperty("apiKey")
-        ?: System.getenv("OPENSUBTITLES_API_KEY")
-        ?: ""
-
 /**
  * Équivalent iOS de `BuildConfig`.
  *
- * La version affichée et la clé OpenSubtitles atteignent l'APK par un champ
+ * La version affichée atteint l'APK par un champ
  * `BuildConfig` et le desktop par une propriété système passée à la JVM.
  * Kotlin/Native n'a ni l'un ni l'autre : pas de `System.getProperty`, et rien
  * n'injecte de constante dans un binaire natif après coup. On génère donc une
  * source, ce qui garde l'unique `appVersion` de ce fichier comme seule origine
  * du numéro de version sur les quatre plateformes.
  *
- * Passer par `Info.plist` aurait été possible pour la version, mais pas pour la
- * clé : le plist est en clair dans le bundle, là où une constante compilée est
- * au moins noyée dans le binaire — même protection, faible, que côté Android.
+ * Passer par `Info.plist` aurait aussi été possible pour la version.
  */
 val genererBuildConfigIos by tasks.registering {
     val sortie = layout.buildDirectory.dir("generated/moovie/ios")
     // Sans ces deux `inputs`, Gradle considérerait la tâche à jour après un
-    // changement de version ou de clé, et le binaire iOS embarquerait
+    // changement de version, et le binaire iOS embarquerait
     // silencieusement les anciennes valeurs.
     inputs.property("version", appVersion)
     inputs.property("buildId", appBuildId)
-    inputs.property("cleOpenSubtitles", openSubtitlesApiKey)
     outputs.dir(sortie)
     doLast {
-        // Échappement : la clé vient d'un secret CI, rien ne garantit qu'elle
-        // ne porte pas de guillemet ou d'antislash.
+        // Échappement : rien ne garantit que la valeur ne porte pas de
+        // guillemet ou d'antislash.
         fun litteral(v: String) = v.replace("\\", "\\\\").replace("\"", "\\\"")
         val f = sortie.get().file("MoovieBuildConfig.kt").asFile
         f.parentFile.mkdirs()
@@ -126,7 +103,6 @@ val genererBuildConfigIos by tasks.registering {
 
             internal const val VERSION_GENEREE: String = "${litteral(appVersion)}"
             internal const val BUILD_ID_GENERE: String = "${litteral(appBuildId)}"
-            internal const val CLE_OPENSUBTITLES_GENEREE: String = "${litteral(openSubtitlesApiKey)}"
             """.trimIndent() + "\n",
         )
     }
@@ -350,7 +326,6 @@ android {
         versionCode = appVersionCode
         versionName = appVersion
         buildConfigField("String", "APP_BUILD_ID", "\"$appBuildId\"")
-        buildConfigField("String", "OPENSUBTITLES_API_KEY", "\"$openSubtitlesApiKey\"")
     }
 
     signingConfigs {
@@ -437,9 +412,6 @@ tasks.withType<Test>().configureEach {
     ).forEach { key ->
         System.getProperty(key)?.let { systemProperty(key, it) }
     }
-    // Les sondes OpenSubtitles interrogent la vraie API : sans la clé elles
-    // s'abstiennent au lieu d'échouer.
-    systemProperty("moovie.opensubtitles.key", openSubtitlesApiKey)
 }
 
 compose.resources {
@@ -460,9 +432,6 @@ compose.desktop {
         // Identité de build, lue par le cache des sources : même numéro de
         // version, build différent, cache rejeté.
         jvmArgs += "-Dmoovie.build=$appBuildId"
-        // Pendant de BuildConfig côté Android : le desktop lit la clé en
-        // propriété système, comme il lit déjà la version.
-        jvmArgs += "-Dmoovie.opensubtitles.key=$openSubtitlesApiKey"
 
         // JDK dont jpackage tire le runtime embarqué, quand il doit différer de
         // celui qui exécute Gradle. Sous Linux la CI y met l'OpenJDK de la
