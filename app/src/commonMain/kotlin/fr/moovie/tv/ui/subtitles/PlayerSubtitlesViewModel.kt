@@ -11,6 +11,8 @@ import fr.moovie.tv.core.subtitles.usecase.SubtitleTiming
 import fr.moovie.tv.core.subtitles.usecase.rankSubtitles
 import fr.moovie.tv.core.subtitles.usecase.timingFor
 import fr.moovie.tv.data.settings.SettingsRepository
+import fr.moovie.tv.data.subtitles.ChainedSubtitleCatalog
+import fr.moovie.tv.data.subtitles.StremioSubtitleCatalog
 import fr.moovie.tv.data.subtitles.OpenSubtitlesApi
 import fr.moovie.tv.data.subtitles.OpenSubtitlesCatalog
 import fr.moovie.tv.data.subtitles.OpenSubtitlesSession
@@ -26,8 +28,14 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okio.Path
 
-/** Ce qui a empêché d'aboutir, en termes affichables. */
-enum class SubtitleTrouble { QUOTA, NETWORK, NOTHING_FOUND }
+/**
+ * Ce qui a empêché d'aboutir, en termes affichables.
+ *
+ * [DOWNLOAD_FAILED] est l'échec d'un téléchargement sans quota en cause : un
+ * fichier vide, une URL refusée, une réponse trop lourde. Il ne doit jamais
+ * s'afficher comme un quota épuisé.
+ */
+enum class SubtitleTrouble { QUOTA, NETWORK, NOTHING_FOUND, DOWNLOAD_FAILED }
 
 data class PlayerSubtitlesState(
     val available: Boolean = false,
@@ -61,11 +69,21 @@ class PlayerSubtitlesViewModel : ViewModel() {
     private val settings = SettingsRepository()
     private val api = OpenSubtitlesApi(openSubtitlesApiKey)
     private val session = OpenSubtitlesSession(api, settings)
-    private val catalog = OpenSubtitlesCatalog(api)
+    /**
+     * OpenSubtitles d'abord, l'addon Stremio quand il ne rend rien.
+     *
+     * Deux cas où le second sert : une compilation depuis les sources, sans clé,
+     * où le premier se déclare indisponible et le lecteur annonçait « aucun
+     * sous-titre trouvé pour ce titre » sur des films qui en comptent des
+     * milliers ; et un titre pour lequel il ne trouve rien alors que l'autre
+     * fonds l'a. Voir [ChainedSubtitleCatalog].
+     */
+    private val catalog: ChainedSubtitleCatalog =
+        ChainedSubtitleCatalog(listOf(OpenSubtitlesCatalog(api), StremioSubtitleCatalog()))
     private val files = SubtitleFileStore()
 
     private val _state = MutableStateFlow(
-        PlayerSubtitlesState(available = openSubtitlesApiKey.isNotBlank()),
+        PlayerSubtitlesState(available = catalog.available),
     )
     val state: StateFlow<PlayerSubtitlesState> = _state.asStateFlow()
 
@@ -118,7 +136,7 @@ class PlayerSubtitlesViewModel : ViewModel() {
             ),
             trouble = if (found.isEmpty()) SubtitleTrouble.NOTHING_FOUND else null,
             quota = catalog.quota(),
-            downloaded = files.storedIds(mediaKey),
+            downloaded = files.storedIds(mediaKey, found),
         )
     }
 
@@ -132,9 +150,13 @@ class PlayerSubtitlesViewModel : ViewModel() {
             _state.value = _state.value.copy(loading = true, trouble = null)
             val downloaded = catalog.download(candidate)
             if (downloaded == null) {
+                // « Quota épuisé » seulement si le catalogue d'où vient le candidat
+                // en compte un (OpenSubtitles). Chez l'addon Stremio, il n'y en a
+                // pas : un échec y est un échec de téléchargement, point.
+                val quotaEnCause = catalog.aUnQuota(candidate)
                 _state.value = _state.value.copy(
                     loading = false,
-                    trouble = SubtitleTrouble.QUOTA,
+                    trouble = if (quotaEnCause) SubtitleTrouble.QUOTA else SubtitleTrouble.DOWNLOAD_FAILED,
                     quota = catalog.quota(),
                 )
                 return@io
@@ -151,7 +173,7 @@ class PlayerSubtitlesViewModel : ViewModel() {
             active = candidate,
             timing = timing,
             loading = false,
-            downloaded = files.storedIds(mediaKey),
+            downloaded = files.storedIds(mediaKey, _state.value.candidates),
         )
         publish(timing)
     }
@@ -202,7 +224,10 @@ class PlayerSubtitlesViewModel : ViewModel() {
         original = null
         mediaKey = ""
         streamFps = null
-        _state.value = PlayerSubtitlesState(available = openSubtitlesApiKey.isNotBlank())
+        // Même source que l'init : `load` sort si `available` est faux, donc la
+        // seule clé OpenSubtitles couperait la cascade Stremio après un passage
+        // d'épisode. Non testé : le ViewModel construit ses dépôts réels.
+        _state.value = PlayerSubtitlesState(available = catalog.available)
         _file.value = null
     }
 

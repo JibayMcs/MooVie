@@ -3,15 +3,20 @@ package fr.moovie.tv.data.tmdb
 import fr.moovie.tv.data.search.SearchFilters
 import fr.moovie.tv.data.search.applyFilters
 import io.ktor.client.plugins.ResponseException
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * Accès TMDB. La clé API et la langue viennent des réglages (fournies par
  * l'appelant), pour rester configurables et hors du binaire.
+ *
+ * [api] est injectable pour les tests ; en fonctionnement normal il vaut
+ * l'accès réel, et rien d'autre n'a besoin de le savoir.
  */
 class TmdbRepository(
     private val language: String = "fr-FR",
+    private val api: TmdbApi = TmdbApi(clientTmdb),
 ) {
-    private val api = TmdbApi(clientTmdb)
 
     suspend fun trendingMovies(apiKey: String): List<TmdbItem> =
         api.trending("movie", apiKey, language).results
@@ -232,7 +237,60 @@ class TmdbRepository(
         }.getOrNull()?.bestTrailer(language)
     }
 
+    /**
+     * Identifiant IMDB (`tt…`) du titre, ou null si TMDB n'en connaît pas.
+     *
+     * Mémoïsé pour la durée du processus, et **les absences avec** : un titre
+     * sans IMDB n'en gagnera pas un pendant la session, et sans cette entrée
+     * négative chaque ouverture de fiche repayerait l'aller-retour pour
+     * réapprendre la même chose. La correspondance est immuable, aucun TTL ne
+     * se justifie.
+     */
+    suspend fun imdbId(apiKey: String, isTv: Boolean, id: Int): String? {
+        if (apiKey.isBlank()) return null
+        val key = (if (isTv) "tv" else "movie") to id
+        // Lecture et écriture sous le verrou, mais jamais l'appel réseau dedans :
+        // tenir un Mutex pendant une requête bloquerait toutes les fiches.
+        imdbIdsVerrou.withLock {
+            if (imdbIds.containsKey(key)) return imdbIds[key]
+        }
+        // Le `Result` compte : `getOrNull()` confondrait « TMDB répond que ce
+        // titre n'a pas d'IMDB » et « la requête a échoué ». Seul le premier cas
+        // se mémorise — mettre null en cache sur un timeout condamnerait le
+        // titre pour toute la session alors que rien ne le disqualifie.
+        val answer = try {
+            Result.success(api.externalIds(if (isTv) "tv" else "movie", id, apiKey).imdbId)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+        if (answer.isFailure) return null
+        val found = answer.getOrNull()?.takeIf { it.startsWith("tt") }
+        imdbIdsVerrou.withLock { imdbIds[key] = found }
+        return found
+    }
+
     private companion object {
+        /**
+         * Partagé par toutes les instances, et il le faut : `TmdbRepository` est
+         * construit à la demande dans chaque ViewModel, un cache d'instance ne
+         * survivrait donc à aucune navigation.
+         *
+         * La valeur est nullable et l'entrée, elle, existe ou non : `containsKey`
+         * distingue « on sait qu'il n'y en a pas » de « on n'a pas encore
+         * cherché », ce qu'une simple lecture à null ne saurait pas faire.
+         */
+        val imdbIds = mutableMapOf<Pair<String, Int>, String?>()
+
+        /**
+         * Protège [imdbIds] : plusieurs ViewModels peuvent ouvrir une fiche en
+         * même temps, sur des coroutines différentes. Un `HashMap` modifié en
+         * parallèle peut lever ou se corrompre, et `containsKey` puis `get` ne
+         * forment pas une lecture atomique sans ce verrou.
+         */
+        val imdbIdsVerrou = Mutex()
+
         /**
          * Anglais : c'est la langue dans laquelle TMDB a une bande-annonce quand
          * il n'en a qu'une, parce que c'est celle que les studios déposent.
