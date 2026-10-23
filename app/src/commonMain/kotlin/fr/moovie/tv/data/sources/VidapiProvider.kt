@@ -68,7 +68,15 @@ class VidapiProvider(private val http: HttpGateway) : SourceProvider {
                 // (« remoteconsultinggroup.site »). Les afficher tels quels ne
                 // dirait rien à personne ; le catalogue, lui, est stable.
                 hoster = name,
-                language = ORIGINAL,
+                // Ce catalogue parle anglais : « VO » n'est vrai que d'un titre
+                // anglophone. Mesuré le 10/10/2026 : One Piece et une série
+                // espagnole y jouaient en anglais sous l'étiquette VO, et la
+                // lecture rapide les prenait pour la version originale.
+                language = if (media.originalLanguage.isBlank() || media.originalLanguage.equals("en", ignoreCase = true)) {
+                    ORIGINAL
+                } else {
+                    DOUBLAGE_ANGLAIS
+                },
                 // Miroirs équivalents : sans rang, la liste montrerait trois
                 // lignes identiques et le choix se ferait à l'aveugle. On s'en
                 // tient au rang — la qualité, l'app la mesure elle-même sur la
@@ -96,6 +104,9 @@ class VidapiProvider(private val http: HttpGateway) : SourceProvider {
          * donc en VO, ce qui le rend éligible au repli VO/VOSTFR de la cascade.
          */
         private const val ORIGINAL = "VO"
+
+        /** La section de la fiche pour un titre non anglophone : un doublage, pas la VO. */
+        private const val DOUBLAGE_ANGLAIS = "Doublage anglais"
 
         /** Null quand il n'y a rien à départager : un rang seul n'apprend rien. */
         fun mirrorLabel(index: Int, total: Int): String? =

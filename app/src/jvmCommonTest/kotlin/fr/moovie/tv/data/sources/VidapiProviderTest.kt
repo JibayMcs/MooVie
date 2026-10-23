@@ -58,6 +58,27 @@ class VidapiProviderTest {
         )
     }
 
+    /** Le catalogue parle anglais : sur un titre espagnol ou japonais, ce n'est pas la VO. */
+    @Test
+    fun `un titre non anglophone passe en doublage anglais`() = runTest {
+        val links = VidapiProvider(FakeGateway(movieJson))
+            .sourcesFor(MediaRef.Movie(550, "La Casa de Papel", "2017", originalLanguage = "es"))
+
+        assertTrue(links.isNotEmpty())
+        assertTrue(links.all { it.language == "Doublage anglais" })
+    }
+
+    @Test
+    fun `un titre anglophone ou de langue inconnue reste en VO`() = runTest {
+        val anglais = VidapiProvider(FakeGateway(movieJson))
+            .sourcesFor(MediaRef.Movie(550, "Fight Club", "1999", originalLanguage = "EN"))
+        val inconnue = VidapiProvider(FakeGateway(movieJson))
+            .sourcesFor(MediaRef.Episode(1396, "Breaking Bad", "2008", 1, 1))
+
+        assertTrue(anglais.all { it.language == "VO" })
+        assertTrue(inconnue.all { it.language == "VO" })
+    }
+
     /** L'ID TMDB suffit : aucun titre n'entre dans la requête, donc aucune langue d'UI. */
     @Test
     fun `un film s interroge par son seul ID TMDB`() = runTest {
