@@ -9,9 +9,12 @@ import fr.moovie.tv.core.subtitles.usecase.SubtitleTiming
 import fr.moovie.tv.core.subtitles.usecase.rankSubtitles
 import fr.moovie.tv.core.subtitles.usecase.timingFor
 import fr.moovie.tv.data.settings.SettingsRepository
+import fr.moovie.tv.data.tmdb.TmdbRepository
 import fr.moovie.tv.data.subtitles.StremioSubtitleCatalog
 import fr.moovie.tv.data.subtitles.SubtitleFileStore
+import fr.moovie.tv.ui.player.PlaybackId
 import fr.moovie.tv.ui.player.parseMediaKey
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -78,9 +81,11 @@ class PlayerSubtitlesViewModel : ViewModel() {
 
     /**
      * Cherche les sous-titres du média en cours. [title] sert de repli quand la
-     * clé de lecture ne porte pas d'identifiant TMDB exploitable.
+     * clé de lecture ne porte pas d'identifiant TMDB exploitable. [episodeTitle]
+     * est le titre de l'épisode tel qu'affiché par le lecteur (vide pour un
+     * film) : il sert au classement, voir [rankSubtitles].
      */
-    fun load(mediaKey: String, title: String, streamFps: Double) = io {
+    fun load(mediaKey: String, title: String, streamFps: Double, episodeTitle: String = "") = io {
         if (!_state.value.available) return@io
         this.mediaKey = mediaKey
         this.streamFps = streamFps.takeIf { it > 0 }
@@ -96,16 +101,41 @@ class PlayerSubtitlesViewModel : ViewModel() {
 
         val languages = settings.subtitleLanguages.first()
         val found = catalog.search(media, languages)
+        val titresEpisode = listOfNotNull(episodeTitle.takeIf { it.isNotBlank() }) +
+            listOfNotNull(englishEpisodeTitle(id.takeIf { it.isTv }))
         _state.value = _state.value.copy(
             loading = false,
             candidates = rankSubtitles(
                 candidates = found,
                 preferredLanguages = languages,
                 streamFps = this.streamFps,
+                episodeTitles = titresEpisode,
             ),
             trouble = if (found.isEmpty()) SubtitleTrouble.NOTHING_FOUND else null,
             downloaded = files.storedIds(mediaKey, found),
         )
+    }
+
+    /**
+     * Le titre de l'épisode en anglais, ou null (film, pas de clé TMDB, réseau).
+     *
+     * Le lecteur affiche le titre dans la langue de l'application, alors que les
+     * releases sont nommées en anglais : « Le Corps des sacrifiés » ne se trouve
+     * dans aucun nom de release, « Body of the Sanctioned » dans tous les bons.
+     * Un échec ne coûte que le gain de classement, jamais la recherche.
+     */
+    private suspend fun englishEpisodeTitle(id: PlaybackId?): String? {
+        if (id == null) return null
+        val apiKey = settings.tmdbApiKey.first()
+        if (apiKey.isBlank()) return null
+        return try {
+            TmdbRepository("en-US").season(apiKey, id.tmdbId, id.season)
+                .episodes.firstOrNull { it.episodeNumber == id.episode }?.name?.takeIf { it.isNotBlank() }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            null
+        }
     }
 
     /**
