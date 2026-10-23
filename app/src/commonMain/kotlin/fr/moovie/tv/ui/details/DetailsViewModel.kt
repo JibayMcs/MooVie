@@ -989,30 +989,36 @@ class DetailsViewModel : ViewModel() {
             // Fiche déjà consultée : on ressert les liens connus au lieu de
             // réinterroger les providers (plusieurs secondes). Le flux jouable,
             // lui, sera de toute façon ré-extrait au moment de lire.
-            if (!skipCache) {
-                val cached = sourceCache.get(cacheKey, expected)
-                val cachedProviders = cached?.mapNotNull { it.provider }?.distinct().orEmpty()
-                if (cached != null && cachedProviders.isNotEmpty()) {
-                    if (generation != loadGeneration) return@launch
-                    servedFromCache = true
-                    _sources.value = SourcesState.Active(
-                        // Filtré aussi ici : une entrée de cache écrite avant
-                        // que la liste existe contient encore ces hébergeurs.
-                        links = keepSupportedHosters(cached),
-                        providers = cachedProviders.map { ProviderProgress(it, ProviderStatus.DONE) },
-                    )
-                    return@launch
-                }
-            }
+            //
+            // Une entrée incomplète sert quand même ses liens : seuls les
+            // catalogues qu'elle n'a pas interrogés sont redemandés, puis
+            // l'entrée est complétée. La rejeter en bloc refaisait toute la
+            // cascade pour un catalogue qui avait dépassé son délai.
+            val entree = if (skipCache) null else sourceCache.lire(cacheKey)
+            val cachedProviders = entree?.links?.mapNotNull { it.provider }?.distinct().orEmpty()
+            val servi = entree?.takeIf { cachedProviders.isNotEmpty() }
+            val aInterroger = providers.filter { servi == null || it.name !in servi.providers }
             if (generation != loadGeneration) return@launch
-            _sources.value = SourcesState.Active(
-                links = emptyList(),
-                providers = providers.map { ProviderProgress(it.name, ProviderStatus.LOADING) },
-            )
+            if (servi != null) {
+                servedFromCache = true
+                _sources.value = SourcesState.Active(
+                    // Filtré aussi ici : une entrée de cache écrite avant
+                    // que la liste existe contient encore ces hébergeurs.
+                    links = keepSupportedHosters(servi.links),
+                    providers = cachedProviders.map { ProviderProgress(it, ProviderStatus.DONE) } +
+                        aInterroger.map { ProviderProgress(it.name, ProviderStatus.LOADING) },
+                )
+                if (aInterroger.isEmpty()) return@launch
+            } else {
+                _sources.value = SourcesState.Active(
+                    links = emptyList(),
+                    providers = providers.map { ProviderProgress(it.name, ProviderStatus.LOADING) },
+                )
+            }
             // coroutineScope : suspend jusqu'à ce que tous les providers aient
             // répondu, pour ne mettre en cache qu'une liste complète.
             coroutineScope {
-                providers.forEach { provider ->
+                aInterroger.forEach { provider ->
                     launch(dispatcherEs) {
                         val result = runCatching {
                             withTimeoutOrNull(PROVIDER_TIMEOUT_MS) { query(provider) }
@@ -1055,7 +1061,7 @@ class DetailsViewModel : ViewModel() {
             // pendant six heures alors qu'il est peut-être déjà revenu.
             val answered = active?.providers.orEmpty()
                 .filter { it.status == ProviderStatus.DONE || it.status == ProviderStatus.EMPTY }
-                .map { it.name }.toSet()
+                .map { it.name }.toSet() + servi?.providers.orEmpty()
             sourceCache.put(cacheKey, active?.links.orEmpty(), answered)
         }
     }
@@ -1098,37 +1104,7 @@ class DetailsViewModel : ViewModel() {
         val key = episodeKey(season, episode)
         if (!prefetched.add(key)) return
 
-        viewModelScope.launch {
-            val providers = activeProviders()
-            // Déjà en cache et complet : rien à faire, et surtout pas de trafic
-            // vers les hébergeurs pour un résultat qu'on a déjà.
-            if (sourceCache.get(key, providers.map { it.name }.toSet()) != null) return@launch
-
-            val media = MediaRef.Episode(
-                tmdbId,
-                catalogTitle(tv.details.name),
-                tv.details.year,
-                season,
-                episode,
-            )
-            val answered = mutableSetOf<String>()
-            val links = coroutineScope {
-                providers.map { provider ->
-                    async(dispatcherEs) {
-                        val result = runCatching {
-                            withTimeoutOrNull(PROVIDER_TIMEOUT_MS) { provider.sourcesFor(media) }
-                        }.getOrNull()
-                        // Un catalogue en panne n'est pas « interrogé » : sans ça
-                        // son absence serait figée dans le cache pour six heures.
-                        if (result != null) answered += provider.name
-                        keepSupportedHosters(result.orEmpty())
-                            .map { it.copy(provider = provider.name) }
-                    }
-                }.awaitAll().flatten()
-            }.distinctBy { it.url }
-
-            if (links.isNotEmpty()) sourceCache.put(key, links, answered)
-        }
+        viewModelScope.launch { liensEpisode(tv, season, episode, activeProviders()) }
     }
 
     /** Épisodes déjà préchargés dans cette session, pour ne pas le refaire. */
@@ -1684,19 +1660,37 @@ class DetailsViewModel : ViewModel() {
     }
 
     /**
-     * Les liens d'un épisode : cache d'abord, interrogation des catalogues
-     * sinon. Même chemin que [prefetchEpisodeSources], dont c'est la moitié
-     * utile — sans le garde-fou « une seule fois », puisqu'ici on veut la
-     * réponse et pas seulement la préchauffe.
+     * Les liens d'un épisode : cache d'abord, catalogues manquants ensuite.
+     * Même chemin que [prefetchEpisodeSources], dont c'est la moitié utile, sans
+     * le garde-fou « une seule fois » puisqu'ici on veut la réponse et pas
+     * seulement la préchauffe.
      */
     private suspend fun seasonLinks(
         tv: DetailsState.Tv,
         season: Int,
         episode: Int,
+    ): List<EmbedLink> = liensEpisode(tv, season, episode, activeProviders())
+
+    /**
+     * Les liens d'un épisode : ceux du cache, puis la réponse des seuls
+     * catalogues que l'entrée n'a pas interrogés, et l'entrée complétée.
+     *
+     * Pas de trafic vers les hébergeurs pour un résultat qu'on a déjà ; mais un
+     * catalogue qui avait dépassé son délai au préchargement est redemandé, au
+     * lieu de laisser une entrée amputée figée dans le cache.
+     */
+    private suspend fun liensEpisode(
+        tv: DetailsState.Tv,
+        season: Int,
+        episode: Int,
+        providers: List<SourceProvider>,
     ): List<EmbedLink> {
-        val providers = activeProviders()
         val key = episodeKey(season, episode)
-        sourceCache.get(key, providers.map { it.name }.toSet())?.let { return it }
+        val entree = sourceCache.lire(key)
+        val connus = entree?.links.orEmpty()
+        val dejaInterroges = entree?.providers.orEmpty()
+        val aInterroger = providers.filter { it.name !in dejaInterroges }
+        if (entree != null && aInterroger.isEmpty()) return connus
 
         val media = MediaRef.Episode(
             tmdbId,
@@ -1706,18 +1700,22 @@ class DetailsViewModel : ViewModel() {
             episode,
         )
         val answered = mutableSetOf<String>()
-        val links = coroutineScope {
-            providers.map { provider ->
+        val nouveaux = coroutineScope {
+            aInterroger.map { provider ->
                 async(dispatcherEs) {
                     val result = runCatching {
                         withTimeoutOrNull(PROVIDER_TIMEOUT_MS) { provider.sourcesFor(media) }
                     }.getOrNull()
+                    // Un catalogue en panne n'est pas « interrogé » : sans ça
+                    // son absence serait figée dans le cache pour six heures.
                     if (result != null) answered += provider.name
-                    result.orEmpty().map { it.copy(provider = provider.name) }
+                    keepSupportedHosters(result.orEmpty())
+                        .map { it.copy(provider = provider.name) }
                 }
             }.awaitAll().flatten()
-        }.let(::keepSupportedHosters).distinctBy { it.url }
-        if (links.isNotEmpty()) sourceCache.put(key, links, answered)
+        }
+        val links = (connus + nouveaux).distinctBy { it.url }
+        if (links.isNotEmpty()) sourceCache.put(key, links, dejaInterroges + answered)
         return links
     }
 
