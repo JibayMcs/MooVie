@@ -72,6 +72,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import org.jetbrains.compose.resources.getString
 import fr.moovie.tv.core.sources.usecase.HosterTrust
 import fr.moovie.tv.data.sources.HosterTrustRepository
+import fr.moovie.tv.data.sources.LastSourceRepository
 
 /** Délai max par provider avant de le marquer en échec (n'affecte que ce provider). */
 private const val PROVIDER_TIMEOUT_MS = 12000L
@@ -830,6 +831,7 @@ class DetailsViewModel : ViewModel() {
     fun loadMovieSources() {
         val movie = _state.value as? DetailsState.Movie ?: return
         playbackKey = movieKey()
+        prechargeSouvenir()
         playbackTitle = movie.details.title
         playbackMinutes = movie.details.runtime
         playbackSubtitle = movie.details.year.orEmpty()
@@ -862,6 +864,7 @@ class DetailsViewModel : ViewModel() {
     fun loadEpisodeSourcesAt(season: Int, episode: Int) {
         val tv = _state.value as? DetailsState.Tv ?: return
         playbackKey = episodeKey(season, episode)
+        prechargeSouvenir()
         val ep = tv.episodes.takeIf { tv.season == season }
             ?.firstOrNull { it.episodeNumber == episode }
         val still = ep?.stillUrl()
@@ -926,6 +929,19 @@ class DetailsViewModel : ViewModel() {
      * ceux qui marchent.
      */
     private val hosterTrust = HosterTrustRepository()
+    private val lastSource = LastSourceRepository()
+
+    /**
+     * La source mémorisée du titre en cours, lue **dès le chargement des
+     * sources** et non au clic : la première lecture d'un magasin coûte sur la
+     * TV, autant la payer pendant que l'utilisateur regarde la fiche.
+     */
+    private var souvenirSource: Pair<String, Deferred<EmbedLink?>>? = null
+
+    private fun prechargeSouvenir() {
+        val cle = playbackKey
+        souvenirSource = cle to viewModelScope.async { runCatching { lastSource.get(cle) }.getOrNull() }
+    }
 
     /**
      * Verdicts en mémoire, relus en continu.
@@ -1277,6 +1293,25 @@ class DetailsViewModel : ViewModel() {
                     return@launch
                 }
             }
+            // La source qui a joué la dernière fois sur ce titre passe avant la
+            // cascade : même fichier, donc même langue et mêmes pistes, et rien à
+            // chercher. Sautée si le lecteur vient de la refuser (rejectedLinks) ;
+            // oubliée si elle ne répond plus. Voir LastSourceRepository.
+            val souvenirLu = souvenirSource?.takeIf { it.first == playbackKey }?.second?.await()
+                ?: runCatching { lastSource.get(playbackKey) }.getOrNull()
+            souvenirLu?.takeIf { it.url !in rejectedLinks }?.let { souvenir ->
+                _quickPlay.value = QuickPlayState.Searching(hosterLabel(souvenir), hoster = hosterLabel(souvenir))
+                val stream = runCatching { ExtractorRegistry.resolve(souvenir) }.getOrNull()
+                if (gen != resolveGen) return@launch
+                if (stream != null && stream.url.isNotBlank() && isStreamPlayable(stream, playbackMinutes)) {
+                    registerUnlessCast(pendingMeta)
+                    playingLink = souvenir
+                    _quickPlay.value = QuickPlayState.Idle
+                    _resolved.value = stream
+                    return@launch
+                }
+                lastSource.forget(playbackKey)
+            }
             val lang = settings.streamLanguage.first().name
             _quickPlay.value = QuickPlayState.Searching(if (label.isBlank()) lang else "$label · $lang")
             _resolveError.value = null
@@ -1322,6 +1357,7 @@ class DetailsViewModel : ViewModel() {
                         hosterTrust.recordSuccess(next.hoster)
                         _quickPlay.value = QuickPlayState.Idle
                         _resolved.value = stream
+                        lastSource.remember(playbackKey, next)
                         return@launch
                     }
                     // Écarté durablement : la sonde vient de le refuser, inutile
@@ -1415,6 +1451,7 @@ class DetailsViewModel : ViewModel() {
                 // savait pas quelle source venait d'échouer.
                 playingLink = link
                 _resolved.value = stream
+                lastSource.remember(playbackKey, link)
             } else {
                 _resolveError.value = getString(Res.string.details_resolve_error, hosterLabel(link))
             }
