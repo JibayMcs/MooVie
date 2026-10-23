@@ -107,11 +107,18 @@ class WiflixProvider(private val http: HttpGateway) : SourceProvider {
     )
 
     companion object {
-        /** Le backend de scraping, partagé par ToFlix et WaveWatch. */
-        const val BASE = "https://apis.wavewatch.top"
+        /**
+         * Le backend de scraping, partagé par ToFlix et WaveWatch. Migré de `.top` vers `.cc` le 23/10/2026 :
+         * `.top` redirige en 301 vers `.cc`, qui sert toujours `apiwiflix.php`.
+         */
+        const val BASE = "https://apis.wavewatch.cc"
 
-        /** Ce que la page lecteur des deux sites présente comme origine. */
-        const val EMBED_ORIGIN = "https://wwembed.wavewatch.top"
+        /**
+         * Ce que la page lecteur des deux sites présente comme origine. Passé
+         * à `.cc` le 23/10/2026, en même temps que [BASE] : les embeds wiflix
+         * sont désormais servis depuis `wwembed.wavewatch.cc`.
+         */
+        const val EMBED_ORIGIN = "https://wwembed.wavewatch.cc"
 
         /**
          * `let allSources = [ … ];` — le tableau est du JSON valide, y compris

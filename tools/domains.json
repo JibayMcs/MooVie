@@ -3,9 +3,12 @@
   "_lisezmoi": "Annuaire des domaines de Moovie. Modifier ce fichier et le re-televerser sur la release v0.0.0-annuaire suffit a corriger un domaine : aucune version de l'app a publier, rien a installer. Les domaines compiles restent le plancher, ce fichier ne fait qu'ajouter des candidats essayes en premier. Uniquement des origines https, sans barre finale.",
   "providers": {
     "swiftflow": ["https://blinkflux.lol", "https://swiftflow.lol"],
-    "fstream": ["https://french-stream.net"],
+    "fstream": ["https://french-stream.net", "https://fs26.lol"],
     "cinestream": ["https://cinestream.info"],
     "animesama": ["https://anime-sama.to"],
-    "wiflix": ["https://apis.wavewatch.top"]
+    "wiflix": ["https://apis.wavewatch.cc", "https://apis.wavewatch.top"],
+    "purstream": ["https://api.purstream.id"],
+    "nakios": ["https://api.nakios.rent"],
+    "coflix": ["https://coflix.esq"]
   }
 }
