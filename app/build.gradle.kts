@@ -16,7 +16,7 @@ plugins {
 //
 // Un suffixe semver — « -rc.1 » — désigne une préversion : le tag correspondant
 // sort en pré-release GitHub et reste invisible pour les updaters intégrés.
-val appVersion = "1.25.0"
+val appVersion = "1.26.0"
 
 /**
  * La même version, telle que **jpackage** l'accepte : purement numérique.
@@ -30,7 +30,7 @@ val appVersion = "1.25.0"
 val jpackageVersion = appVersion.substringBefore('-')
 
 // Code de version Android : à incrémenter à chaque release, comme `appVersion`.
-val appVersionCode = 103
+val appVersionCode = 104
 
 /**
  * Hash court du commit construit (« 3f2a9c1 »), vide si git est absent ou si le
