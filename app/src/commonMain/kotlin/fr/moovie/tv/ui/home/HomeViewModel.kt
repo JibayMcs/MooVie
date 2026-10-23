@@ -22,6 +22,7 @@ import fr.moovie.tv.resources.home_row_because
 import fr.moovie.tv.resources.home_row_trending_movies
 import fr.moovie.tv.resources.home_row_trending_tv
 import fr.moovie.tv.resources.home_tmdb_error
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -110,7 +111,16 @@ class HomeViewModel : ViewModel() {
         //
         // `collectLatest` : un épinglage pendant le chargement annule le lot en
         // cours plutôt que de le laisser écraser le suivant.
-        viewModelScope.launch {
+        // Hors du fil principal, et ce n'est pas un détail : mesuré sur le
+        // téléviseur le 10/10/2026, la première composition de l'accueil tient
+        // le fil principal 2,5 s (« Skipped 100 frames »). Lancé sur Main, ce
+        // collecteur ne recevait la clé et la disposition qu'après, et les
+        // appels TMDB — 2,3 s de réseau — ne partaient qu'à ce moment-là : les
+        // deux attentes s'additionnaient. Sur Default, le réseau part pendant
+        // que l'écran se compose, et le JSON se décode sans concurrencer le
+        // dessin. Tout ce qui suit est sûr hors du fil principal : StateFlow,
+        // DataStore, Ktor, getString.
+        viewModelScope.launch(Dispatchers.Default) {
             combine(settings.tmdbApiKey, layoutRepo.layout, ::Pair)
                 .collectLatest { (apiKey, layout) ->
                     if (apiKey.isBlank()) {
