@@ -57,6 +57,29 @@ class StreamProbeForbiddenHeadTest {
         )
     }
 
+    /**
+     * Le GET de repli est lu sous plafond. Le proxy de SwiftFlow perd le `Range` :
+     * lu en texte, ce GET chargeait le film entier en mémoire (1,35 Go mesurés sur
+     * l'émulateur mibox, application tuée par le lowmemorykiller).
+     */
+    @Test
+    fun `le GET de repli est une lecture plafonnee`() = runTest {
+        val requests = mutableListOf<HttpRequest>()
+        val gateway = HttpGateway { request ->
+            requests += request
+            HttpResponse(
+                status = if (request.method == HttpMethod.HEAD) 403 else 200,
+                url = request.url,
+                headers = mapOf("Content-Type" to "video/mp4"),
+            )
+        }
+
+        isStreamPlayable(stream, expectedMinutes = null, http = gateway)
+
+        val get = requests.single { it.method == HttpMethod.GET }
+        assertTrue(get.binary, "un GET de sonde lu en texte n'a aucune borne")
+    }
+
     @Test
     fun `HEAD 403 puis GET 403 n'est pas jouable`() = runTest {
         val gateway = MethodGateway(headStatus = 403, getStatus = 403)

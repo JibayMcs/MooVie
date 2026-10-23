@@ -40,9 +40,15 @@ class StreamProbeMemoryTest {
             )
         }
 
-        /** Une requête qui ramènerait tout : ni HEAD, ni bornée par un `Range`. */
+        /**
+         * Une requête qui ramènerait tout : un GET lu en texte.
+         *
+         * Un `Range` ne suffit pas à le borner : c'est une demande, que le proxy
+         * de SwiftFlow perd en route. Seule la lecture binaire est plafonnée
+         * côté passerelle, quoi que réponde le serveur.
+         */
         fun unboundedGets(): List<HttpRequest> = requests.filter {
-            it.method == HttpMethod.GET && it.headers["Range"] == null
+            it.method == HttpMethod.GET && !it.binary
         }
     }
 

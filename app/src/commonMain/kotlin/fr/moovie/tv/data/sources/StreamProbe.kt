@@ -209,6 +209,14 @@ private suspend fun probe(http: HttpGateway, stream: PlayableStream, head: Boole
             url = stream.url,
             method = if (head) HttpMethod.HEAD else HttpMethod.GET,
             headers = if (head) stream.headers else stream.headers + ("Range" to "bytes=0-1"),
+            // Binaire, donc lu sous plafond. Le `Range` n'est qu'une demande :
+            // le proxy de SwiftFlow le perd, le serveur répond 200 avec le film
+            // entier, et un corps texte le chargeait **en entier** en mémoire
+            // pour n'en lire que les en-têtes. Mesuré le 23/10/2026 sur
+            // l'émulateur mibox : 1,35 Go à l'ouverture des sources, et le
+            // lowmemorykiller emportait l'application. Le retour au GET sur un
+            // 403 (1.26.0) a rendu ce chemin courant.
+            binary = !head,
         ),
     ) // Échec réseau : sur un HEAD on laisse sa chance au GET, sinon c'est mort.
         ?: return if (head) null else false
