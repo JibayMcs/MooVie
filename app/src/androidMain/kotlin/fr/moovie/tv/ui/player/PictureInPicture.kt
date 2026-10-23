@@ -144,7 +144,12 @@ object Pip {
     /** L'appareil sait-il afficher une vignette, et la version le permet-elle ? */
     fun disponible(context: Context): Boolean =
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
-            context.packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)
+            context.packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE) &&
+            // Pas sur un téléviseur : on n'y quitte pas une lecture « par
+            // mégarde », on appuie sur Home pour faire autre chose, et une
+            // vignette y ferait tourner le film sans personne devant. La
+            // lecture se met en pause à la place — voir PlayerScreen.
+            !context.packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
 
     /**
      * Le système signale un départ : on bascule en vignette si ça joue.
