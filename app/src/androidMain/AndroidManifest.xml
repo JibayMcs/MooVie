@@ -106,10 +106,19 @@
             android:supportsPictureInPicture="true"
             android:theme="@style/Theme.MooVie" />
 
+        <!--
+          singleTask : une seule instance, quel que soit le lanceur. Mesuré le
+          10/10/2026 sur la TCL : FLauncher relance l'application de lui-même
+          après un arrêt forcé ou une installation, et un second lancement dans
+          la foulée empilait une deuxième MainActivity dans la même tâche — deux
+          accueils, deux lecteurs, et un plantage de session média. Les intents
+          reçus ensuite passent par onNewIntent, qui existe déjà.
+        -->
         <activity
             android:name=".MainActivity"
             android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenLayout|screenSize|smallestScreenSize|uiMode"
             android:exported="true"
+            android:launchMode="singleTask"
             android:theme="@style/Theme.MooVie.Splash">
             <!--
               Deux catégories, deux lanceurs : LEANBACK_LAUNCHER pour l'accueil
