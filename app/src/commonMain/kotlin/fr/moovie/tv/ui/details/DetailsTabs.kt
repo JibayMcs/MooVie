@@ -52,16 +52,19 @@ import fr.moovie.tv.ui.theme.MOOVIE_BG
  * « Épisodes » n'existe que pour les séries. La barre se réduit à ce qui est
  * réellement là.
  *
- * ## Le soulignement plutôt qu'un fond
+ * ## Le trait pour l'onglet ouvert, l'aplat blanc pour le focus
  *
- * C'est déjà la langue du projet — les saisons, les genres du catalogue
- * marquent leur sélection ainsi. L'onglet actif passe donc simplement
- * `selected` à `MoovieButton`, qui trace le trait lui-même (`moovieSurface`).
+ * L'onglet actif passe simplement `selected` à `MoovieButton`, qui trace le
+ * trait dégradé lui-même (`moovieSurface`) — c'est déjà la langue du projet,
+ * les saisons et les genres du catalogue marquent leur sélection ainsi. Le
+ * focus, lui, est l'aplat blanc du thème : un onglet visé est blanc, l'onglet
+ * ouvert est souligné, et les deux peuvent être le même sans qu'on les
+ * confonde.
  *
  * Un second trait dessiné ici par-dessus donnait **deux marques de sélection**
- * superposées, et trois états qui se ressemblaient tous : survolé, focalisé,
- * actif. Le thème sait déjà les distinguer — le verre et le halo pour le focus,
- * le trait seul pour la sélection — et le mieux qu'on puisse faire est de ne
+ * superposées ; et tant que le focus se disait aussi par un trait, « Épisodes »
+ * souligné et « Lire » cerné de la même couleur ne se distinguaient pas depuis
+ * le canapé. Le thème sait les séparer, et le mieux qu'on puisse faire est de ne
  * pas le contredire.
  */
 @Composable

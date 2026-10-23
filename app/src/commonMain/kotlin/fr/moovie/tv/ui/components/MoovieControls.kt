@@ -64,28 +64,31 @@ import fr.moovie.tv.ui.adaptive.isPointerUi
 import fr.moovie.tv.ui.adaptive.isTouchUi
 import fr.moovie.tv.ui.theme.MoovieShape
 import fr.moovie.tv.ui.theme.moovieSurface
-import fr.moovie.tv.ui.theme.rememberGlow
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import fr.moovie.tv.ui.theme.MOOVIE_SURFACE
 
 /**
- * Couleurs de contenu. Il n'y a plus de couleur de *fond* : au repos un bouton
- * n'est que son libellé ou son icône, et tout le reste — verre, halo, liseré
- * dégradé — n'apparaît qu'au focus (voir `moovieSurface`).
+ * Couleurs de contenu. Il n'y a pas de couleur de *fond* au repos : un bouton
+ * n'est que son libellé ou son icône, et le fond n'arrive qu'avec le focus —
+ * blanc, opaque, le contenu passant alors en sombre (voir `moovieSurface`).
  */
 private val REST_FG = Color(0xFFC9C9C9)
 private val ACTIVE_FG = Color.White
 private val DISABLED_FG = Color(0xFF5A5A5A)
 
+/** Contenu d'un bouton au focus, une fois le fond passé au blanc. */
+private val INVERSE_FG = Color(0xFF141414)
+
 /**
  * Bouton de l'app, 100 % foundation (aucune dépendance tv-material).
  *
  * Au repos : **rien**. Pas de fond, pas de bordure — seulement le libellé ou
- * l'icône. Au focus D-pad ou au survol : verre translucide, halo dégradé et
- * liseré aux couleurs de la bannière. [selected] garde le liseré seul, pour
- * marquer l'option retenue sans rallumer tout l'écran.
+ * l'icône. Au focus D-pad ou au survol : un aplat blanc et le contenu en
+ * sombre, la même marque pour tous les boutons de l'application, remplis ou
+ * non. [selected] souligne d'un trait dégradé l'option retenue — un état, qui
+ * ne ressemble en rien au focus. Pourquoi ces deux formes : `moovieSurface`.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -106,12 +109,12 @@ fun MoovieButton(
      * seule. Le reste de l'application ne remplit pas : un bouton au repos n'a
      * pas de fond, ce qui laisse les affiches porter l'écran.
      *
-     * Elle existe parce que le traitement de focus habituel disparaît sur un
-     * fond saturé : le verre est un blanc à 8 %, le halo un magenta sur du
-     * magenta, et le liseré dégradé se perd dans la couleur qu'il souligne. Un
-     * bouton rempli avait donc l'air inerte — on le survolait sans que rien ne
-     * bouge. Rempli, il se signale par un **contour clair** et par sa hauteur,
-     * pas par un voile qu'on ne voit pas.
+     * Au focus, le remplissage s'efface sous le blanc du thème, comme pour
+     * n'importe quel bouton : le focus n'a qu'une tête. Le bouton rempli, lui,
+     * se reconnaît à sa couleur au repos et à sa taille — pas à une marque de
+     * focus qui lui serait propre. Il en avait une, un contour de sa couleur
+     * autour du blanc, et c'est elle qu'on confondait depuis le canapé avec le
+     * trait de sélection d'un onglet voisin.
      */
     remplissage: Color? = null,
     content: @Composable RowScope.() -> Unit,
@@ -124,12 +127,14 @@ fun MoovieButton(
     // Agrandissement plus sobre qu'avant : sans fond plein, un bouton qui gonfle
     // se remarque déjà beaucoup.
     val scale by animateFloatAsState(if (active) 1.03f else 1f, label = "moovieButtonScale")
-    val glow = rememberGlow(active)
 
     val fg = when {
         !enabled -> DISABLED_FG
-        active || pressed -> ACTIVE_FG
-        selected -> ACTIVE_FG
+        // Sur l'aplat blanc du focus, le contenu passe en sombre — pour tous
+        // les boutons, remplis ou non.
+        active -> INVERSE_FG
+        // Un bouton rempli porte du blanc sur sa couleur dès le repos.
+        pressed || selected || remplissage != null -> ACTIVE_FG
         else -> REST_FG
     }
 
@@ -153,35 +158,17 @@ fun MoovieButton(
                 },
             )
             .clip(MoovieShape)
-            .then(
-                if (remplissage == null) {
-                    Modifier.moovieSurface(
-                        active = active,
-                        selected = selected,
-                        pressed = pressed && enabled,
-                        glowAlpha = glow,
-                    )
-                } else {
-                    // Le fond d'abord, le contour ensuite : dessiné derrière le
-                    // contenu, il ne mange pas le libellé. L'appui l'éclaircit
-                    // franchement — sur une couleur pleine, un assombrissement
-                    // ne se distingue pas d'une ombre.
-                    Modifier
-                        .background(
-                            if (pressed && enabled) {
-                                remplissage.copy(alpha = 0.82f)
-                            } else {
-                                remplissage
-                            },
-                        )
-                        .then(
-                            if (active) {
-                                Modifier.border(CONTOUR_REMPLI, Color.White, MoovieShape)
-                            } else {
-                                Modifier
-                            },
-                        )
-                }
+            // Le remplissage d'abord, l'habillage du thème par-dessus : au
+            // focus, le blanc opaque le recouvre entièrement, et un appui au
+            // doigt n'y pose qu'un voile clair — sur une couleur pleine, un
+            // assombrissement ne se distingue pas d'une ombre. Le trait de
+            // sélection n'a pas de sens sur un bouton rempli : il dit « l'option
+            // retenue », et l'action principale n'est pas une option.
+            .then(if (remplissage != null) Modifier.background(remplissage) else Modifier)
+            .moovieSurface(
+                active = active,
+                selected = selected && remplissage == null,
+                pressed = pressed && enabled,
             )
             .then(longPressKeys(onLongClick))
             .secondaryClick(onLongClick)
@@ -346,14 +333,6 @@ fun MoovieIconButton(
  * titres qui défilent, synopsis qui se déroule…
  */
 val LocalMoovieCardActive = compositionLocalOf { false }
-
-/**
- * Épaisseur du contour qui signale un bouton **rempli** visé.
- *
- * Deux points : en dessous, le trait se perd sur une couleur saturée vue de
- * trois mètres ; au-dessus, il mange le libellé qu'il entoure.
- */
-private val CONTOUR_REMPLI = 2.dp
 
 /** Touches « OK » d'une télécommande / d'un clavier. */
 private val CONFIRM_KEYS = setOf(Key.DirectionCenter, Key.Enter, Key.NumPadEnter)

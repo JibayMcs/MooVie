@@ -1,7 +1,5 @@
 package fr.moovie.tv.ui.theme
 
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -16,9 +14,11 @@ import androidx.compose.ui.unit.dp
  * Identité visuelle de Moo-vie, relevée sur la bannière du dépôt : une diagonale
  * chaude → froide, orange → magenta → violet.
  *
- * Ces trois teintes ne servent qu'à **signaler** — focus, état actif, repère.
- * Jamais à remplir : un bouton au repos n'a pas de fond, seule son icône est
- * visible. C'est ce qui laisse les affiches floutées derrière porter l'écran.
+ * Ces trois teintes ne servent qu'à **signaler** — l'option retenue, l'action
+ * principale, un repère. Jamais à remplir un bouton ordinaire : au repos il n'a
+ * pas de fond, seule son icône est visible, et c'est ce qui laisse les affiches
+ * floutées derrière porter l'écran. Le focus, lui, n'est pas de cette palette :
+ * il est blanc (voir [moovieSurface]).
  */
 val MOOVIE_ORANGE = Color(0xFFFF9A2E)
 val MOOVIE_MAGENTA = Color(0xFFE8214E)
@@ -102,72 +102,68 @@ val MoovieGradient = Brush.horizontalGradient(
  */
 val MoovieShape: Shape = RectangleShape
 
-/** Verre translucide posé sur le focus. Volontairement discret. */
-private val GLASS_FOCUSED = Color.White.copy(alpha = 0.08f)
+/** Le fond de ce qu'on vise : blanc, opaque, sans ambiguïté possible. */
+private val FOCUS_FILL = Color.White
+
+/** Le même blanc, entamé le temps d'un appui : le bouton accuse le coup. */
+private val FOCUS_PRESSED = Color.White.copy(alpha = 0.82f)
+
+/** Retour d'un appui au doigt, sans focus : un voile, puisqu'il n'y a rien à viser. */
 private val GLASS_PRESSED = Color.White.copy(alpha = 0.16f)
 
-/** Épaisseur du liseré d'accent sous un contrôle actif. */
-private val UNDERLINE = 2.dp
+/**
+ * Épaisseur du trait dégradé sous l'option retenue. Trois points : à deux, il
+ * ne se voyait plus à trois mètres.
+ */
+private val UNDERLINE = 3.dp
 
 /**
- * Habillage commun à tous les contrôles : rien au repos, verre + halo au focus,
- * liseré dégradé quand l'état est actif.
+ * Habillage commun à tous les contrôles.
  *
- * Le halo est un dégradé radial dessiné *derrière* le contenu, pas un flou :
- * Compose n'offre pas de flou d'arrière-plan portable, et `Modifier.blur` ne
- * s'applique qu'à partir d'Android 12 — sur une box plus ancienne il ne ferait
- * rien du tout. Par-dessus un fond déjà flouté, le rendu « verre » est le même
- * et il tient sur toutes les versions.
+ * ## Deux marques, deux sens, deux formes
+ *
+ * **Le focus est un aplat blanc.** Ce que la télécommande vise prend un fond
+ * blanc opaque et son contenu passe en sombre : c'est la marque la plus visible
+ * qu'un écran sombre puisse porter, et c'est celle de tous les lecteurs de
+ * salon — personne n'a à l'apprendre.
+ *
+ * **La sélection est un trait dégradé sous le contrôle.** L'onglet ouvert,
+ * l'option choisie dans un réglage : un état, pas un curseur. Il n'a rien de
+ * commun avec le focus, ni la couleur ni la forme, et c'est le point. Les deux
+ * peuvent se cumuler — l'onglet ouvert, visé — sans qu'on les confonde : un
+ * aplat blanc avec un trait en bas.
+ *
+ * ## Ce que ça remplace
+ *
+ * Le focus était un verre blanc à 8 %, un halo magenta et le **même trait
+ * dégradé** que la sélection, en plus franc ; et le bouton principal, rempli,
+ * se cernait de sa propre couleur. Depuis le canapé, « Épisodes » souligné de
+ * violet et « Lire » cerné de violet se lisaient pareil, et rien ne disait
+ * lequel des deux répondrait à OK : impossible de savoir si c'est un bouton
+ * ou un onglet. Le halo s'en va avec : derrière un aplat opaque, il ne se
+ * voyait plus.
  *
  * @param active focus D-pad ou survol souris.
- * @param selected état retenu (onglet courant, option choisie) : le liseré
- *   reste, mais sans le verre — sinon un écran de réglages ressemble à un
- *   damier de boutons allumés.
+ * @param selected état retenu (onglet courant, option choisie).
+ * @param pressed appui en cours. Avec le focus, le blanc s'entame ; sans — au
+ *   doigt —, un simple voile.
  */
 fun Modifier.moovieSurface(
     active: Boolean,
     selected: Boolean = false,
     pressed: Boolean = false,
-    glowAlpha: Float = 1f,
 ): Modifier = drawBehind {
-    if (active || pressed) {
-        drawRect(color = if (pressed) GLASS_PRESSED else GLASS_FOCUSED)
+    when {
+        active && pressed -> drawRect(color = FOCUS_PRESSED)
+        active -> drawRect(color = FOCUS_FILL)
+        pressed -> drawRect(color = GLASS_PRESSED)
     }
-    if (active && glowAlpha > 0f) {
-        // Halo centré, éteint sur les bords : il éclaire le contrôle sans
-        // dessiner une seconde forme par-dessus la première.
-        drawRect(
-            brush = Brush.radialGradient(
-                colors = listOf(
-                    MOOVIE_MAGENTA.copy(alpha = 0.34f * glowAlpha),
-                    MOOVIE_VIOLET.copy(alpha = 0.16f * glowAlpha),
-                    Color.Transparent,
-                ),
-                center = Offset(size.width / 2f, size.height),
-                radius = size.maxDimension,
-            ),
-        )
-    }
-    if (active || selected) {
+    if (selected) {
         val thickness = UNDERLINE.toPx()
         drawRect(
             brush = MoovieGradient,
             topLeft = Offset(0f, size.height - thickness),
             size = Size(size.width, thickness),
-            alpha = if (active) 1f else 0.65f,
         )
     }
-}
-
-/**
- * Halo qui respire au focus. Une animation lente et de faible amplitude : sur
- * une TV allumée des heures, un effet marqué devient vite fatigant, et le focus
- * doit rester lisible d'un coup d'œil à trois mètres.
- */
-@Composable
-fun rememberGlow(active: Boolean): Float {
-    return animateFloatAsState(
-        targetValue = if (active) 1f else 0f,
-        label = "moovieGlow",
-    ).value
 }

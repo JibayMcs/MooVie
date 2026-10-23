@@ -149,8 +149,8 @@ import fr.moovie.tv.ui.theme.MOOVIE_RATING
  * jamais de recomposition. Une animation par carte qui recompose ferait tomber
  * la box à quelques images par seconde.
  *
- * L'amplitude reste faible, pour la raison écrite dans `rememberGlow` : sur un
- * téléviseur allumé des heures, un effet marqué devient vite fatigant.
+ * L'amplitude reste faible : sur un téléviseur allumé des heures, un effet
+ * marqué devient vite fatigant.
  */
 @Composable
 fun DiscoveryScreenContent(
