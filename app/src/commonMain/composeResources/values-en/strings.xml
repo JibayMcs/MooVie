@@ -385,6 +385,7 @@
     <string name="player_subtitles_none_found">No subtitles found for this title.</string>
     <string name="player_subtitles_quota_out">Quota used up. It renews at midnight UTC.</string>
     <string name="player_subtitles_network">OpenSubtitles is unreachable.</string>
+    <string name="player_subtitles_download_failed">The subtitle download failed.</string>
     <string name="player_subtitles_sync">Sync</string>
     <string name="player_subtitles_earlier">%1$s s earlier</string>
     <string name="player_subtitles_later">%1$s s later</string>

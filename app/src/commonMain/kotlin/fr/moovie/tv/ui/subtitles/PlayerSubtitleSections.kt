@@ -5,6 +5,7 @@ import fr.moovie.tv.core.subtitles.model.SubtitleCandidate
 import fr.moovie.tv.core.subtitles.usecase.COMMON_FPS
 import fr.moovie.tv.resources.Res
 import fr.moovie.tv.resources.player_online_subtitles
+import fr.moovie.tv.resources.player_subtitles_download_failed
 import fr.moovie.tv.resources.player_subtitles_downloaded
 import fr.moovie.tv.resources.player_subtitles_earlier
 import fr.moovie.tv.resources.player_subtitles_fps
@@ -59,6 +60,8 @@ fun onlineSubtitleSection(
             listOf(PlayerOption(stringResource(Res.string.player_subtitles_quota_out), false) {})
         state.trouble == SubtitleTrouble.NETWORK ->
             listOf(PlayerOption(stringResource(Res.string.player_subtitles_network), false) {})
+        state.trouble == SubtitleTrouble.DOWNLOAD_FAILED ->
+            listOf(PlayerOption(stringResource(Res.string.player_subtitles_download_failed), false) {})
         state.candidates.isEmpty() ->
             listOf(PlayerOption(stringResource(Res.string.player_subtitles_none_found), false) {})
         else -> {
