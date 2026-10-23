@@ -215,6 +215,38 @@ class DownloadEngineTest {
         assertTrue(outcome is DownloadOutcome.Failed)
     }
 
+    /** Une piste audio choisie vit hors des variantes : refus explicite, rien d'écrit. */
+    @Test
+    fun `un flux a piste audio choisie est refuse`() = runTest {
+        val fetcher = FakeFetcher(mapOf(stream.url to playlist))
+
+        val outcome = engine(fetcher).run(download, stream.copy(audioLanguage = "en"))
+
+        assertTrue(outcome is DownloadOutcome.Failed)
+        assertTrue(fetcher.calls.isEmpty())
+    }
+
+    /**
+     * Des renditions audio à `URI` propre ne prouvent pas une vidéo muette : chez
+     * fsvid, l'hébergeur wiflix et PurStream (mesuré le 23/10/2026), les segments
+     * vidéo portent aussi l'audio. Refuser ces masters casserait des
+     * téléchargements qui marchaient.
+     */
+    @Test
+    fun `une master a renditions audio separees reste telechargeable`() = runTest {
+        val master = """
+            #EXTM3U
+            #EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="a",LANGUAGE="fr",URI="audio/fr.m3u8"
+            #EXT-X-STREAM-INF:BANDWIDTH=5000000,AUDIO="a"
+            haut/index.m3u8
+        """.trimIndent()
+        val fetcher = FakeFetcher(mapOf(stream.url to master))
+
+        engine(fetcher).run(download, stream)
+
+        assertTrue(fetcher.calls.any { it.endsWith("haut/index.m3u8") })
+    }
+
     @Test
     fun `une master playlist redescend sur sa meilleure variante`() = runTest {
         val master = """

@@ -119,6 +119,10 @@ class DownloadEngine(
         // laisse des octets qui ne serviront jamais, sur un disque qui manque
         // déjà de place.
         if (diskFull(dir)) return DownloadOutcome.Failed(DISK_FULL)
+        // Une piste audio choisie (VO d'un master PurStream) : le fichier garderait
+        // toutes les pistes, lues par défaut dans la langue du site, sous une
+        // étiquette qui annonce l'autre. Mieux vaut refuser que mal étiqueter.
+        if (stream.audioLanguage != null) return DownloadOutcome.Failed(AUDIO_CHOISIE)
         affiche(download)
         return try {
             if (isHls(stream.url)) hls(download, stream, dir) else direct(download, stream, dir)
@@ -354,6 +358,8 @@ class DownloadEngine(
          */
         const val MIN_FREE_BYTES = 500L * 1024 * 1024
 
+        const val AUDIO_CHOISIE =
+            "Téléchargement impossible : cette source choisit sa piste audio à la lecture, ce que le téléchargement ne gère pas."
         const val DISK_FULL = "Espace de stockage insuffisant : libérez de la place, le téléchargement reprendra où il en est."
     }
 }
