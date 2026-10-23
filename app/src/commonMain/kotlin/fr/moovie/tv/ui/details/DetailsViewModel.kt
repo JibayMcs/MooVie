@@ -844,7 +844,12 @@ class DetailsViewModel : ViewModel() {
         )
         startSourceLoad {
             it.sourcesFor(
-                MediaRef.Movie(tmdbId, catalogTitle(movie.details.title), movie.details.year),
+                MediaRef.Movie(
+                    tmdbId,
+                    catalogTitle(movie.details.title),
+                    movie.details.year,
+                    originalLanguage = movie.details.originalLanguage,
+                ),
             )
         }
     }
@@ -889,6 +894,7 @@ class DetailsViewModel : ViewModel() {
                     tv.details.year,
                     season,
                     episode,
+                    originalLanguage = tv.details.originalLanguage,
                 ),
             )
         }
@@ -1110,6 +1116,7 @@ class DetailsViewModel : ViewModel() {
                 tv.details.year,
                 season,
                 episode,
+                originalLanguage = tv.details.originalLanguage,
             )
             val answered = mutableSetOf<String>()
             val links = coroutineScope {
@@ -1704,6 +1711,7 @@ class DetailsViewModel : ViewModel() {
             tv.details.year,
             season,
             episode,
+            originalLanguage = tv.details.originalLanguage,
         )
         val answered = mutableSetOf<String>()
         val links = coroutineScope {
