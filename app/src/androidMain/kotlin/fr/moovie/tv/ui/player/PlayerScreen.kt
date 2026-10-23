@@ -1203,19 +1203,18 @@ fun PlayerScreen(
                     // contrôles, elle n'est pas transmise aux boutons — sinon on
                     // déclencherait une action invisible pour l'utilisateur.
                     //
-                    // Une exception, où l'intention ne fait aucun doute : **OK**.
-                    // Sur une télécommande de TV, OK devant une image sans
-                    // contrôles veut dire « mets en pause » ; obliger à un
-                    // premier appui pour révéler la barre puis à un second pour
-                    // agir fait payer deux gestes ce que l'utilisateur demandait
-                    // au premier. (Les touches média, elles, sont traitées plus
-                    // haut — elles n'ont pas à dépendre de la barre.)
+                    // **OK ne met pas en pause** : il révèle la barre, comme les
+                    // autres touches. Quand une touche Pause est sous le pouce,
+                    // OK devant une image sans contrôles demande plutôt à voir
+                    // les options. Un second OK, sur le bouton Lecture qui reçoit
+                    // le focus, met en pause. Les touches média, elles, sont
+                    // traitées plus haut et n'ont pas à dépendre de la barre.
                     if (event.key in CONFIRM_KEYS) {
-                        controller.togglePause()
                         // OK va donner le focus au bouton Lecture en réveillant
                         // la barre, et le KeyUp — qui n'est pas consommé —
-                        // l'atteindrait : la pause serait aussitôt annulée. Même
-                        // piège que pour « Passer l'intro » juste au-dessus.
+                        // l'atteindrait : la lecture passerait en pause sur la
+                        // fin de l'appui. Même piège que pour « Passer l'intro »
+                        // juste au-dessus.
                         swallowUntilRelease = true
                     }
                     wake()
