@@ -65,6 +65,7 @@ import androidx.media3.common.Player
 import androidx.media3.common.Tracks
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.MediaSession
@@ -274,6 +275,21 @@ fun PlayerScreen(
             )
             .setSeekBackIncrementMs(PLAYER_SEEK_STEP_MS)
             .setSeekForwardIncrementMs(PLAYER_SEEK_STEP_MS)
+            // Démarre avec 1,5 s de média en tampon au lieu des 2,5 s par
+            // défaut, 3 s après un rebuffering au lieu de 5. Mesuré le
+            // 09/10/2026 : 2,5 à 5,5 s entre le montage du flux et la première
+            // image, dont le temps à remplir ce tampon. Le reste du tampon
+            // (50 s) ne change pas : c'est lui qui absorbe le Wi-Fi.
+            .setLoadControl(
+                DefaultLoadControl.Builder()
+                    .setBufferDurationsMs(
+                        DefaultLoadControl.DEFAULT_MIN_BUFFER_MS,
+                        DefaultLoadControl.DEFAULT_MAX_BUFFER_MS,
+                        PLAYER_BUFFER_FOR_PLAYBACK_MS,
+                        PLAYER_BUFFER_AFTER_REBUFFER_MS,
+                    )
+                    .build(),
+            )
             // Garde CPU + Wi-Fi éveillés pendant la lecture (évite les coupures
             // de flux quand le réseau se met en veille).
             .setWakeMode(C.WAKE_MODE_NETWORK)
@@ -1644,3 +1660,7 @@ private fun ExoPlayer.videoHeights(): List<Int> = runCatching {
         .distinct()
         .sortedDescending()
 }.getOrDefault(emptyList())
+
+/** Tampon exigé avant la première image, et après un rebuffering (voir le LoadControl). */
+private const val PLAYER_BUFFER_FOR_PLAYBACK_MS = 1_500
+private const val PLAYER_BUFFER_AFTER_REBUFFER_MS = 3_000
