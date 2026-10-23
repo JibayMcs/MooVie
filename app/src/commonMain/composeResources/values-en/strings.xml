@@ -370,6 +370,7 @@
     <string name="player_subtitles_fps">Subtitle frame rate</string>
     <string name="player_subtitles_fps_auto">Automatic</string>
     <string name="player_subtitles_downloaded">Downloaded</string>
+    <string name="player_subtitles_try_next">Try the next one (%1$d left)</string>
     <string name="settings_introdb_key">TheIntroDB key</string>
     <string name="settings_introdb_hint">Paste your TheIntroDB key here…</string>
     <string name="settings_introdb_help">Optional. It lets you report missing intros and credits from the player — and your own reports take effect for you straight away. Free key on theintrodb.org.</string>

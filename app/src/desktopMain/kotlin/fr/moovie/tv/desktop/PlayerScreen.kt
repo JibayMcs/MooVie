@@ -1262,7 +1262,13 @@ internal fun DesktopPlayerScreen(
                         tracks = controller.tracks()
                         dialog = null
                     },
-                    onlineSubtitleSection(subsState) { candidate ->
+                    onlineSubtitleSection(
+                        state = subsState,
+                        onNext = {
+                            subsViewModel.next()
+                            dialog = null
+                        },
+                    ) { candidate ->
                         subsViewModel.pick(candidate)
                         dialog = null
                     },

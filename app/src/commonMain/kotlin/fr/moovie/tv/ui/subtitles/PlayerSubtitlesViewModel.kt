@@ -166,6 +166,18 @@ class PlayerSubtitlesViewModel : ViewModel() {
         publish(timing)
     }
 
+    /**
+     * Le prochain sous-titre pas encore essayé, dans l'ordre du classement :
+     * une seule touche pour passer au suivant, sans relire la liste. « Essayé »
+     * veut dire déjà téléchargé, puisque rien ne se télécharge sans choix.
+     */
+    fun next() {
+        val s = _state.value
+        val suivant = s.candidates.firstOrNull { it.fileId !in s.downloaded && it.fileId != s.active?.fileId }
+            ?: return
+        pick(suivant)
+    }
+
     /** Décale le sous-titre, en relatif. */
     fun nudge(deltaMs: Long) {
         val timing = _state.value.timing
