@@ -87,6 +87,7 @@ import fr.moovie.tv.ui.player.qualitySection
 import fr.moovie.tv.ui.player.bestDownloadStream
 import fr.moovie.tv.ui.player.resolveAlternative
 import fr.moovie.tv.ui.format.formatNowDateTime
+import fr.moovie.tv.core.player.chooseAudioTrack
 import fr.moovie.tv.core.player.matchAudioTrack
 import fr.moovie.tv.data.intro.IntroDbRepository
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -639,18 +640,28 @@ fun PlayerScreen(
         parseMediaKey(mediaKey)?.let { if (it.isTv) "tv:${it.tmdbId}" else null }
     }
 
-    // Réapplique la piste audio retenue sur cette série. Le libellé, jamais
-    // l'identifiant : celui-ci est propre au flux (voir matchAudioTrack).
+    // La piste audio, une fois les pistes connues : d'abord celle retenue sur
+    // cette série (le libellé, jamais l'identifiant, propre au flux — voir
+    // matchAudioTrack). Sans choix retenu, on laisse le lecteur faire, sauf s'il
+    // est tombé sur une audiodescription ou une piste qu'il ne décode pas : la
+    // règle commune (chooseAudioTrack) en choisit alors une autre. Une fois par
+    // média : les republications suivantes ne doivent pas défaire un choix fait
+    // entre-temps dans le menu.
     var audioRestored by remember(mediaKey) { mutableStateOf(false) }
     LaunchedEffect(tracks.audio, titleKey) {
-        val key = titleKey ?: return@LaunchedEffect
         if (audioRestored || tracks.audio.size < 2) return@LaunchedEffect
-        val remembered = progress.audioTrack(key) ?: return@LaunchedEffect
-        val target = matchAudioTrack(remembered, tracks.audio.map { it.label }) ?: return@LaunchedEffect
-        val track = tracks.audio.firstOrNull { it.label == target } ?: return@LaunchedEffect
+        val remembered = titleKey?.let { progress.audioTrack(it) }
+        val retenue = remembered
+            ?.let { matchAudioTrack(it, tracks.audio.map { t -> t.label }) }
+            ?.let { label -> tracks.audio.firstOrNull { it.label == label } }
+        val courante = tracks.audio.firstOrNull { it.selected }
+        val target = retenue
+            ?: courante?.takeIf { !it.audioDescription && it.supported }
+            ?: chooseAudioTrack(tracks.audio, emptyList())
+            ?: return@LaunchedEffect
         audioRestored = true
-        if (!track.selected) {
-            controller.selectAudio(track.id)
+        if (!target.selected) {
+            controller.selectAudio(target.id)
             tracks = controller.tracks()
         }
     }
@@ -1176,6 +1187,11 @@ fun PlayerScreen(
                 // se traite donc **avant** la question de la barre. Elle réveille
                 // les contrôles au passage, parce qu'on veut voir ce qu'on vient
                 // de faire.
+                if (event.key == Key.MediaAudioTrack) {
+                    dialog = PlayerDialogKind.AUDIO
+                    wake()
+                    return@onPreviewKeyEvent true
+                }
                 if (event.key in MEDIA_TOGGLE_KEYS) {
                     controller.togglePause()
                     wake()
@@ -1527,11 +1543,31 @@ fun PlayerScreen(
             }
         }
 
+        // Le choix d'une piste audio, partagé entre les réglages et le dialogue
+        // ouvert par la touche Langue de la télécommande.
+        val choisirAudio: (String) -> Unit = { trackId ->
+            controller.selectAudio(trackId)
+            tracks = controller.tracks()
+            // Retenu au niveau du *titre* : on choisit une langue
+            // pour une série, pas pour un épisode.
+            titleKey?.let { key ->
+                tracks.audio.firstOrNull { it.id == trackId }?.label?.let { label ->
+                    exitScope.launch { progress.setAudioTrack(key, label) }
+                }
+            }
+            dialog = null
+        }
+
         // Le panneau des épisodes est rendu plus haut, dans la page : il n'a
         // rien à faire parmi les modales centrées.
         @Suppress("KotlinConstantConditions")
         when (dialog.takeIf { !enPip && it != PlayerDialogKind.EPISODES }) {
             PlayerDialogKind.EPISODES -> Unit
+            // Touche Langue de la télécommande : les pistes audio, rien d'autre.
+            PlayerDialogKind.AUDIO -> PlayerOptionsDialog(
+                sections = listOf(audioSection(tracks, choisirAudio)).filter { it.options.isNotEmpty() },
+                onDismiss = { dialog = null },
+            )
             PlayerDialogKind.SUBTITLES -> PlayerOptionsDialog(
                 sections = listOf(
                     subtitleSection(tracks) { trackId ->
@@ -1596,18 +1632,7 @@ fun PlayerScreen(
                         QualityChoice.parse(id)?.let { applyQuality(it) }
                         dialog = null
                     },
-                    audioSection(tracks) { trackId ->
-                        controller.selectAudio(trackId)
-                        tracks = controller.tracks()
-                        // Retenu au niveau du *titre* : on choisit une langue
-                        // pour une série, pas pour un épisode.
-                        titleKey?.let { key ->
-                            tracks.audio.firstOrNull { it.id == trackId }?.label?.let { label ->
-                                exitScope.launch { progress.setAudioTrack(key, label) }
-                            }
-                        }
-                        dialog = null
-                    },
+                    audioSection(tracks, choisirAudio),
                 ).filter { it.options.isNotEmpty() },
                 onDismiss = { dialog = null },
             )

@@ -1243,6 +1243,9 @@ internal fun DesktopPlayerScreen(
         @Suppress("KotlinConstantConditions")
         when (dialog.takeIf { it != PlayerDialogKind.EPISODES }) {
             PlayerDialogKind.EPISODES -> Unit
+            // Pas de touche Langue sur un clavier : la section audio reste
+            // dans les réglages.
+            PlayerDialogKind.AUDIO -> Unit
             PlayerDialogKind.SUBTITLES -> PlayerOptionsDialog(
                 sections = listOf(
                     subtitleSection(tracks) { trackId ->
