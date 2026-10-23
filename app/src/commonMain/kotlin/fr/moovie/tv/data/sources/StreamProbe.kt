@@ -214,7 +214,13 @@ private suspend fun probe(http: HttpGateway, stream: PlayableStream, head: Boole
         ?: return if (head) null else false
 
     // 405 / 501 : la méthode est refusée, pas la ressource.
-    if (head && (resp.status == 405 || resp.status == 501)) return null
+    //
+    // 403 aussi. Certains CDN refusent le HEAD mais servent le même GET avec un
+    // `Range` (206) : lu comme un verdict, ce 403 écartait la source sans qu'un
+    // GET ait jamais été tenté. Une ressource réellement interdite refusera
+    // aussi le GET, qui rendra false : on ne paie donc qu'une requête de plus,
+    // et seulement sur les 403.
+    if (head && (resp.status == 405 || resp.status == 501 || resp.status == 403)) return null
     if (!resp.isSuccessful) return false
 
     // Un 200 ne suffit pas. Un extracteur peut produire une URL bien formée que
