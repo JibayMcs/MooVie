@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import fr.moovie.tv.data.search.SearchFilters
 import fr.moovie.tv.data.search.SearchFiltersRepository
+import fr.moovie.tv.data.search.applyFilters
 import fr.moovie.tv.data.search.SearchHistoryRepository
 import fr.moovie.tv.data.settings.SettingsRepository
 import fr.moovie.tv.data.settings.currentTmdbLanguage
@@ -78,12 +79,19 @@ class SearchViewModel : ViewModel() {
                     // cas courant, et en payer trois coûterait deux requêtes
                     // sur chaque frappe.
                     val pages = if (activeFilters.isActive) DEEP_PAGES else 1
-                    runCatching { repo.search(apiKey, term, activeFilters, pages) }
-                        .onSuccess {
+                    // Seul `include_adult` part au service ; le type, la note
+                    // et l'époque s'appliquent ici, après coup, pour savoir
+                    // combien de titres ils écartent — et le dire quand il ne
+                    // reste rien, au lieu d'un « aucun résultat » qui ment.
+                    val apiFilters = SearchFilters.DEFAULT.copy(includeAdult = activeFilters.includeAdult)
+                    runCatching { repo.search(apiKey, term, apiFilters, pages) }
+                        .onSuccess { bruts ->
+                            val gardes = bruts.applyFilters(activeFilters)
                             _results.value =
-                                if (it.isEmpty()) SearchState.Empty else SearchState.Results(it)
+                                if (gardes.isEmpty()) SearchState.Empty(masques = bruts.size)
+                                else SearchState.Results(gardes)
                         }
-                        .onFailure { _results.value = SearchState.Empty }
+                        .onFailure { _results.value = SearchState.Empty() }
                 }
         }
     }
@@ -115,7 +123,16 @@ class SearchViewModel : ViewModel() {
         viewModelScope.launch { watchRepo.removeFromWatchlist(key) }
     }
 
-    fun setQuery(q: String) { _query.value = q }
+    /**
+     * Une recherche = un titre : les filtres posés pour l'une ne valent pas pour
+     * la suivante. Ils s'effacent quand on repart d'un champ vide — pas à chaque
+     * frappe, ni en allant voir une fiche et en revenant. Un « Séries » resté
+     * posé d'une recherche à l'autre rendait un film introuvable.
+     */
+    fun setQuery(q: String) {
+        if (_query.value.isBlank() && q.isNotBlank()) viewModelScope.launch { filtersRepo.reset() }
+        _query.value = q
+    }
 
     /** Mémorise la requête dans l'historique (appelé à l'ouverture d'un résultat). */
     fun remember() {
