@@ -3,6 +3,7 @@ package fr.moovie.tv.core.sources.usecase
 import fr.moovie.tv.core.sources.model.EmbedLink
 import fr.moovie.tv.core.sources.model.PlayableStream
 import fr.moovie.tv.core.sources.port.SourceExtractor
+import kotlinx.coroutines.CancellationException
 
 /**
  * Politique de résolution d'un lien d'embed en flux jouable.
@@ -89,6 +90,11 @@ class StreamResolution(
     private suspend fun attempt(extractor: SourceExtractor?, link: EmbedLink): PlayableStream? =
         try {
             extractor?.extract(link)
+        } catch (e: CancellationException) {
+            // L'annulation n'est pas un échec de l'extracteur : un délai posé
+            // par l'appelant doit arrêter la chaîne, pas la faire passer au
+            // renifleur suivant.
+            throw e
         } catch (_: Throwable) {
             null
         }
