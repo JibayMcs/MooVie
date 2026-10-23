@@ -50,6 +50,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -207,6 +208,23 @@ fun HomeScreenContent(
     // Cible de descente depuis l'en-tête : sans ça, le focus reste bloqué sur
     // les boutons (les cartes sont hors du faisceau vertical du D-pad).
     val firstContentFocus = remember { FocusRequester() }
+    // Au démarrage, le focus se pose sur la première carte de la première
+    // rangée — « Reprendre » quand elle est en tête, donc le dernier titre
+    // regardé, prêt pour OK — et non sur la barre : le plus souvent, on veut
+    // reprendre là où on en était.
+    // La rangée se compose une image après l'arrivée des données : on
+    // réessaie jusqu'à ce que la demande aboutisse, et une seule fois.
+    var focusInitialPose by remember { mutableStateOf(false) }
+    LaunchedEffect(resume.isNotEmpty()) {
+        if (focusInitialPose || resume.isEmpty()) return@LaunchedEffect
+        repeat(90) {
+            if (runCatching { firstContentFocus.requestFocus() }.isSuccess) {
+                focusInitialPose = true
+                return@LaunchedEffect
+            }
+            withFrameNanos { }
+        }
+    }
     // Entrée du rail dont le menu contextuel (appui long) est ouvert.
     var resumeMenuFor by remember { mutableStateOf<ResumeEntry?>(null) }
     // Rend le focus à la carte qui a ouvert le menu, plutôt que de le laisser
