@@ -29,6 +29,10 @@ nohup "$EMULATOR" -avd "$AVD_NAME" \
   -accel on \
   -no-boot-anim \
   -no-snapshot \
+  `# Résolveurs explicites : sans eux, l'émulateur prend le premier de` \
+  `# /etc/resolv.conf de l'hôte, souvent 127.0.0.1 (résolveur local), et tout` \
+  `# nom échoue dès que ce service est arrêté, alors que ping par IP passe.` \
+  -dns-server 1.1.1.1,8.8.8.8 \
   "${MODE_ARGS[@]}" >"$LOG" 2>&1 &
 EMU_PID=$!
 disown "$EMU_PID" 2>/dev/null || true
