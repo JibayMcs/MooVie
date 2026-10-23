@@ -9,6 +9,7 @@ import fr.moovie.tv.core.subtitles.model.SubtitleStyle
 import fr.moovie.tv.core.subtitles.model.toOpaqueArgb
 import androidx.media3.common.C
 import androidx.media3.common.Format
+import fr.moovie.tv.core.player.isAudioDescription
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
@@ -314,11 +315,23 @@ internal class ExoPlayerController(private val player: Player) : MooviePlayerCon
                 // langues, c'est la puce qui n'en lit qu'une, et c'est ça qu'il
                 // faut dire.
                 val decodable = group.isTrackSupported(i)
+                val format = group.getTrackFormat(i)
+                val titre = format.label.orEmpty()
                 add(
                     PlayerTrack(
                         id = "$groupIndex:$i",
                         label = group.trackLabel(i) + if (decodable) "" else " · non décodable par la TV",
                         selected = group.isTrackSelected(i),
+                        language = format.language,
+                        title = titre,
+                        channels = format.channelCount.takeIf { it != Format.NO_VALUE } ?: 0,
+                        isDefault = format.selectionFlags and C.SELECTION_FLAG_DEFAULT != 0,
+                        supported = decodable,
+                        // Le rôle du conteneur quand l'extracteur le lit, le
+                        // titre sinon : les MKV de rips ne portent souvent que
+                        // le second.
+                        audioDescription = format.roleFlags and C.ROLE_FLAG_DESCRIBES_VIDEO != 0 ||
+                            isAudioDescription(titre),
                     ),
                 )
             }

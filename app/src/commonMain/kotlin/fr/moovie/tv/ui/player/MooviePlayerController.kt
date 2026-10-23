@@ -14,6 +14,26 @@ data class PlayerTrack(
     val id: String,
     val label: String,
     val selected: Boolean,
+    /**
+     * Ce que le conteneur dit de la piste, pour choisir **sans** lire le libellé.
+     *
+     * Le libellé est fait pour l'œil (nom de langue en français, mention « non
+     * décodable ») ; la règle de choix automatique a besoin des faits bruts.
+     * Les lecteurs qui ne les connaissent pas (mpv, AVPlayer) laissent les
+     * valeurs par défaut : la règle s'y réduit alors à « ne rien changer ».
+     */
+    /** Code de langue du conteneur (ISO 639), null quand il n'en porte pas. */
+    val language: String? = null,
+    /** Titre écrit par l'encodeur (« French », « Audio Description »…), vide sinon. */
+    val title: String = "",
+    /** Nombre de canaux ; 0 quand inconnu ou sans objet. */
+    val channels: Int = 0,
+    /** Piste marquée « par défaut » dans le conteneur. */
+    val isDefault: Boolean = false,
+    /** Décodable par l'appareil ; false = listée pour information, injouable. */
+    val supported: Boolean = true,
+    /** Audiodescription ou commentaire : jamais choisie d'office. */
+    val audioDescription: Boolean = false,
 )
 
 /** Pistes disponibles sur le média en cours. */
