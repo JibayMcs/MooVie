@@ -85,9 +85,10 @@ class CoflixProvider(private val http: HttpGateway) : SourceProvider {
     companion object {
         const val BASE = "https://coflix.esq"
 
+        // `[\s\S]` plutôt que `.` sous RegexOption.DOT_MATCHES_ALL, qui n'existe
+        // que sur la JVM (voir PackedJs) : ces motifs franchissent des lignes.
         private val CARD = Regex(
-            "md-manga-card-cover\">(.*?)md-manga-card-name\">(.*?)</p>",
-            RegexOption.DOT_MATCHES_ALL,
+            "md-manga-card-cover\">([\\s\\S]*?)md-manga-card-name\">([\\s\\S]*?)</p>",
         )
         private val HREF = Regex("href=\"https?://[^/\"]+/(film|serie)/([^/\"]+)/?\"")
         private val YEAR = Regex("md-card-badge year\">\\s*(\\d{4})\\s*<")
@@ -96,13 +97,11 @@ class CoflixProvider(private val http: HttpGateway) : SourceProvider {
         private val CFP_SEASON = Regex("\"season\"\\s*:\\s*\"?(\\d+)")
         private val CFP_EPISODE = Regex("\"episode\"\\s*:\\s*\"?(\\d+)")
         private val STAT_YEAR = Regex(
-            "cf-stat-item\"\\s+title=\"(?:Año|A&ntilde;o|Année|Year)\">\\s*(?:<svg.*?</svg>)?\\s*(\\d{4})\\s*</span>",
-            RegexOption.DOT_MATCHES_ALL,
+            "cf-stat-item\"\\s+title=\"(?:Año|A&ntilde;o|Année|Year)\">\\s*(?:<svg[\\s\\S]*?</svg>)?\\s*(\\d{4})\\s*</span>",
         )
-        private val CF_SERVERS = Regex("cfServers\\s*=\\s*(\\[.*?\\])\\s*;", RegexOption.DOT_MATCHES_ALL)
+        private val CF_SERVERS = Regex("cfServers\\s*=\\s*(\\[[\\s\\S]*?\\])\\s*;")
         private val ITEM = Regex(
-            "showVideo\\(\\s*['\"]([^'\"]+)['\"][^)]*\\)[^>]*>(.*?)</li>",
-            RegexOption.DOT_MATCHES_ALL,
+            "showVideo\\(\\s*['\"]([^'\"]+)['\"][^)]*\\)[^>]*>([\\s\\S]*?)</li>",
         )
         private val PARA = Regex("<p>\\s*([^<]*?)\\s*</p>")
 
