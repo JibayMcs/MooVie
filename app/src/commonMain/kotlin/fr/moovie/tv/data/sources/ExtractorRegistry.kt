@@ -40,6 +40,12 @@ object ExtractorRegistry {
             // premier et repartirait sans le `Referer` que le CDN exige — 403
             // garanti. Voir SwiftFlowExtractor.
             SwiftFlowExtractor(),
+            // Avant DirectStream : le fragment `#audio=` doit être retiré et la
+            // piste transmise, ce que DirectStream ne ferait pas.
+            PurStreamExtractor(),
+            // Avant DirectStream pour la même raison que SwiftFlow : le CDN
+            // exige un Referer. Choisi par nom d'hébergeur (CDN partagé).
+            NakiosExtractor(),
             // En tête : un lien déjà jouable ne doit traverser aucune autre
             // règle, et la reconnaissance ne coûte qu'un test d'extension.
             DirectStreamExtractor(),

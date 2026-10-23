@@ -25,10 +25,18 @@ sealed interface MediaRef {
     val title: String
     val year: String?
 
+    /**
+     * Langue originale TMDB (`original_language`, code ISO 639-1), ou null si
+     * inconnue. Sert aux catalogues qui livrent plusieurs pistes audio : une
+     * piste n'est « VO » que si elle est dans cette langue.
+     */
+    val originalLanguage: String?
+
     data class Movie(
         override val tmdbId: Int,
         override val title: String,
         override val year: String? = null,
+        override val originalLanguage: String? = null,
     ) : MediaRef
 
     data class Episode(
@@ -37,5 +45,6 @@ sealed interface MediaRef {
         override val year: String? = null,
         val season: Int,
         val episode: Int,
+        override val originalLanguage: String? = null,
     ) : MediaRef
 }
