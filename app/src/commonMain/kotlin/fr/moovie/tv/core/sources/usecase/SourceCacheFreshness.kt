@@ -17,10 +17,26 @@ package fr.moovie.tv.core.sources.usecase
  * on la considère incomplète dès qu'on attend quoi que ce soit, plutôt que de
  * parier qu'elle couvrait déjà tout.
  */
-fun isCacheComplete(consulted: Collection<String>, expected: Collection<String>): Boolean {
-    if (expected.isEmpty()) return true
-    return consulted.toSet().containsAll(expected.toSet())
-}
+fun isCacheComplete(consulted: Collection<String>, expected: Collection<String>): Boolean =
+    cataloguesManquants(consulted, expected).isEmpty()
+
+/**
+ * Les catalogues attendus que l'entrée n'a pas interrogés : ceux à **redemander**,
+ * et non une raison de jeter le reste.
+ *
+ * Une entrée incomplète était rejetée en bloc. Or le préchargement de l'épisode
+ * suivant écrit son entrée sans les catalogues qui ont dépassé leur délai, et la
+ * lecture rapide, trouvant l'entrée incomplète, refaisait toute la cascade au
+ * moment précis que le préchargement voulait épargner. Mesuré sur un
+ * enchaînement d'épisodes : 4,6 s de catalogues avant la première résolution,
+ * alors que la plupart des liens étaient déjà connus.
+ *
+ * Les liens des catalogues interrogés se servent donc tout de suite, et seuls
+ * les manquants sont demandés ; l'entrée est ensuite complétée. Un catalogue en
+ * panne n'est ainsi ni figé six heures dans le cache, ni un obstacle aux autres.
+ */
+fun cataloguesManquants(consulted: Collection<String>, expected: Collection<String>): Set<String> =
+    expected.toSet() - consulted.toSet()
 
 /**
  * Une **mesure jouable** se garde longtemps : la définition d'un fichier est une

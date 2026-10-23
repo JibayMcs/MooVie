@@ -93,14 +93,19 @@ class SourceCacheRepository {
     private val json = Json { ignoreUnknownKeys = true }
 
     /**
-     * Liens en cache pour cette clé, ou null si absent, périmé, ou **incomplet**.
-     *
-     * Incomplet = [expectedProviders] contient un catalogue que l'entrée n'a pas
-     * interrogé. C'est le cas juste après une mise à jour qui ajoute un provider,
-     * ou quand l'utilisateur en réactive un : resservir l'entrée telle quelle
-     * masquerait le nouveau catalogue pendant toute la durée de vie du cache.
+     * Ce que le cache sait d'une clé : des liens, et les catalogues interrogés
+     * pour les produire, les muets compris.
      */
-    suspend fun get(key: String, expectedProviders: Set<String> = emptySet()): List<EmbedLink>? {
+    class Entree(val links: List<EmbedLink>, val providers: Set<String>)
+
+    /**
+     * L'entrée telle qu'elle est, **complète ou non** ; null si absente, périmée,
+     * vide, ou écrite par un autre build.
+     *
+     * La complétude est l'affaire de l'appelant : `cataloguesManquants` lui dit
+     * quels catalogues redemander pour la compléter, plutôt que de la jeter.
+     */
+    suspend fun lire(key: String): Entree? {
         if (key.isBlank()) return null
         val raw = store.data.first()[stringPreferencesKey(ENTRY_PREFIX + key)] ?: return null
         val entry = runCatching { json.decodeFromString<CachedSources>(raw) }.getOrNull() ?: return null
@@ -108,8 +113,23 @@ class SourceCacheRepository {
         // Écrite par un autre build : le code qui a produit ces liens n'est
         // plus celui qui tourne.
         if (!writtenByRunningVersion(entry.buildId)) return null
-        if (!isCacheComplete(entry.providers, expectedProviders)) return null
-        return entry.links.ifEmpty { null }
+        if (entry.links.isEmpty()) return null
+        return Entree(entry.links, entry.providers.toSet())
+    }
+
+    /**
+     * Liens en cache pour cette clé, ou null si absent, périmé, ou **incomplet**.
+     *
+     * Incomplet = [expectedProviders] contient un catalogue que l'entrée n'a pas
+     * interrogé. C'est le cas juste après une mise à jour qui ajoute un provider,
+     * ou quand l'utilisateur en réactive un : resservir l'entrée telle quelle
+     * masquerait le nouveau catalogue pendant toute la durée de vie du cache.
+     * Pour garder les liens d'une entrée incomplète, voir [lire].
+     */
+    suspend fun get(key: String, expectedProviders: Set<String> = emptySet()): List<EmbedLink>? {
+        val entree = lire(key) ?: return null
+        if (!isCacheComplete(entree.providers, expectedProviders)) return null
+        return entree.links
     }
 
     /**

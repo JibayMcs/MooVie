@@ -1,6 +1,7 @@
 package fr.moovie.tv.core.sources.usecase
 
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -41,6 +42,47 @@ class SourceCacheFreshnessTest {
     @Test
     fun `sans attente l entree est complete`() {
         assertTrue(isCacheComplete(emptyList(), emptyList()))
+    }
+
+    // ── Catalogues à redemander ──────────────────────────────────────────────
+
+    /**
+     * Le cas qui motive la fonction : le préchargement a écrit l'entrée sans
+     * swiftflow, qui avait dépassé son délai. Les liens des autres se servent,
+     * swiftflow seul est redemandé.
+     */
+    @Test
+    fun `un catalogue expire est le seul a redemander`() {
+        assertEquals(
+            setOf("swiftflow"),
+            cataloguesManquants(listOf("fstream", "vidapi"), listOf("fstream", "swiftflow", "vidapi")),
+        )
+    }
+
+    @Test
+    fun `une entree complete n a rien a redemander`() {
+        assertEquals(emptySet(), cataloguesManquants(listOf("fstream", "swiftflow"), listOf("swiftflow", "fstream")))
+    }
+
+    /** Un catalogue désactivé depuis ne manque pas : on n'attend plus rien de lui. */
+    @Test
+    fun `un catalogue desactive ne manque pas`() {
+        assertEquals(emptySet(), cataloguesManquants(listOf("fstream", "coflix"), listOf("fstream")))
+    }
+
+    /** Entrée d'une version qui n'écrivait pas la liste : tout est à redemander. */
+    @Test
+    fun `sans liste de catalogues tout manque`() {
+        assertEquals(setOf("fstream", "vidapi"), cataloguesManquants(emptyList(), listOf("fstream", "vidapi")))
+    }
+
+    /** Les deux lectures disent la même chose : complet, c'est rien à redemander. */
+    @Test
+    fun `complet veut dire rien a redemander`() {
+        val consulte = listOf("fstream")
+        val attendu = listOf("fstream", "swiftflow")
+        assertEquals(cataloguesManquants(consulte, attendu).isEmpty(), isCacheComplete(consulte, attendu))
+        assertFalse(isCacheComplete(consulte, attendu))
     }
 
     // ── Péremption d'une mesure de qualité ───────────────────────────────────
