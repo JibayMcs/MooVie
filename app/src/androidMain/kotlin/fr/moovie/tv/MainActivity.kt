@@ -775,6 +775,7 @@ class MainActivity : ComponentActivity() {
                             is Screen.Player -> if (uiFlavor != UiFlavor.TOUCH) PlayerScreen(
                                 streamUrl = s.streamUrl,
                                 headers = s.headers,
+                                audioLanguage = s.audioLanguage,
                                 mediaKey = s.mediaKey,
                                 // Le téléviseur rend le lecteur **ici**, pas via
                                 // PlayerActivity : il y a deux sites d'appel, et

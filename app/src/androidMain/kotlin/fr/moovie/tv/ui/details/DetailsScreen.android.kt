@@ -248,6 +248,7 @@ fun DetailsScreen(
                     Screen.Player(
                         streamUrl = s.url,
                         headers = s.headers,
+                        audioLanguage = s.audioLanguage,
                         mediaKey = viewModel.playbackKey,
                         subtitles = s.subtitleUrls,
                         title = viewModel.playbackTitle,

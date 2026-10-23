@@ -104,6 +104,7 @@ fun CastLaunchScreen(
                 Screen.Player(
                     streamUrl = stream.url,
                     headers = stream.headers,
+                    audioLanguage = stream.audioLanguage,
                     mediaKey = viewModel.playbackKey,
                     subtitles = stream.subtitleUrls,
                     title = viewModel.playbackTitle,

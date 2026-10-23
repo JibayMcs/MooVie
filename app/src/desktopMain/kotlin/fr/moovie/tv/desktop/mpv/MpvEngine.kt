@@ -143,6 +143,7 @@ internal class MpvEngine(
         entetes: Map<String, String> = emptyMap(),
         departMs: Long = 0L,
         urlAudio: String? = null,
+        langueAudio: String? = null,
     ): Boolean {
         val lib = mpv ?: run {
             surErreur("libmpv introuvable : le lecteur ne peut pas démarrer")
@@ -179,6 +180,12 @@ internal class MpvEngine(
         urlAudio?.let {
             lib.mpv_command(contexte, arrayOf("change-list", "audio-files", "append", it, null))
         }
+
+        // `alang` n'est qu'une préférence de sélection automatique, appliquée au
+        // chargement : un choix manuel (`aid`) fait ensuite par l'utilisateur
+        // reste prioritaire. Toujours réécrite, vide quand rien n'est demandé,
+        // pour qu'un média précédent ne laisse pas sa langue au suivant.
+        lib.mpv_set_property_string(contexte, "alang", langueAudio.orEmpty())
 
         termine = false
         charge = false

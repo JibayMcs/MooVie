@@ -67,4 +67,15 @@ data class PlayableStream(
      */
     val videoOnlyUrl: String? = null,
     val audioOnlyUrl: String? = null,
+    /**
+     * Piste audio à jouer quand le manifeste en porte plusieurs (code ISO 639-1 :
+     * « fr », « en »). Un même HLS peut réunir VF et VO en `EXT-X-MEDIA
+     * TYPE=AUDIO`, alors que le modèle n'a qu'une langue par lien : c'est le lien
+     * qui décide, et ce champ le répercute au lecteur.
+     *
+     * Une préférence, pas une exigence : le choix manuel de l'utilisateur dans le
+     * lecteur prime, et une piste absente laisse le défaut du manifeste. Null =
+     * comportement inchangé.
+     */
+    val audioLanguage: String? = null,
 )

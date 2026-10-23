@@ -165,6 +165,8 @@ sealed interface Screen {
          * ainsi. Vide quand la lecture vient du disque.
          */
         val alternatives: List<AltSource> = emptyList(),
+        /** Piste audio préférée du flux (ISO 639-1), voir `PlayableStream.audioLanguage`. Null = défaut. */
+        val audioLanguage: String? = null,
     ) : Screen
 }
 

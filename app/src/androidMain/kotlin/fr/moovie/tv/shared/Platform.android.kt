@@ -43,3 +43,5 @@ actual val deviceName: String
         Build.MANUFACTURER?.takeIf { it.isNotBlank() }?.replaceFirstChar { it.uppercase() },
         Build.MODEL?.takeIf { it.isNotBlank() },
     ).distinct().joinToString(" ").ifBlank { "Android TV" }
+
+actual val supportsAudioTrackSelection: Boolean = true

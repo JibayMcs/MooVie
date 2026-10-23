@@ -22,3 +22,6 @@ actual val appBuildId: String = BUILD_ID_GENERE
  */
 actual val deviceName: String
     get() = UIDevice.currentDevice.name.takeIf { it.isNotBlank() } ?: "Moo-vie"
+
+/** iOS ne sait pas encore sélectionner une piste audio : le lecteur joue la piste par défaut. */
+actual val supportsAudioTrackSelection: Boolean = false

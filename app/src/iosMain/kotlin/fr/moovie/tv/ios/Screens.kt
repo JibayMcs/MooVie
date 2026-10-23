@@ -392,6 +392,7 @@ internal fun IosDetailsScreen(
                     Screen.Player(
                         streamUrl = s.url,
                         headers = s.headers,
+                        audioLanguage = s.audioLanguage,
                         mediaKey = vm.playbackKey,
                         subtitles = s.subtitleUrls,
                         title = vm.playbackTitle,

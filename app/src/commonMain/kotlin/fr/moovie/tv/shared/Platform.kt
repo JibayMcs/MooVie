@@ -35,3 +35,13 @@ expect val appBuildId: String
  * modèle que le constructeur a écrit.
  */
 expect val deviceName: String
+
+/**
+ * Le lecteur sait-il choisir une piste audio parmi plusieurs dans un même flux ?
+ *
+ * Vrai sur Android (ExoPlayer) et desktop (mpv). Faux sur iOS, où le lecteur
+ * joue la piste par défaut : un lien par piste y donnerait deux entrées qui
+ * jouent la même chose. Les fournisseurs qui exposent plusieurs pistes dans un
+ * seul master s'en servent pour n'émettre que ce que le lecteur peut honorer.
+ */
+expect val supportsAudioTrackSelection: Boolean

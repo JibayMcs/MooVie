@@ -90,6 +90,7 @@ class PlayerActivity : ComponentActivity() {
                             PlayerScreen(
                                 streamUrl = ecran.streamUrl,
                                 headers = ecran.headers,
+                                audioLanguage = ecran.audioLanguage,
                                 mediaKey = ecran.mediaKey,
                                 sourceUrl = ecran.sourceUrl,
                                 hoster = ecran.hoster,

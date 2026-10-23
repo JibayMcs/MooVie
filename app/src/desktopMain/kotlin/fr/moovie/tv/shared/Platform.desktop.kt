@@ -13,3 +13,5 @@ actual val appBuildId: String = System.getProperty("moovie.build") ?: appVersion
 actual val deviceName: String
     get() = runCatching { java.net.InetAddress.getLocalHost().hostName }
         .getOrNull()?.takeIf { it.isNotBlank() } ?: "Moo-vie"
+
+actual val supportsAudioTrackSelection: Boolean = true

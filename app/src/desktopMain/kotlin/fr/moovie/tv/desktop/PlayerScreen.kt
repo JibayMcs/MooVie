@@ -205,6 +205,8 @@ private val BLANK_CURSOR: PointerIcon by lazy {
 internal fun DesktopPlayerScreen(
     streamUrl: String,
     headers: Map<String, String>,
+    /** Piste audio préférée (ISO 639-1), ou null : défaut du flux. */
+    audioLanguage: String? = null,
     mediaKey: String,
     subtitles: Map<String, String>,
     title: String,
@@ -495,7 +497,7 @@ internal fun DesktopPlayerScreen(
         }
         // L'ouverture attend le réseau : hors du fil d'interface.
         withContext(Dispatchers.IO) {
-            val ouvert = moteur.ouvre(played, headers, departMs = resumeAt)
+            val ouvert = moteur.ouvre(played, headers, departMs = resumeAt, langueAudio = audioLanguage)
             if (ouvert) {
                 moteur.coupeSon(false)
                 moteur.regleVolumePourcent(100)
@@ -954,6 +956,9 @@ internal fun DesktopPlayerScreen(
         var currentHeights by remember(streamUrl) { mutableStateOf(emptyList<Int>()) }
         var playedUrl by remember(streamUrl) { mutableStateOf(streamUrl) }
         var playedHeaders by remember(streamUrl) { mutableStateOf(headers) }
+        // Langue audio du flux COURANT : celle de l'écran d'origine, puis celle de
+        // l'alternative choisie. Tout rouvrir doit partir d'elle.
+        var currentAudioLanguage by remember(streamUrl) { mutableStateOf(audioLanguage) }
         val qualityScope = rememberCoroutineScope()
 
         // Les variantes se lisent dans la master playlist, comme avant : les
@@ -977,7 +982,7 @@ internal fun DesktopPlayerScreen(
             }.getOrDefault(emptyList())
         }
 
-        fun reopen(url: String, hdrs: Map<String, String>) {
+        fun reopen(url: String, hdrs: Map<String, String>, langue: String?) {
             val at = controller.positionMs()
             qualityScope.launch {
                 withContext(Dispatchers.IO) {
@@ -992,7 +997,7 @@ internal fun DesktopPlayerScreen(
                     } else {
                         url
                     }
-                    runCatching { moteur.ouvre(cible, hdrs, departMs = at.coerceAtLeast(0)) }
+                    runCatching { moteur.ouvre(cible, hdrs, departMs = at.coerceAtLeast(0), langueAudio = langue) }
                 }
             }
         }
@@ -1017,7 +1022,8 @@ internal fun DesktopPlayerScreen(
                         playedUrl = stream.url
                         playedHeaders = stream.headers
                         quality = choice
-                        reopen(stream.url, stream.headers)
+                        currentAudioLanguage = stream.audioLanguage
+                        reopen(stream.url, stream.headers, currentAudioLanguage)
                     }
                 }
             }

@@ -473,6 +473,7 @@ private fun DesktopApp(
                     Screen.Player(
                         streamUrl = stream.url,
                         headers = stream.headers,
+                        audioLanguage = stream.audioLanguage,
                         mediaKey = details.playbackKey,
                         subtitles = stream.subtitleUrls,
                         title = details.playbackTitle,
@@ -645,6 +646,7 @@ private fun DesktopApp(
                     DesktopPlayerScreen(
                         streamUrl = s.streamUrl,
                         headers = s.headers,
+                        audioLanguage = s.audioLanguage,
                         mediaKey = s.mediaKey,
                         sourceUrl = s.sourceUrl,
                         hoster = s.hoster,

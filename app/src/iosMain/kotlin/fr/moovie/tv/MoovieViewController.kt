@@ -402,6 +402,10 @@ private fun EcranCourant(nav: NavStack, online: Boolean) {
  */
 @Composable
 private fun LecteurIos(nav: NavStack, params: Screen.Player) {
+    // TODO(audio): appliquer `params.audioLanguage` via le groupe audible de l'asset
+    // (`mediaSelectionGroupForMediaCharacteristic(AVMediaCharacteristicAudible)` +
+    // `selectMediaOption`), une fois `AvPlayerController` testé sur appareil :
+    // le code iOS ne se compile pas sur cette machine, donc on ne l'écrit pas à l'aveugle.
     val controleur = remember(params.streamUrl) {
         AvPlayerController(params.streamUrl, params.headers)
     }
