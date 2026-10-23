@@ -265,29 +265,6 @@ class SettingsRepository {
         store.edit { it[SUBTITLE_LANGUAGES] = value.joinToString(",") }
 
     /**
-     * Remonter les sous-titres « forcés » — ceux qui ne traduisent que les
-     * passages en langue étrangère.
-     *
-     * Faux par défaut, et ce n'est pas une timidité : servi sans être demandé,
-     * un forcé donne l'impression que les dialogues manquent. C'est aussi
-     * pourquoi le réglage existe plutôt qu'une heuristique — personne ne peut
-     * deviner à la place de l'utilisateur qu'il regarde un film majoritairement
-     * dans une langue qu'il comprend.
-     */
-    val subtitlePreferForced: Flow<Boolean> =
-        store.data.map { it[SUBTITLE_PREFER_FORCED] ?: false }
-
-    suspend fun setSubtitlePreferForced(value: Boolean) =
-        store.edit { it[SUBTITLE_PREFER_FORCED] = value }
-
-    /** Remonter les sous-titres pour sourds et malentendants (bruits, locuteurs). */
-    val subtitlePreferHearingImpaired: Flow<Boolean> =
-        store.data.map { it[SUBTITLE_PREFER_SDH] ?: false }
-
-    suspend fun setSubtitlePreferHearingImpaired(value: Boolean) =
-        store.edit { it[SUBTITLE_PREFER_SDH] = value }
-
-    /**
      * Apparence des sous-titres, recomposée depuis trois clés indépendantes.
      *
      * Trois clés plutôt qu'une chaîne sérialisée : chacune se relit seule, et
@@ -349,8 +326,6 @@ class SettingsRepository {
         val SCREENSAVER_DELAY = stringPreferencesKey("screensaver_delay")
         val INTRODB_API_KEY = stringPreferencesKey("introdb_api_key")
         val SUBTITLE_LANGUAGES = stringPreferencesKey("subtitle_languages")
-        val SUBTITLE_PREFER_FORCED = booleanPreferencesKey("subtitle_prefer_forced")
-        val SUBTITLE_PREFER_SDH = booleanPreferencesKey("subtitle_prefer_sdh")
         val SUBTITLE_SIZE = stringPreferencesKey("subtitle_size")
         val SUBTITLE_COLOR = stringPreferencesKey("subtitle_color")
         val SUBTITLE_BACKDROP = stringPreferencesKey("subtitle_backdrop")

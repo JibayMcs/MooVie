@@ -11,34 +11,23 @@ class SubtitleRankingTest {
         id: String,
         language: String = "fr",
         fps: Double? = null,
-        downloads: Int = 0,
-        trusted: Boolean = false,
-        hearingImpaired: Boolean = false,
-        forced: Boolean = false,
-        ai: Boolean = false,
-        machine: Boolean = false,
     ) = SubtitleCandidate(
         fileId = id,
         language = language,
         fps = fps,
-        downloads = downloads,
-        fromTrusted = trusted,
-        hearingImpaired = hearingImpaired,
-        foreignPartsOnly = forced,
-        aiTranslated = ai,
-        machineTranslated = machine,
     )
 
     private fun ids(list: List<SubtitleCandidate>) = list.map { it.fileId }
 
     @Test
-    fun `la langue preferee passe avant tout le reste`() {
+    fun `la langue preferee passe avant la cadence`() {
         val ranked = rankSubtitles(
             candidates = listOf(
-                sub("en", language = "en", downloads = 9_000, trusted = true),
-                sub("fr", language = "fr", downloads = 1),
+                sub("en", language = "en", fps = 23.976),
+                sub("fr", language = "fr", fps = 25.0),
             ),
             preferredLanguages = listOf("fr", "en"),
+            streamFps = 23.976,
         )
 
         assertEquals(listOf("fr", "en"), ids(ranked))
@@ -54,19 +43,19 @@ class SubtitleRankingTest {
         assertEquals(listOf("en", "es"), ids(ranked))
     }
 
-    /** Une cadence identique évite la dérive : elle prime sur la popularité. */
+    /** Une cadence identique évite la dérive : elle départage deux sous-titres de même langue. */
     @Test
-    fun `a langue egale la cadence du flux l emporte sur le nombre de telechargements`() {
+    fun `a langue egale la cadence du flux departage deux sous-titres de meme langue`() {
         val ranked = rankSubtitles(
             candidates = listOf(
-                sub("populaire", fps = 25.0, downloads = 50_000),
-                sub("cale", fps = 23.976, downloads = 12),
+                sub("derive", fps = 25.0),
+                sub("cale", fps = 23.976),
             ),
             preferredLanguages = listOf("fr"),
             streamFps = 23.976,
         )
 
-        assertEquals(listOf("cale", "populaire"), ids(ranked))
+        assertEquals(listOf("cale", "derive"), ids(ranked))
     }
 
     /**
@@ -77,8 +66,8 @@ class SubtitleRankingTest {
     fun `une cadence connue mais differente passe devant une cadence absente`() {
         val ranked = rankSubtitles(
             candidates = listOf(
-                sub("sans", fps = null, downloads = 900),
-                sub("avec", fps = 25.0, downloads = 1),
+                sub("sans", fps = null),
+                sub("avec", fps = 25.0),
             ),
             preferredLanguages = listOf("fr"),
             streamFps = 23.976,
@@ -89,77 +78,17 @@ class SubtitleRankingTest {
 
     /** Sans cadence de flux, le critère se neutralise au lieu de trancher au hasard. */
     @Test
-    fun `sans cadence de flux le classement retombe sur la popularite`() {
+    fun `sans cadence de flux l ordre du catalogue est conserve`() {
         val ranked = rankSubtitles(
             candidates = listOf(
-                sub("peu", fps = 25.0, downloads = 10),
-                sub("beaucoup", fps = 23.976, downloads = 5_000),
+                sub("premier", fps = 25.0),
+                sub("second", fps = 23.976),
             ),
             preferredLanguages = listOf("fr"),
             streamFps = null,
         )
 
-        assertEquals(listOf("beaucoup", "peu"), ids(ranked))
-    }
-
-    @Test
-    fun `la traduction humaine passe devant la machine`() {
-        val ranked = rankSubtitles(
-            candidates = listOf(
-                sub("machine", downloads = 8_000, machine = true),
-                sub("ia", downloads = 4_000, ai = true),
-                sub("humain", downloads = 3),
-            ),
-            preferredLanguages = listOf("fr"),
-        )
-
-        assertEquals(listOf("humain", "ia", "machine"), ids(ranked))
-    }
-
-    @Test
-    fun `a egalite la source de confiance puis la popularite departagent`() {
-        val ranked = rankSubtitles(
-            candidates = listOf(
-                sub("banal", downloads = 100),
-                sub("confiance", downloads = 10, trusted = true),
-            ),
-            preferredLanguages = listOf("fr"),
-        )
-
-        assertEquals(listOf("confiance", "banal"), ids(ranked))
-    }
-
-    @Test
-    fun `les sous-titres sourds et malentendants reculent, sauf demande explicite`() {
-        val candidates = listOf(sub("sdh", hearingImpaired = true), sub("normal"))
-
-        assertEquals(listOf("normal", "sdh"), ids(rankSubtitles(candidates, listOf("fr"))))
-        assertEquals(
-            listOf("sdh", "normal"),
-            ids(rankSubtitles(candidates, listOf("fr"), preferHearingImpaired = true)),
-        )
-    }
-
-    /**
-     * Constaté sur la sonde : le mieux classé pour Fight Club était un
-     * « Forced », qui ne sous-titre que les passages en langue étrangère. Sorti
-     * en tête, il donne l'impression que les dialogues manquent.
-     */
-    @Test
-    fun `les sous-titres forces reculent, sauf demande explicite`() {
-        val candidates = listOf(
-            sub("force", fps = 23.976, downloads = 18, forced = true),
-            sub("complet", fps = 23.976, downloads = 5),
-        )
-
-        assertEquals(
-            listOf("complet", "force"),
-            ids(rankSubtitles(candidates, listOf("fr"), streamFps = 23.976)),
-        )
-        assertEquals(
-            listOf("force", "complet"),
-            ids(rankSubtitles(candidates, listOf("fr"), streamFps = 23.976, preferForced = true)),
-        )
+        assertEquals(listOf("premier", "second"), ids(ranked))
     }
 
     @Test

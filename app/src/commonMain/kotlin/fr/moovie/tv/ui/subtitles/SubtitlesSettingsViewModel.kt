@@ -20,9 +20,6 @@ import kotlinx.coroutines.withContext
 data class SubtitlesSettingsState(
     /** Langues recherchées, dans l'ordre de préférence. */
     val languages: List<String> = emptyList(),
-    /** Préférences de *contenu* : quel fichier proposer en premier. */
-    val preferForced: Boolean = false,
-    val preferHearingImpaired: Boolean = false,
     /** Préférence d'*apparence* : comment le texte est rendu à l'écran. */
     val style: SubtitleStyle = SubtitleStyle.Default,
 )
@@ -37,12 +34,10 @@ class SubtitlesSettingsViewModel : ViewModel() {
         refresh()
     }
 
-    /** Relit les langues, les préférences de contenu et l'apparence. */
+    /** Relit les langues et l'apparence. */
     fun refresh() = io {
         _state.value = _state.value.copy(
             languages = settings.subtitleLanguages.first(),
-            preferForced = settings.subtitlePreferForced.first(),
-            preferHearingImpaired = settings.subtitlePreferHearingImpaired.first(),
             style = settings.subtitleStyle.first(),
         )
     }
@@ -64,16 +59,6 @@ class SubtitlesSettingsViewModel : ViewModel() {
         }
         settings.setSubtitleLanguages(next)
         _state.value = _state.value.copy(languages = next)
-    }
-
-    fun setPreferForced(value: Boolean) = io {
-        settings.setSubtitlePreferForced(value)
-        _state.value = _state.value.copy(preferForced = value)
-    }
-
-    fun setPreferHearingImpaired(value: Boolean) = io {
-        settings.setSubtitlePreferHearingImpaired(value)
-        _state.value = _state.value.copy(preferHearingImpaired = value)
     }
 
     // L'état local est mis à jour à la main plutôt que collecté depuis le

@@ -37,12 +37,6 @@ import fr.moovie.tv.resources.subtitles_backdrop_shadow
 import fr.moovie.tv.resources.subtitles_color
 import fr.moovie.tv.resources.subtitles_color_white
 import fr.moovie.tv.resources.subtitles_color_yellow
-import fr.moovie.tv.resources.subtitles_content
-import fr.moovie.tv.resources.subtitles_content_help
-import fr.moovie.tv.resources.subtitles_prefer_forced
-import fr.moovie.tv.resources.subtitles_prefer_forced_help
-import fr.moovie.tv.resources.subtitles_prefer_sdh
-import fr.moovie.tv.resources.subtitles_prefer_sdh_help
 import fr.moovie.tv.resources.subtitles_preview
 import fr.moovie.tv.resources.subtitles_size
 import fr.moovie.tv.resources.subtitles_size_huge
@@ -73,8 +67,8 @@ import fr.moovie.tv.ui.theme.MOOVIE_TEXT_DIM
 private val DIM = MOOVIE_TEXT_DIM
 
 /**
- * Section « Sous-titres » des réglages : langues recherchées, préférences de
- * contenu et apparence. Les sous-titres viennent d'un addon public, sans clé ni
+ * Section « Sous-titres » des réglages : langues recherchées et apparence.
+ * Les sous-titres viennent d'un addon public, sans clé ni
  * compte : rien à configurer côté service.
  */
 @Composable
@@ -95,20 +89,6 @@ fun SubtitlesSection(
         )
         Help(stringResource(Res.string.subtitles_languages_help))
         LanguagePicker(selected = state.languages, onToggle = viewModel::toggleLanguage)
-
-        Text(
-            stringResource(Res.string.subtitles_content),
-            style = MaterialTheme.typography.titleMedium,
-        )
-        Help(stringResource(Res.string.subtitles_content_help))
-
-        Text(stringResource(Res.string.subtitles_prefer_forced), style = MaterialTheme.typography.bodyMedium)
-        Help(stringResource(Res.string.subtitles_prefer_forced_help))
-        OnOff(value = state.preferForced, onChange = viewModel::setPreferForced)
-
-        Text(stringResource(Res.string.subtitles_prefer_sdh), style = MaterialTheme.typography.bodyMedium)
-        Help(stringResource(Res.string.subtitles_prefer_sdh_help))
-        OnOff(value = state.preferHearingImpaired, onChange = viewModel::setPreferHearingImpaired)
 
         Text(
             stringResource(Res.string.subtitles_appearance),

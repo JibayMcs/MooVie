@@ -13,20 +13,12 @@ package fr.moovie.tv.core.subtitles.model
  *   dérive progressivement — plus de quatre minutes d'écart en fin de film — et
  *   aucun décalage constant ne rattrape ça. Voir [fr.moovie.tv.core.subtitles.usecase.timingFor].
  *   Null quand le catalogue ne la déclare pas, ce qui est fréquent.
- * @param foreignPartsOnly sous-titres « forcés » : uniquement les passages en
- *   langue étrangère, pas tous les dialogues.
  */
 data class SubtitleCandidate(
     val fileId: String,
     val language: String,
     val release: String = "",
     val fps: Double? = null,
-    val downloads: Int = 0,
-    val fromTrusted: Boolean = false,
-    val hearingImpaired: Boolean = false,
-    val foreignPartsOnly: Boolean = false,
-    val aiTranslated: Boolean = false,
-    val machineTranslated: Boolean = false,
 )
 
 /** Un sous-titre téléchargé : son contenu. */

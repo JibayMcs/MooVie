@@ -133,8 +133,6 @@ fun subtitleFpsSection(
 private fun SubtitleCandidate.describe(): String = buildString {
     append(language.uppercase())
     fps?.let { append(" · ").append(format(it)) }
-    if (foreignPartsOnly) append(" · forcé")
-    if (hearingImpaired) append(" · SDH")
     if (release.isNotBlank()) append(" · ").append(release.take(36))
 }
 
