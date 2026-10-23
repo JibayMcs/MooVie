@@ -68,7 +68,13 @@ fun ProfileHost(content: @Composable (profileId: String) -> Unit) {
             println("[profil] purge des identifiants OpenSubtitles en échec : $e")
         }
         val active = repo.restoreActive()
-        session = if (repo.profiles.first().size > 1) null else active
+        val profils = repo.profiles.first()
+        // Le dernier profil utilisé entre directement : la porte ne s'ouvre
+        // que s'il a disparu. Changer reste possible depuis les réglages
+        // (LocalSwitchProfile). Sur un téléviseur, c'est presque toujours la
+        // même personne qui ouvre l'application.
+        session = active.takeIf { id -> profils.any { it.id == id } }
+            ?: if (profils.size > 1) null else active
         resolved = true
     }
 
