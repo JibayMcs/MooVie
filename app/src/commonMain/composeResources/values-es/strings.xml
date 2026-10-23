@@ -629,6 +629,8 @@
     <string name="player_quality">Calidad</string>
     <string name="player_quality_auto">Automática</string>
     <string name="details_download_best">Descargar en la mejor calidad</string>
+    <string name="details_download_remove">Descargado · eliminar el archivo</string>
+    <string name="details_download_remove_question">¿Eliminar esta descarga? El archivo se borrará del dispositivo y la reproducción volverá a usar las fuentes.</string>
     <string name="settings_update_prereleases">Recibir preversiones</string>
     <string name="settings_update_prereleases_help">Propone también las versiones de prueba («rc»), publicadas antes de la versión definitiva para ponerlas a prueba. Pueden contener fallos; desactivado, solo se proponen las versiones finales.</string>
 
