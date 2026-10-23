@@ -922,6 +922,9 @@ fun PlayerScreen(
     // Version à afficher sur la pastille, ou null s'il n'y a rien à montrer :
     // porter la non-nullité dans la valeur évite de la revérifier plus bas.
     val subsViewModel: PlayerSubtitlesViewModel = viewModel()
+    // **Pendant la composition, avant de lire `file`** : voir
+    // PlayerSubtitlesViewModel.enter.
+    remember(mediaKey) { subsViewModel.enter(mediaKey) }
     val subsState by subsViewModel.state.collectAsStateWithLifecycle()
     val subsFile by subsViewModel.file.collectAsStateWithLifecycle()
     // Le fichier arrive déjà recalé : le lecteur n'a qu'à le charger.
@@ -940,6 +943,15 @@ fun PlayerScreen(
         controller.loadExternalSubtitle(subsFile)
     }
     DisposableEffect(Unit) { onDispose { subsViewModel.onLeave() } }
+    // Le sous-titre choisi à la dernière lecture revient au premier passage en
+    // lecture : le flux est alors monté et sa cadence connue. Depuis le disque
+    // seulement, rien n'est téléchargé (voir PlayerSubtitlesViewModel.restore).
+    var subsRestored by remember(mediaKey) { mutableStateOf(false) }
+    LaunchedEffect(mediaKey, isPlaying) {
+        if (subsRestored || !isPlaying) return@LaunchedEffect
+        subsRestored = true
+        subsViewModel.restore(mediaKey, controller.videoFps())
+    }
 
     val chipVersion = updateVersion?.takeIf { updateChipFresh || controlsVisible }
 
@@ -1542,7 +1554,13 @@ fun PlayerScreen(
                         tracks = controller.tracks()
                         dialog = null
                     },
-                    onlineSubtitleSection(subsState) { candidate ->
+                    onlineSubtitleSection(
+                        state = subsState,
+                        onNext = {
+                            subsViewModel.next()
+                            dialog = null
+                        },
+                    ) { candidate ->
                         subsViewModel.pick(candidate)
                         dialog = null
                     },

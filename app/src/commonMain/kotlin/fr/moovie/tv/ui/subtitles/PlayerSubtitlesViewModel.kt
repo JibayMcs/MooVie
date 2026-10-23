@@ -10,6 +10,7 @@ import fr.moovie.tv.core.subtitles.usecase.rankSubtitles
 import fr.moovie.tv.core.subtitles.usecase.timingFor
 import fr.moovie.tv.data.settings.SettingsRepository
 import fr.moovie.tv.data.subtitles.StremioSubtitleCatalog
+import fr.moovie.tv.data.subtitles.SubtitleChoiceRepository
 import fr.moovie.tv.data.subtitles.SubtitleFileStore
 import fr.moovie.tv.ui.player.parseMediaKey
 import kotlinx.coroutines.Dispatchers
@@ -58,6 +59,7 @@ class PlayerSubtitlesViewModel : ViewModel() {
     /** L'addon Stremio public : aucune clé, aucun compte. */
     private val catalog = StremioSubtitleCatalog()
     private val files = SubtitleFileStore()
+    private val choices = SubtitleChoiceRepository()
 
     private val _state = MutableStateFlow(
         PlayerSubtitlesState(available = catalog.available),
@@ -127,6 +129,30 @@ class PlayerSubtitlesViewModel : ViewModel() {
             files.storeOriginal(mediaKey, candidate, downloaded.content)
         }
 
+        activate(candidate, source)
+        choices.remember(mediaKey, candidate)
+    }
+
+    /**
+     * Rejoue le sous-titre choisi la dernière fois sur ce média, au démarrage
+     * de la lecture (le flux est alors monté et sa cadence connue).
+     *
+     * **Uniquement depuis le disque** : rien n'est cherché ni téléchargé sans
+     * geste de l'utilisateur. Si le fichier a disparu (cache purgé), on ne fait
+     * rien et le menu reste tel quel.
+     */
+    fun restore(mediaKey: String, streamFps: Double) = io {
+        if (!_state.value.available || _state.value.active != null) return@io
+        val candidate = choices.get(mediaKey) ?: return@io
+        val source = files.existing(mediaKey, candidate) ?: return@io
+        // Le choix a pu être fait à la main pendant la lecture du disque.
+        if (_state.value.active != null) return@io
+        this.mediaKey = mediaKey
+        this.streamFps = streamFps.takeIf { it > 0 }
+        activate(candidate, source)
+    }
+
+    private fun activate(candidate: SubtitleCandidate, source: Path) {
         original = source
         // La correction de cadence s'applique d'emblée : c'est la dérive qu'un
         // curseur de décalage ne rattrape pas, autant partir juste.
@@ -138,6 +164,18 @@ class PlayerSubtitlesViewModel : ViewModel() {
             downloaded = files.storedIds(mediaKey, _state.value.candidates),
         )
         publish(timing)
+    }
+
+    /**
+     * Le prochain sous-titre pas encore essayé, dans l'ordre du classement :
+     * une seule touche pour passer au suivant, sans relire la liste. « Essayé »
+     * veut dire déjà téléchargé, puisque rien ne se télécharge sans choix.
+     */
+    fun next() {
+        val s = _state.value
+        val suivant = s.candidates.firstOrNull { it.fileId !in s.downloaded && it.fileId != s.active?.fileId }
+            ?: return
+        pick(suivant)
     }
 
     /** Décale le sous-titre, en relatif. */
@@ -155,6 +193,9 @@ class PlayerSubtitlesViewModel : ViewModel() {
 
     /** Retire le sous-titre externe sans oublier ce qui a été téléchargé. */
     fun clear() {
+        // Une piste du fichier prend la place du sous-titre en ligne : à la
+        // reprise, on ne le rejoue pas par-dessus.
+        viewModelScope.launch { choices.forget(mediaKey) }
         original = null
         _state.value = _state.value.copy(active = null, timing = SubtitleTiming.None)
         _file.value = null
@@ -189,6 +230,21 @@ class PlayerSubtitlesViewModel : ViewModel() {
         // Même source que l'init. Non testé : le ViewModel construit ses dépôts réels.
         _state.value = PlayerSubtitlesState(available = catalog.available)
         _file.value = null
+    }
+
+    /**
+     * Le lecteur présente un média : s'il change, on repart de zéro.
+     *
+     * Sur Android le ViewModel est porté par l'activité et survit à la
+     * navigation d'un épisode à l'autre : la liste, le sous-titre actif et le
+     * fichier recalé de l'épisode précédent restaient en place, et le menu ne
+     * cherchait plus puisque sa liste n'était pas vide. À appeler **pendant la
+     * composition**, avant toute lecture de [file] : un effet arriverait après
+     * que le fichier de l'épisode précédent a déjà été chargé dans le lecteur
+     * neuf.
+     */
+    fun enter(mediaKey: String) {
+        if (this.mediaKey.isNotEmpty() && this.mediaKey != mediaKey) reset()
     }
 
     private fun apply(timing: SubtitleTiming) = io {

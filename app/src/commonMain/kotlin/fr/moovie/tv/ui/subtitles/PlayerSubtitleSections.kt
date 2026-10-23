@@ -3,10 +3,12 @@ package fr.moovie.tv.ui.subtitles
 import androidx.compose.runtime.Composable
 import fr.moovie.tv.core.subtitles.model.SubtitleCandidate
 import fr.moovie.tv.core.subtitles.usecase.COMMON_FPS
+import fr.moovie.tv.core.subtitles.usecase.orderForMenu
 import fr.moovie.tv.resources.Res
 import fr.moovie.tv.resources.player_online_subtitles
 import fr.moovie.tv.resources.player_subtitles_download_failed
 import fr.moovie.tv.resources.player_subtitles_downloaded
+import fr.moovie.tv.resources.player_subtitles_try_next
 import fr.moovie.tv.resources.player_subtitles_earlier
 import fr.moovie.tv.resources.player_subtitles_fps
 import fr.moovie.tv.resources.player_subtitles_fps_auto
@@ -41,6 +43,7 @@ import org.jetbrains.compose.resources.stringResource
 @Composable
 fun onlineSubtitleSection(
     state: PlayerSubtitlesState,
+    onNext: () -> Unit = {},
     onPick: (SubtitleCandidate) -> Unit,
 ): PlayerOptionSection {
     val title = stringResource(Res.string.player_online_subtitles)
@@ -53,14 +56,23 @@ fun onlineSubtitleSection(
             listOf(PlayerOption(stringResource(Res.string.player_subtitles_none_found), false) {})
         else -> {
             val mark = stringResource(Res.string.player_subtitles_downloaded)
-            state.candidates.take(MAX_SHOWN).map { candidate ->
+            val activeId = state.active?.fileId
+            // « Essayer le suivant » en tête tant qu'il en reste : une touche
+            // pour enchaîner, sans relire des noms de release peu lisibles.
+            val restants = state.candidates.count { it.fileId !in state.downloaded && it.fileId != activeId }
+            val suivant = if (restants > 0) {
+                listOf(PlayerOption(stringResource(Res.string.player_subtitles_try_next, restants), false) { onNext() })
+            } else {
+                emptyList()
+            }
+            suivant + orderForMenu(state.candidates, activeId, state.downloaded).take(MAX_SHOWN).map { candidate ->
                 val paid = candidate.fileId in state.downloaded
                 PlayerOption(
                     // Le repère passe **en tête** : c'est l'information la plus
                     // actionnable de la ligne — gratuit ou non — et la seule que
                     // la troncature de la release ne doit jamais emporter.
                     label = if (paid) "$mark · ${candidate.describe()}" else candidate.describe(),
-                    selected = candidate.fileId == state.active?.fileId,
+                    selected = candidate.fileId == activeId,
                 ) { onPick(candidate) }
             }
         }

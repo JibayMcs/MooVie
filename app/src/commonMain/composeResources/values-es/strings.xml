@@ -370,6 +370,7 @@
     <string name="player_subtitles_fps">Cadencia del subtítulo</string>
     <string name="player_subtitles_fps_auto">Automática</string>
     <string name="player_subtitles_downloaded">Descargado</string>
+    <string name="player_subtitles_try_next">Probar el siguiente (quedan %1$d)</string>
     <string name="settings_introdb_key">Clave de TheIntroDB</string>
     <string name="settings_introdb_hint">Pegar la clave de TheIntroDB aquí…</string>
     <string name="settings_introdb_help">Opcional. Sirve para informar de intros y créditos que faltan desde el reproductor — y los informes enviados surten efecto de inmediato en este dispositivo. Clave gratuita en theintrodb.org.</string>
