@@ -298,6 +298,9 @@ internal class ExoPlayerController(private val player: Player) : MooviePlayerCon
         val trackIndex = parts[1].toIntOrNull() ?: return null
         val group = player.currentTracks.groups.getOrNull(groupIndex) ?: return null
         if (trackIndex !in 0 until group.length) return null
+        // Une piste que la puce ne décode pas se liste mais ne se choisit pas :
+        // la forcer laisserait le rendu sans son, ou sans texte.
+        if (!group.isTrackSupported(trackIndex)) return null
         return group to trackIndex
     }
 
@@ -305,11 +308,16 @@ internal class ExoPlayerController(private val player: Player) : MooviePlayerCon
         this@toPlayerTracks.forEachIndexed { groupIndex, group ->
             if (group.type != type) return@forEachIndexed
             for (i in 0 until group.length) {
-                if (!group.isTrackSupported(i)) continue
+                // Les pistes que la TV ne décode pas restent **listées**, et
+                // marquées. Cachées, le menu Audio disparaissait sur un fichier
+                // à deux pistes dont une seule se lit : le fichier a bien deux
+                // langues, c'est la puce qui n'en lit qu'une, et c'est ça qu'il
+                // faut dire.
+                val decodable = group.isTrackSupported(i)
                 add(
                     PlayerTrack(
                         id = "$groupIndex:$i",
-                        label = group.trackLabel(i),
+                        label = group.trackLabel(i) + if (decodable) "" else " · non décodable par la TV",
                         selected = group.isTrackSelected(i),
                     ),
                 )
