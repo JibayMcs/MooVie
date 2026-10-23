@@ -1523,7 +1523,10 @@ fun PlayerScreen(
         // ce moment-là le flux est prêt, donc sa cadence est connue.
         LaunchedEffect(dialog) {
             if (dialog == PlayerDialogKind.SUBTITLES && subsState.candidates.isEmpty()) {
-                subsViewModel.load(mediaKey, title, controller.videoFps())
+                subsViewModel.load(
+                    mediaKey, title, controller.videoFps(),
+                    episodeTitle = subtitle.substringAfter(" — ", ""),
+                )
             }
         }
 
