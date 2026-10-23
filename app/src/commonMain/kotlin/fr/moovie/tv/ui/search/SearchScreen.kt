@@ -82,6 +82,8 @@ import fr.moovie.tv.resources.search_hint_short
 import fr.moovie.tv.resources.search_loading
 import fr.moovie.tv.resources.search_needs_key
 import fr.moovie.tv.resources.search_no_results
+import fr.moovie.tv.resources.search_hidden_by_filters
+import fr.moovie.tv.resources.search_filters_reset
 import fr.moovie.tv.resources.search_recent
 import fr.moovie.tv.resources.search_recent_hint
 import fr.moovie.tv.resources.search_remove_query
@@ -322,7 +324,23 @@ fun SearchScreenContent(
                 color = MOOVIE_ERROR,
                 modifier = Modifier.padding(horizontal = searchHPad()),
             )
-            results is SearchState.Empty -> Text(stringResource(Res.string.search_no_results, query), color = MOOVIE_TEXT_MUTED, modifier = Modifier.padding(horizontal = searchHPad()))
+            results is SearchState.Empty -> Column(modifier = Modifier.padding(horizontal = searchHPad())) {
+                if (results.masques > 0) {
+                    // TMDB avait trouvé, les filtres ont tout écarté : le dire,
+                    // et offrir de les lever d'un appui plutôt que de laisser
+                    // chercher l'erreur dans l'orthographe du titre.
+                    Text(
+                        stringResource(Res.string.search_hidden_by_filters, query, results.masques),
+                        color = MOOVIE_TEXT_MUTED,
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    MoovieButton(onClick = { onFiltersChange(SearchFilters.DEFAULT) }) {
+                        Text(stringResource(Res.string.search_filters_reset))
+                    }
+                } else {
+                    Text(stringResource(Res.string.search_no_results, query), color = MOOVIE_TEXT_MUTED)
+                }
+            }
             results is SearchState.Results -> ResultsGrid(
                 filters = filters,
                 items = results.items,

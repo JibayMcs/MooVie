@@ -57,6 +57,7 @@
     <string name="search_loading">Recherche…</string>
     <string name="search_needs_key">Clé TMDB manquante — à renseigner dans les réglages.</string>
     <string name="search_no_results">Aucun résultat pour « %1$s ».</string>
+    <string name="search_hidden_by_filters">Aucun résultat pour « %1$s » avec les filtres posés : %2$d titres masqués.</string>
     <string name="search_recent">Recherches récentes</string>
     <string name="search_empty_hint">Saisir une recherche. L'historique apparaîtra ici.</string>
     <string name="search_clear_history">Vider l'historique</string>

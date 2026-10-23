@@ -55,6 +55,7 @@
     <string name="search_loading">Searching…</string>
     <string name="search_needs_key">Missing TMDB key — set it in Settings.</string>
     <string name="search_no_results">No results for “%1$s”.</string>
+    <string name="search_hidden_by_filters">No result for “%1$s” with the current filters: %2$d titles hidden.</string>
     <string name="search_recent">Recent searches</string>
     <string name="search_empty_hint">Type to search. Your history will appear here.</string>
     <string name="search_clear_history">Clear history</string>
