@@ -922,6 +922,9 @@ fun PlayerScreen(
     // Version à afficher sur la pastille, ou null s'il n'y a rien à montrer :
     // porter la non-nullité dans la valeur évite de la revérifier plus bas.
     val subsViewModel: PlayerSubtitlesViewModel = viewModel()
+    // **Pendant la composition, avant de lire `file`** : voir
+    // PlayerSubtitlesViewModel.enter.
+    remember(mediaKey) { subsViewModel.enter(mediaKey) }
     val subsState by subsViewModel.state.collectAsStateWithLifecycle()
     val subsFile by subsViewModel.file.collectAsStateWithLifecycle()
     // Le fichier arrive déjà recalé : le lecteur n'a qu'à le charger.

@@ -191,6 +191,21 @@ class PlayerSubtitlesViewModel : ViewModel() {
         _file.value = null
     }
 
+    /**
+     * Le lecteur présente un média : s'il change, on repart de zéro.
+     *
+     * Sur Android le ViewModel est porté par l'activité et survit à la
+     * navigation d'un épisode à l'autre : la liste, le sous-titre actif et le
+     * fichier recalé de l'épisode précédent restaient en place, et le menu ne
+     * cherchait plus puisque sa liste n'était pas vide. À appeler **pendant la
+     * composition**, avant toute lecture de [file] : un effet arriverait après
+     * que le fichier de l'épisode précédent a déjà été chargé dans le lecteur
+     * neuf.
+     */
+    fun enter(mediaKey: String) {
+        if (this.mediaKey.isNotEmpty() && this.mediaKey != mediaKey) reset()
+    }
+
     private fun apply(timing: SubtitleTiming) = io {
         if (original == null) return@io
         _state.value = _state.value.copy(timing = timing)
