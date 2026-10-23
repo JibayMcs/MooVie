@@ -54,7 +54,7 @@ toute façon la même largeur logique de 960 dp, donc le même agencement.
 cd emulator
 
 ./setup.sh            # UNE fois PAR PROFIL : image système (si absente) + AVD
-./start.sh            # démarre l'émulateur (fenêtre) et attend le boot
+./start.sh            # démarre l'émulateur (fenêtre), attend le boot et vérifie le réseau (cycle Wi-Fi si besoin)
 ./start.sh --headless # sans fenêtre (utile en SSH / sans écran)
 
 ./build-install.sh    # boucle de test : build debug + install + lancement

@@ -47,4 +47,35 @@ until [[ "$("$ADB" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" =
   sleep 2
 done
 echo ">> $AVD_NAME démarré et prêt. L'émulateur continue de tourner après ce script."
+
+# Après le boot, le Wi-Fi virtuel (profil mibox, Android 9) reste parfois « enabled »
+# sans être associé : pas de réseau, et l'app affiche « hors ligne ». Un cycle
+# disable/enable le relance. On tente au plus 3 cycles, sans faire échouer le script.
+reseau_ok() {
+  local sortie
+  sortie="$("$ADB" shell ping -c 1 -W 3 1.1.1.1 2>/dev/null || true)"
+  [[ "$sortie" == *" 0% packet loss"* ]]
+}
+
+echo ">> Vérification du réseau..."
+reseau_ok_final=false
+for essai in 1 2 3 4; do
+  if reseau_ok; then
+    reseau_ok_final=true
+    break
+  fi
+  (( essai == 4 )) && break
+  echo ">> Pas de réseau (essai $essai/3) : cycle Wi-Fi disable/enable..."
+  "$ADB" shell svc wifi disable || true
+  sleep 3
+  "$ADB" shell svc wifi enable || true
+  sleep 12
+done
+
+if $reseau_ok_final; then
+  echo ">> Réseau OK (ping 1.1.1.1 répond)."
+else
+  echo "!! Réseau toujours injoignable après 3 cycles Wi-Fi. L'émulateur tourne, mais l'app"
+  echo "   restera « hors ligne » : vérifie le Wi-Fi à la main (svc wifi enable via adb)."
+fi
 "$ADB" devices
