@@ -18,6 +18,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -141,6 +142,11 @@ fun main() {
             },
         )
         val nav = remember(start) { NavStack(start ?: Screen.Home) }
+        // La pile change d'instance quand la racine se résout : `start` vaut null
+        // à la première image. Le gestionnaire d'Échap de la fenêtre est figé à
+        // sa création et gardait donc la **première** pile, vide (l'accueil) —
+        // Échap ne voyait jamais le lecteur ni rien à dépiler. Il lit celle-ci.
+        val navCourante by rememberUpdatedState(nav)
         // Retour *interne* à un écran uniquement (panneau des sources, fiche
         // d'épisode). Null quand l'écran n'a rien à fermer : Échap dépile alors.
         var innerBack: (() -> Unit)? by remember { mutableStateOf(null) }
@@ -220,17 +226,29 @@ fun main() {
                 // de sources, la liste des épisodes du lecteur. Sortir du plein
                 // écran en laissant ce quelque chose ouvert répondait à côté :
                 // on avait appuyé sur Échap pour refermer ce qu'on voyait.
+                //
+                // **L'état se relit ici, à l'appui, jamais depuis la composition.**
+                // Ce lambda est figé par `Window` à sa création : `isFullscreen`
+                // et `inPlayer` y valaient pour toujours « hors lecteur, fenêtré »,
+                // et Échap ne quittait jamais le plein écran — F, géré par le
+                // lecteur, marchait. Mesuré le 27/10/2026 sous Windows par un
+                // journal des touches : Échap arrivait, avec `fs=false` en pleine
+                // lecture plein écran. Seuls les états délégués (`by`) restaient à
+                // jour ; `windowState.placement` aussi, et la pile passe par
+                // `navCourante` (voir sa déclaration).
+                val pleinEcranMaintenant = windowState.placement == WindowPlacement.Fullscreen ||
+                    (!pleinEcranNatif && navCourante.current is Screen.Player && wantsFullscreen)
                 when {
                     innerBack != null -> {
                         innerBack?.invoke()
                         true
                     }
-                    isFullscreen -> {
+                    pleinEcranMaintenant -> {
                         wantsFullscreen = false
                         true
                     }
-                    nav.canGoBack -> {
-                        nav.pop()
+                    navCourante.canGoBack -> {
+                        navCourante.pop()
                         true
                     }
                     else -> false
