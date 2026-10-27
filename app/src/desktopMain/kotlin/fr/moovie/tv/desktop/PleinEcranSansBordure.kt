@@ -40,6 +40,18 @@ import java.awt.Window
  * balayait, et le compositeur fait le reste. C'est la raison pour laquelle ça
  * marche là où l'exclusif échoue.
  *
+ * ## Toutes les coordonnées viennent de Win32, jamais de Java
+ *
+ * `SetWindowPos` parle en pixels physiques ; `graphicsConfiguration.bounds` et
+ * `Window.bounds` rendent des unités **logiques**, divisées par la mise à
+ * l'échelle de Windows. À 100 % les deux coïncident, et c'est pourquoi le
+ * défaut a longtemps semblé lié à « certaines versions de Windows » : il suit
+ * en réalité le réglage d'échelle. Mesuré le 27/10/2026 sur un portable à
+ * 150 % (AppliedDPI 144, dalle 2560×1600) : la fenêtre perdait son cadre mais
+ * ne couvrait que 1707×1067 pixels, un tiers de l'écran en moins. L'écran vient
+ * donc de `MonitorFromWindow` + `GetMonitorInfoW`, et les bornes à rétablir de
+ * `GetWindowRect` — tous en pixels physiques, sans conversion à deviner.
+ *
  * ## Pourquoi au niveau Win32 et pas dans Compose
  *
  * `Window(undecorated = …)` de Compose Desktop ne se change pas en cours de
@@ -50,7 +62,7 @@ import java.awt.Window
  */
 object PleinEcranSansBordure {
 
-    /** Le style d'origine et les bornes, pour savoir revenir. */
+    /** Le style d'origine et les bornes **physiques**, pour savoir revenir. */
     private data class Etat(val style: Long, val bornes: Rectangle)
 
     private val memoire = HashMap<Window, Etat>()
@@ -70,9 +82,10 @@ object PleinEcranSansBordure {
         return runCatching {
             val hwnd = Native.getWindowPointer(fenetre) ?: return false
             val style = User32.INSTANCE.GetWindowLongPtrW(hwnd, GWL_STYLE)
-            val ecran = fenetre.graphicsConfiguration?.bounds ?: return false
+            val ecran = ecranPhysique(hwnd) ?: return false
+            val bornes = rectanglePhysique(hwnd) ?: return false
 
-            memoire[fenetre] = Etat(style, fenetre.bounds)
+            memoire[fenetre] = Etat(style, bornes)
             User32.INSTANCE.SetWindowLongPtrW(hwnd, GWL_STYLE, style and CADRE.inv())
             User32.INSTANCE.SetWindowPos(
                 hwnd, HWND_TOP,
@@ -107,8 +120,28 @@ object PleinEcranSansBordure {
     /** Vrai si cette fenêtre est actuellement sans bordure de notre fait. */
     fun actif(fenetre: Window): Boolean = memoire.containsKey(fenetre)
 
+    /** Bornes de l'écran qui porte la fenêtre (pas le principal), en pixels physiques. */
+    private fun ecranPhysique(hwnd: Pointer): Rectangle? {
+        val ecran = User32.INSTANCE.MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST) ?: return null
+        // MONITORINFO : cbSize, rcMonitor (4), rcWork (4), dwFlags — dix entiers.
+        val info = IntArray(10).also { it[0] = 40 }
+        if (!User32.INSTANCE.GetMonitorInfoW(ecran, info)) return null
+        return rectangle(info[1], info[2], info[3], info[4])
+    }
+
+    /** Bornes actuelles de la fenêtre, cadre compris, en pixels physiques. */
+    private fun rectanglePhysique(hwnd: Pointer): Rectangle? {
+        val rect = IntArray(4)
+        if (!User32.INSTANCE.GetWindowRect(hwnd, rect)) return null
+        return rectangle(rect[0], rect[1], rect[2], rect[3])
+    }
+
+    /** RECT Win32 (gauche, haut, droite, bas) vers un Rectangle (x, y, largeur, hauteur). */
+    internal fun rectangle(gauche: Int, haut: Int, droite: Int, bas: Int): Rectangle? =
+        Rectangle(gauche, haut, droite - gauche, bas - haut).takeIf { it.width > 0 && it.height > 0 }
+
     /**
-     * `user32` réduit à trois appels.
+     * `user32` réduit aux appels utilisés.
      *
      * Déclarée à la main plutôt que via `jna-platform` : celui-ci pèse plusieurs
      * mégaoctets pour des centaines d'API dont nous n'utilisons rien, et le
@@ -126,6 +159,9 @@ object PleinEcranSansBordure {
             hauteur: Int,
             drapeaux: Int,
         ): Boolean
+        fun MonitorFromWindow(hwnd: Pointer, drapeaux: Int): Pointer?
+        fun GetMonitorInfoW(ecran: Pointer, info: IntArray): Boolean
+        fun GetWindowRect(hwnd: Pointer, rect: IntArray): Boolean
 
         companion object {
             val INSTANCE: User32 by lazy { Native.load("user32", User32::class.java) }
@@ -133,6 +169,7 @@ object PleinEcranSansBordure {
     }
 
     private const val GWL_STYLE = -16
+    private const val MONITOR_DEFAULTTONEAREST = 2
 
     /** Tout ce qui dessine un cadre : titre, bordures, boutons, menu système. */
     private const val CADRE = 0x00C00000L or // WS_CAPTION
