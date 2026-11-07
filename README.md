@@ -177,6 +177,7 @@ and **iOS**, built from a single Kotlin Multiplatform codebase. Source extractio
 Grab the latest build from [Releases](https://github.com/JibayMcs/MooVie/releases):
 
 - **Android TV and phone** - sideload `moovie-vX.Y.Z.apk` (one APK for both)
+- **Amazon Fire TV Stick (Fire OS)** - same APK on supported Android-based devices; see the [Fire TV setup and compatibility guide (French)](docs/fire-tv.fr.md)
 - **Linux** - `moovie-vX.Y.Z-x86_64.AppImage` (`chmod +x`, then run - no install, no root)
 - **Windows** - `moovie-vX.Y.Z.msi`
 - **macOS** - `moovie-vX.Y.Z.dmg`
