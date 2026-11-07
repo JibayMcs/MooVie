@@ -135,8 +135,11 @@ class MainActivity : ComponentActivity() {
      * l'un répond en général correctement à l'autre.
      */
     private val uiFlavor: UiFlavor by lazy {
-        val onTv = (getSystemService(Context.UI_MODE_SERVICE) as? UiModeManager)
-            ?.currentModeType == Configuration.UI_MODE_TYPE_TELEVISION ||
+        // Fire OS peut déclarer son propre indicateur TV sans Leanback.
+        // Amazon recommande cette feature pour reconnaître un Fire TV Stick.
+        val onTv = packageManager.hasSystemFeature("amazon.hardware.fire_tv") ||
+            (getSystemService(Context.UI_MODE_SERVICE) as? UiModeManager)
+                ?.currentModeType == Configuration.UI_MODE_TYPE_TELEVISION ||
             packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
         if (onTv) UiFlavor.TV else UiFlavor.TOUCH
     }
