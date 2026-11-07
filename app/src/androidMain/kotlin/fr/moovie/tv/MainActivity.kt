@@ -128,11 +128,10 @@ class MainActivity : ComponentActivity() {
      * tournent sur le même APK, donc aucun `expect`/`actual` ni aucune variante
      * de build ne peut trancher.
      *
-     * Deux signaux plutôt qu'un, parce qu'ils ratent chacun des cas : le mode
-     * d'interface décrit ce que l'appareil est *en train* de faire (une TV
-     * branchée en dock, une tablette sur un écran externe), alors que la
-     * fonctionnalité `leanback` décrit ce qu'il *est*. Une box qui répond mal à
-     * l'un répond en général correctement à l'autre.
+     * Trois indices complémentaires : le mode d'interface décrit ce que
+     * l'appareil fait actuellement, Leanback est l'indicateur Android TV,
+     * et `amazon.hardware.fire_tv` est celui des appareils Fire OS.
+     * Une Fire TV peut ne pas exposer Leanback, sans être un téléphone.
      */
     private val uiFlavor: UiFlavor by lazy {
         // Fire OS peut déclarer son propre indicateur TV sans Leanback.
