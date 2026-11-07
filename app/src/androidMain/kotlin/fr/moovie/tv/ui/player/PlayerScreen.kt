@@ -152,6 +152,10 @@ private val MEDIA_TOGGLE_KEYS = setOf(
     Key.Spacebar,
 )
 
+/** Touches physiques de déplacement des télécommandes Fire TV et Android TV. */
+private val MEDIA_REWIND_KEYS = setOf(Key.MediaRewind, Key.MediaSkipBackward)
+private val MEDIA_FORWARD_KEYS = setOf(Key.MediaFastForward, Key.MediaSkipForward)
+
 /**
  * Lecteur natif Media3/ExoPlayer.
  *
@@ -1173,8 +1177,10 @@ fun PlayerScreen(
                         // endroit. Deux granularités, mappées naturellement sur
                         // la croix : horizontal pour approcher, vertical pour
                         // ajuster à la seconde. Le timecode visé est affiché.
-                        Key.DirectionLeft -> controller.seekBy(-PLAYER_SEEK_STEP_MS)
-                        Key.DirectionRight -> controller.seekBy(PLAYER_SEEK_STEP_MS)
+                        Key.DirectionLeft, Key.MediaRewind, Key.MediaSkipBackward ->
+                            controller.seekBy(-PLAYER_SEEK_STEP_MS)
+                        Key.DirectionRight, Key.MediaFastForward, Key.MediaSkipForward ->
+                            controller.seekBy(PLAYER_SEEK_STEP_MS)
                         Key.DirectionDown -> controller.seekBy(-REPORT_FINE_STEP_MS)
                         Key.DirectionUp -> controller.seekBy(REPORT_FINE_STEP_MS)
                         else -> return@onPreviewKeyEvent true
@@ -1188,6 +1194,20 @@ fun PlayerScreen(
                 // de faire.
                 if (event.key in MEDIA_TOGGLE_KEYS) {
                     controller.togglePause()
+                    wake()
+                    return@onPreviewKeyEvent true
+                }
+                // Fire TV : avance/retour rapide ont des touches dédiées.
+                // Les traiter avant la visibilité de la barre évite qu'un
+                // premier appui ne serve uniquement à afficher les commandes.
+                val mediaSeek = when (event.key) {
+                    in MEDIA_REWIND_KEYS -> -PLAYER_SEEK_STEP_MS
+                    in MEDIA_FORWARD_KEYS -> PLAYER_SEEK_STEP_MS
+                    else -> null
+                }
+                if (mediaSeek != null) {
+                    controller.seekBy(mediaSeek)
+                    positionMs = controller.positionMs()
                     wake()
                     return@onPreviewKeyEvent true
                 }
