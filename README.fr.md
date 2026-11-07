@@ -193,6 +193,7 @@ Récupérer le dernier build depuis les
 [Releases](https://github.com/JibayMcs/MooVie/releases) :
 
 - **Android TV et mobile** - sideload de `moovie-vX.Y.Z.apk` (un seul APK pour les deux)
+- **Amazon Fire TV Stick (Fire OS)** - même APK sur les modèles Android compatibles ; voir [installation et limites](docs/fire-tv.fr.md)
 - **Linux** - `moovie-vX.Y.Z-x86_64.AppImage` (`chmod +x` puis lancer - ni installation ni root)
 - **Windows** - `moovie-vX.Y.Z.msi`
 - **macOS** - `moovie-vX.Y.Z.dmg`

@@ -57,6 +57,8 @@
     -->
     <uses-feature android:name="android.software.leanback" android:required="false" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+    <!-- Les Fire TV Stick n'ont pas non plus de faux écran tactile (faketouch). -->
+    <uses-feature android:name="android.hardware.faketouch" android:required="false" />
 
 
     <!--
