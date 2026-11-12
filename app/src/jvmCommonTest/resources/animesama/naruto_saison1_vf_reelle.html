@@ -1,0 +1,896 @@
+<!doctype html>
+<html lang="fr">
+
+	<head>
+
+		
+<meta name="clckd" content="b31ee4983505f8e76071e409d45ec9f4" />
+
+
+<!-- Meta Tags -->
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="robots" content="index, nofollow">
+
+<!-- Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-QK64GJ58E9"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-QK64GJ58E9');
+</script>
+
+<!-- Favicon -->
+<link rel="icon" type="image/png" sizes="32x32" href="/img/opti/icon.png?v=5">
+<link rel="apple-touch-icon" sizes="180x180" href="/img/appli/icone-apple-180.png">
+<!-- Appli (PWA) : description, couleur, icône ; installation gérée par js/defaut/appli.js -->
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#020306">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Anime-Sama">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<link rel="stylesheet" href="/css/appli.css?v=1792337067">
+<script defer src="/js/defaut/appli.js?v=1792420538"></script>
+
+<link rel="icon" href="/img/favicon.ico?v=4">
+
+<!-- CSS -->
+<!-- Anti-miroirs : si la page s'affiche sur un domaine qui n'est pas le nôtre, retour au vrai site (liste : /config/domaines.php) -->
+<script>(function(){var ok=["anime-sama.to","anime-sama.tv","anime-sama.si","anime-sama.org"],h=location.hostname.replace(/^www\./,'');if(ok.indexOf(h)===-1&&!/^(localhost|127\.0\.0\.1)$/.test(h)){location.replace('https://anime-sama.to'+location.pathname+location.search+location.hash);}})();</script>
+<link rel="preload" href="/fonts/outfit-latin-400.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/css/tailwind.css?v=1792337070">
+<link rel="stylesheet" href="/css/defaut.css?v=1794182838">
+<link rel="stylesheet" href="/css/carte.css?v=1794422571">
+<!-- Fond d'écran choisi dans le footer (appliqué avant l'affichage pour éviter un flash) -->
+<script>try{var fondSite=localStorage.getItem('fondSite');if(fondSite)document.documentElement.setAttribute('data-fond',fondSite);}catch(e){}</script>
+<!-- jQuery & JS -->
+<script src="/js/libs/jquery.min.js?v=3.7.1"></script>
+<script defer src="/js/defaut/defaut.js?v=1792337073"></script>
+<script defer src="/js/defaut/rangees.js?v=1792233832"></script>
+<!-- Cartes du site : menu ⋯ (Watchlist / Favoris / Vu) et webtoons en couleur -->
+<script defer src="/js/defaut/carte.js?v=1792420437"></script>
+<!-- Listes déroulantes du site (tri du catalogue, épisodes, lecteurs, chapitres…) -->
+<link rel="stylesheet" href="/css/deroulant.css?v=1792351032">
+<script defer src="/js/defaut/deroulant.js?v=1794435336"></script>
+<!-- La barre de défilement garde toujours sa place : la page ne se décale plus quand elle apparaît -->
+<style>html { scrollbar-gutter: stable; }</style>
+
+<!-- Enquête sur les pubs qui s'ouvrent toutes seules (inactif sauf ?debug_pub=1), avant Adcash -->
+<script src="/js/defaut/espion-pub.js?v=1792431616"></script>
+<!-- Adcash -->
+<script>
+/* PUBLICITÉS ADCASH, ISOLÉES
+   aclib.js n'est plus chargé dans la page : chaque emplacement <div data-adcash-zone="…"> reçoit une
+   petite iframe (/pub/cadre-adcash.html) qui charge Adcash chez elle. Ses scripts ne voient donc
+   plus la page : fini le lecteur caché (display:none) et la pop-under rattachée aux bandeaux,
+   qui ne peut plus se déclencher que sur un clic dans le bandeau lui-même.
+   Un bandeau non rempli (pas de pub à afficher) est replié, comme avant.
+
+   COMPTEUR : 1 page sur 20 envoie, en quittant, ce qui s'est passé pour chaque emplacement
+   (demandé / rempli / vu au moins 1 s à moitié à l'écran) à /stats/v.php.
+   Résultats dans /systemas/pubs.php (×20), à comparer avec les tableaux de bord des régies. */
+(function () {
+    var TAILLES = { '160x600': [160, 600], '728x90': [728, 90], '300x250': [300, 250], '320x50': [320, 50], '320x100': [320, 100], '300x100': [300, 100], '468x60': [468, 60], '250x250': [250, 250] };
+    var ZONES = { '8653010': '160x600', '8653006': '160x600', '8653014': '728x90', '8653002': '300x250' };
+    var ECHANTILLON = 20;
+    var compte = Math.random() < 1 / ECHANTILLON || /[?&]compteur=1/.test(location.search);   // ?compteur=1 : forcer (essais)
+    var suivi = [];
+
+    var obs = ('IntersectionObserver' in window) ? new IntersectionObserver(function (entrees) {
+        entrees.forEach(function (e) {
+            var s = e.target.__pub; if (!s) return;
+            clearTimeout(s.minuteur);
+            if (e.isIntersecting && e.intersectionRatio >= 0.5) s.minuteur = setTimeout(function () { s.vu = 1; obs.unobserve(e.target); }, 1000);
+        });
+    }, { threshold: [0, 0.5] }) : null;
+
+    function suivre(el, nom) {
+        var s = { z: nom, rempli: 0, vu: 0 };
+        el.__pub = s; suivi.push(s);
+        if (obs) obs.observe(el);
+        return s;
+    }
+
+    // Emplacement Onclicka qui ne peut pas servir : on remet la zone Adcash notée dans data-repli
+    function versRepli(el) {
+        var r = el.getAttribute('data-repli');
+        el.removeAttribute('data-onclicka-zone'); el.removeAttribute('data-taille'); el.removeAttribute('data-adcash-lance');
+        if (r) { el.setAttribute('data-adcash-zone', r); setTimeout(lancer, 0); }
+    }
+
+    function lancer() {
+        var zones = document.querySelectorAll('[data-adcash-zone]:not([data-adcash-lance]),[data-onclicka-zone]:not([data-adcash-lance])');
+        for (var i = 0; i < zones.length; i++) {
+            var el = zones[i];
+            if (!el.offsetParent && getComputedStyle(el).position !== 'fixed') continue;   // caché (colonnes sur téléphone)
+            // Onclicka (11/11/2026) : <div data-onclicka-zone="ID" data-taille="160x600" data-repli="zone Adcash">
+            var oc = el.getAttribute('data-onclicka-zone');
+            var z = oc || el.getAttribute('data-adcash-zone');
+            var t = TAILLES[el.getAttribute('data-taille') || ZONES[z]] || TAILLES['300x250'];
+            // Trop large pour l'écran (728×90 sur téléphone) : pas demandé… sauf data-ajuster, réduit à la largeur dispo
+            var echelle = 1;
+            var adapter = false;
+            if (oc && window.innerWidth < t[0] + 16) { versRepli(el); continue; }   // trop large : la pub Adcash habituelle
+            if (window.innerWidth < t[0] + 16) {
+                if (z === '8653014') {
+                    // Téléphone : Adcash sert ici sa version mobile (8653016, l'essentiel des revenus) ;
+                    // le cadre prend la largeur de l'écran puis la taille exacte de la pub reçue (11/11/2026)
+                    t = [Math.min(t[0], window.innerWidth - 16), 100]; adapter = true;
+                } else if (!el.hasAttribute('data-ajuster')) continue;
+                else echelle = (window.innerWidth - 16) / t[0];
+            }
+            el.setAttribute('data-adcash-lance', '1');
+            var f = document.createElement('iframe');
+            f.src = oc ? '/pub/cadre-onclicka.html?z=' + oc : '/pub/cadre-adcash.html?z=' + z;
+            f.width = t[0]; f.height = t[1];
+            f.title = 'Publicité';
+            f.setAttribute('scrolling', 'no');
+            f.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox');
+            // taille imposée : le CSS des colonnes de côté met « height:auto » aux iframes
+            f.style.cssText = 'border:0;display:block;margin:0 auto;width:' + t[0] + 'px;height:' + t[1] + 'px';
+            if (echelle < 1) {
+                f.style.transform = 'scale(' + echelle + ')';
+                f.style.transformOrigin = '0 0';
+                el.style.width = Math.floor(t[0] * echelle) + 'px';
+                el.style.height = Math.floor(t[1] * echelle) + 'px';
+                el.style.margin = '0 auto';
+                el.style.overflow = 'hidden';   // l'iframe garde sa taille réelle sous le scale()
+            } else {
+                f.style.maxWidth = '100%';
+            }
+            el.appendChild(f);
+            var s = suivre(el, oc ? 'oc-' + oc : z);
+            s.cadre = f; s.el = el; s.adapter = adapter;
+        }
+        // Autres régies suivies par le compteur (emplacements marqués data-pub-suivi)
+        var autres = document.querySelectorAll('[data-pub-suivi]:not([data-pub-lance])');
+        for (var j = 0; j < autres.length; j++) {
+            if (!autres[j].offsetParent) continue;
+            autres[j].setAttribute('data-pub-lance', '1');
+            suivre(autres[j], autres[j].getAttribute('data-pub-suivi')).autre = autres[j];
+        }
+    }
+
+    window.addEventListener('message', function (e) {
+        if (e.origin !== location.origin || !e.data || (e.data.asPub !== 'adcash' && e.data.asPub !== 'onclicka')) return;
+        for (var i = 0; i < suivi.length; i++) {
+            var s = suivi[i];
+            if (s.cadre && s.cadre.contentWindow === e.source) {
+                s.rempli = e.data.rempli ? 1 : 0;
+                if (!s.rempli && e.data.asPub === 'onclicka' && s.el && s.el.hasAttribute('data-repli')) {   // Onclicka vide : Adcash à la place
+                    s.cadre.remove(); s.cadre = null; versRepli(s.el); continue;
+                }
+                if (!s.rempli) { s.cadre.style.display = 'none'; if (s.el) { s.el.style.width = ''; s.el.style.height = ''; } }   // rien à afficher : on replie
+                if (s.rempli && s.adapter && e.data.h > 10) {   // taille exacte de la pub mobile
+                    s.cadre.style.height = e.data.h + 'px';
+                    if (e.data.w > 10 && e.data.w <= window.innerWidth - 16) s.cadre.style.width = e.data.w + 'px';
+                }
+                if (s.el) s.el.dispatchEvent(new CustomEvent('pub-remplie', { detail: !!s.rempli }));
+            }
+        }
+    });
+
+    var envoye = false;
+    function envoyer() {
+        if (!compte || envoye) return;
+        envoye = true;
+        suivi.forEach(function (s) { if (s.autre) s.rempli = s.autre.offsetHeight > 50 ? 1 : 0; });
+        var d = {
+            s: location.pathname.indexOf('/refonte/') === 0 ? 'refonte' : 'site',
+            m: window.innerWidth < 1024 ? 1 : 0,
+            z: suivi.map(function (s) { return [s.z, s.rempli, s.vu]; })
+        };
+        try { navigator.sendBeacon('/stats/v.php', JSON.stringify(d)); } catch (e) {}
+    }
+    document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') envoyer(); });
+    window.addEventListener('pagehide', envoyer);
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', lancer);
+    else lancer();
+})();
+</script>
+
+<!-- NAV BAR -->
+<nav class="asn-navbar">
+    <!-- Menu burger mobile -->
+    <button class="asn-burger">
+        <svg class="w-6 h-6" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" fill="currentColor">
+            <path d="M0 3h20v2H0V3zm0 6h20v2H0V9zm0 6h20v2H0v-2z"></path>
+        </svg>
+    </button>
+
+    <!-- Searchbar mobile -->
+    <div class="asn-mobile-search">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M9 9a2 2 0 114 0 2 2 0 01-4 0z" />
+            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a4 4 0 00-3.446 6.032l-2.261 2.26a1 1 0 101.414 1.415l2.261-2.261A4 4 0 1011 5z" clip-rule="evenodd" />
+        </svg>
+        <input name="search_text" type="search" placeholder="Rechercher..." autocomplete="off" spellcheck="false"/>
+    </div>
+    <!-- Mobile Results (outside search box) -->
+    <div id="asn-result-mobile"></div>
+
+    <!-- Logo -->
+    <a href="/" class="asn-logo">
+        <img class="asn-logo-desktop" src="/img/opti/logo_banniere.webp" alt="Anime-Sama"/>
+        <img class="asn-logo-mobile" src="/img/opti/logo.webp" alt="Anime-Sama"/>
+    </a>
+
+    <!-- Donate -->
+    <a href="https://www.paypal.com/donate/?hosted_button_id=3FBNLMGT3JAJ2" class="asn-donate-btn">
+        <img src="/img/opti/flag_pal.webp" alt="PayPal"/>
+    </a>
+
+    <!-- Social Discord -->
+    <a href="https://discord.gg/mKbYYbmxY8" class="asn-social-link">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" class="bi bi-discord" viewBox="0 0 16 16">
+            <path d="M13.545 2.907a13.2 13.2 0 0 0-3.257-1.011.05.05 0 0 0-.052.025c-.141.25-.297.577-.406.833a12.2 12.2 0 0 0-3.658 0 8 8 0 0 0-.412-.833.05.05 0 0 0-.052-.025c-1.125.194-2.22.534-3.257 1.011a.04.04 0 0 0-.021.018C.356 6.024-.213 9.047.066 12.032q.003.022.021.037a13.3 13.3 0 0 0 3.995 2.02.05.05 0 0 0 .056-.019q.463-.63.818-1.329a.05.05 0 0 0-.01-.059l-.018-.011a9 9 0 0 1-1.248-.595.05.05 0 0 1-.02-.066l.015-.019q.127-.095.248-.195a.05.05 0 0 1 .051-.007c2.619 1.196 5.454 1.196 8.041 0a.05.05 0 0 1 .053.007q.121.1.248.195a.05.05 0 0 1-.004.085 8 8 0 0 1-1.249.594.05.05 0 0 0-.03.03.05.05 0 0 0 .003.041c.24.465.515.909.817 1.329a.05.05 0 0 0 .056.019 13.2 13.2 0 0 0 4.001-2.02.05.05 0 0 0 .021-.037c.334-3.451-.559-6.449-2.366-9.106a.03.03 0 0 0-.02-.019m-8.198 7.307c-.789 0-1.438-.724-1.438-1.612s.637-1.613 1.438-1.613c.807 0 1.45.73 1.438 1.613 0 .888-.637 1.612-1.438 1.612m5.316 0c-.788 0-1.438-.724-1.438-1.612s.637-1.613 1.438-1.613c.807 0 1.451.73 1.438 1.613 0 .888-.631 1.612-1.438 1.612"/>
+        </svg>
+    </a>
+
+    <!-- Social X 
+    <a href="https://x.com/anime_samafr" class="asn-social-link">
+        <svg viewBox="0 0 1200 1227" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M714.163 519.284L1160.89 0H1055.03L667.137 450.887L357.328 0H0L468.492 681.821L0 1226.37H105.866L515.491 750.218L842.672 1226.37H1200L714.137 519.284H714.163ZM569.165 687.828L521.697 619.934L144.011 79.6944H306.615L611.412 515.685L658.88 583.579L1055.08 1150.3H892.476L569.165 687.854V687.828Z" fill="currentColor"/>
+        </svg>
+    </a>-->
+
+    <!-- Desktop Navigation -->
+    <div class="asn-nav-desktop">
+        <!-- Search -->
+        <div class="asn-desktop-search">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M9 9a2 2 0 114 0 2 2 0 01-4 0z" />
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a4 4 0 00-3.446 6.032l-2.261 2.26a1 1 0 101.414 1.415l2.261-2.261A4 4 0 1011 5z" clip-rule="evenodd" />
+            </svg>
+            <input name="search_text" type="search" placeholder="Rechercher une œuvre..." autocomplete="off" spellcheck="false"/>
+            <div id="asn-result-desktop"></div>
+        </div>
+
+        <!-- Catalogue -->
+        <a href="/catalogue" class="asn-nav-link">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zM2 11a2 2 0 012-2h12a2 2 0 012 2v4a2 2 0 01-2 2H4a2 2 0 01-2-2v-4z" />
+            </svg>
+            <span>Catalogue</span>
+        </a>
+
+        <!-- Planning -->
+        <a href="/planning" class="asn-nav-link">
+			<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+				<path d="M12.75 12.75a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM7.5 15.75a.75.75 0 100-1.5.75.75 0 000 1.5zM8.25 17.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM9.75 15.75a.75.75 0 100-1.5.75.75 0 000 1.5zM10.5 17.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM12 15.75a.75.75 0 100-1.5.75.75 0 000 1.5zM12.75 17.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM14.25 15.75a.75.75 0 100-1.5.75.75 0 000 1.5zM15 17.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM16.5 15.75a.75.75 0 100-1.5.75.75 0 000 1.5zM15 12.75a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM16.5 13.5a.75.75 0 100-1.5.75.75 0 000 1.5z" />
+				<path fill-rule="evenodd" d="M6.75 2.25A.75.75 0 017.5 3v1.5h9V3A.75.75 0 0118 3v1.5h.75a3 3 0 013 3v11.25a3 3 0 01-3 3H5.25a3 3 0 01-3-3V7.5a3 3 0 013-3H6V3a.75.75 0 01.75-.75zm13.5 9a1.5 1.5 0 00-1.5-1.5H5.25a1.5 1.5 0 00-1.5 1.5v7.5a1.5 1.5 0 001.5 1.5h13.5a1.5 1.5 0 001.5-1.5v-7.5z" clip-rule="evenodd" />
+			</svg>
+            <span>Planning</span>
+        </a>
+
+        <!-- Aide -->
+        <a href="/aide" class="asn-nav-link">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                <path fill-rule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12Zm11.378-3.917c-.89-.777-2.366-.777-3.255 0a.75.75 0 0 1-.988-1.129c1.454-1.272 3.776-1.272 5.23 0 1.513 1.324 1.513 3.518 0 4.842a3.75 3.75 0 0 1-.837.552c-.676.328-1.028.774-1.028 1.152v.75a.75.75 0 0 1-1.5 0v-.75c0-1.279 1.06-2.107 1.875-2.502.182-.088.351-.199.503-.331.83-.727.83-1.857 0-2.584ZM12 18a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Z" clip-rule="evenodd" />
+            </svg>
+            <span>Aide</span>
+        </a>
+
+        <!-- Profil -->
+        <a href="/profil" class="asn-nav-link">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-6-3a2 2 0 11-4 0 2 2 0 014 0zm-2 4a5 5 0 00-4.546 2.916A5.986 5.986 0 0010 16a5.986 5.986 0 004.546-2.084A5 5 0 0010 11z" clip-rule="evenodd" />
+            </svg>
+            <span>Profil (Déconnecté)</span>        </a>
+    </div>
+</nav>
+
+<!-- MOBILE MENU DRAWER -->
+<div class="asn-mobile-menu">
+    <div class="asn-menu-backdrop"></div>
+    
+    <nav class="asn-menu-panel">
+        <div class="asn-menu-nav">
+            <a href="/catalogue">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zM2 11a2 2 0 012-2h12a2 2 0 012 2v4a2 2 0 01-2 2H4a2 2 0 01-2-2v-4z" />
+                </svg>
+                <span>Catalogue</span>
+            </a>
+            <a href="/planning">
+				<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+					<path d="M12.75 12.75a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM7.5 15.75a.75.75 0 100-1.5.75.75 0 000 1.5zM8.25 17.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM9.75 15.75a.75.75 0 100-1.5.75.75 0 000 1.5zM10.5 17.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM12 15.75a.75.75 0 100-1.5.75.75 0 000 1.5zM12.75 17.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM14.25 15.75a.75.75 0 100-1.5.75.75 0 000 1.5zM15 17.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM16.5 15.75a.75.75 0 100-1.5.75.75 0 000 1.5zM15 12.75a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM16.5 13.5a.75.75 0 100-1.5.75.75 0 000 1.5z" />
+					<path fill-rule="evenodd" d="M6.75 2.25A.75.75 0 017.5 3v1.5h9V3A.75.75 0 0118 3v1.5h.75a3 3 0 013 3v11.25a3 3 0 01-3 3H5.25a3 3 0 01-3-3V7.5a3 3 0 013-3H6V3a.75.75 0 01.75-.75zm13.5 9a1.5 1.5 0 00-1.5-1.5H5.25a1.5 1.5 0 00-1.5 1.5v7.5a1.5 1.5 0 001.5 1.5h13.5a1.5 1.5 0 001.5-1.5v-7.5z" clip-rule="evenodd" />
+				</svg>
+                <span>Planning</span>
+            </a>
+            <a href="/aide">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                    <path fill-rule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12Zm11.378-3.917c-.89-.777-2.366-.777-3.255 0a.75.75 0 0 1-.988-1.129c1.454-1.272 3.776-1.272 5.23 0 1.513 1.324 1.513 3.518 0 4.842a3.75 3.75 0 0 1-.837.552c-.676.328-1.028.774-1.028 1.152v.75a.75.75 0 0 1-1.5 0v-.75c0-1.279 1.06-2.107 1.875-2.502.182-.088.351-.199.503-.331.83-.727.83-1.857 0-2.584ZM12 18a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Z" clip-rule="evenodd" />
+                </svg>
+                <span>Aide</span>
+            </a>
+
+            <a href="https://discord.gg/mKbYYbmxY8">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" class="bi bi-discord" viewBox="0 0 16 16">
+                    <path d="M13.545 2.907a13.2 13.2 0 0 0-3.257-1.011.05.05 0 0 0-.052.025c-.141.25-.297.577-.406.833a12.2 12.2 0 0 0-3.658 0 8 8 0 0 0-.412-.833.05.05 0 0 0-.052-.025c-1.125.194-2.22.534-3.257 1.011a.04.04 0 0 0-.021.018C.356 6.024-.213 9.047.066 12.032q.003.022.021.037a13.3 13.3 0 0 0 3.995 2.02.05.05 0 0 0 .056-.019q.463-.63.818-1.329a.05.05 0 0 0-.01-.059l-.018-.011a9 9 0 0 1-1.248-.595.05.05 0 0 1-.02-.066l.015-.019q.127-.095.248-.195a.05.05 0 0 1 .051-.007c2.619 1.196 5.454 1.196 8.041 0a.05.05 0 0 1 .053.007q.121.1.248.195a.05.05 0 0 1-.004.085 8 8 0 0 1-1.249.594.05.05 0 0 0-.03.03.05.05 0 0 0 .003.041c.24.465.515.909.817 1.329a.05.05 0 0 0 .056.019 13.2 13.2 0 0 0 4.001-2.02.05.05 0 0 0 .021-.037c.334-3.451-.559-6.449-2.366-9.106a.03.03 0 0 0-.02-.019m-8.198 7.307c-.789 0-1.438-.724-1.438-1.612s.637-1.613 1.438-1.613c.807 0 1.45.73 1.438 1.613 0 .888-.637 1.612-1.438 1.612m5.316 0c-.788 0-1.438-.724-1.438-1.612s.637-1.613 1.438-1.613c.807 0 1.451.73 1.438 1.613 0 .888-.631 1.612-1.438 1.612"/>
+                </svg>
+                <span>Discord</span>
+            </a>
+            
+            <!-- X
+            <a href="https://x.com/anime_samafr">
+                <svg viewBox="0 0 1200 1227" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M714.163 519.284L1160.89 0H1055.03L667.137 450.887L357.328 0H0L468.492 681.821L0 1226.37H105.866L515.491 750.218L842.672 1226.37H1200L714.137 519.284H714.163ZM569.165 687.828L521.697 619.934L144.011 79.6944H306.615L611.412 515.685L658.88 583.579L1055.08 1150.3H892.476L569.165 687.854V687.828Z" fill="currentColor"/>
+                </svg>
+                <span>X</span>
+            </a>-->
+
+            <a href="/profil">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-6-3a2 2 0 11-4 0 2 2 0 014 0zm-2 4a5 5 0 00-4.546 2.916A5.986 5.986 0 0010 16a5.986 5.986 0 004.546-2.084A5 5 0 0010 11z" clip-rule="evenodd" />
+                </svg>
+                <span>Profil (Déconnecté)</span>            </a>
+        </div>
+    </nav>
+</div>
+
+<!-- Scroll to Top Button -->
+<div style="z-index:300;" id="scrollProgressWrapper">
+    <svg id="scrollProgressSvg" width="60" height="60" viewBox="0 0 60 60" class="absolute top-0 left-0 z-10" style="opacity: 1; transition: opacity 0.3s ease; pointer-events: none;">
+        <circle cx="30" cy="30" r="26" stroke="#0c4a6e" stroke-width="4" fill="none" stroke-linecap="round" />
+    </svg>
+
+	<button onclick="topFunction()" id="topBtn" style="background: rgba(39, 56, 70, 0.3);" class="pointer-events-auto rounded-full p-2 w-12 h-12 flex items-center justify-center hover:opacity-80 transition-all duration-200 z-20 relative">
+		<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-black" viewBox="0 0 20 20" fill="currentColor">
+		<path fill-rule="evenodd" d="M3.293 9.707a1 1 0 010-1.414l6-6a1 1 0 011.414 0l6 6a1 1 0 01-1.414 1.414L11 5.414V17a1 1 0 11-2 0V5.414L4.707 9.707a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+		</svg>
+	</button>
+</div>
+
+		<meta name="keywords" content="Naruto  , Naruto Origin, Saison 1, Saison 2, Saison 3, Saison 4, Saison 5, Saison 6, Saison 7, Saison 8, Saison 9, Saison 10, Film, OAV, VOSTFR, VF, anime-sama, anime, scan, anime sama, vostfr, vf, streaming, streaming vostfr, streaming vf, sans pubs, streaming sans pubs, streaming scan">
+		<meta property="og:image" content="https://raw.githubusercontent.com/Anime-Sama/IMG/img/contenu/naruto.jpg"/>
+		<meta property="og:image:width" content="800">
+		<meta property="og:image:height" content="450">
+		<meta property="og:image:type" content="image/jpeg"/>
+		<meta name="description" content="Naruto   - Saison 1 | Anime-Sama - Streaming et catalogage d'animes et scans.">
+		<title>Naruto   - Saison 1 | Anime-Sama - Streaming et catalogage d'animes et scans.</title>
+		<script>$(document).ready(function(){$("#avOeuvre").html("Saison 1");});</script>
+		<link rel="canonical" href="https://anime-sama.to/catalogue/naruto/saison1/vf/" />
+
+	</head>
+
+	<body>
+
+		<div id="blocEntier" class="grid grid-cols-8 pb-16">
+
+	<div id="sousBlocLeft" style="margin-top: 600px; margin-left: 20px;" class="hidden lg:block">
+		<div id="bannLeft" class="ad-container">
+		<span class="ad-label">Publicité</span>
+			<a href="https://korbo.fr/jeux/animedle?utm_source=anime-sama&utm_medium=banniere&utm_campaign=animedle-sky" target="_blank"><img src="https://cdn.jsdelivr.net/gh/Anime-Sama/IMG@img/autres/korbo_animedle_skyscraper.png" alt="Korbo - Skyscraper Animedle" loading="lazy" style="max-width:100%; height:auto; border-radius:6px;"></a>
+			<div class="ad-content"><div data-adcash-zone="8653010"></div></div>
+			<!--<a href="https://www.eneba.com/fr/?af_id=Leynoor&currency=EUR&region=global" target="_blank"><img src="https://cdn.jsdelivr.net/gh/Anime-Sama/IMG@img/autres/eneba_skyscraper.jpg" alt="Eneba - Jeux moins chers" loading="lazy" style="max-width:100%; height:auto; border-radius:6px;"></a>-->
+		</div>
+	</div>
+
+	<div id="sousBlocMiddle" class="col-span-8 mx-3 lg:col-span-6 lg:mx-0 mt-6 z-20"><!-- liste épisodes -->
+<script data-source="bdd">var eps1 = ["lien:187332","lien:187335","lien:187338","lien:187341","lien:187344","lien:187347","lien:187350","lien:187353","lien:187356","lien:187359","lien:187362","lien:187365","lien:187368","lien:187371","lien:187374","lien:187377","lien:187380","lien:187383","lien:187386","lien:187389","lien:187392","lien:187395","lien:187398","lien:187401","lien:187404","lien:187407","lien:187410","lien:187413","lien:187416","lien:187419","lien:187422","lien:187425","lien:187428","lien:187431","lien:187434","lien:187437","lien:187440","lien:187443","lien:187446","lien:187449","lien:187452","lien:187455","lien:187458","lien:187461","lien:187464","lien:187467","lien:187470","lien:187473","lien:187476","lien:187479","lien:187482","lien:187485","lien:187488","lien:187491","lien:187494","lien:187497","lien:187500","lien:187503","lien:187506","lien:187509","lien:187512","lien:187515","lien:187518","lien:187521","lien:187524","lien:187527","lien:187530","lien:187533","lien:187536","lien:187539","lien:187542","lien:187545","lien:187548","lien:187551","lien:187554","lien:187557","lien:187560","lien:187563","lien:187566","lien:187569","lien:187572","lien:187575","lien:187578","lien:187581","lien:187584","lien:187587","lien:187590","lien:187593","lien:187596","lien:187599","lien:187602","lien:187605","lien:187608","lien:187611","lien:187614","lien:187617","lien:187620","lien:187623","lien:187626","lien:187629","lien:187632","lien:187635","lien:187638","lien:187641","lien:187644","lien:187647","lien:187650","lien:187653","lien:187656","lien:187659","lien:187662","lien:187665","lien:187668","lien:187671","lien:187674","lien:187677","lien:187680","lien:187683","lien:187686","lien:187689","lien:187692","lien:187695","lien:187698","lien:187701","lien:187704","lien:187707","lien:187710","lien:187713","lien:187716","lien:187719","lien:187722","lien:187725","lien:187728","lien:187731","lien:187734","lien:187737","lien:187740","lien:187743","lien:187746","lien:187749","lien:187752","lien:187755","lien:187758","lien:187761","lien:187764","lien:187767","lien:187770","lien:187773","lien:187776","lien:187779","lien:187782","lien:187785","lien:187788","lien:187791","lien:187794","lien:187797","lien:187800","lien:187803","lien:187806","lien:187809","lien:187812","lien:187815","lien:187818","lien:187821","lien:187824","lien:187827","lien:187830","lien:187833","lien:187836","lien:187839","lien:187842","lien:187845","lien:187848","lien:187851","lien:187854","lien:187857","lien:187860","lien:187863","lien:187866","lien:187869","lien:187872","lien:187875","lien:187878","lien:187881","lien:187884","lien:187887","lien:187890","lien:187893","lien:187896","lien:187899","lien:187902","lien:187905","lien:187908","lien:187911","lien:187914","lien:187917","lien:187920","lien:187923","lien:187926","lien:187929","lien:187932","lien:187935","lien:187938","lien:187941","lien:187944","lien:187947","lien:187950","lien:187953","lien:187956","lien:187959","lien:187962","lien:187965","lien:187968","lien:187971","lien:187974","lien:187977","lien:187980","lien:187983","lien:187986","lien:187989"];
+var eps2 = ["lien:187331","lien:187334","lien:187337","lien:187340","lien:187343","lien:187346","lien:187349","lien:187352","lien:187355","lien:187358","lien:187361","lien:187364","lien:187367","lien:187370","lien:187373","lien:187376","lien:187379","lien:187382","lien:187385","lien:187388","lien:187391","lien:187394","lien:187397","lien:187400","lien:187403","lien:187406","lien:187409","lien:187412","lien:187415","lien:187418","lien:187421","lien:187424","lien:187427","lien:187430","lien:187433","lien:187436","lien:187439","lien:187442","lien:187445","lien:187448","lien:187451","lien:187454","lien:187457","lien:187460","lien:187463","lien:187466","lien:187469","lien:187472","lien:187475","lien:187478","lien:187481","lien:187484","lien:187487","lien:187490","lien:187493","lien:187496","lien:187499","lien:187502","lien:187505","lien:187508","lien:187511","lien:187514","lien:187517","lien:187520","lien:187523","lien:187526","lien:187529","lien:187532","lien:187535","lien:187538","lien:187541","lien:187544","lien:187547","lien:187550","lien:187553","lien:187556","lien:187559","lien:187562","lien:187565","lien:187568","lien:187571","lien:187574","lien:187577","lien:187580","lien:187583","lien:187586","lien:187589","lien:187592","lien:187595","lien:187598","lien:187601","lien:187604","lien:187607","lien:187610","lien:187613","lien:187616","lien:187619","lien:187622","lien:187625","lien:187628","lien:187631","lien:187634","lien:187637","lien:187640","lien:187643","lien:187646","lien:187649","lien:187652","lien:187655","lien:187658","lien:187661","lien:187664","lien:187667","lien:187670","lien:187673","lien:187676","lien:187679","lien:187682","lien:187685","lien:187688","lien:187691","lien:187694","lien:187697","lien:187700","lien:187703","lien:187706","lien:187709","lien:187712","lien:187715","lien:187718","lien:187721","lien:187724","lien:187727","lien:187730","lien:187733","lien:187736","lien:187739","lien:187742","lien:187745","lien:187748","lien:187751","lien:187754","lien:187757","lien:187760","lien:187763","lien:187766","lien:187769","lien:187772","lien:187775","lien:187778","lien:187781","lien:187784","lien:187787","lien:187790","lien:187793","lien:187796","lien:187799","lien:187802","lien:187805","lien:187808","lien:187811","lien:187814","lien:187817","lien:187820","lien:187823","lien:187826","lien:187829","lien:187832","lien:187835","lien:187838","lien:187841","lien:187844","lien:187847","lien:187850","lien:187853","lien:187856","lien:187859","lien:187862","lien:187865","lien:187868","lien:187871","lien:187874","lien:187877","lien:187880","lien:187883","lien:187886","lien:187889","lien:187892","lien:187895","lien:187898","lien:187901","lien:187904","lien:187907","lien:187910","lien:187913","lien:187916","lien:187919","lien:187922","lien:187925","lien:187928","lien:187931","lien:187934","lien:187937","lien:187940","lien:187943","lien:187946","lien:187949","lien:187952","lien:187955","lien:187958","lien:187961","lien:187964","lien:187967","lien:187970","lien:187973","lien:187976","lien:187979","lien:187982","lien:187985","lien:187988"];
+var eps3 = ["lien:187333","lien:187336","lien:187339","lien:187342","lien:187345","lien:187348","lien:187351","lien:187354","lien:187357","lien:187360","lien:187363","lien:187366","lien:187369","lien:187372","lien:187375","lien:187378","lien:187381","lien:187384","lien:187387","lien:187390","lien:187393","lien:187396","lien:187399","lien:187402","lien:187405","lien:187408","lien:187411","lien:187414","lien:187417","lien:187420","lien:187423","lien:187426","lien:187429","lien:187432","lien:187435","lien:187438","lien:187441","lien:187444","lien:187447","lien:187450","lien:187453","lien:187456","lien:187459","lien:187462","lien:187465","lien:187468","lien:187471","lien:187474","lien:187477","lien:187480","lien:187483","lien:187486","lien:187489","lien:187492","lien:187495","lien:187498","lien:187501","lien:187504","lien:187507","lien:187510","lien:187513","lien:187516","lien:187519","lien:187522","lien:187525","lien:187528","lien:187531","lien:187534","lien:187537","lien:187540","lien:187543","lien:187546","lien:187549","lien:187552","lien:187555","lien:187558","lien:187561","lien:187564","lien:187567","lien:187570","lien:187573","lien:187576","lien:187579","lien:187582","lien:187585","lien:187588","lien:187591","lien:187594","lien:187597","lien:187600","lien:187603","lien:187606","lien:187609","lien:187612","lien:187615","lien:187618","lien:187621","lien:187624","lien:187627","lien:187630","lien:187633","lien:187636","lien:187639","lien:187642","lien:187645","lien:187648","lien:187651","lien:187654","lien:187657","lien:187660","lien:187663","lien:187666","lien:187669","lien:187672","lien:187675","lien:187678","lien:187681","lien:187684","lien:187687","lien:187690","lien:187693","lien:187696","lien:187699","lien:187702","lien:187705","lien:187708","lien:187711","lien:187714","lien:187717","lien:187720","lien:187723","lien:187726","lien:187729","lien:187732","lien:187735","lien:187738","lien:187741","lien:187744","lien:187747","lien:187750","lien:187753","lien:187756","lien:187759","lien:187762","lien:187765","lien:187768","lien:187771","lien:187774","lien:187777","lien:187780","lien:187783","lien:187786","lien:187789","lien:187792","lien:187795","lien:187798","lien:187801","lien:187804","lien:187807","lien:187810","lien:187813","lien:187816","lien:187819","lien:187822","lien:187825","lien:187828","lien:187831","lien:187834","lien:187837","lien:187840","lien:187843","lien:187846","lien:187849","lien:187852","lien:187855","lien:187858","lien:187861","lien:187864","lien:187867","lien:187870","lien:187873","lien:187876","lien:187879","lien:187882","lien:187885","lien:187888","lien:187891","lien:187894","lien:187897","lien:187900","lien:187903","lien:187906","lien:187909","lien:187912","lien:187915","lien:187918","lien:187921","lien:187924","lien:187927","lien:187930","lien:187933","lien:187936","lien:187939","lien:187942","lien:187945","lien:187948","lien:187951","lien:187954","lien:187957","lien:187960","lien:187963","lien:187966","lien:187969","lien:187972","lien:187975","lien:187978","lien:187981","lien:187984","lien:187987","lien:187990"];
+var epsMeta = {"187331":["uqload.vc"],"187332":["ansembed.net"],"187333":["ashleyhardat.com"],"187334":["uqload.vc"],"187335":["ansembed.net"],"187336":["ashleyhardat.com"],"187337":["uqload.vc"],"187338":["ansembed.net"],"187339":["ashleyhardat.com"],"187340":["uqload.vc"],"187341":["ansembed.net"],"187342":["ashleyhardat.com"],"187343":["uqload.vc"],"187344":["ansembed.net"],"187345":["ashleyhardat.com"],"187346":["uqload.vc"],"187347":["ansembed.net"],"187348":["ashleyhardat.com"],"187349":["uqload.vc"],"187350":["ansembed.net"],"187351":["ashleyhardat.com"],"187352":["uqload.vc"],"187353":["ansembed.net"],"187354":["ashleyhardat.com"],"187355":["uqload.vc"],"187356":["ansembed.net"],"187357":["ashleyhardat.com"],"187358":["uqload.vc"],"187359":["ansembed.net"],"187360":["ashleyhardat.com"],"187361":["uqload.vc"],"187362":["ansembed.net"],"187363":["ashleyhardat.com"],"187364":["uqload.vc"],"187365":["ansembed.net"],"187366":["ashleyhardat.com"],"187367":["uqload.vc"],"187368":["ansembed.net"],"187369":["ashleyhardat.com"],"187370":["uqload.vc"],"187371":["ansembed.net"],"187372":["ashleyhardat.com"],"187373":["uqload.vc"],"187374":["ansembed.net"],"187375":["ashleyhardat.com"],"187376":["uqload.vc"],"187377":["ansembed.net"],"187378":["ashleyhardat.com"],"187379":["uqload.vc"],"187380":["ansembed.net"],"187381":["ashleyhardat.com"],"187382":["uqload.vc"],"187383":["ansembed.net"],"187384":["ashleyhardat.com"],"187385":["uqload.vc"],"187386":["ansembed.net"],"187387":["ashleyhardat.com"],"187388":["uqload.vc"],"187389":["ansembed.net"],"187390":["ashleyhardat.com"],"187391":["uqload.vc"],"187392":["ansembed.net"],"187393":["ashleyhardat.com"],"187394":["uqload.vc"],"187395":["ansembed.net"],"187396":["ashleyhardat.com"],"187397":["uqload.vc"],"187398":["ansembed.net"],"187399":["ashleyhardat.com"],"187400":["uqload.vc"],"187401":["ansembed.net"],"187402":["ashleyhardat.com"],"187403":["uqload.vc"],"187404":["ansembed.net"],"187405":["ashleyhardat.com"],"187406":["uqload.vc"],"187407":["ansembed.net"],"187408":["ashleyhardat.com"],"187409":["uqload.vc"],"187410":["ansembed.net"],"187411":["ashleyhardat.com"],"187412":["uqload.vc"],"187413":["ansembed.net"],"187414":["ashleyhardat.com"],"187415":["uqload.vc"],"187416":["ansembed.net"],"187417":["ashleyhardat.com"],"187418":["uqload.vc"],"187419":["ansembed.net"],"187420":["ashleyhardat.com"],"187421":["uqload.vc"],"187422":["ansembed.net"],"187423":["ashleyhardat.com"],"187424":["uqload.vc"],"187425":["ansembed.net"],"187426":["ashleyhardat.com"],"187427":["uqload.vc"],"187428":["ansembed.net"],"187429":["ashleyhardat.com"],"187430":["uqload.vc"],"187431":["ansembed.net"],"187432":["ashleyhardat.com"],"187433":["uqload.vc"],"187434":["ansembed.net"],"187435":["ashleyhardat.com"],"187436":["uqload.vc"],"187437":["ansembed.net"],"187438":["ashleyhardat.com"],"187439":["uqload.vc"],"187440":["ansembed.net"],"187441":["ashleyhardat.com"],"187442":["uqload.vc"],"187443":["ansembed.net"],"187444":["shanelocaldog.com"],"187445":["uqload.vc"],"187446":["ansembed.net"],"187447":["shanelocaldog.com"],"187448":["uqload.vc"],"187449":["ansembed.net"],"187450":["shanelocaldog.com"],"187451":["uqload.vc"],"187452":["ansembed.net"],"187453":["shanelocaldog.com"],"187454":["uqload.vc"],"187455":["ansembed.net"],"187456":["shanelocaldog.com"],"187457":["uqload.vc"],"187458":["ansembed.net"],"187459":["shanelocaldog.com"],"187460":["uqload.vc"],"187461":["ansembed.net"],"187462":["shanelocaldog.com"],"187463":["uqload.vc"],"187464":["ansembed.net"],"187465":["shanelocaldog.com"],"187466":["uqload.vc"],"187467":["ansembed.net"],"187468":["shanelocaldog.com"],"187469":["uqload.vc"],"187470":["ansembed.net"],"187471":["shanelocaldog.com"],"187472":["uqload.vc"],"187473":["ansembed.net"],"187474":["shanelocaldog.com"],"187475":["uqload.vc"],"187476":["ansembed.net"],"187477":["shanelocaldog.com"],"187478":["uqload.vc"],"187479":["ansembed.net"],"187480":["shanelocaldog.com"],"187481":["uqload.vc"],"187482":["ansembed.net"],"187483":["shanelocaldog.com"],"187484":["uqload.vc"],"187485":["ansembed.net"],"187486":["shanelocaldog.com"],"187487":["uqload.vc"],"187488":["ansembed.net"],"187489":["shanelocaldog.com"],"187490":["uqload.vc"],"187491":["ansembed.net"],"187492":["shanelocaldog.com"],"187493":["uqload.vc"],"187494":["ansembed.net"],"187495":["ashleyhardat.com"],"187496":["uqload.vc"],"187497":["ansembed.net"],"187498":["ashleyhardat.com"],"187499":["uqload.vc"],"187500":["ansembed.net"],"187501":["ashleyhardat.com"],"187502":["uqload.vc"],"187503":["ansembed.net"],"187504":["ashleyhardat.com"],"187505":["uqload.vc"],"187506":["ansembed.net"],"187507":["ashleyhardat.com"],"187508":["uqload.vc"],"187509":["ansembed.net"],"187510":["ashleyhardat.com"],"187511":["uqload.vc"],"187512":["ansembed.net"],"187513":["ashleyhardat.com"],"187514":["uqload.vc"],"187515":["ansembed.net"],"187516":["ashleyhardat.com"],"187517":["uqload.vc"],"187518":["ansembed.net"],"187519":["ashleyhardat.com"],"187520":["uqload.vc"],"187521":["ansembed.net"],"187522":["ashleyhardat.com"],"187523":["uqload.vc"],"187524":["ansembed.net"],"187525":["ashleyhardat.com"],"187526":["uqload.vc"],"187527":["ansembed.net"],"187528":["ashleyhardat.com"],"187529":["uqload.vc"],"187530":["ansembed.net"],"187531":["ashleyhardat.com"],"187532":["uqload.vc"],"187533":["ansembed.net"],"187534":["ashleyhardat.com"],"187535":["uqload.vc"],"187536":["ansembed.net"],"187537":["ashleyhardat.com"],"187538":["uqload.vc"],"187539":["ansembed.net"],"187540":["ashleyhardat.com"],"187541":["uqload.vc"],"187542":["ansembed.net"],"187543":["ashleyhardat.com"],"187544":["uqload.vc"],"187545":["ansembed.net"],"187546":["ashleyhardat.com"],"187547":["uqload.vc"],"187548":["ansembed.net"],"187549":["ashleyhardat.com"],"187550":["uqload.vc"],"187551":["ansembed.net"],"187552":["ashleyhardat.com"],"187553":["uqload.vc"],"187554":["ansembed.net"],"187555":["ashleyhardat.com"],"187556":["uqload.vc"],"187557":["ansembed.net"],"187558":["ashleyhardat.com"],"187559":["uqload.vc"],"187560":["ansembed.net"],"187561":["ashleyhardat.com"],"187562":["uqload.vc"],"187563":["ansembed.net"],"187564":["ashleyhardat.com"],"187565":["uqload.vc"],"187566":["ansembed.net"],"187567":["ashleyhardat.com"],"187568":["uqload.vc"],"187569":["ansembed.net"],"187570":["ashleyhardat.com"],"187571":["uqload.vc"],"187572":["ansembed.net"],"187573":["ashleyhardat.com"],"187574":["uqload.vc"],"187575":["ansembed.net"],"187576":["ashleyhardat.com"],"187577":["uqload.vc"],"187578":["ansembed.net"],"187579":["ashleyhardat.com"],"187580":["uqload.vc"],"187581":["ansembed.net"],"187582":["ashleyhardat.com"],"187583":["uqload.vc"],"187584":["ansembed.net"],"187585":["ashleyhardat.com"],"187586":["uqload.vc"],"187587":["ansembed.net"],"187588":["ashleyhardat.com"],"187589":["uqload.vc"],"187590":["ansembed.net"],"187591":["ashleyhardat.com"],"187592":["uqload.vc"],"187593":["ansembed.net"],"187594":["ashleyhardat.com"],"187595":["uqload.vc"],"187596":["ansembed.net"],"187597":["ashleyhardat.com"],"187598":["uqload.vc"],"187599":["ansembed.net"],"187600":["ashleyhardat.com"],"187601":["uqload.vc"],"187602":["ansembed.net"],"187603":["ashleyhardat.com"],"187604":["uqload.vc"],"187605":["ansembed.net"],"187606":["ashleyhardat.com"],"187607":["uqload.vc"],"187608":["ansembed.net"],"187609":["ashleyhardat.com"],"187610":["uqload.vc"],"187611":["ansembed.net"],"187612":["ashleyhardat.com"],"187613":["uqload.vc"],"187614":["ansembed.net"],"187615":["ashleyhardat.com"],"187616":["uqload.vc"],"187617":["ansembed.net"],"187618":["ashleyhardat.com"],"187619":["uqload.vc"],"187620":["ansembed.net"],"187621":["ashleyhardat.com"],"187622":["uqload.vc"],"187623":["ansembed.net"],"187624":["ashleyhardat.com"],"187625":["uqload.vc"],"187626":["ansembed.net"],"187627":["ashleyhardat.com"],"187628":["uqload.vc"],"187629":["ansembed.net"],"187630":["ashleyhardat.com"],"187631":["uqload.vc"],"187632":["ansembed.net"],"187633":["ashleyhardat.com"],"187634":["uqload.vc"],"187635":["ansembed.net"],"187636":["ashleyhardat.com"],"187637":["uqload.vc"],"187638":["ansembed.net"],"187639":["ashleyhardat.com"],"187640":["uqload.vc"],"187641":["ansembed.net"],"187642":["ashleyhardat.com"],"187643":["uqload.vc"],"187644":["ansembed.net"],"187645":["ashleyhardat.com"],"187646":["uqload.vc"],"187647":["ansembed.net"],"187648":["ashleyhardat.com"],"187649":["uqload.vc"],"187650":["ansembed.net"],"187651":["ashleyhardat.com"],"187652":["uqload.vc"],"187653":["ansembed.net"],"187654":["ashleyhardat.com"],"187655":["uqload.vc"],"187656":["ansembed.net"],"187657":["ashleyhardat.com"],"187658":["uqload.vc"],"187659":["ansembed.net"],"187660":["ashleyhardat.com"],"187661":["uqload.vc"],"187662":["ansembed.net"],"187663":["ashleyhardat.com"],"187664":["uqload.vc"],"187665":["ansembed.net"],"187666":["ashleyhardat.com"],"187667":["uqload.vc"],"187668":["ansembed.net"],"187669":["ashleyhardat.com"],"187670":["uqload.vc"],"187671":["ansembed.net"],"187672":["ashleyhardat.com"],"187673":["uqload.vc"],"187674":["ansembed.net"],"187675":["ashleyhardat.com"],"187676":["uqload.vc"],"187677":["ansembed.net"],"187678":["ashleyhardat.com"],"187679":["uqload.vc"],"187680":["ansembed.net"],"187681":["shanelocaldog.com"],"187682":["uqload.vc"],"187683":["ansembed.net"],"187684":["shanelocaldog.com"],"187685":["uqload.vc"],"187686":["ansembed.net"],"187687":["shanelocaldog.com"],"187688":["uqload.vc"],"187689":["ansembed.net"],"187690":["shanelocaldog.com"],"187691":["uqload.vc"],"187692":["ansembed.net"],"187693":["shanelocaldog.com"],"187694":["uqload.vc"],"187695":["ansembed.net"],"187696":["ashleyhardat.com"],"187697":["uqload.vc"],"187698":["ansembed.net"],"187699":["ashleyhardat.com"],"187700":["uqload.vc"],"187701":["ansembed.net"],"187702":["ashleyhardat.com"],"187703":["uqload.vc"],"187704":["ansembed.net"],"187705":["ashleyhardat.com"],"187706":["uqload.vc"],"187707":["ansembed.net"],"187708":["ashleyhardat.com"],"187709":["uqload.vc"],"187710":["ansembed.net"],"187711":["ashleyhardat.com"],"187712":["uqload.vc"],"187713":["ansembed.net"],"187714":["ashleyhardat.com"],"187715":["uqload.vc"],"187716":["ansembed.net"],"187717":["ashleyhardat.com"],"187718":["uqload.vc"],"187719":["ansembed.net"],"187720":["ashleyhardat.com"],"187721":["uqload.vc"],"187722":["ansembed.net"],"187723":["ashleyhardat.com"],"187724":["uqload.vc"],"187725":["ansembed.net"],"187726":["ashleyhardat.com"],"187727":["uqload.vc"],"187728":["ansembed.net"],"187729":["ashleyhardat.com"],"187730":["uqload.vc"],"187731":["ansembed.net"],"187732":["ashleyhardat.com"],"187733":["uqload.vc"],"187734":["ansembed.net"],"187735":["ashleyhardat.com"],"187736":["uqload.vc"],"187737":["ansembed.net"],"187738":["ashleyhardat.com"],"187739":["uqload.vc"],"187740":["ansembed.net"],"187741":["ashleyhardat.com"],"187742":["uqload.vc"],"187743":["ansembed.net"],"187744":["ashleyhardat.com"],"187745":["uqload.vc"],"187746":["ansembed.net"],"187747":["ashleyhardat.com"],"187748":["uqload.vc"],"187749":["ansembed.net"],"187750":["ashleyhardat.com"],"187751":["uqload.vc"],"187752":["ansembed.net"],"187753":["ashleyhardat.com"],"187754":["uqload.vc"],"187755":["ansembed.net"],"187756":["ashleyhardat.com"],"187757":["uqload.vc"],"187758":["ansembed.net"],"187759":["ashleyhardat.com"],"187760":["uqload.vc"],"187761":["ansembed.net"],"187762":["ashleyhardat.com"],"187763":["uqload.vc"],"187764":["ansembed.net"],"187765":["ashleyhardat.com"],"187766":["uqload.vc"],"187767":["ansembed.net"],"187768":["ashleyhardat.com"],"187769":["uqload.vc"],"187770":["ansembed.net"],"187771":["ashleyhardat.com"],"187772":["uqload.vc"],"187773":["ansembed.net"],"187774":["ashleyhardat.com"],"187775":["uqload.vc"],"187776":["ansembed.net"],"187777":["ashleyhardat.com"],"187778":["uqload.vc"],"187779":["ansembed.net"],"187780":["ashleyhardat.com"],"187781":["uqload.vc"],"187782":["ansembed.net"],"187783":["ashleyhardat.com"],"187784":["uqload.vc"],"187785":["ansembed.net"],"187786":["ashleyhardat.com"],"187787":["uqload.vc"],"187788":["ansembed.net"],"187789":["ashleyhardat.com"],"187790":["uqload.vc"],"187791":["ansembed.net"],"187792":["ashleyhardat.com"],"187793":["uqload.vc"],"187794":["ansembed.net"],"187795":["ashleyhardat.com"],"187796":["uqload.vc"],"187797":["ansembed.net"],"187798":["ashleyhardat.com"],"187799":["uqload.vc"],"187800":["ansembed.net"],"187801":["ashleyhardat.com"],"187802":["uqload.vc"],"187803":["ansembed.net"],"187804":["ashleyhardat.com"],"187805":["uqload.vc"],"187806":["ansembed.net"],"187807":["ashleyhardat.com"],"187808":["uqload.vc"],"187809":["ansembed.net"],"187810":["ashleyhardat.com"],"187811":["uqload.vc"],"187812":["ansembed.net"],"187813":["ashleyhardat.com"],"187814":["uqload.vc"],"187815":["ansembed.net"],"187816":["ashleyhardat.com"],"187817":["uqload.vc"],"187818":["ansembed.net"],"187819":["ashleyhardat.com"],"187820":["uqload.vc"],"187821":["ansembed.net"],"187822":["ashleyhardat.com"],"187823":["uqload.vc"],"187824":["ansembed.net"],"187825":["ashleyhardat.com"],"187826":["uqload.vc"],"187827":["ansembed.net"],"187828":["ashleyhardat.com"],"187829":["uqload.vc"],"187830":["ansembed.net"],"187831":["ashleyhardat.com"],"187832":["uqload.vc"],"187833":["ansembed.net"],"187834":["ashleyhardat.com"],"187835":["uqload.vc"],"187836":["ansembed.net"],"187837":["ashleyhardat.com"],"187838":["uqload.vc"],"187839":["ansembed.net"],"187840":["ashleyhardat.com"],"187841":["uqload.vc"],"187842":["ansembed.net"],"187843":["ashleyhardat.com"],"187844":["uqload.vc"],"187845":["ansembed.net"],"187846":["ashleyhardat.com"],"187847":["uqload.vc"],"187848":["ansembed.net"],"187849":["ashleyhardat.com"],"187850":["uqload.vc"],"187851":["ansembed.net"],"187852":["ashleyhardat.com"],"187853":["uqload.vc"],"187854":["ansembed.net"],"187855":["ashleyhardat.com"],"187856":["uqload.vc"],"187857":["ansembed.net"],"187858":["ashleyhardat.com"],"187859":["uqload.vc"],"187860":["ansembed.net"],"187861":["ashleyhardat.com"],"187862":["uqload.vc"],"187863":["ansembed.net"],"187864":["ashleyhardat.com"],"187865":["uqload.vc"],"187866":["ansembed.net"],"187867":["ashleyhardat.com"],"187868":["uqload.vc"],"187869":["ansembed.net"],"187870":["ashleyhardat.com"],"187871":["uqload.vc"],"187872":["ansembed.net"],"187873":["ashleyhardat.com"],"187874":["uqload.vc"],"187875":["ansembed.net"],"187876":["ashleyhardat.com"],"187877":["uqload.vc"],"187878":["ansembed.net"],"187879":["ashleyhardat.com"],"187880":["uqload.vc"],"187881":["ansembed.net"],"187882":["ashleyhardat.com"],"187883":["uqload.vc"],"187884":["ansembed.net"],"187885":["ashleyhardat.com"],"187886":["uqload.vc"],"187887":["ansembed.net"],"187888":["ashleyhardat.com"],"187889":["uqload.vc"],"187890":["ansembed.net"],"187891":["ashleyhardat.com"],"187892":["uqload.vc"],"187893":["ansembed.net"],"187894":["ashleyhardat.com"],"187895":["uqload.vc"],"187896":["ansembed.net"],"187897":["ashleyhardat.com"],"187898":["uqload.vc"],"187899":["ansembed.net"],"187900":["ashleyhardat.com"],"187901":["uqload.vc"],"187902":["ansembed.net"],"187903":["ashleyhardat.com"],"187904":["uqload.vc"],"187905":["ansembed.net"],"187906":["ashleyhardat.com"],"187907":["uqload.vc"],"187908":["ansembed.net"],"187909":["ashleyhardat.com"],"187910":["uqload.vc"],"187911":["ansembed.net"],"187912":["ashleyhardat.com"],"187913":["uqload.vc"],"187914":["ansembed.net"],"187915":["ashleyhardat.com"],"187916":["uqload.vc"],"187917":["ansembed.net"],"187918":["ashleyhardat.com"],"187919":["uqload.vc"],"187920":["ansembed.net"],"187921":["ashleyhardat.com"],"187922":["uqload.vc"],"187923":["ansembed.net"],"187924":["ashleyhardat.com"],"187925":["uqload.vc"],"187926":["ansembed.net"],"187927":["ashleyhardat.com"],"187928":["uqload.vc"],"187929":["ansembed.net"],"187930":["ashleyhardat.com"],"187931":["uqload.vc"],"187932":["ansembed.net"],"187933":["ashleyhardat.com"],"187934":["uqload.vc"],"187935":["ansembed.net"],"187936":["ashleyhardat.com"],"187937":["uqload.vc"],"187938":["ansembed.net"],"187939":["ashleyhardat.com"],"187940":["uqload.vc"],"187941":["ansembed.net"],"187942":["ashleyhardat.com"],"187943":["uqload.vc"],"187944":["ansembed.net"],"187945":["ashleyhardat.com"],"187946":["uqload.vc"],"187947":["ansembed.net"],"187948":["ashleyhardat.com"],"187949":["uqload.vc"],"187950":["ansembed.net"],"187951":["ashleyhardat.com"],"187952":["uqload.vc"],"187953":["ansembed.net"],"187954":["ashleyhardat.com"],"187955":["uqload.vc"],"187956":["ansembed.net"],"187957":["ashleyhardat.com"],"187958":["uqload.vc"],"187959":["ansembed.net"],"187960":["ashleyhardat.com"],"187961":["uqload.vc"],"187962":["ansembed.net"],"187963":["ashleyhardat.com"],"187964":["uqload.vc"],"187965":["ansembed.net"],"187966":["ashleyhardat.com"],"187967":["uqload.vc"],"187968":["ansembed.net"],"187969":["ashleyhardat.com"],"187970":["uqload.vc"],"187971":["ansembed.net"],"187972":["ashleyhardat.com"],"187973":["uqload.vc"],"187974":["ansembed.net"],"187975":["ashleyhardat.com"],"187976":["uqload.vc"],"187977":["ansembed.net"],"187978":["ashleyhardat.com"],"187979":["uqload.vc"],"187980":["ansembed.net"],"187981":["ashleyhardat.com"],"187982":["uqload.vc"],"187983":["ansembed.net"],"187984":["ashleyhardat.com"],"187985":["uqload.vc"],"187986":["ansembed.net"],"187987":["ashleyhardat.com"],"187988":["uqload.vc"],"187989":["ansembed.net"],"187990":["ashleyhardat.com"]};
+var epsJeton = "5280.1794582000.ad6a3a368239a810993af1da";
+var epsOrdreFinal = true;
+</script>
+<!-- script vidéo -->
+<script defer src="/js/contenu/videos.js?v=1794453009"></script>
+<script defer src="/js/contenu/lecteur.js?v=1794461006"></script>
+
+<div class="ct-page">
+	<link rel="stylesheet" href="/css/contenu.css?v=1794154235">
+
+<div class="ct-tete">
+    <!-- Toute la bannière ramène à la fiche de l'œuvre -->
+    <a href="/catalogue/naruto/" class="ct-banniere-lien" aria-label="Fiche de l’œuvre"><img id="imgOeuvre" class="ct-banniere" src="https://cdn.jsdelivr.net/gh/Anime-Sama/IMG@img/contenu/naruto.jpg" alt="Naruto  " fetchpriority="high" decoding="async"></a>
+    <div class="ct-tete-contenu">
+        <a href="/catalogue/naruto/" class="ct-retour">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5"/></svg>
+            Fiche de l’œuvre
+        </a>
+        <h3 id="titreOeuvre" class="ct-titre">Naruto  </h3>
+        <h2 id="avOeuvre" class="ct-saison"></h2>
+    </div>
+</div>
+
+<div class="ct-choix">
+        <label class="ct-select-saison">
+        <span class="ct-etiquette">Saison</span>
+        <select onchange="if (this.value) location.href = this.value;" aria-label="Changer de saison">
+                        <option value="/catalogue/naruto/saison1/vostfr/" selected>Avec Fillers</option>
+                        <option value="/catalogue/naruto/saison1hs/vf/">Sans Fillers</option>
+                        <option value="/catalogue/naruto/kai/vf/">Kai</option>
+                        <option value="/catalogue/naruto/scan/vf/">Scans</option>
+                    </select>
+    </label>
+    
+    <div class="ct-langues" role="group" aria-label="Langue">
+                <a href="../vostfr" id="switchVOSTFR" class="ct-langue">
+            <img src="https://cdn.jsdelivr.net/gh/Anime-Sama/IMG@img/autres/flag_jp.png" alt="" width="22" height="15">            <span>VOSTFR</span>
+        </a>
+                <a href="../vf" id="switchVF" class="ct-langue ct-langue-active" aria-current="page">
+            <img src="https://cdn.jsdelivr.net/gh/Anime-Sama/IMG@img/autres/flag_fr.png" alt="" width="22" height="15">            <span>VF</span>
+        </a>
+            </div>
+</div>
+
+<p id="messagePage" class="ct-message"></p>
+<p id="ctLangueAbsente" class="ct-message ct-langue-absente" hidden></p>
+<script>
+/* Arrivé ici depuis une autre saison regardée dans une langue que cette saison n'a pas encore */
+(function () {
+    var m = /^#sans-([a-z0-9]+)$/.exec(location.hash);
+    if (!m) return;
+    var noms = {"vostfr":"VOSTFR","vf":"VF","vf1":"VF1","vf2":"VF2","va":"VA","vj":"VJ","var":"VAR","vkr":"VKR","vcn":"VCN","vqc":"VQC"};
+    var voulue = noms[m[1]] || m[1].toUpperCase();
+    var ici = "VF";
+    var p = document.getElementById('ctLangueAbsente');
+    p.textContent = 'Cette saison n’est pas encore disponible en ' + voulue + ' : elle est affichée en ' + ici + '.';
+    p.hidden = false;
+    history.replaceState(null, '', location.pathname + location.search);
+})();
+</script>
+<script>var ctSaisonSuivante = {"nom":"Sans Fillers","url":"/catalogue/naruto/saison1hs/vf/"};</script>
+<script>
+var languesDispo = ["vostfr","vf"];
+var lecteursInfos = {"ansembed.net":{"nom":"Vidmoly","pub":1,"hd":true},"vidmoly.to":{"nom":"Vidmoly","pub":1,"hd":true},"vidmoly.net":{"nom":"Vidmoly","pub":1,"hd":true},"vidmoly.biz":{"nom":"Vidmoly","pub":1,"hd":true},"smoothpre.com":{"nom":"Earnvids","pub":2,"hd":true},"morencius.com":{"nom":"Earnvids","pub":2,"hd":true},"movearnpre.com":{"nom":"Earnvids","pub":2,"hd":true},"dingtezuni.com":{"nom":"Earnvids","pub":2,"hd":true},"earnvids.com":{"nom":"Earnvids","pub":2,"hd":true},"voe.sx":{"nom":"VOE","pub":2,"hd":false},"teresapoliticallearn.com":{"nom":"VOE","pub":2,"hd":false},"megankiddifference.com":{"nom":"VOE","pub":2,"hd":false},"jeremyparticipantanything.com":{"nom":"VOE","pub":2,"hd":false},"jamesbornmain.com":{"nom":"VOE","pub":2,"hd":false},"claireguessthousand.com":{"nom":"VOE","pub":2,"hd":false},"derricknationtop.com":{"nom":"VOE","pub":2,"hd":false},"shanelocaldog.com":{"nom":"VOE","pub":2,"hd":false},"jamespatterncamera.com":{"nom":"VOE","pub":2,"hd":false},"shannoncoldalready.com":{"nom":"VOE","pub":2,"hd":false},"sendvid.com":{"nom":"Sendvid","pub":0,"hd":false},"sibnet.ru":{"nom":"Sibnet","pub":0,"hd":false,"mort":true},"uqload.vc":{"nom":"Uqload","pub":1,"hd":true},"oneupload.to":{"nom":"OneUpload","pub":2,"hd":false,"mort":true},"vk.com":{"nom":"VK","pub":0,"hd":true},"vkvideo.ru":{"nom":"VK","pub":0,"hd":true},"dailymotion.com":{"nom":"Dailymotion","pub":0,"hd":true},"youtube.com":{"nom":"YouTube","pub":0,"hd":true},"minochinos.com":{"nom":"Earnvids","pub":1,"hd":true},"embed4me.com":{"nom":"Embed4me","pub":2,"hd":true,"mort":true},"player4me.com":{"nom":"Embed4me","pub":2,"hd":true,"mort":true},"4meplayer.com":{"nom":"Embed4me","pub":2,"hd":true,"mort":true},"drive.google.com":{"nom":"Google Drive"},"ok.ru":{"nom":"OK.ru"},"yourupload.com":{"nom":"YourUpload"},"uptostream.com":{"nom":"Uptostream"},"myvi.top":{"nom":"MyVi","pub":0,"hd":false,"mort":true},"player.vimeo.com":{"nom":"Vimeo"},"playtube.ws":{"nom":"Playtube"},"anime-sama.fr":{"nom":"Anime-Sama"},"animationdigitalnetwork.fr":{"nom":"ADN"}};
+var lecteursHS = []; // vidéos supprimées : maintenant dans epsMeta (contenu_anime.php, 12/11/2026)
+var liensHS = [];
+</script>
+
+<!-- Choix de l'épisode et du lecteur -->
+<div class="ct-barre">
+	<label class="ct-champ" title="Double-clic (ou appui long sur téléphone) pour taper directement un numéro">
+		<span class="ct-etiquette">Épisode</span>
+		<select ontouchstart="handleTouchStart(event);" ondblclick="createInputField();" onchange="selectEpisode();" id="selectEpisodes" class="scrollBarStyled"></select>
+	</label>
+	<label class="ct-champ">
+		<span class="ct-etiquette">Lecteur</span>
+		<select onchange="selectLecteur();" id="selectLecteurs" class="scrollBarStyled"></select>
+	</label>
+	<span class="ct-lecteur-infos" id="ctLecteurInfos"></span>
+	<a id="printLastEpisode" class="ct-reprise"><b>Reprise :</b> <i id="savedEpisodeId"></i></a>
+	<button type="button" class="ct-bouton ct-cinema-btn" id="ctCinema" title="Mode cinéma (touche C)">
+		<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.6" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15"/></svg>
+		<span>Cinéma</span>
+	</button>
+</div>
+
+<!-- Annonces -->
+<div class="ct-annonces">
+	<!-- Sibnet hors service : plus de bandeau pour tout le monde, message rouge à côté du lecteur Sibnet (js/contenu/lecteur.js), 12/11/2026 -->
+	<p class="ct-annonce ct-annonce-pub" id="ctAnnoncePub" hidden>
+		<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.6" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z"/></svg>
+		<span>Les pubs vous empêchent de regarder ? Utilisez le navigateur <a class="ct-lien-brave" href="https://brave.com/fr/download/" target="_blank" rel="noopener">Brave</a> ou l'extension <a class="ct-lien-ublock" href="https://ublockorigin.com/fr" target="_blank" rel="noopener">uBlock Origin</a>.</span>
+		<button type="button" class="ct-annonce-fermer" aria-label="Fermer ce message">&times;</button>
+	</p>
+</div>
+
+<!-- Navigation -->
+<div class="ct-nav ct-nav-video">
+	<button onclick="prevEp();" id="prevEpisode" class="ct-nav-btn" type="button" title="Épisode précédent (touche P)">
+		<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5"/></svg>
+		<span>Précédent</span>
+	</button>
+	<div class="ct-nav-milieu">
+		<span id="ctEpisodeActuel" class="ct-nav-actuel"></span>
+		<button onclick="lastEp();" id="lastEpisode" class="ct-nav-dernier" type="button">Dernier épisode</button>
+		<a id="ctSaisonSuivante" class="ct-nav-saison" href="#" hidden></a>
+	</div>
+	<button onclick="nextEp();" id="nextEpisode" class="ct-nav-btn ct-nav-suivant" type="button" title="Épisode suivant (touche N)">
+		<span>Suivant</span>
+		<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"/></svg>
+	</button>
+</div>
+
+<!-- Vidéo -->
+<div class="ct-lecteur">
+	<button type="button" class="ct-cinema-fermer" aria-label="Quitter le mode cinéma">&times;</button>
+	<iframe id="playerDF" src="" onload="this.onload=null;" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+	<img id="msgErrorEp" class="hidden" src="https://cdn.jsdelivr.net/gh/Anime-Sama/IMG@img/autres/erreur_videos.jpg" alt="Épisode indisponible"/>
+</div>
+
+<!-- Tous les épisodes -->
+<section class="ct-episodes" hidden>
+	<h2 class="ct-h2">Épisodes <span class="ct-h2-detail" id="ctNbEpisodes"></span></h2>
+	<div id="ctGrille" class="ct-grille scrollBarStyled"></div>
+</section>
+
+	<script>
+	$(document).ready(function(){
+		// La liste des épisodes (episodes.js) peut arriver après ce moment chez certains visiteurs :
+		// avant, on cachait alors le lecteur pour de bon. On attend la fin du chargement avant de conclure.
+		function lancer(){
+			if(typeof eps1 === 'undefined'){$('#msgErrorEp').show();$('#playerDF').hide();return;}
+			resetListe();
+			finirListe(1);
+		}
+		if(typeof eps1 !== 'undefined' || document.readyState === 'complete') lancer();
+		else window.addEventListener('load', lancer);
+	});
+	</script>
+</div>
+<div id="blocBottom" class="flex flex-col items-center justify-center gap-4 mt-10">
+			<p class="text-sm text-white text-center font-medium opacity-50 pb-2">Cliquer sur une pub est le meilleur moyen de nous soutenir.</p>
+			
+			<div id="squBot" style="margin-top:5px;" class="ad-container">
+				<span class="ad-label">Publicité</span>
+				<div class="ad-content sm:inline-flex items-center justify-center pt-1">
+					<a href="https://korbo.fr/?utm_source=anime-sama&utm_medium=banniere&utm_campaign=liste-sq" target="_blank"><img src="https://cdn.jsdelivr.net/gh/Anime-Sama/IMG@img/autres/korbo_liste_carre.png" alt="Korbo - Square liste" loading="lazy" width="300" height="300" style="max-width:100%; height:auto; border-radius:6px;"></a>
+					<div data-pub-suivi="a-zzz"><iframe class="pub-btag" src="/pub/cadre-btag.html?h=a-zzz&amp;z=7809940&amp;t=300x250" width="300" height="250" title="Publicité" scrolling="no" loading="lazy" sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox" style="border:0;display:block;margin:0 auto;width:300px;height:250px;max-width:none"></iframe></div>
+					<!--<a href="https://www.eneba.com/fr/?af_id=Leynoor&currency=EUR&region=global" target="_blank"><img src="https://cdn.jsdelivr.net/gh/Anime-Sama/IMG@img/autres/eneba_square.jpg" alt="Eneba - Jeux moins chers" loading="lazy" width="300" height="300" style="max-width:100%; height:auto; border-radius:6px;"></a>-->
+					<div class="pub-ordi"><div data-adcash-zone="8653002"></div></div>
+					<!-- Téléphone : nouvelle zone 300×250 -->
+					<div class="pub-tel"><div data-adcash-zone="12424246" data-taille="300x250"></div></div>
+				</div>
+			</div>
+
+			<div id="bannBot" class="ad-container">
+				<span class="ad-label">Publicité</span>
+					<a href="https://korbo.fr/jeux/animedle?utm_source=anime-sama&utm_medium=banniere&utm_campaign=animedle-lb" target="_blank"><img src="https://cdn.jsdelivr.net/gh/Anime-Sama/IMG@img/autres/korbo_animedle_leaderboard.png" alt="Korbo - Leaderboard Animedle" width="728" height="90" loading="lazy" style="max-width:100%; height:auto; border-radius:6px;"></a>
+				<!--<span class="ad-label mt-2">Publicité</span>
+					<a href="https://www.eneba.com/fr/?af_id=Leynoor&currency=EUR&region=global" target="_blank"><img src="https://cdn.jsdelivr.net/gh/Anime-Sama/IMG@img/autres/eneba_leaderboard.jpg" alt="Eneba - Jeux moins chers" width="728" height="90" loading="lazy" style="max-width:100%; height:auto; border-radius:6px;"></a>-->
+				<span class="ad-label mt-2">Publicité</span>
+					<iframe class="pub-btag" src="/pub/cadre-btag.html?h=aqle3&amp;z=12228087&amp;t=728x90" width="728" height="90" title="Publicité" scrolling="no" loading="lazy" sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox" style="border:0;display:block;margin:0 auto;width:728px;height:90px;max-width:none"></iframe>
+				<span class="ad-label mt-2">Publicité</span>
+					<div class="ad-content flex items-center justify-center mt-2"><div data-adcash-zone="8653014"></div></div>
+					<!-- Téléphone : la 728×90 ne rentre pas, à la place une 300×100 -->
+					<div class="ad-content flex items-center justify-center mt-2 pub-tel"><div data-adcash-zone="12424238" data-taille="300x100"></div></div>
+			</div>
+		</div>
+
+	</div>
+	
+	<!-- Bannière collée en bas de l'écran, téléphone et tablette uniquement (cachée à partir de lg) -->
+	<div id="pubCollee" class="lg:hidden" hidden>
+		<span class="pc-label">Publicité</span>
+		<button type="button" class="pc-fermer" aria-label="Fermer la publicité">&times;</button>
+		<div class="pc-contenu">
+			<iframe class="pub-btag" src="/pub/cadre-btag.html?h=aqle3&amp;z=12228087&amp;t=728x90" width="728" height="90" title="Publicité" scrolling="no" loading="lazy" sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox" style="border:0;display:block;margin:0 auto;width:728px;height:90px;max-width:none"></iframe>
+			<!-- <div class="pc-adcash" data-adcash-zone="12424250" data-taille="468x60" data-ajuster></div>-->
+			<!--<a class="pc-repli" href="https://www.eneba.com/fr/?af_id=Leynoor&currency=EUR&region=global" target="_blank" rel="sponsored noopener"><img src="https://cdn.jsdelivr.net/gh/Anime-Sama/IMG@img/autres/eneba_leaderboard.jpg" alt="Eneba - Jeux moins chers" width="728" height="90"></a>-->
+		</div>
+	</div>
+	<script>
+	/* Bannières « Download » dans une iframe isolée (12/11/2026) : posé dans la page, leur script cachait
+	   le lecteur vidéo. Une 728×90 plus large que la place dispo est réduite (transform), pas coupée. */
+	(function () {
+		function ajuster() {
+			var l = document.querySelectorAll('iframe.pub-btag');
+			for (var i = 0; i < l.length; i++) {
+				var f = l[i], w = +f.getAttribute('width'), h = +f.getAttribute('height');
+				var parent = f.parentNode, dispo = Math.min(parent.clientWidth || w, window.innerWidth - 16);
+				var e = dispo > 0 && dispo < w ? dispo / w : 1;
+				f.style.transform = e < 1 ? 'scale(' + e + ')' : '';
+				f.style.transformOrigin = '0 0';
+				f.style.margin = e < 1 ? '0' : '0 auto';
+				if (e < 1) {
+					var boite = f.parentNode.classList.contains('pub-btag-boite') ? f.parentNode : null;
+					if (!boite) { boite = document.createElement('div'); boite.className = 'pub-btag-boite'; f.parentNode.insertBefore(boite, f); boite.appendChild(f); }
+					boite.style.cssText = 'width:' + Math.floor(w * e) + 'px;height:' + Math.floor(h * e) + 'px;overflow:hidden;margin:0 auto';
+				}
+			}
+		}
+		ajuster();
+		window.addEventListener('resize', ajuster);
+	})();
+	</script>
+	<script>
+	(function () {
+		var b = document.getElementById('pubCollee');
+		if (!b || window.innerWidth >= 1024) return;
+		try { if (sessionStorage.getItem('pc-ferme')) return; } catch (e) {}
+		b.hidden = false;
+		document.body.classList.add('pc-on');
+		var ac = b.querySelector('.pc-adcash');
+		if (ac) ac.addEventListener('pub-remplie', function (e) {
+			if (e.detail) b.classList.add('pc-ac-ok');   // pub Adcash là : on retire Eneba
+		});
+		b.querySelector('.pc-fermer').addEventListener('click', function () {
+			b.remove();
+			document.body.classList.remove('pc-on');
+			try { sessionStorage.setItem('pc-ferme', '1'); } catch (e) {}
+		});
+	})();
+	</script>
+
+	<div id="sousBlocRight" style="margin-top: 600px; margin-left: 30px;" class="hidden lg:block">
+		<div id="bannRight" class="ad-container">
+			<span class="ad-label">Publicité</span>
+			<a href="https://korbo.fr/jeux/blind-test?utm_source=anime-sama&utm_medium=banniere&utm_campaign=blindtest-sky" target="_blank"><img src="https://cdn.jsdelivr.net/gh/Anime-Sama/IMG@img/autres/korbo_blindtest_skyscraper.png" alt="Korbo - Skyscraper Blindtest" loading="lazy" style="max-width:100%; height:auto; border-radius:6px;"></a>
+			<div class="ad-content"><div data-adcash-zone="8653006"></div></div>
+			<!--<a href="https://www.eneba.com/fr/?af_id=Leynoor&currency=EUR&region=global" target="_blank"><img src="https://cdn.jsdelivr.net/gh/Anime-Sama/IMG@img/autres/eneba_skyscraper.jpg" alt="Eneba - Jeux moins chers" loading="lazy" style="max-width:100%; height:auto; border-radius:6px;"></a>-->
+		</div>
+	</div>
+
+	<!-- Bandeau de nuit (3h–6h, heure de l'appareil) : prévient que des pubs plus envahissantes tournent pendant ce créneau.
+	     Même famille que les autres bandeaux du site (raccourci écran d'accueil, annonces). -->
+	<div id="bandeau-pubs-nuit" role="status" hidden>
+		<div class="bpn-contenu">
+			<span class="bpn-icone" aria-hidden="true">
+				<svg viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" d="M9.528 1.718a.75.75 0 0 1 .162.819A8.97 8.97 0 0 0 9 6a9 9 0 0 0 9 9 8.97 8.97 0 0 0 3.463-.69.75.75 0 0 1 .981.98 10.503 10.503 0 0 1-9.694 6.46c-5.799 0-10.5-4.7-10.5-10.5 0-4.368 2.667-8.112 6.46-9.694a.75.75 0 0 1 .818.162Z" clip-rule="evenodd"/></svg>
+			</span>
+			<p class="bpn-texte">
+				<strong>Période creuse de nuit · 3h – 6h</strong>
+				<span>Quelques pubs plus envahissantes s'affichent pendant ce créneau pour financer le site. Un bloqueur de pubs les retire.</span>
+			</p>
+			<span class="bpn-compteur" aria-hidden="true"></span>
+			<button type="button" class="bpn-fermer" aria-label="Fermer" title="Fermer">
+				<svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z"/></svg>
+			</button>
+		</div>
+	</div>
+
+	<style>
+	#bandeau-pubs-nuit {
+		position: fixed; left: 0; right: 0; bottom: 14px; z-index: 99999;
+		display: flex; justify-content: center;
+		padding: 0 14px;
+		pointer-events: none;
+		transition: opacity .35s ease, transform .35s ease;
+	}
+	#bandeau-pubs-nuit[hidden] { display: none; }
+	#bandeau-pubs-nuit.bpn-sortie { opacity: 0; transform: translateY(20px); }
+	#bandeau-pubs-nuit .bpn-contenu {
+		pointer-events: auto;
+		display: flex; align-items: center; gap: .85rem;
+		width: 100%; max-width: 760px;
+		padding: .85rem 1rem;
+		border-radius: 14px;
+		border: 1px solid rgba(245, 158, 11, .28);
+		background:
+			radial-gradient(120% 160% at 0% 0%, rgba(245, 158, 11, .10), transparent 55%),
+			rgba(11, 20, 36, .96);
+		box-shadow: 0 14px 40px rgba(0, 0, 0, .55);
+		color: #cbd5e1;
+		font-size: .85rem; line-height: 1.45;
+	}
+	#bandeau-pubs-nuit .bpn-icone {
+		flex: 0 0 auto;
+		display: flex; align-items: center; justify-content: center;
+		width: 38px; height: 38px;
+		border-radius: 10px;
+		background: rgba(245, 158, 11, .14);
+		color: #fbbf24;
+	}
+	#bandeau-pubs-nuit .bpn-icone svg { width: 20px; height: 20px; }
+	#bandeau-pubs-nuit .bpn-texte { margin: 0; flex: 1; min-width: 0; display: flex; flex-direction: column; gap: .1rem; }
+	#bandeau-pubs-nuit strong { color: #fde68a; font-weight: 800; }
+	#bandeau-pubs-nuit .bpn-compteur {
+		flex: 0 0 auto;
+		min-width: 2.2rem;
+		padding: .15rem .45rem;
+		border-radius: 999px;
+		background: rgba(148, 163, 184, .12);
+		color: #94a3b8;
+		font-size: .72rem; font-weight: 700;
+		font-variant-numeric: tabular-nums;
+		text-align: center;
+		user-select: none;
+	}
+	#bandeau-pubs-nuit .bpn-fermer {
+		flex: 0 0 auto;
+		width: 28px; height: 28px; padding: 5px;
+		border: none; border-radius: 7px;
+		background: none; color: #7f9bb3;
+		cursor: pointer;
+	}
+	#bandeau-pubs-nuit .bpn-fermer:hover { color: #ffffff; background: rgba(255, 255, 255, .08); }
+	#bandeau-pubs-nuit .bpn-fermer svg { width: 100%; height: 100%; display: block; }
+	@media (max-width: 600px) {
+		#bandeau-pubs-nuit { bottom: 10px; padding: 0 10px; }
+		#bandeau-pubs-nuit .bpn-contenu { gap: .6rem; padding: .7rem .75rem; font-size: .78rem; }
+		#bandeau-pubs-nuit .bpn-icone { width: 32px; height: 32px; }
+	}
+	@media (prefers-reduced-motion: reduce) {
+		#bandeau-pubs-nuit { transition: none; }
+	}
+	</style>
+
+	<script>
+		
+	(function () {
+		var HEURE_DEBUT = 3;
+		var HEURE_FIN   = 6;
+		var DUREE       = 10;   // secondes avant fermeture automatique
+
+		// Heure LOCALE du visiteur, selon les réglages de son appareil
+		var h = new Date().getHours();
+		if (h < HEURE_DEBUT || h >= HEURE_FIN) return;
+
+		// --- Bandeau ---
+		var b = document.getElementById('bandeau-pubs-nuit');
+		if (b && !sessionStorage.getItem('bpn-ferme')) {
+			b.hidden = false;
+
+			var compteur = b.querySelector('.bpn-compteur');
+			var restant  = DUREE;
+			var tic;
+
+			function fermer(memoriser) {
+				clearInterval(tic);
+				if (memoriser) sessionStorage.setItem('bpn-ferme', '1');
+				b.classList.add('bpn-sortie');
+				setTimeout(function () { b.remove(); }, 400);
+			}
+
+			function tick() {
+				restant--;
+				if (restant <= 0) { fermer(true); return; }
+				compteur.textContent = restant + ' s';
+			}
+
+			compteur.textContent = restant + ' s';
+			tic = setInterval(tick, 1000);
+
+			// Fermeture manuelle : mémorisée pour toute la session
+			b.querySelector('.bpn-fermer').addEventListener('click', function () {
+				fermer(true);
+			});
+
+			// On met en pause si le visiteur survole ou touche le bandeau
+			b.addEventListener('mouseenter', function () { clearInterval(tic); });
+			b.addEventListener('mouseleave', function () {
+				clearInterval(tic);
+				tic = setInterval(tick, 1000);
+			});
+		}
+
+		// --- Scripts pop, une seule fois, après le chargement complet ---
+		if (window.__popsCharges) return;
+		window.__popsCharges = true;
+
+		// 12/11/2026 : pop llvpn.com (zone 11435645) retiré : présent dans presque tous les signalements de lecteur
+		// vidéo caché (js/contenu/lecteur.js). Ancien code : avant/bot_body.php.avant-sans-llvpn
+	})();
+	</script>
+
+</div>
+		<script>
+		$(document).ready(function(){
+			/*
+			resetListe(); toujours au debut en premier
+			creerListe(debut, fin);newSP(special); on en met autant qu'on veut
+			creerListe(debut, fin);newSP(special); on en met autant qu'on veut
+			finirListe(debut de la fin);
+			*/
+		});
+		</script>
+	
+	<script>window.__CF$cv$params={r:'a5964b05dee494d1',t:'MTc5NDQ5NDQzOQ==',u:'01a1d034204871fb8cc584488dc84ea5',ut:'KtgQDxLsL5uBE_U.eaSEf2HL94ctHk0r5jJueIMqkb4-1794494439-1.2.1.1-2CL1GRS5.wYllurCY1oKenZbhQilcSwTxYP_JnbyJ8A6OJXwjBLDMAsm0VXVfUOORwDFAKG6ehcYTXvRf5KQOSrcI0uo0LOXs_IJIsSqVYQ',i:60};(function(){if(!document.body)return;var l=window.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/precursor/main.js?ray=a5964b05dee494d1',s=document.createElement('script');s.src=o?new URL(u,o).href:u;document.head.appendChild(s);})();</script></body>
+
+	<footer>
+		<footer class="asn-footer" role="contentinfo" aria-label="Pied de page site">
+  <div class="container">
+    <!-- Colonne 1 : Qui sommes-nous -->
+    <div class="col-about">
+      <h4>Qui sommes-nous</h4>
+      <p>Anime-Sama est un site de catalogue et de référencement d'animation APAC. Navigation optimisée, publicités réduites et fiches organisées pour faciliter vos recherches.</p>
+      <p class="legal">Anime-Sama n'héberge pas les vidéos. Pour toute réclamation liée au droit d'auteur, consultez la page DMCA ou contactez la plateforme d'hébergement concernée.</p>
+    </div>
+
+    <!-- Colonne 2 : Liens utiles -->
+    <div class="col-links">
+      <h4>Liens utiles</h4>
+      <ul class="links" aria-label="Liens utiles">
+        <li><a href="/catalogue">Catalogue</a></li>
+        <li><a href="/planning">Planning des sorties</a></li>
+        <li><a href="/aide">Centre d'aide</a></li>
+        <li><a href="/aide/#dmca">DMCA & signalements</a></li>
+        <li><a href="/profil">Mon profil</a></li>
+      </ul>
+    </div>
+
+    <!-- Colonne 3 : Soutien -->
+    <div class="col-support">
+      <h4>Soutenir les causes</h4>
+
+      <ul class="links" aria-label="Soutien les causes">
+        <li>
+          <a href="https://www.paypal.com/donate/?hosted_button_id=3FBNLMGT3JAJ2" target="_blank" rel="noopener">
+            <img class="flag" loading="lazy" src="https://flagcdn.com/w40/ps.png" alt="Drapeau Palestine">
+            <span>Palestine</span>
+          </a>
+        </li>
+
+        <li>
+          <a href="https://life-ong.org/en-us/urgence-soudan" target="_blank" rel="noopener">
+            <img class="flag" loading="lazy" src="https://flagcdn.com/w40/sd.png" alt="Drapeau Soudan">
+            <span>Soudan</span>
+          </a>
+        </li>
+
+        <li>
+          <a href="https://soutenir.msf.fr/faire-un-don/~mon-don?ns_ira_cr_arg=IyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMy8U8gFXy%2BvsdzSPrRo%2Fs2RMylPSbGlljZY1f0RudDLg%3D%3D&_cv=1" target="_blank" rel="noopener">
+            <img class="flag" loading="lazy" src="https://flagcdn.com/w40/cd.png" alt="Drapeau RDC">
+            <span>RDC</span>
+          </a>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="container bottom">
+    <div class="brand-inline" style="align-items:center;">
+      <img class="logo-mobile" loading="lazy" src="/img/opti/logo.webp" alt="Logo Anime-Sama mini">
+      <div>
+        <span class="copyright" style="color:#8ea8bb; font-weight:700;">© 2026 Anime-Sama</span>
+        <div class="reserved" style="color:#6f8899;">Tous droits réservés</div>
+      </div>
+    </div>
+
+    <!-- Choix du fond d'écran (mémorisé dans le navigateur du visiteur) -->
+    <div class="fond-picker" role="group" aria-label="Fond d'écran du site">
+      <span>Fond d'écran</span>
+      <button type="button" data-fond="aurore" title="Aurore (par défaut)" aria-label="Aurore"></button>
+      <button type="button" data-fond="nuit" title="Bleu nuit" aria-label="Bleu nuit"></button>
+      <button type="button" data-fond="noir" title="Noir" aria-label="Noir"></button>
+      <button type="button" data-fond="anthracite" title="Anthracite" aria-label="Anthracite"></button>
+    </div>
+    <script>
+    (function () {
+      var boutons = document.querySelectorAll('.fond-picker button');
+      function marquerActif() {
+        var fond = document.documentElement.getAttribute('data-fond') || 'aurore';
+        boutons.forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.fond === fond ? 'true' : 'false'); });
+      }
+      boutons.forEach(function (b) {
+        b.addEventListener('click', function () {
+          var fond = b.dataset.fond;
+          try {
+            if (fond === 'aurore') localStorage.removeItem('fondSite');
+            else localStorage.setItem('fondSite', fond);
+          } catch (e) {}
+          if (fond === 'aurore') document.documentElement.removeAttribute('data-fond');
+          else document.documentElement.setAttribute('data-fond', fond);
+          marquerActif();
+        });
+      });
+      marquerActif();
+    })();
+    </script>
+
+    <div>
+
+    <nav aria-label="Discord">
+        <a href="https://discord.gg/mKbYYbmxY8" aria-label="Discord" target="_blank" rel="noopener" title="Discord" class="social-link">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" class="bi bi-discord" viewBox="0 0 16 16">
+              <path d="M13.545 2.907a13.2 13.2 0 0 0-3.257-1.011.05.05 0 0 0-.052.025c-.141.25-.297.577-.406.833a12.2 12.2 0 0 0-3.658 0 8 8 0 0 0-.412-.833.05.05 0 0 0-.052-.025c-1.125.194-2.22.534-3.257 1.011a.04.04 0 0 0-.021.018C.356 6.024-.213 9.047.066 12.032q.003.022.021.037a13.3 13.3 0 0 0 3.995 2.02.05.05 0 0 0 .056-.019q.463-.63.818-1.329a.05.05 0 0 0-.01-.059l-.018-.011a9 9 0 0 1-1.248-.595.05.05 0 0 1-.02-.066l.015-.019q.127-.095.248-.195a.05.05 0 0 1 .051-.007c2.619 1.196 5.454 1.196 8.041 0a.05.05 0 0 1 .053.007q.121.1.248.195a.05.05 0 0 1-.004.085 8 8 0 0 1-1.249.594.05.05 0 0 0-.03.03.05.05 0 0 0 .003.041c.24.465.515.909.817 1.329a.05.05 0 0 0 .056.019 13.2 13.2 0 0 0 4.001-2.02.05.05 0 0 0 .021-.037c.334-3.451-.559-6.449-2.366-9.106a.03.03 0 0 0-.02-.019m-8.198 7.307c-.789 0-1.438-.724-1.438-1.612s.637-1.613 1.438-1.613c.807 0 1.45.73 1.438 1.613 0 .888-.637 1.612-1.438 1.612m5.316 0c-.788 0-1.438-.724-1.438-1.612s.637-1.613 1.438-1.613c.807 0 1.451.73 1.438 1.613 0 .888-.631 1.612-1.438 1.612"/>
+          </svg>
+          <span>Discord</span>
+        </a>
+      </nav>
+      
+      <nav aria-label="Appli">
+        <a href="/application/" class="social-link appli-pied" data-installer-appli="" title="Ajouter Anime-Sama sur l'écran d'accueil">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
+          <span>Raccourci comme une appli</span>
+        </a>
+      </nav>
+
+      <!--
+      <nav aria-label="Réseau social X">
+        <a href="https://x.com/Anime_samaFR" aria-label="X" target="_blank" rel="noopener" title="X" class="social-link">
+          <svg viewBox="0 0 1200 1227" xmlns="http://www.w3.org/2000/svg" fill="currentColor" aria-hidden="true">
+            <path d="M714.163 519.284L1160.89 0H1055.03L667.137 450.887L357.328 0H0L468.492 681.821L0 1226.37H105.866L515.491 750.218L842.672 1226.37H1200L714.137 519.284H714.163ZM569.165 687.828L521.697 619.934L144.011 79.6944H306.615L611.412 515.685L658.88 583.579L1055.08 1150.3H892.476L569.165 687.854V687.828Z"/>
+          </svg>
+          <span>@Anime_samaFR</span>
+        </a>
+      </nav>
+      -->
+
+
+    </div>
+  </div>
+</footer>
+	</footer>
+
+</html>

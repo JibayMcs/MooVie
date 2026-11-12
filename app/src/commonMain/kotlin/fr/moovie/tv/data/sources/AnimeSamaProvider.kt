@@ -7,15 +7,46 @@ import fr.moovie.tv.core.sources.port.HttpMethod
 import fr.moovie.tv.core.sources.port.HttpRequest
 import fr.moovie.tv.core.sources.port.SourceProvider
 import fr.moovie.tv.core.sources.port.getBody
+import fr.moovie.tv.core.sources.usecase.isHosterSupported
 import fr.moovie.tv.shared.dispatcherEs
 import kotlin.concurrent.Volatile
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 
 /**
- * Provider anime-sama (anime-sama.to) — port de API/Mainapi/routes animeSama.
- * Flux : fetch.php (recherche) → page catalogue (`panneauAnime("Nom","saisonX/lang")`)
- * → episodes.js par langue (`var epsN = ['https://…embed…']`, index = épisode).
+ * Provider anime-sama (anime-sama.to) - port de API/Mainapi/routes animeSama.
  * Renvoie des liens d'embed (ansembed, vidmoly, sibnet…) à résoudre ensuite.
+ *
+ * ### Flux de résolution (relevé sur le site le 12/11/2026)
+ *
+ * Ce format a été relevé sur anime-sama.to le 12/11/2026 et figé dans les
+ * fixtures `naruto_saison1_vf_reelle.html` (page de saison) et
+ * `lien_reponse.json` (réponse de `lien.php`), lues par `AnimeSamaSeasonPageTest`.
+ *
+ * 1. `fetch.php` (recherche) puis la page catalogue, qui dit si la saison
+ *    existe (`panneauAnime("Nom","saisonX/lang")`).
+ * 2. Pour chaque langue, la **page de saison** `<catalogue>/saisonX/<lang>/`.
+ *    Les listes y sont désormais en ligne, dans un `<script data-source="bdd">` :
+ *    `var eps1 = ["lien:187332", …]` (un tableau par lecteur, index =
+ *    épisode), `var epsMeta = {"187332":["ansembed.net"], …}` (hôtes annoncés)
+ *    et `var epsJeton = "…"` (jeton de page, horodaté).
+ * 3. Un repère `lien:N` se résout par
+ *    `GET /api/lien.php?j=<epsJeton>&l=<N>` (Referer = page de saison), qui
+ *    rend `{"u":"https://…embed…"}`. **Seul l'épisode demandé** est résolu :
+ *    un appel par lecteur, pas un par épisode de la saison.
+ * 4. L'ancien format (URL en clair dans `epsN`) peut coexister : il ne passe
+ *    qu'en https, comme un lien résolu ; et si la page de saison ne porte aucun tableau, on retente
+ *    l'ancien `episodes.js`, devenu 404 sur les catalogues migrés.
+ *
+ * Ce qui a cassé ce jour-là ne levait rien : `episodes.js` rendait une page
+ * 404 en HTML, sans tableau, donc zéro lien sur chaque épisode - le catalogue
+ * muet que seules les sondes de couverture voient.
  */
 class AnimeSamaProvider(private val http: HttpGateway) : SourceProvider {
 
@@ -63,15 +94,89 @@ class AnimeSamaProvider(private val http: HttpGateway) : SourceProvider {
         val links = mutableListOf<EmbedLink>()
         for ((suffix, lang) in LANGS) {
             val dossier = "$catalogueUrl$seasonPrefix/$suffix/"
-            val js = get("${dossier}episodes.js", referer = dossier) ?: continue
-            for (arr in parseEpsArrays(js)) {
-                arr.getOrNull(episode - 1)?.let { url ->
-                    links += EmbedLink(url = url, hoster = hosterOf(url), language = lang)
-                }
-            }
+            links += linksForLanguage(catalogueUrl, dossier, episode, lang)
         }
         return links.distinctBy { it.url }
     }
+
+    /**
+     * Les liens d'une langue pour [episode] : la page de saison d'abord, puis
+     * l'ancien `episodes.js` si elle ne porte aucun tableau `epsN`.
+     */
+    private suspend fun linksForLanguage(
+        catalogueUrl: String,
+        dossier: String,
+        episode: Int,
+        lang: String,
+    ): List<EmbedLink> {
+        get(dossier, referer = catalogueUrl)?.let { page ->
+            val saison = parseSeasonPage(page)
+            if (saison.lecteurs.isNotEmpty()) return resolve(saison, episode, dossier, lang)
+        }
+        // Repli : catalogues pas encore migrés, dont les listes vivent encore
+        // dans un fichier à part.
+        val js = get("${dossier}episodes.js", referer = dossier) ?: return emptyList()
+        return resolve(parseSeasonPage(js), episode, dossier, lang)
+    }
+
+    /**
+     * L'entrée [episode] de chaque lecteur, rendue en lien d'embed.
+     *
+     * Une URL en clair passe si elle est en https, avec le même contrôle qu'un
+     * lien résolu. Un repère `lien:N` coûte **un**
+     * appel à `lien.php`, et seulement pour l'épisode demandé : résoudre la
+     * saison entière, ce serait des centaines de requêtes par clic. Un repère
+     * qui ne se résout pas est ignoré, les autres continuent.
+     */
+    private suspend fun resolve(
+        saison: SeasonPage,
+        episode: Int,
+        dossier: String,
+        lang: String,
+    ): List<EmbedLink> {
+        val entrees = saison.lecteurs.mapNotNull { it.getOrNull(episode - 1) }.distinct()
+        return coroutineScope {
+            entrees.map { entree ->
+                async {
+                    val url = if (entree.startsWith("https://") || entree.startsWith("http://")) {
+                        acceptable(entree)
+                    } else {
+                        val id = LIEN.matchEntire(entree)?.groupValues?.get(1)
+                        when {
+                            id == null -> null
+                            !worthResolving(saison.meta[id]) -> null
+                            else -> saison.jeton?.let { resolveLien(it, id, dossier) }
+                        }
+                    }
+                    url?.let { EmbedLink(url = it, hoster = hosterOf(it), language = lang) }
+                }
+            }.awaitAll().filterNotNull()
+        }
+    }
+
+    /**
+     * `GET /api/lien.php?j=<jeton>&l=<N>` rend `{"u":"https://…"}` ; on rend
+     * l'URL, ou null.
+     *
+     * Le Referer est la page de saison, comme le fait le site. Tout ce qui
+     * n'est pas un objet JSON portant une URL https dans `u` vaut null : on ne
+     * fabrique jamais d'URL à partir d'une réponse qu'on ne comprend pas.
+     */
+    private suspend fun resolveLien(jeton: String, id: String, dossier: String): String? {
+        val origine = originOf(dossier, baseCourante)
+        val corps = get("$origine/api/lien.php?j=$jeton&l=$id", referer = dossier) ?: return null
+        val objet = runCatching { Json.parseToJsonElement(corps) as? JsonObject }.getOrNull()
+            ?: return null
+        val u = (objet["u"] as? JsonPrimitive)?.takeIf { it.isString }?.content ?: return null
+        return acceptable(u)
+    }
+
+    /**
+     * Le contrôle commun aux deux formats : https et un hôte non vide. Une URL
+     * en clair (ancien format) et une URL résolue passent par la même porte.
+     */
+    private fun acceptable(url: String): String? =
+        url.takeIf { it.startsWith("https://") && hosterOf(it) != "?" }
 
     private suspend fun search(title: String): String? {
         val html = http.fetch(
@@ -85,11 +190,6 @@ class AnimeSamaProvider(private val http: HttpGateway) : SourceProvider {
         val href = cataloguePath(html, title) ?: return null
         return "$baseCourante$href".let { if (it.endsWith("/")) it else "$it/" }
     }
-
-    private fun parseEpsArrays(js: String): List<List<String>> =
-        EPS.findAll(js).map { m ->
-            URL.findAll(m.groupValues[1]).map { it.groupValues[1] }.toList()
-        }.toList()
 
     /**
      * [referer] n'est pas décoratif pour `episodes.js` : depuis octobre 2026, le
@@ -110,6 +210,50 @@ class AnimeSamaProvider(private val http: HttpGateway) : SourceProvider {
 
     companion object {
         const val BASE = "https://anime-sama.to"
+
+        /**
+         * Ce que déclare une page de saison, ou un ancien `episodes.js`.
+         *
+         * [lecteurs] : un tableau par lecteur (`eps1`, `eps2`…), index =
+         * épisode ; chaque entrée est une URL en clair (ancien format) ou un
+         * repère `lien:N` (nouveau). [meta] : `epsMeta`, repère vers hôtes
+         * annoncés. [jeton] : `epsJeton`, à repasser à `lien.php`.
+         */
+        internal class SeasonPage(
+            val lecteurs: List<List<String>>,
+            val meta: Map<String, List<String>>,
+            val jeton: String?,
+        )
+
+        internal fun parseSeasonPage(texte: String): SeasonPage {
+            val lecteurs = EPS.findAll(texte).map { m ->
+                CHAINE.findAll(m.groupValues[1])
+                    .map { (it.groups[1] ?: it.groups[2])?.value.orEmpty().trim() }
+                    .toList()
+            }.filter { it.isNotEmpty() }.toList()
+            val meta = META.find(texte)?.groupValues?.get(1)?.let { brut ->
+                val objet = runCatching { Json.parseToJsonElement(brut) as? JsonObject }.getOrNull()
+                objet?.mapValues { (_, v) ->
+                    (v as? JsonArray)
+                        ?.mapNotNull { (it as? JsonPrimitive)?.takeIf { p -> p.isString }?.content }
+                        .orEmpty()
+                }
+            }.orEmpty()
+            return SeasonPage(lecteurs, meta, JETON.find(texte)?.groupValues?.get(1))
+        }
+
+        /**
+         * Vrai s'il vaut la peine d'appeler `lien.php` pour un repère dont
+         * `epsMeta` annonce [hotes].
+         *
+         * Ce n'est qu'une économie d'appels : l'hébergeur retenu reste celui
+         * de l'URL résolue, jamais celui qu'annonce la page. Sans métadonnée,
+         * on résout - mieux vaut un appel de trop qu'un lien perdu.
+         */
+        internal fun worthResolving(hotes: List<String>?): Boolean {
+            if (hotes.isNullOrEmpty()) return true
+            return hotes.any { isHosterSupported(hosterOf("https://$it")) }
+        }
 
         /**
          * Le chemin de la fiche qui porte **vraiment** [titre], ou null.
@@ -246,7 +390,14 @@ class AnimeSamaProvider(private val http: HttpGateway) : SourceProvider {
             "vostfr" to "VOSTFR",
         )
         private val PANEL = Regex("""panneauAnime\("([^"]+)",\s*"([^"]+)"\)""")
+        /** `var eps1 = [...]` ; `epsMeta` (un objet) et `epsJeton` (une chaîne) n'y répondent pas. */
         private val EPS = Regex("""var\s+eps\w+\s*=\s*\[([\s\S]*?)\]""")
-        private val URL = Regex("""'([^']+)'""")
+        /** Une chaîne JS, entre apostrophes (ancien format) ou guillemets (nouveau). */
+        private val CHAINE = Regex("""'([^']*)'|"([^"]*)"""")
+        /** `epsMeta` ne contient que des tableaux : la première accolade suivie de `;` le ferme. */
+        private val META = Regex("""var\s+epsMeta\s*=\s*(\{[\s\S]*?\})\s*;""")
+        /** Restreint au jeu de caractères mesuré : le jeton part tel quel dans l'URL. */
+        private val JETON = Regex("""var\s+epsJeton\s*=\s*["']([A-Za-z0-9._-]+)["']""")
+        private val LIEN = Regex("""lien:(\d+)""")
     }
 }
