@@ -506,8 +506,11 @@ compose.desktop {
 // construite sur la plus ancienne base visée, sinon elle ne démarrera pas sur
 // les distributions plus anciennes.
 
+// Version épinglée, jamais `continuous` : celle-ci est republiée sans prévenir.
+// Celle du 06/11/2026 refuse notre AppRun (« found 1 ERROR(S) in the AppDir »)
+// et la 1.27.0 est sortie sans AppImage ; la 1.9.1 construit la même image.
 private val appImageToolUrl =
-    "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage"
+    "https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage"
 
 /**
  * Copie libmpv dans l'AppDir.
@@ -615,7 +618,8 @@ val packageAppImage by tasks.registering {
         require(appImageDir.isDirectory) { "app-image introuvable : $appImageDir" }
 
         // Outil téléchargé une fois puis conservé (la CI le remet en cache).
-        val tool = File(appDirRoot.parentFile, "appimagetool")
+        // Version dans le nom : un cache garde sinon l'ancien binaire.
+        val tool = File(appDirRoot.parentFile, "appimagetool-1.9.1")
         if (!tool.exists()) {
             tool.parentFile.mkdirs()
             uri(appImageToolUrl).toURL().openStream().use { input ->
