@@ -699,4 +699,5 @@
     <string name="discovery_opt_serie">Une série à suivre</string>
     <string name="discovery_optd_serie">séries uniquement</string>
     <string name="discovery_quiz_reset">Effacer les réponses</string>
+    <string name="exit_press_back_again">Appuyer encore sur Retour pour quitter</string>
 </resources>

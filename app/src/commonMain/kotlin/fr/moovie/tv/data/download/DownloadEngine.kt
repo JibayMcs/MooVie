@@ -2,6 +2,7 @@ package fr.moovie.tv.data.download
 
 import fr.moovie.tv.core.sources.model.PlayableStream
 import fr.moovie.tv.core.sources.model.StreamFormat
+import kotlinx.coroutines.CancellationException
 import fr.moovie.tv.shared.enCheminUri
 import fr.moovie.tv.shared.maintenantMs
 import fr.moovie.tv.shared.espaceLibre
@@ -126,6 +127,10 @@ class DownloadEngine(
         affiche(download)
         return try {
             if (isHls(stream.url)) hls(download, stream, dir) else direct(download, stream, dir)
+        } catch (e: CancellationException) {
+            // L'annulation n'est pas un échec du téléchargement : elle remonte
+            // à la file, qui décide (pause, ou arrêt de l'application).
+            throw e
         } catch (e: Exception) {
             DownloadOutcome.Failed(e.message ?: e.toString())
         }
@@ -289,6 +294,10 @@ class DownloadEngine(
         onProgress: suspend (recus: Long, total: Long) -> Unit = { _, _ -> },
     ): Long = try {
         fetcher.fetch(url, stream.headers, target, onProgress)
+    } catch (annulation: CancellationException) {
+        // Coroutine annulée : pas de nouvelle résolution, elle n'aurait qu'un
+        // appel réseau inutile à faire pendant l'arrêt.
+        throw annulation
     } catch (first: Exception) {
         val fresh = resolver.resolve(download.key, download.language)
             ?: throw first

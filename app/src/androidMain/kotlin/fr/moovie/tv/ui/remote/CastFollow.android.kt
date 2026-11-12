@@ -1,5 +1,6 @@
 package fr.moovie.tv.ui.remote
 
+import fr.moovie.tv.exit.AppExit
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
@@ -30,6 +31,8 @@ actual fun rememberCastFollow(): () -> Unit {
                 context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) !=
                 PackageManager.PERMISSION_GRANTED
             ) {
+                // Une demande d'autorisation n'est pas un départ. Voir AppExit.
+                AppExit.expectReturn()
                 askNotify.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
             CastSessionService.start(context)

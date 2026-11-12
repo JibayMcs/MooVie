@@ -697,4 +697,5 @@
     <string name="discovery_opt_serie">A series to follow</string>
     <string name="discovery_optd_serie">series only</string>
     <string name="discovery_quiz_reset">Clear the answers</string>
+    <string name="exit_press_back_again">Press Back again to exit</string>
 </resources>

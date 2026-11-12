@@ -1,5 +1,6 @@
 package fr.moovie.tv.data.backup
 
+import fr.moovie.tv.exit.AppExit
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -82,7 +83,11 @@ actual fun requestBackupRootAccess(): Boolean {
     ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
     if (intent.resolveActivity(appContext.packageManager) == null) return false
-    return runCatching { appContext.startActivity(intent); true }.getOrDefault(false)
+    // Un réglage système dont on revient : pas un départ. Voir AppExit.
+    AppExit.expectReturn()
+    return runCatching { appContext.startActivity(intent); true }
+        .onFailure { AppExit.cancelReturn() }
+        .getOrDefault(false)
 }
 
 actual fun writeBackup(targetId: String, fileName: String, content: String): String? = runCatching {

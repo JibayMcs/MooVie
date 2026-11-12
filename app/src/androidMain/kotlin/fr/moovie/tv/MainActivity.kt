@@ -5,11 +5,9 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import fr.moovie.tv.data.download.DownloadRepository
-import android.app.UiModeManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
 import android.view.KeyEvent
@@ -102,6 +100,14 @@ import android.content.pm.ActivityInfo
 import fr.moovie.tv.ui.adaptive.AdaptiveRoot
 import fr.moovie.tv.ui.adaptive.MoovieBottomBar
 import fr.moovie.tv.ui.adaptive.UiFlavor
+import fr.moovie.tv.ui.adaptive.deviceUiFlavor
+import fr.moovie.tv.exit.AppExit
+import fr.moovie.tv.exit.DoubleBackGate
+import fr.moovie.tv.resources.Res
+import fr.moovie.tv.resources.exit_press_back_again
+import org.jetbrains.compose.resources.stringResource
+import android.os.SystemClock
+import android.widget.Toast
 import fr.moovie.tv.ui.adaptive.hidesBottomBar
 import fr.moovie.tv.ui.adaptive.isTopLevel
 import fr.moovie.tv.ui.adaptive.useBottomNav
@@ -124,22 +130,10 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
-     * TV ou téléphone ? La question se pose **à l'exécution** : les deux
-     * tournent sur le même APK, donc aucun `expect`/`actual` ni aucune variante
-     * de build ne peut trancher.
-     *
-     * Deux signaux plutôt qu'un, parce qu'ils ratent chacun des cas : le mode
-     * d'interface décrit ce que l'appareil est *en train* de faire (une TV
-     * branchée en dock, une tablette sur un écran externe), alors que la
-     * fonctionnalité `leanback` décrit ce qu'il *est*. Une box qui répond mal à
-     * l'un répond en général correctement à l'autre.
+     * TV ou téléphone ? Tranché à l'exécution, voir [deviceUiFlavor] : la même
+     * détection sert à la sortie de l'application.
      */
-    private val uiFlavor: UiFlavor by lazy {
-        val onTv = (getSystemService(Context.UI_MODE_SERVICE) as? UiModeManager)
-            ?.currentModeType == Configuration.UI_MODE_TYPE_TELEVISION ||
-            packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
-        if (onTv) UiFlavor.TV else UiFlavor.TOUCH
-    }
+    private val uiFlavor: UiFlavor by lazy { deviceUiFlavor() }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
@@ -440,6 +434,31 @@ class MainActivity : ComponentActivity() {
                         // internes à un écran (panneau des sources, fiche d'épisode)
                         // sont captés avant, par un BackHandler plus profond.
                         BackHandler(enabled = nav.canGoBack) { nav.pop() }
+
+                        // À la racine, sur téléviseur : un premier Retour
+                        // prévient, un second dans les deux secondes ferme
+                        // réellement l'application (voir AppExit). Posé avant
+                        // les écrans, donc consulté après tous leurs retours
+                        // internes, le panneau des sources, la diffusion,
+                        // l'installation se referment d'abord.
+                        //
+                        // Le téléphone n'en a pas : Retour y rend la main au
+                        // lanceur comme partout ailleurs, application en
+                        // mémoire.
+                        if (uiFlavor == UiFlavor.TV) {
+                            val sortie = remember { DoubleBackGate() }
+                            val prevenir = stringResource(Res.string.exit_press_back_again)
+                            // La pile a bougé : un appui d'avant ne compte plus
+                            // pour le Retour qu'on fera en revenant à la racine.
+                            LaunchedEffect(nav.canGoBack) { sortie.reset() }
+                            BackHandler(enabled = !nav.canGoBack) {
+                                if (sortie.press(SystemClock.uptimeMillis())) {
+                                    AppExit.quit(this@MainActivity)
+                                } else {
+                                    Toast.makeText(this@MainActivity, prevenir, Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        }
 
                         // Réseau : c'est lui qui décide de quelle application on
                         // se sert. Voir OfflineScreen.

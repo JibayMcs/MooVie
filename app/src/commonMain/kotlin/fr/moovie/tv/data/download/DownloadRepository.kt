@@ -11,6 +11,19 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 /**
+ * Le magasin que la file lit et écrit.
+ *
+ * Un port, comme [DownloadProgress] : sans lui, éprouver la file exigerait un
+ * DataStore, donc un appareil. [DownloadRepository] en est l'implémentation.
+ */
+interface DownloadStore {
+    val downloads: Flow<List<Download>>
+    suspend fun get(key: String): Download?
+    suspend fun put(download: Download)
+    suspend fun remove(key: String)
+}
+
+/**
  * La liste des téléchargements et leur état.
  *
  * Magasin **global**, non scindé par profil : voir [Download]. Une entrée par
@@ -18,22 +31,22 @@ import kotlinx.serialization.json.Json
  * avancent en parallèle du point de vue de l'écran, et réécrire toute la liste
  * à chaque segment ferait de la barre de progression un point de contention.
  */
-class DownloadRepository {
+class DownloadRepository : DownloadStore {
 
     private val store = preferencesStore("moovie_downloads")
     private val json = Json { ignoreUnknownKeys = true }
 
-    val downloads: Flow<List<Download>> = store.data.map { prefs ->
+    override val downloads: Flow<List<Download>> = store.data.map { prefs ->
         prefs.asMap().mapNotNull { (k, v) ->
             if (!k.name.startsWith(PREFIX)) return@mapNotNull null
             runCatching { json.decodeFromString<Download>(v as String) }.getOrNull()
         }.sortedByDescending { it.createdAt }
     }
 
-    suspend fun get(key: String): Download? = store.data.first()[keyOf(key)]
+    override suspend fun get(key: String): Download? = store.data.first()[keyOf(key)]
         ?.let { runCatching { json.decodeFromString<Download>(it) }.getOrNull() }
 
-    suspend fun put(download: Download) {
+    override suspend fun put(download: Download) {
         store.edit { it[keyOf(download.key)] = json.encodeToString(download) }
     }
 
@@ -44,7 +57,7 @@ class DownloadRepository {
      * annonce un titre illisible, des fichiers sans entrée occupent le disque
      * sans que rien ne les nomme.
      */
-    suspend fun remove(key: String) {
+    override suspend fun remove(key: String) {
         store.edit { it.remove(keyOf(key)) }
         runCatching { systemeFichiers.deleteRecursively(downloadDir(key)) }
     }

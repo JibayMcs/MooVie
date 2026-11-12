@@ -94,6 +94,7 @@ import fr.moovie.tv.data.intro.IntroMedia
 import fr.moovie.tv.data.settings.ScreensaverDelay
 import fr.moovie.tv.data.settings.SettingsRepository
 import fr.moovie.tv.data.watch.WatchProgressRepository
+import fr.moovie.tv.exit.AppExit
 import fr.moovie.tv.data.watch.nextUpEntry
 import fr.moovie.tv.ui.components.MoovieScreensaver
 import fr.moovie.tv.ui.intro.ReportMarkingBanner
@@ -863,6 +864,22 @@ fun PlayerScreen(
             player.removeListener(listener)
             playerView.keepScreenOn = false
         }
+    }
+
+    // Fermeture réelle de l'application (téléviseur) : la position doit être
+    // écrite **avant** que le processus ne meure. L'écriture de sortie
+    // ci-dessous ne suffit pas, elle part en asynchrone pendant que la
+    // composition se défait, et rien n'attendrait qu'elle aboutisse. Voir
+    // AppExit, qui appelle ceci sur le fil principal et attend la fin.
+    DisposableEffect(mediaKey) {
+        val retire = AppExit.beforeExit {
+            val position = runCatching { controller.positionMs() }.getOrDefault(0L)
+            val duration = runCatching { controller.durationMs() }.getOrDefault(0L)
+            if (mediaKey.isNotBlank() && position > 0 && !RemoteCast.isEphemeral(mediaKey)) {
+                progress.save(mediaKey, position, duration)
+            }
+        }
+        onDispose { retire() }
     }
 
     DisposableEffect(Unit) {

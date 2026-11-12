@@ -2,6 +2,11 @@ package fr.moovie.tv.data.download
 
 import fr.moovie.tv.core.sources.model.PlayableStream
 import fr.moovie.tv.core.sources.model.StreamFormat
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import okio.FileSystem
 import okio.Path
@@ -387,5 +392,48 @@ class DownloadEngineTest {
         assertTrue(fetcher.calls.isNotEmpty(), "le téléchargement doit avoir commencé")
         val dir = File(root, safeName(download.key))
         assertTrue(File(dir, PLAYLIST_NAME).exists(), "la playlist locale doit rester")
+    }
+
+    /**
+     * Une annulation en plein transfert n'est pas un échec : le moteur la laisse
+     * remonter à la file (qui décide pause ou arrêt) et ne relance aucune
+     * résolution, qui serait un appel réseau inutile pendant l'arrêt.
+     */
+    @Test
+    fun `une annulation pendant le transfert remonte et ne re-resout pas`() = runTest {
+        val mp4 = PlayableStream(url = "https://cdn.example.com/video.mp4", format = StreamFormat.MP4)
+        val started = CompletableDeferred<Unit>()
+        val fetcher = object : ByteFetcher {
+            override suspend fun fetch(
+                url: String,
+                headers: Map<String, String>,
+                target: Path,
+                onProgress: suspend (recus: Long, total: Long) -> Unit,
+            ): Long {
+                started.complete(Unit)
+                awaitCancellation()
+            }
+        }
+        var resolutions = 0
+        val engine = engine(fetcher, StreamResolver { _, _ -> resolutions++; null })
+
+        var outcome: DownloadOutcome? = null
+        var thrown: CancellationException? = null
+        val job = launch {
+            try {
+                outcome = engine.run(download, mp4)
+            } catch (e: CancellationException) {
+                thrown = e
+                throw e
+            }
+        }
+        runCurrent()
+        assertTrue(started.isCompleted, "le transfert doit avoir commencé")
+        job.cancel()
+        runCurrent()
+
+        assertTrue(thrown != null, "l'annulation doit remonter au lieu d'être avalée")
+        assertEquals(null, outcome, "aucun DownloadOutcome ne doit être rendu sur annulation")
+        assertEquals(0, resolutions, "une annulation ne doit déclencher aucune re-résolution")
     }
 }

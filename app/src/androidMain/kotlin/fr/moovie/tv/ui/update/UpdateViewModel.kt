@@ -11,6 +11,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import fr.moovie.tv.BuildConfig
 import fr.moovie.tv.R
+import fr.moovie.tv.exit.AppExit
 import fr.moovie.tv.data.settings.SettingsRepository
 import kotlinx.coroutines.flow.first
 import fr.moovie.tv.data.settings.UpdateInterval
@@ -150,6 +151,10 @@ class UpdateViewModel(app: Application) : AndroidViewModel(app) {
             setDataAndType(uri, "application/vnd.android.package-archive")
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-        runCatching { context.startActivity(intent) }
+        // L'installeur système est un écran qu'on lance soi-même : le
+        // téléviseur ne doit pas y voir un départ vers une autre application.
+        // Fermer pendant qu'il tourne risquerait de casser l'installation.
+        AppExit.expectReturn()
+        runCatching { context.startActivity(intent) }.onFailure { AppExit.cancelReturn() }
     }
 }

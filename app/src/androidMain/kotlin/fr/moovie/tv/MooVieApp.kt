@@ -7,6 +7,7 @@ import fr.moovie.tv.data.net.Connectivity
 import fr.moovie.tv.data.settings.LocaleManager
 import fr.moovie.tv.data.settings.SettingsRepository
 import fr.moovie.tv.data.store.appContext
+import fr.moovie.tv.exit.AppExit
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -39,6 +40,10 @@ class MooVieApp : Application() {
         // fond — la synchro, la file de téléchargement — a besoin de la réponse
         // même si aucune Activity n'est vivante.
         Connectivity.start()
+        // Le passage en arrière-plan se juge pour l'application entière, pas
+        // pour une Activity : seul le processus voit toutes les siennes. Voir
+        // AppExit, sur téléviseur, quitter ferme réellement.
+        AppExit.install(this)
         val settings = SettingsRepository()
         scope.launch {
             combine(settings.dohEnabled, settings.dohProvider) { enabled, provider ->

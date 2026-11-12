@@ -1,5 +1,6 @@
 package fr.moovie.tv.ui.search
 
+import fr.moovie.tv.exit.AppExit
 import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -92,7 +93,10 @@ fun SearchScreen(
                 // Un moteur peut disparaître entre le contrôle et le clic
                 // (désinstallation, profil restreint) : l'app ne doit pas
                 // tomber pour une recherche vocale.
-                runCatching { recognizer.launch(intent) }
+                // On revient de la dictée avec un résultat : ce n'est pas un
+                // départ, le téléviseur ne doit pas fermer. Voir AppExit.
+                AppExit.expectReturn()
+                runCatching { recognizer.launch(intent) }.onFailure { AppExit.cancelReturn() }
             }
         },
     )

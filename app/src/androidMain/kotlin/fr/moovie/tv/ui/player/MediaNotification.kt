@@ -1,5 +1,6 @@
 package fr.moovie.tv.ui.player
 
+import fr.moovie.tv.exit.AppExit
 import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -85,7 +86,11 @@ fun PlayerMediaNotification(
         if (!actif || Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return@LaunchedEffect
         val accordee = context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) ==
             PackageManager.PERMISSION_GRANTED
-        if (!accordee) demande.launch(Manifest.permission.POST_NOTIFICATIONS)
+        if (!accordee) {
+            // Une demande d'autorisation n'est pas un départ. Voir AppExit.
+            AppExit.expectReturn()
+            demande.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
     }
 
     DisposableEffect(actif, player, session, nomCanal) {
