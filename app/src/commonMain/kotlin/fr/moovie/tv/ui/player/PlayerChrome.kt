@@ -127,14 +127,20 @@ import fr.moovie.tv.ui.theme.ESPACE_LARGE
 @Composable
 fun PlayerControlBar(
     isPlaying: Boolean,
-    positionMs: Long,
-    durationMs: Long,
+    /**
+     * Position, durée et fin du tampon sont passées **en lambdas** : elles
+     * bougent deux fois par seconde, et lues ici, dans le corps de la barre,
+     * elles recomposaient les boutons avec elles. Lues dans [PlayerProgressRow],
+     * seules la ligne de progression et ses deux temps suivent le tick.
+     */
+    positionMs: () -> Long,
+    durationMs: () -> Long,
     scrubbing: Boolean,
     /**
      * Fin du tampon, dessinée en piste secondaire. 0 = inconnue (desktop) : la
      * piste n'apparaît pas.
      */
-    bufferedMs: Long = 0L,
+    bufferedMs: () -> Long = { 0L },
     showEpisodeButtons: Boolean,
     canGoPrevious: Boolean,
     playFocus: FocusRequester,
@@ -354,42 +360,79 @@ fun PlayerControlBar(
             }
             trailing()
         }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            Text(
-                formatPlayerTime(positionMs),
-                style = MaterialTheme.typography.labelLarge,
-                color = if (scrubbing) MOOVIE_ACCENT else MOOVIE_TEXT_MUTED,
-            )
-            PlayerSeekBar(
-                fraction = if (durationMs > 0) {
-                    (positionMs.toFloat() / durationMs).coerceIn(0f, 1f)
-                } else {
-                    0f
-                },
-                bufferedFraction = if (durationMs > 0) {
-                    (bufferedMs.toFloat() / durationMs).coerceIn(0f, 1f)
-                } else {
-                    0f
-                },
-                durationMs = durationMs,
-                segments = segments,
-                scrubbing = scrubbing,
-                onCommitScrub = onCommitScrub,
-                onNudgeScrub = onNudgeScrub,
-                onActivity = onActivity,
-                onSeekToFraction = onSeekToFraction,
-                modifier = Modifier.weight(1f),
-            )
-            Text(
-                formatPlayerTime(durationMs),
-                style = MaterialTheme.typography.labelLarge,
-                color = MOOVIE_TEXT_MUTED,
-            )
-        }
+        PlayerProgressRow(
+            positionMs = positionMs,
+            durationMs = durationMs,
+            bufferedMs = bufferedMs,
+            segments = segments,
+            scrubbing = scrubbing,
+            onCommitScrub = onCommitScrub,
+            onNudgeScrub = onNudgeScrub,
+            onActivity = onActivity,
+            onSeekToFraction = onSeekToFraction,
+        )
+    }
+}
+
+/**
+ * Rangée du bas : temps écoulé, barre de progression, durée.
+ *
+ * C'est le **seul** endroit de la barre où la position est lue, et la raison
+ * d'être de cette fonction : une lecture faite dans [PlayerControlBar] ferait
+ * recomposer toute la barre à chaque tick, alors que ces trois éléments sont
+ * les seuls à changer. Les lambdas ne sont appelées qu'ici, donc c'est cette
+ * portée-ci, et elle seule, que le tick invalide.
+ */
+@Composable
+private fun PlayerProgressRow(
+    positionMs: () -> Long,
+    durationMs: () -> Long,
+    bufferedMs: () -> Long,
+    segments: List<PlayerSegment>,
+    scrubbing: Boolean,
+    onCommitScrub: () -> Unit,
+    onNudgeScrub: (Long) -> Unit,
+    onActivity: () -> Unit,
+    onSeekToFraction: ((Float) -> Unit)?,
+) {
+    val position = positionMs()
+    val duration = durationMs()
+    val buffered = bufferedMs()
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        Text(
+            formatPlayerTime(position),
+            style = MaterialTheme.typography.labelLarge,
+            color = if (scrubbing) MOOVIE_ACCENT else MOOVIE_TEXT_MUTED,
+        )
+        PlayerSeekBar(
+            fraction = if (duration > 0) {
+                (position.toFloat() / duration).coerceIn(0f, 1f)
+            } else {
+                0f
+            },
+            bufferedFraction = if (duration > 0) {
+                (buffered.toFloat() / duration).coerceIn(0f, 1f)
+            } else {
+                0f
+            },
+            durationMs = duration,
+            segments = segments,
+            scrubbing = scrubbing,
+            onCommitScrub = onCommitScrub,
+            onNudgeScrub = onNudgeScrub,
+            onActivity = onActivity,
+            onSeekToFraction = onSeekToFraction,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            formatPlayerTime(duration),
+            style = MaterialTheme.typography.labelLarge,
+            color = MOOVIE_TEXT_MUTED,
+        )
     }
 }
 

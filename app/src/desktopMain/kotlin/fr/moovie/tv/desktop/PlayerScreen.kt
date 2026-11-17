@@ -852,7 +852,7 @@ internal fun DesktopPlayerScreen(
             // Au pointeur, marquer se fait au clic : pas de touche à deviner.
             ReportMarkingBanner(
                 step = reportStep,
-                positionMs = timeMs,
+                positionMs = { timeMs },
                 onMark = {
                     reportViewModel.mark(controller.positionMs())
                     // Voir PlayerScreen (Android) : une intro se relève en deux
@@ -1039,8 +1039,8 @@ internal fun DesktopPlayerScreen(
         ) {
             PlayerControlBar(
                 isPlaying = isPlaying,
-                positionMs = timeMs,
-                durationMs = lengthMs,
+                positionMs = { timeMs },
+                durationMs = { lengthMs },
                 // Pas de mode scrub au pointeur : le clic repositionne directement.
                 scrubbing = false,
                 // Intro / générique repérés sur la barre, comme sur Android TV.

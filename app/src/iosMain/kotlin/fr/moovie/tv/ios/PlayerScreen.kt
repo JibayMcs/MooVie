@@ -479,10 +479,10 @@ internal fun IosPlayerScreen(
         ) {
             PlayerControlBar(
                 isPlaying = isPlaying,
-                positionMs = scrubTargetMs ?: timeMs,
-                durationMs = lengthMs,
+                positionMs = { scrubTargetMs ?: timeMs },
+                durationMs = { lengthMs },
                 scrubbing = scrubTargetMs != null,
-                bufferedMs = controller.bufferedMs(),
+                bufferedMs = { controller.bufferedMs() },
                 showEpisodeButtons = nextSeason > 0 && nextEpisode > 0,
                 canGoPrevious = nextEpisode > 1,
                 playFocus = remember { FocusRequester() },

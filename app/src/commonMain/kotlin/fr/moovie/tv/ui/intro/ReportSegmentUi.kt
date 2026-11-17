@@ -125,8 +125,12 @@ fun ReportMarkingBanner(
      * Sans elle, avancer dans la vidéo pour viser une intro qu'on connaît déjà
      * reviendrait à chercher à l'aveugle : c'est ce chiffre qui sera envoyé, il
      * doit être lisible au moment où on valide.
+     *
+     * En lambda, lue ici seulement : la position bouge deux fois par seconde, et
+     * l'appelant ne doit pas se recomposer pour une bannière le plus souvent
+     * absente.
      */
-    positionMs: Long = 0,
+    positionMs: () -> Long = { 0L },
     modifier: Modifier = Modifier,
     /**
      * Marquage au clic, pour le desktop. Null sur TV, où le geste attendu est
@@ -157,7 +161,7 @@ fun ReportMarkingBanner(
                 style = MaterialTheme.typography.titleMedium,
                 textAlign = TextAlign.Center,
             )
-            Text(clock(positionMs), style = MaterialTheme.typography.headlineMedium)
+            Text(clock(positionMs()), style = MaterialTheme.typography.headlineMedium)
             // Le début déjà relevé reste sous les yeux pendant qu'on vise la
             // fin : c'est la seule façon de voir le segment qu'on est en train
             // de délimiter, plutôt que deux chiffres sans rapport apparent.
