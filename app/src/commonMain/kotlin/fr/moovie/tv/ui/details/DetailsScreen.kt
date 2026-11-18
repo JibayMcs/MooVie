@@ -2,7 +2,7 @@ package fr.moovie.tv.ui.details
 
 import fr.moovie.tv.shared.formaterDecimal
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -196,6 +196,7 @@ import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.delay
+import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
@@ -216,6 +217,12 @@ import fr.moovie.tv.ui.theme.margePage
  * remettre le défilement à zéro sans attendre se ferait écraser juste après.
  */
 private const val SCROLL_SETTLE_MS = 120L
+
+/** Temps laissé à chaque ligne d'un synopsis d'épisode avant de passer à la suivante. */
+private const val SYNOPSIS_LINE_READ_MS = 2_600L
+
+/** Arrêt sur la fin du synopsis avant de revenir au début. */
+private const val SYNOPSIS_END_PAUSE_MS = 3_000L
 
 /**
  * Temps passé sur une fiche avant que sa bande-annonce ne démarre d'elle-même.
@@ -3141,30 +3148,33 @@ private fun ScrollingSynopsis(
     val scrolling = active ?: LocalMoovieCardActive.current
     val scroll = rememberScrollState()
     val density = LocalDensity.current
-    val height = remember(style, lines, density) {
-        val lineSp = if (style.lineHeight.isSp) style.lineHeight.value else style.fontSize.value * 1.4f
-        with(density) { (lineSp * lines).sp.toDp() }
-    }
+    val lineSp = if (style.lineHeight.isSp) style.lineHeight.value else style.fontSize.value * 1.4f
+    val height = remember(lineSp, lines, density) { with(density) { (lineSp * lines).sp.toDp() } }
+    val lineStepPx = remember(lineSp, density) { with(density) { lineSp.sp.toPx() }.roundToInt().coerceAtLeast(1) }
 
-    LaunchedEffect(scrolling, text) {
+    // Défilement **ligne par ligne**, pas en continu. L'ancien déroulé glissait
+    // à vitesse constante (14 ms par pixel, soit plus de deux lignes par
+    // seconde sur la box) : un texte qui bouge sans arrêt ne se lit pas, on le
+    // regarde passer. Ici chaque ligne s'arrête le temps d'être lue, puis la
+    // suivante monte d'un cran.
+    LaunchedEffect(scrolling, text, lineStepPx) {
         if (!scrolling) {
             scroll.scrollTo(0)
             return@LaunchedEffect
         }
-        delay(900)
         while (true) {
-            if (scroll.maxValue > 0) {
-                // Vitesse constante : la durée suit la hauteur à parcourir.
+            // Les premières lignes sont déjà visibles : leur laisser leur temps.
+            delay(SYNOPSIS_LINE_READ_MS * lines)
+            if (scroll.maxValue <= 0) continue
+            while (scroll.value < scroll.maxValue) {
                 scroll.animateScrollTo(
-                    scroll.maxValue,
-                    tween(durationMillis = (scroll.maxValue * 14).coerceIn(1200, 9000), easing = LinearEasing),
+                    (scroll.value + lineStepPx).coerceAtMost(scroll.maxValue),
+                    tween(durationMillis = 450, easing = FastOutSlowInEasing),
                 )
-                delay(1500)
-                scroll.animateScrollTo(0, tween(400))
-                delay(1500)
-            } else {
-                delay(600)
+                delay(SYNOPSIS_LINE_READ_MS)
             }
+            delay(SYNOPSIS_END_PAUSE_MS)
+            scroll.animateScrollTo(0, tween(500))
         }
     }
 
