@@ -1172,8 +1172,8 @@ private fun RemotePlayerLayout(
         Box(modifier = Modifier.align(Alignment.BottomCenter)) {
             PlayerControlBar(
                 isPlaying = now.playing,
-                positionMs = positionMs,
-                durationMs = now.durationMs,
+                positionMs = { positionMs },
+                durationMs = { now.durationMs },
                 // Jamais : le mode scrub est un geste au D-pad, et ici la barre
                 // se clique directement.
                 scrubbing = false,

@@ -170,8 +170,8 @@ fun CastPlayerScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
 
             PlayerControlBar(
                 isPlaying = status.playing,
-                positionMs = affichee,
-                durationMs = status.durationMs,
+                positionMs = { affichee },
+                durationMs = { status.durationMs },
                 scrubbing = false,
                 showEpisodeButtons = false,
                 canGoPrevious = false,

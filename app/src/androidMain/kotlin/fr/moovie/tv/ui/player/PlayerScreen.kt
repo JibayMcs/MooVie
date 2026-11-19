@@ -39,6 +39,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -110,6 +112,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 
 /**
  * Touches qui, en sortant de l'écran de veille, relancent aussi la lecture.
@@ -441,6 +444,14 @@ fun PlayerScreen(
 
     // ── État observé par l'UI ────────────────────────────────────────────────
     var isPlaying by remember { mutableStateOf(false) }
+    //
+    // **Position, durée et tampon ne se lisent jamais dans le corps de cet
+    // écran** : la boucle de suivi les réécrit deux fois par seconde, et une
+    // lecture ici recomposait tout le lecteur à chaque tick, ce qui se paie sur
+    // une box ou une TV d'entrée de gamme. Les enfants reçoivent des lambdas
+    // `() -> Long` qu'ils n'appellent que dans leur propre portée ; ici, on ne
+    // les lit que dans des coroutines et des gestionnaires d'événements, qui ne
+    // s'abonnent à rien.
     var positionMs by remember { mutableLongStateOf(0L) }
     var durationMs by remember { mutableLongStateOf(0L) }
     // Fin du tampon Media3, pour la piste de chargement de la barre.
@@ -469,6 +480,9 @@ fun PlayerScreen(
     var dialog by remember { mutableStateOf<PlayerDialogKind?>(null) }
     // Position en cours de réglage à la télécommande (null = pas en mode réglage).
     var scrubTarget by remember { mutableStateOf<Long?>(null) }
+    // Dérivé : la barre n'a besoin que de savoir *si* on vise, pas où — sans
+    // quoi chaque cran de visée recomposerait toute la barre de contrôles.
+    val scrubbing by remember { derivedStateOf { scrubTarget != null } }
     // Fin de lecture atteinte : déclenche l'enchaînement (remis à false = annulé).
     var ended by remember(streamUrl) { mutableStateOf(false) }
     // Secondes restantes du décompte (null = pas de décompte en cours).
@@ -1269,8 +1283,12 @@ fun PlayerScreen(
         // se déclare jouant avant d'avoir décodé quoi que ce soit, et le noir
         // reparaissait alors une fraction de seconde.
         var premiereImage by remember(streamUrl) { mutableStateOf(false) }
-        LaunchedEffect(streamUrl, positionMs) {
-            if (positionMs > 0) premiereImage = true
+        // `snapshotFlow` plutôt qu'une clé `positionMs` : la clé relançait l'effet,
+        // et recomposait tout l'écran, à chaque tick de position. Ici, la lecture
+        // se fait dans l'effet et il se termine à la première position non nulle.
+        LaunchedEffect(streamUrl) {
+            snapshotFlow { positionMs > 0 }.first { it }
+            premiereImage = true
         }
         androidx.compose.animation.AnimatedVisibility(
             visible = !premiereImage,
@@ -1309,7 +1327,7 @@ fun PlayerScreen(
             modifier = Modifier.align(Alignment.TopCenter),
         ) {
             PlayerTitleOverlay(title = title, subtitle = subtitle, clock = clock)
-            ReportMarkingBanner(reportStep, positionMs)
+            ReportMarkingBanner(reportStep, positionMs = { positionMs })
         }
 
         // Bouton « Passer l'intro / le générique », au-dessus de la barre pour
@@ -1362,10 +1380,12 @@ fun PlayerScreen(
         ) {
             PlayerControlBar(
                 isPlaying = isPlaying,
-                positionMs = scrubTarget ?: positionMs,
-                durationMs = durationMs,
-                scrubbing = scrubTarget != null,
-                bufferedMs = bufferedMs,
+                // Lambdas : la position n'est lue que par la rangée de
+                // progression de la barre, voir PlayerProgressRow.
+                positionMs = { scrubTarget ?: positionMs },
+                durationMs = { durationMs },
+                scrubbing = scrubbing,
+                bufferedMs = { bufferedMs },
                 // Intro / générique repérés sur la barre, à la SponsorBlock.
                 // Les mêmes bornes que les boutons « Passer » : rien de plus à
                 // aller chercher, on cesse juste de les réserver aux boutons.
